@@ -97,17 +97,18 @@ export const envValidationSchema = Joi.object({
    *
    * ⚠️ **Cada uno que falte apaga solo su plan**, no el cobro entero: la
    * pantalla de precios pregunta cuáles se pueden contratar y no ofrece los
-   * demás. Así se puede desplegar PRO —que ya está en producción— antes que los
-   * de empresa, sin dejar un botón que responde 503 al pulsarlo.
+   * demás. Así se puede desplegar un peldaño antes que el siguiente sin dejar un
+   * botón que responde 503 al pulsarlo.
    */
+  STRIPE_PRICE_PRO: Joi.string().optional().allow(''),
   STRIPE_PRICE_TEAM: Joi.string().optional().allow(''),
   STRIPE_PRICE_BUSINESS: Joi.string().optional().allow(''),
   /**
    * El secreto con el que se firma el webhook, `whsec_...`.
    *
    * Sin él, el manejador rechaza **todo**: es la única autenticación que tiene
-   * ese endpoint, y aceptarlo sin firma sería regalar el plan PRO a cualquiera
-   * con un `curl`.
+   * ese endpoint, y aceptarlo sin firma sería regalar cualquier plan de pago a
+   * quien supiera hacer un `curl`.
    */
   STRIPE_WEBHOOK_SECRET: Joi.string().optional().allow(''),
 

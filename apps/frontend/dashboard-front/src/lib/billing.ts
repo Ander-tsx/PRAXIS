@@ -9,13 +9,14 @@
  * `/projects/:id/assistant/quota` allá) y no hay una tercera zona que lo
  * necesite todavía como para subirlo a `commons`.
  *
- * ⚠️ Los límites de cada plan **no** se copian aquí. `ASSISTANT_LIMITS` vive en
- * `@praxis/contracts`, del lado del backend; el número del plan que no es el
- * tuyo no se conoce sin pedirlo, así que esta pantalla no lo enseña — describe
- * el otro plan en palabras, nunca con una cifra inventada o copiada a mano.
+ * ⚠️ Los límites de cada plan **no** se copian aquí: vienen en `limite`, que lo
+ * manda el servidor resuelto contra el plan de la organización. El número del
+ * plan que no es el tuyo no se conoce sin pedirlo, así que esta pantalla no lo
+ * enseña — describe el otro plan en palabras, nunca con una cifra copiada.
  */
 export interface AssistantQuota {
-  plan: 'FREE' | 'PRO';
+  /* 🕳️ `plan: 'FREE' | 'PRO'` era del catálogo por persona, retirado el
+     2026-09-03. Ver `docs/AUDITORIA-PLANES.md`. */
   usados: number;
   limite: number;
   /** `YYYY-MM`. El periodo que se está consumiendo. */
@@ -30,7 +31,7 @@ export interface AssistantQuota {
  * Se pregunta en vez de deducirse del plan porque son cosas distintas:
  * `disponible` depende de que el **backend** tenga claves de Stripe —cosa que
  * el navegador no puede saber— y `gestionable`, de que esta persona ya sea
- * cliente. Alguien con plan PRO puesto a mano desde administración no tiene
+ * cliente. Alguien cuya organización nunca ha pasado por Stripe no tiene
  * suscripción que gestionar.
  */
 export interface EstadoDeFacturacion {

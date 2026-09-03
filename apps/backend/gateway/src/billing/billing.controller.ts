@@ -25,6 +25,7 @@ import {
   QuotaKind,
   type SubscriptionStatus,
   type Tope,
+  cabe,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
@@ -205,6 +206,34 @@ export class BillingController {
         `El plan ${spec.nombre} empieza en ${spec.asientosMinimos} asientos.`,
       );
     }
+    /**
+     * 🔴 **Y el techo del plan, que no lo comprobaba nadie.**
+     *
+     * `quotas.asientos` decía 15 en Equipo y 100 en Negocio, la tabla de precios
+     * lo pintaba, y `body.seats` no se comparaba contra él en ninguna parte: se
+     * podía abrir un checkout de Equipo con 500 asientos, Stripe cobraba 500 y
+     * la organización metía a 500 personas —porque lo único que mira al invitar
+     * es `Subscription.seats`, no el catálogo—.
+     *
+     * No era un agujero de dinero (se cobra por asiento), pero sí una promesa
+     * rota en las dos direcciones: la tabla afirmaba un techo inexistente, y el
+     * escalón a Negocio dejaba de tener sentido si Equipo escalaba igual.
+     *
+     * Es el patrón de la trampa 23 de CLAUDE.md, la tercera vez: **una cuota que
+     * no se comprueba no da ningún error.** El número llevaba puesto desde el
+     * principio y no lo invocaba nadie.
+     *
+     * `cabe()` y no un `<` a mano: `ENTERPRISE` tiene `SIN_TOPE`, y `500 <
+     * null` es `false` — o sea que el plan sin límite se comportaría como el más
+     * restrictivo de todos. Aquí se pregunta si caben `seats`, así que se compara
+     * `seats - 1` («¿cabe uno más sobre los que ya hay?»).
+     */
+    if (!cabe((body.seats ?? 0) - 1, spec.quotas.asientos)) {
+      throw new BadRequestException(
+        `El plan ${spec.nombre} llega hasta ${spec.quotas.asientos} asientos. ` +
+          'Para más, el siguiente plan.',
+      );
+    }
 
     const organizationId = await this.organizacionPropia(body.organizationId, userId);
 
@@ -219,7 +248,25 @@ export class BillingController {
       seats: body.seats,
       email,
       stripeCustomerId: suscripcion?.stripeCustomerId ?? null,
-      volverA: `/dashboard/organizations/${organizationId}`,
+      /**
+       * 🔴 **`/main/billing`, y antes era `/dashboard/organizations/<id>`.**
+       *
+       * Dos cosas mal en un solo literal, y las dos de cara a quien acaba de
+       * pagar:
+       *
+       * 1. **`/dashboard` no existe.** El `basePath` de dashboard-front es
+       *    `/main` desde el renombrado de la etapa del rediseño; ese barrido fue
+       *    del frontend y estos literales viven aquí. Pagabas y aterrizabas en
+       *    el 404 del shell — con el cobro hecho, porque lo concede el webhook y
+       *    no la vuelta (I3).
+       * 2. **Y `/main/organizations/<id>` tampoco existe.** Bajo
+       *    `(private)/organizations/` solo quedan `new` e `invitation`.
+       *
+       * `/main/billing` es el destino correcto y no una aproximación: es donde
+       * está montado `PaymentReturn`, que es lo único que sabe leer el `?pago=ok`
+       * que Stripe añade a esta URL.
+       */
+      volverA: '/main/billing',
     });
   }
 

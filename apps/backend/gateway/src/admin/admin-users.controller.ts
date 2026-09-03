@@ -26,7 +26,6 @@ import {
   FindAdminUsersQueryDto,
   GLOBAL_ROLES,
   type GlobalRole,
-  SetAssistantPlanBodyDto,
   SetUserRoleBodyDto,
   SetUserStatusBodyDto,
   UserStatus,
@@ -138,12 +137,10 @@ export class AdminUsersController {
 
     const identificadores = items.map((u) => u.id);
 
-    /* Roles y planes salen de dos servicios distintos y no dependen entre sí:
-       en paralelo, y **una** llamada por servicio para toda la página. */
-    const [roles, planes] = await Promise.all([
-      this.rolesDe(identificadores),
-      this.planesDe(identificadores),
-    ]);
+    /* Una llamada para toda la página, no una por fila. Los planes se pedían
+       aquí también, a assistant-service; esa columna se fue con el sistema de
+       planes por persona (ver el hueco de más abajo). */
+    const roles = await this.rolesDe(identificadores);
 
     return {
       items: items.map((usuario) => ({
@@ -153,8 +150,6 @@ export class AdminUsersController {
            evita que cada pantalla tenga que saberlo. */
         globalRole: (roles[usuario.id] ?? [])[0] ?? GLOBAL_ROLES.USER,
         globalRoles: roles[usuario.id] ?? [],
-        /* Sin fila de suscripción es FREE, igual que en el propio servicio. */
-        assistantPlan: planes[usuario.id] ?? 'FREE',
       })),
       total,
     };
@@ -289,79 +284,22 @@ export class AdminUsersController {
     return { userId: id, globalRole: body.role };
   }
 
-  /**
-   * Cambia el plan del asistente de una cuenta.
+  /*
+   * 🕳️ Aquí estaban `PUT /admin/users/:id/plan` y su ayudante `planesDe`.
    *
-   * Es lo que hace las veces de pasarela de pago: PRO se concede a mano desde el
-   * panel. La cuota vive en assistant-service, así que aquí solo se comprueba
-   * quién lo pide y se reenvía.
+   * Concedían el `PRO` **por persona** del asistente, con la coletilla de que
+   * hacían «las veces de pasarela de pago». Desde la etapa Enterprise el tope de
+   * IA lo pone el plan de la **organización**, así que esta ruta ya no cambiaba
+   * ningún límite: solo escribía una etiqueta que la pantalla enseñaba y que
+   * podía contradecir al tope de verdad.
    *
-   * ⚠️ **Exige `exigirMando` como el resto**, y eso incluye no poder cambiarse el
-   * plan a uno mismo. Es deliberado: sin esa regla, cualquier administrador se
-   * asciende solo a 250 mensajes y el límite deja de significar nada. Que te lo
-   * conceda otro deja además el rastro de quién lo hizo.
+   * ⚠️ **`AdminActionType.ASSISTANT_PLAN_CHANGED` no se retira.** El registro de
+   * actividad es un histórico: las filas que ya existen siguen contando quién
+   * concedió qué, y borrar el verbo las dejaría sin nombre. Lo que no se escribe
+   * es una fila nueva.
+   *
+   * Retirado el 2026-09-03. Ver `docs/AUDITORIA-PLANES.md` (P5-P7).
    */
-  @Put(':id/plan')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Fija el plan del asistente de una cuenta (solo administradores)' })
-  @ApiResponse({ status: 200, description: 'Plan fijado' })
-  @ApiResponse({ status: 403, description: 'Sobre tu propia cuenta o sobre un igual' })
-  async setAssistantPlan(
-    @Request() req: Express.Request,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: SetAssistantPlanBodyDto,
-  ) {
-    const actorId = req.user!.userId;
-
-    await this.exigirMando(actorId, id);
-
-    const resultado = await firstValueFrom(
-      this.assistantClient.send<{ userId: string; plan: string }>(
-        { cmd: 'assistant_plan_set' },
-        { userId: id, plan: body.plan },
-      ),
-    );
-
-    await this.actividad.record({
-      actorId,
-      actorLabel: await this.etiquetaDe(actorId),
-      /* Verbo propio: sin pasarela de pago, esta línea es la única prueba de
-         quién concedió PRO a quién. Reutilizar otra acción dejaría el
-         registro mintiendo. */
-      action: AdminActionType.ASSISTANT_PLAN_CHANGED,
-      targetType: AdminTargetType.USER,
-      targetId: id,
-      targetLabel: await this.etiquetaDe(id),
-      reason: body.reason,
-      metadata: { assistantPlan: body.plan },
-    });
-
-    return resultado;
-  }
-
-  /**
-   * Los planes del listado, en una sola llamada.
-   *
-   * Degrada igual que `rolesDe` y por lo mismo: que assistant-service esté caído
-   * no puede tumbar la pantalla de administración de cuentas. Sin respuesta,
-   * todos salen como FREE, que es el valor por defecto de verdad.
-   */
-  private async planesDe(userIds: string[]): Promise<Record<string, string>> {
-    if (userIds.length === 0) return {};
-    try {
-      return await firstValueFrom(
-        this.assistantClient.send<Record<string, string>>(
-          { cmd: 'assistant_plans_of' },
-          { userIds },
-        ),
-      );
-    } catch (error) {
-      this.logger.warn(
-        `No se pudieron resolver los planes del listado: ${(error as Error).message}`,
-      );
-      return {};
-    }
-  }
 
   /* ─── Invariantes ──────────────────────────────────────────────────── */
 

@@ -14,7 +14,6 @@ import {
 } from '@praxis/commons';
 import { useMemo, useState } from 'react';
 import { HardDeleteDialog } from './HardDeleteDialog';
-import { UserPlanDialog } from './UserPlanDialog';
 import { UserRoleDialog } from './UserRoleDialog';
 import { UserStatusDialog } from './UserStatusDialog';
 
@@ -58,7 +57,6 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
   const [estadoDe, setEstadoDe] = useState<AdminUser | null>(null);
   const [rolDe, setRolDe] = useState<AdminUser | null>(null);
   const [borrarA, setBorrarA] = useState<AdminUser | null>(null);
-  const [planDe, setPlanDe] = useState<AdminUser | null>(null);
 
   const miNivel = globalRoleLevelOf(misRoles);
 
@@ -126,19 +124,12 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
           </Badge>
         ),
       },
-      {
-        key: 'plan',
-        header: 'Plan IA',
-        track: { fr: 0.8 },
-        /* El plan no es un rol y no se pinta como tal: PRO destaca porque es lo
-           que se concede a mano; FREE es el valor por defecto de casi todas las
-           cuentas y no necesita color. */
-        cell: (usuario) => (
-          <Badge variant={usuario.assistantPlan === 'PRO' ? 'success' : 'default'}>
-            {usuario.assistantPlan}
-          </Badge>
-        ),
-      },
+      /* 🕳️ Aquí iba la columna «Plan IA», del catálogo de planes **por
+         persona** que se retiró el 2026-09-03. El plan de alguien es hoy el de
+         su organización, que no es un dato de la cuenta: la misma persona puede
+         estar en una gratuita y en una de pago a la vez, así que una sola
+         columna aquí no podría decir la verdad. Vive en el portal de cada
+         organización. */
       {
         key: 'alta',
         header: 'Se registró',
@@ -185,12 +176,6 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
                   onSelect: () => setRolDe(usuario),
                 },
                 {
-                  id: 'plan',
-                  label: 'Cambiar plan de IA',
-                  disabledReason: bloqueo,
-                  onSelect: () => setPlanDe(usuario),
-                },
-                {
                   id: 'borrar',
                   label: 'Borrar cuenta',
                   tone: 'danger',
@@ -216,8 +201,6 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
       />
 
       {estadoDe && <UserStatusDialog usuario={estadoDe} open onClose={() => setEstadoDe(null)} />}
-
-      {planDe && <UserPlanDialog usuario={planDe} open onClose={() => setPlanDe(null)} />}
 
       {borrarA && (
         <HardDeleteDialog

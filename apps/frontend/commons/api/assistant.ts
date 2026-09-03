@@ -19,7 +19,13 @@
 import type { ProjectTemplate } from './domain';
 
 export interface AssistantQuota {
-  plan: 'FREE' | 'PRO';
+  /*
+   * 🕳️ Aquí iba `plan: 'FREE' | 'PRO'`, del catálogo viejo por persona.
+   *
+   * Se retiró con él: el plan que importa es el de la organización y la pantalla
+   * lo tiene por su cuenta. Tenerlo aquí además era la vía por la que este
+   * objeto podía contradecirse — «PRO» junto a un límite de 13.
+   */
   usados: number;
   limite: number;
   /** `YYYY-MM`. El periodo que se está consumiendo. */

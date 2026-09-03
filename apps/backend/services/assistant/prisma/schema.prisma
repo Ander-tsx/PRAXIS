@@ -9,51 +9,29 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Cuánto da cada plan al mes vive en `@praxis/contracts` (`ASSISTANT_LIMITS`),
-/// no aquí: el backend y el contador del chat tienen que leer el mismo número.
-enum AssistantPlan {
-  FREE
-  PRO
+/*
+ * 🕳️ Aquí estaban el enum `AssistantPlan` y el modelo `AssistantSubscription`.
+ *
+ * 🔴 **Eran un sistema de suscripción por persona, paralelo al catálogo de
+ * verdad.** Un plan FREE/PRO que se concedía a mano desde el panel de
+ * administración —con su propio cliente de Stripe y su propio webhook—, escrito
+ * antes de que existieran las organizaciones.
+ *
+ * Desde la etapa Enterprise el tope de IA lo decide el plan de la
+ * **organización** y llega en el payload de cada llamada, así que esta tabla ya
+ * no gobernaba nada; lo único que seguía haciendo era devolver un campo `plan`
+ * que podía contradecir al tope (`{ plan: 'PRO', limite: 13 }` para quien
+ * tuviera el PRO viejo dentro de una organización gratuita). Sus tres columnas
+ * de Stripe llevaban muertas desde que el cliente pasó a ser de la organización.
+ *
+ * Retirado el 2026-09-03. Ver `docs/AUDITORIA-PLANES.md` (P5-P7).
+ *
+ * ⚠️ **`AssistantUsage`, de aquí abajo, NO se toca.** Es el contador, no el
+ * plan: sigue siendo la única prueba de cuánto se ha usado esto y su clave
+ * `(persona, organización, mes)` es lo que hace que la cuota sea personal
+ * dentro de cada organización.
+ */
 
-  @@schema("assistant")
-}
-
-/// El plan de cada usuario.
-///
-/// **Sin fila = FREE.** No se crea nada al registrarse: una tabla que hay que
-/// rellenar para todo el mundo antes de que sirva de algo es una migración
-/// pendiente disfrazada, y el valor por defecto ya es el correcto.
-///
-/// No hay clave foránea hacia el usuario: vive en credentials-service, en otro
-/// esquema y bajo otro dueño. Es la misma regla que siguen `task_events` y
-/// `notifications`.
-///
-/// El pago va por **Stripe Checkout alojado**: la página de la tarjeta la sirve
-/// Stripe, no nosotros, así que ningún dato de tarjeta pasa jamás por este
-/// sistema. Aquí solo quedan los dos identificadores que Stripe devuelve, que
-/// no son secretos y no sirven para cobrar nada.
-///
-/// ⚠️ **Quien decide el plan es el webhook, nunca la vuelta del navegador.** La
-/// URL de éxito la puede escribir cualquiera en la barra de direcciones; si
-/// pasar a PRO dependiera de visitarla, PRO sería gratis.
-model AssistantSubscription {
-  userId    String        @id
-  plan      AssistantPlan @default(FREE)
-
-  /// El cliente en Stripe. Se reutiliza entre compras para que el historial de
-  /// facturación de una persona no se parta en varios clientes sueltos.
-  stripeCustomerId String? @unique
-
-  /// La suscripción activa. Es la clave por la que se busca al cancelar: el
-  /// webhook de baja **no trae nuestro `userId`**, solo lo que es de Stripe.
-  stripeSubscriptionId String? @unique
-
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-
-  @@schema("assistant")
-  @@map("assistant_subscriptions")
-}
 
 /// Consumo de un usuario en una organización y un mes. `period` es 'YYYY-MM'.
 ///

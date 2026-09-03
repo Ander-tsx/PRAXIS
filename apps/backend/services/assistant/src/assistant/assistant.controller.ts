@@ -1,7 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
-import type { AssistantPlanName } from '@praxis/contracts';
 import { AssistantService } from './assistant.service';
 import { AttachmentsService } from './attachments.service';
 
@@ -75,57 +74,19 @@ export class AssistantController {
     }
   }
 
-  /**
-   * Cambia el plan de una persona. Lo usa el panel de administración.
+  /*
+   * 🕳️ Aquí había cinco comandos del sistema de planes viejo:
+   * `assistant_plan_set`, `assistant_plans_of`, `assistant_billing_of`,
+   * `assistant_billing_link` y `assistant_billing_by_subscription`.
    *
-   * ⚠️ Exigir el rol global de la plataforma es cosa del gateway, como en el
-   * resto de comandos: aquí no hay sesión que mirar. Vale lo que dice la nota de
-   * arriba sobre quien pueda hablar por TCP con el 3006.
-   */
-  @MessagePattern({ cmd: 'assistant_plan_set' })
-  cambiarPlan(@Payload() dto: { userId: string; plan: AssistantPlanName }) {
-    return this.assistant.cambiarPlan(dto.userId, dto.plan);
-  }
-
-  /** Los planes de varias personas, para pintar la lista de administración. */
-  @MessagePattern({ cmd: 'assistant_plans_of' })
-  planesDe(@Payload() dto: { userIds: string[] }) {
-    return this.assistant.planesDe(dto.userIds);
-  }
-
-  /* ─── Facturación ─────────────────────────────────────────────────── */
-
-  /** El cliente de Stripe de una persona, si ya tiene uno. */
-  @MessagePattern({ cmd: 'assistant_billing_of' })
-  facturacionDe(@Payload() dto: { userId: string }) {
-    return this.assistant.facturacionDe(dto.userId);
-  }
-
-  /**
-   * Aplica lo que dijo Stripe.
+   * Los tres de facturación **no los llamaba nadie desde antes**: el cliente de
+   * Stripe pasó a ser de la organización y billing-service tiene los suyos. Los
+   * dos de plan servían a una pantalla de administración que concedía un `PRO`
+   * por persona que ya no cambiaba ningún tope — ver el hueco de
+   * `QuotaService` y `docs/AUDITORIA-PLANES.md`.
    *
-   * ⚠️ Lo llama **solo** el manejador del webhook del gateway, después de haber
-   * verificado la firma. Vale aquí lo de siempre: este servicio no distingue
-   * quién le habla por TCP, y por eso el 3006 no sale de la red privada.
+   * Retirados el 2026-09-03 con la tabla que había debajo.
    */
-  @MessagePattern({ cmd: 'assistant_billing_link' })
-  vincularSuscripcion(
-    @Payload()
-    dto: {
-      userId: string;
-      plan: AssistantPlanName;
-      stripeCustomerId: string | null;
-      stripeSubscriptionId: string | null;
-    },
-  ) {
-    return this.assistant.vincularSuscripcion(dto);
-  }
-
-  /** De quién es una suscripción. Lo pide la baja, que no trae `userId`. */
-  @MessagePattern({ cmd: 'assistant_billing_by_subscription' })
-  porSuscripcion(@Payload() dto: { stripeSubscriptionId: string }) {
-    return this.assistant.porSuscripcion(dto.stripeSubscriptionId);
-  }
 
   /**
    * Los comandos de conversaciones.

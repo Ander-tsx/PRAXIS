@@ -20,6 +20,7 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | [docs/frontend/PLAN-ORGANIZACIONES.md](docs/frontend/PLAN-ORGANIZACIONES.md) | Etapa cerrada — la organización pasó a contener los proyectos, a cobrarse por asiento y a tener papeles. Se conserva por sus once decisiones y su registro; la continúa el plan de abajo |
 | [docs/PLAN-ORGANIZACION-ACTIVA.md](docs/PLAN-ORGANIZACION-ACTIVA.md) | **Etapa en curso** — desaparece «Todas las organizaciones»: siempre hay una activa y todo cuelga de ella. El plan vale solo dentro de la organización que lo paga, y hay tope de tres por persona. ⚠️ Es el primer plan que **toca el backend**, por excepción acordada. Siete decisiones, cinco invariantes y el orden |
 | [docs/AUDITORIA-ORGANIZACION-CHAT-MOVIL.md](docs/AUDITORIA-ORGANIZACION-CHAT-MOVIL.md) | **Auditoría abierta** (2026-09-03) — los 30 hallazgos que dejaron la organización activa, la barra lateral segmentada y el rediseño monocromo. Proyectos que caen en la organización equivocada, insignias apuntando a entradas de menú que ya no existen, el chat privado negando el paso que el gateway concede, y el móvil sin una sola puerta a los chats. Con severidad, reproducción, orden propuesto y casilla por hallazgo — **se marca al cerrar cada uno** |
+| [docs/AUDITORIA-PLANES.md](docs/AUDITORIA-PLANES.md) | **Los planes de pago.** Qué promete el catálogo y qué aplica el servidor, cuota por cuota. Incluye el plan **Pro** (entre Gratis y Equipo: menos inventario, más IA) y la retirada del `PRO` viejo por persona. ⚠️ Contesta por escrito si la cuota de PRAX es personal o del equipo — **personal, una entera por miembro** |
 | [kyloo-design/SKILL.md](kyloo-design/SKILL.md) | **Antes de tocar cualquier pantalla.** Cómo se componen: filas en vez de tarjetas, tipografía como jerarquía, activo por tono. ⚠️ **Su paleta, sus radios y sus fuentes están revertidos** (`3fa9b87`) y no se reaplican sin pedirlo — lee el aviso de su cabecera. §13 es la de dentro de la aplicación |
 | [STRUCTURE.md](STRUCTURE.md) | Dónde va cada archivo nuevo |
 | [docs/backend/permissions.md](docs/backend/permissions.md) | Modelo de permisos de dos capas |
@@ -188,7 +189,9 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
       se valida la pertenencia antes de usarlo
       (`QuotaService.organizacionElegida`, que da 403 `NOT_IN_ORG`).
     - **La cuota de IA se cuenta por `(persona, organización, mes)`**, no por
-      persona. `AssistantUsage` lleva `organizationId` —cadena vacía, nunca
+      persona. Es decir: **cada miembro tiene su cuota entera** dentro de la
+      organización, y gastar la tuya no le quita ninguna a nadie. El techo del
+      equipo es ese número por los asientos. `AssistantUsage` lleva `organizationId` —cadena vacía, nunca
       `NULL`, porque dos `NULL` no chocan en un índice único—. Contar en un cubo
       y negar contra el tope de otro deja a alguien bloqueado nada más entrar en
       su espacio personal.
@@ -376,6 +379,19 @@ medio de un `create`, no con un mensaje claro.
 la misma trampa que `prisma:generate`, y vale igual para un `pnpm --filter …
 build`: sale un `MODULE_NOT_FOUND` que **no se arregla volviendo a compilar**.
 Hay que parar, borrar `dist/` del servicio, reconstruir y arrancar en frío.
+
+🍎 ⚠️ **Y lo mismo le pasa a `.next/` de una zona del frontend.** Es la misma
+trampa un piso más arriba, y no estaba escrita. Un `next build` con la zona
+levantada —o **renombrar y borrar archivos de `commons/` con las ocho zonas
+corriendo**— puede dejar al servidor de desarrollo vivo y **sin su directorio de
+compilación**. El síntoma es engañoso: los estáticos siguen sirviéndose (200 en
+`/assistant/icon.png`) y **todo lo demás da 404**, incluido `/api/gateway/*`, que
+ni pasa por el guard. Las demás zonas responden 307 con la misma petición, así
+que parece un fallo de esa zona en concreto.
+
+Comprobación en un segundo: `ls apps/frontend/<zona>/.next`. Si no existe, es
+esto. Se arregla **parando la zona, borrando `.next` y arrancando en frío** —
+volver a compilar no basta, igual que con `dist/`.
 
 ⚠️ **Levantar los 9 servicios y las 8 zonas a la vez agota los descriptores de
 archivo** (`ENFILE` en el vigilante de chokidar) y el último en arrancar muere.

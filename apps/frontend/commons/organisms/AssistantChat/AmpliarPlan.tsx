@@ -54,9 +54,24 @@ export function AmpliarPlan({ cuota }: { cuota: AssistantQuota }) {
 
   const reinicio = formatoReinicio(cuota.reinicia);
 
-  /* Mientras no se sabe si hay pago, se enseña el aviso de siempre: parpadear
-     entre dos mensajes distintos es peor que tardar un segundo en ofrecer. */
-  if (cuota.plan !== 'FREE' || disponible !== true) {
+  /**
+   * Mientras no se sabe si hay pago, se enseña el aviso de siempre: parpadear
+   * entre dos mensajes distintos es peor que tardar un segundo en ofrecer.
+   *
+   * ⚠️ **Ya no se mira `cuota.plan`**, que era del catálogo de planes por
+   * persona y se retiró (`docs/AUDITORIA-PLANES.md`). Aquella condición decía
+   * «solo ofrece ampliar a quien esté en FREE», y con el plan viviendo en la
+   * organización esa pregunta no se puede contestar desde aquí: el chat se monta
+   * en cinco zonas y quien está en una organización gratuita puede estar en otra
+   * de pago.
+   *
+   * Lo que queda es la pregunta que sí importa y que ya se hacía: **¿hay pasarela
+   * configurada?** Quien esté en el plan más alto verá un enlace a la tabla de
+   * precios, que es una salida honesta —ahí se ve que ya lo tiene— y no una
+   * promesa falsa. Ofrecerlo de más cuesta un clic; esconderlo a quien sí puede
+   * pagar cuesta la venta, que es la asimetría de siempre.
+   */
+  if (disponible !== true) {
     return <AvisoDeCuota limite={cuota.limite} reinicio={reinicio} />;
   }
 

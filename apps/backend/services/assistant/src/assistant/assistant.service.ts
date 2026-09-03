@@ -8,7 +8,6 @@ import {
   ASSISTANT_TEXT_MAX_CHARS,
   ASSISTANT_TEXT_MIME,
   type AssistantChatResult,
-  type AssistantPlanName,
   type AssistantProposal,
   type AssistantQuota,
   MAX_HISTORIAL,
@@ -264,40 +263,8 @@ export class AssistantService {
     return this.quota.estado(userId, limiteMensual, organizationId);
   }
 
-  /**
-   * Asignar plan a mano. Lo llama administración.
-   *
-   * Sigue existiendo con la pasarela puesta: es la vía para regalar PRO, para
-   * arreglar un cobro que salió mal y para quitarlo sin pasar por Stripe.
-   */
-  cambiarPlan(userId: string, plan: AssistantPlanName) {
-    return this.quota.cambiarPlan(userId, plan);
-  }
-
-  /** Los planes de una tanda de usuarios, para la lista de administración. */
-  planesDe(userIds: string[]) {
-    return this.quota.planesDe(userIds);
-  }
-
-  /** Lo que hace falta para abrir un pago: el cliente de Stripe, si ya lo hay. */
-  facturacionDe(userId: string) {
-    return this.quota.facturacionDe(userId);
-  }
-
-  /** Aplica lo que dijo el webhook de Stripe. Idempotente a propósito. */
-  vincularSuscripcion(datos: {
-    userId: string;
-    plan: AssistantPlanName;
-    stripeCustomerId: string | null;
-    stripeSubscriptionId: string | null;
-  }) {
-    return this.quota.vincularSuscripcion(datos);
-  }
-
-  /** De quién es una suscripción de Stripe. Para las bajas, que no traen userId. */
-  porSuscripcion(stripeSubscriptionId: string) {
-    return this.quota.porSuscripcion(stripeSubscriptionId);
-  }
+  /* 🕳️ Los cinco delegadores del sistema de planes viejo. Ver el hueco de
+     `assistant.controller.ts` y `docs/AUDITORIA-PLANES.md`. */
 
   /**
    * Un turno de conversación.

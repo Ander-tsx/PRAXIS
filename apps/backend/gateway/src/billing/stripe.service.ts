@@ -140,7 +140,10 @@ export class StripeService {
        quien trabaja en su organización personal. */
     const cantidad = Math.max(data.seats ?? spec.asientosMinimos, 1);
 
-    const vuelta = data.volverA ?? '/dashboard/billing';
+    /* ⚠️ `/main`, no `/dashboard`: el `basePath` de dashboard-front se renombró
+       y estos literales del backend se quedaron atrás. Ver `volverA` en
+       `billing.controller.ts` para el fallo entero. */
+    const vuelta = data.volverA ?? '/main/billing';
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -206,7 +209,7 @@ export class StripeService {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
-      return_url: `${this.appUrl}${volverA ?? '/dashboard/billing'}`,
+      return_url: `${this.appUrl}${volverA ?? '/main/billing'}`,
     });
 
     return { url: session.url };

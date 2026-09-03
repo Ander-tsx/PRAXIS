@@ -307,7 +307,12 @@ export class OrganizationsController {
       ),
     );
 
-    const enlace = `${this.appUrl}/dashboard/organizations/invitation?token=${invitacion.token}`;
+    /* 🔴 **`/main`, no `/dashboard`.** La pantalla existe —
+       `(private)/organizations/invitation/page.tsx`— pero bajo el `basePath`
+       nuevo. Con el prefijo viejo, lo primero que veía alguien que todavía no es
+       cliente era el 404 del shell, y era lo único que podía hacer con el
+       correo. */
+    const enlace = `${this.appUrl}/main/organizations/invitation?token=${invitacion.token}`;
 
     /* 🔴 **El correo se manda, y el enlace se sigue devolviendo.** Las dos
        cosas: un correo se pierde en no deseados el día de la demostración, y el

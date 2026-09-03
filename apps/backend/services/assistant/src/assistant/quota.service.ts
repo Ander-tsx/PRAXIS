@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ASSISTANT_LIMITS, type AssistantPlanName, type AssistantQuota } from '@praxis/contracts';
+import { ASSISTANT_LIMITE_POR_DEFECTO, type AssistantQuota } from '@praxis/contracts';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -46,12 +46,6 @@ export class QuotaService {
     return new Date(fecha.getFullYear(), fecha.getMonth() + 1, 1).toISOString();
   }
 
-  /** Sin fila de suscripción = FREE. Ver la nota del modelo en el esquema. */
-  private async plan(userId: string): Promise<AssistantPlanName> {
-    const fila = await this.prisma.assistantSubscription.findUnique({ where: { userId } });
-    return (fila?.plan ?? 'FREE') as AssistantPlanName;
-  }
-
   /**
    * Cuántos mensajes tiene al mes.
    *
@@ -60,13 +54,15 @@ export class QuotaService {
    * venir de la organización de su empresa, que este servicio no conoce: el
    * gateway resuelve el número y lo pasa en el payload.
    *
-   * `ASSISTANT_LIMITS` se queda como valor por defecto y **no es decorativo**:
+   * `ASSISTANT_LIMITE_POR_DEFECTO` se queda como valor por defecto y **no es decorativo**:
    * es lo que responde si alguien llama a este servicio por TCP sin pasar por el
    * gateway, y sin él ese camino daría `undefined`, que comparado con `>=` es
    * siempre falso — o sea, mensajes infinitos y ni un error.
    */
-  private limite(plan: AssistantPlanName, desdeFuera?: number | null): number {
-    return typeof desdeFuera === 'number' && desdeFuera >= 0 ? desdeFuera : ASSISTANT_LIMITS[plan];
+  private limite(desdeFuera?: number | null): number {
+    return typeof desdeFuera === 'number' && desdeFuera >= 0
+      ? desdeFuera
+      : ASSISTANT_LIMITE_POR_DEFECTO;
   }
 
   /**
@@ -83,134 +79,41 @@ export class QuotaService {
   ): Promise<AssistantQuota> {
     const period = this.periodo();
     const org = organizationId ?? '';
-    const [plan, uso] = await Promise.all([
-      this.plan(userId),
-      this.prisma.assistantUsage.findUnique({
-        where: { userId_organizationId_period: { userId, organizationId: org, period } },
-      }),
-    ]);
+    const uso = await this.prisma.assistantUsage.findUnique({
+      where: { userId_organizationId_period: { userId, organizationId: org, period } },
+    });
 
     return {
-      plan,
       usados: uso?.used ?? 0,
-      limite: this.limite(plan, limiteMensual),
+      limite: this.limite(limiteMensual),
       periodo: period,
       reinicia: this.reinicio(),
     };
   }
 
-  /**
-   * Cambia el plan de una persona.
+  /*
+   * 🕳️ Aquí vivían `cambiarPlan`, `planesDe`, `facturacionDe`,
+   * `vincularSuscripcion` y `porSuscripcion`, con el modelo
+   * `AssistantSubscription` debajo.
    *
-   * ⚠️ **Aquí no se comprueba quién llama, y no es un descuido.** Este servicio
-   * habla por TCP dentro de la red privada y no sabe de sesiones ni de roles;
-   * quien exige ser administrador de la plataforma es el gateway, en la ruta que
-   * llega hasta aquí. Repetir la comprobación exigiría traerse el rol global a
-   * este esquema, que pertenece a credentials-service.
+   * 🔴 **Era un sistema de suscripción entero, por persona y paralelo al de
+   * verdad**, anterior a las organizaciones: un plan `FREE`/`PRO` que se
+   * concedía a mano desde el panel de administración, con su propio cliente de
+   * Stripe y su propio webhook.
    *
-   * `upsert` porque **no hay fila hasta que hace falta**: la mayoría de las
-   * cuentas nunca han tenido suscripción, y pasar a PRO es justo el momento en
-   * que empieza a existir. Volver a FREE deja la fila puesta con ese valor, que
-   * es equivalente a no tenerla.
+   * Desde la etapa Enterprise, el tope de IA lo decide el plan de la
+   * **organización** y llega en el payload (`limiteMensual`), así que de todo
+   * esto solo quedaba en pie el campo `plan` de la respuesta — que además podía
+   * contradecir al tope: `{ plan: 'PRO', limite: 13 }` para quien tuviera el PRO
+   * viejo dentro de una organización gratuita.
+   *
+   * Las tres de facturación estaban **muertas desde antes**: sus
+   * `MessagePattern` seguían publicados y no las llamaba nadie —billing-service
+   * tiene las suyas (`porSuscripcionDeStripe`)— porque el cliente de Stripe pasó
+   * a ser de la organización, no de la persona.
+   *
+   * Retirado el 2026-09-03. Ver `docs/AUDITORIA-PLANES.md` (P5-P7).
    */
-  async cambiarPlan(
-    userId: string,
-    plan: AssistantPlanName,
-  ): Promise<{ userId: string; plan: AssistantPlanName }> {
-    const fila = await this.prisma.assistantSubscription.upsert({
-      where: { userId },
-      create: { userId, plan },
-      update: { plan },
-    });
-
-    return { userId: fila.userId, plan: fila.plan as AssistantPlanName };
-  }
-
-  /**
-   * El plan de varias personas de una vez.
-   *
-   * Lo pide el panel de administración para su lista: una consulta por fila
-   * serían veinte llamadas TCP para pintar una tabla. Devuelve un diccionario y
-   * **omite a quien no tiene fila**, que es quien está en FREE — el consumidor
-   * ya sabe cuál es el valor por defecto.
-   */
-  async planesDe(userIds: string[]): Promise<Record<string, AssistantPlanName>> {
-    if (userIds.length === 0) return {};
-
-    const filas = await this.prisma.assistantSubscription.findMany({
-      where: { userId: { in: userIds } },
-      select: { userId: true, plan: true },
-    });
-
-    return Object.fromEntries(filas.map((fila) => [fila.userId, fila.plan as AssistantPlanName]));
-  }
-
-  /* ─── Facturación ─────────────────────────────────────────────────── */
-
-  /**
-   * Lo que Stripe necesita saber de una persona antes de cobrarle.
-   *
-   * Devuelve el cliente que ya tuviera, si lo tiene. Reutilizarlo es lo que
-   * mantiene su historial de facturación en un solo sitio: crear un cliente
-   * nuevo en cada compra funciona, pero parte los recibos de la misma persona
-   * entre varios clientes que Stripe no relaciona entre sí.
-   */
-  async facturacionDe(userId: string): Promise<{ stripeCustomerId: string | null }> {
-    const fila = await this.prisma.assistantSubscription.findUnique({
-      where: { userId },
-      select: { stripeCustomerId: true },
-    });
-    return { stripeCustomerId: fila?.stripeCustomerId ?? null };
-  }
-
-  /**
-   * Aplica lo que dijo Stripe: el plan y sus identificadores.
-   *
-   * ⚠️ **Es idempotente, y tiene que serlo.** Stripe reintenta un webhook hasta
-   * que le contestas 2xx, así que el mismo pago puede llegar aquí varias veces;
-   * también manda eventos solapados —`checkout.session.completed` y
-   * `customer.subscription.updated`— que describen el mismo hecho. Un `upsert`
-   * que escribe el estado final, en vez de un incremento o una transición,
-   * hace que repetirlo no cambie nada.
-   */
-  async vincularSuscripcion(datos: {
-    userId: string;
-    plan: AssistantPlanName;
-    stripeCustomerId: string | null;
-    stripeSubscriptionId: string | null;
-  }): Promise<{ userId: string; plan: AssistantPlanName }> {
-    const { userId, plan, stripeCustomerId, stripeSubscriptionId } = datos;
-
-    const fila = await this.prisma.assistantSubscription.upsert({
-      where: { userId },
-      create: { userId, plan, stripeCustomerId, stripeSubscriptionId },
-      /* Los ids solo se escriben si vienen. Una baja llega sin ellos y no debe
-         borrar el cliente: esa persona puede volver a suscribirse y su
-         historial tiene que seguir colgando del mismo cliente de Stripe. */
-      update: {
-        plan,
-        ...(stripeCustomerId && { stripeCustomerId }),
-        ...(stripeSubscriptionId && { stripeSubscriptionId }),
-      },
-    });
-
-    return { userId: fila.userId, plan: fila.plan as AssistantPlanName };
-  }
-
-  /**
-   * De quién es una suscripción de Stripe.
-   *
-   * Hace falta para las bajas: el webhook de `customer.subscription.deleted`
-   * **no trae nuestro `userId`** —Stripe no lo conoce fuera del momento del
-   * checkout—, solo sus propios identificadores.
-   */
-  async porSuscripcion(stripeSubscriptionId: string): Promise<{ userId: string } | null> {
-    const fila = await this.prisma.assistantSubscription.findUnique({
-      where: { stripeSubscriptionId },
-      select: { userId: true },
-    });
-    return fila ?? null;
-  }
 
   /**
    * Consume un mensaje.
@@ -240,12 +143,9 @@ export class QuotaService {
       update: { used: { increment: 1 } },
     });
 
-    const plan = await this.plan(userId);
-
     return {
-      plan,
       usados: uso.used,
-      limite: this.limite(plan, limiteMensual),
+      limite: this.limite(limiteMensual),
       periodo: period,
       reinicia: this.reinicio(),
     };

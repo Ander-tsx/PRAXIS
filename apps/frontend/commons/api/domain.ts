@@ -71,31 +71,23 @@ export type UserStatusName = (typeof USER_STATUSES)[number];
  * estado de la cuenta y el rol global, y por eso es otra ruta detrás del rol de
  * administrador en vez de un campo más de `GET /users`.
  */
-/**
- * Planes del asistente y lo que da cada uno al mes.
+/*
+ * 🕳️ Aquí estaban `ASSISTANT_PLAN_LIMITS`, `AssistantPlanName` y
+ * `ASSISTANT_PLANS`: el espejo del catálogo de planes del asistente **por
+ * persona** (FREE 13 / PRO 250).
  *
- * Espejo de `ASSISTANT_LIMITS` en `@praxis/contracts`. El gratuito da para
- * probarlo, no para trabajar: cada pregunta cuesta una llamada real a Gemini.
+ * 🔴 Era un segundo sistema de planes, anterior a las organizaciones, que se
+ * concedía a mano desde el panel de administración. El tope de IA lo decide el
+ * plan de la **organización** desde la etapa Enterprise, así que aquello no
+ * cambiaba ningún límite — solo la etiqueta que esta pantalla enseñaba, que
+ * podía contradecir al tope real.
  *
- * ⚠️ **Es una copia, y hay que moverla a la vez que la otra.** El frontend no
- * puede importar de `@praxis/contracts` —es un paquete del backend—, así que
- * este espejo es la convención de la casa, la misma que `NOTIFICATION_TYPES`.
- * Nada comprueba que coincidan: cuando el gratuito pasó de 5 a 13, este archivo
- * se quedó en 5 y la pantalla de administración enseñaba un límite que el
- * servidor no aplicaba.
+ * Retirado el 2026-09-03 con su tabla y su ruta. Ver `docs/AUDITORIA-PLANES.md`.
  *
- * Lo que ve quien usa el chat **no sale de aquí**: sale de `cuota.limite`, que
- * lo manda el servidor. Esta copia la usan el panel de administración y la
- * página de planes para describir los planes.
+ * ⚠️ El nombre «Pro» **sí existe** hoy: es el peldaño del catálogo de
+ * organización entre Gratis y Equipo, y vive donde el resto (`GET
+ * /me/billing/planes`). No tiene nada que ver con esto.
  */
-export const ASSISTANT_PLAN_LIMITS = {
-  FREE: 13,
-  PRO: 250,
-} as const;
-
-export type AssistantPlanName = keyof typeof ASSISTANT_PLAN_LIMITS;
-
-export const ASSISTANT_PLANS = Object.keys(ASSISTANT_PLAN_LIMITS) as AssistantPlanName[];
 
 export interface AdminUser {
   id: string;
@@ -112,12 +104,10 @@ export interface AdminUser {
   globalRole: GlobalRoleName;
   /** Los roles tal cual. Vacío en la mayoría de las cuentas reales. */
   globalRoles: string[];
-  /**
-   * Plan del asistente. `FREE` cuando la cuenta no tiene suscripción.
-   *
-   * No hay pasarela de pago: PRO se concede desde este mismo panel.
+  /*
+   * 🕳️ Aquí estaba `assistantPlan`. El gateway ya no lo devuelve: ver el hueco
+   * de arriba.
    */
-  assistantPlan: AssistantPlanName;
 }
 
 /** Acciones que registra el panel. Espejo de `AdminActionType`. */

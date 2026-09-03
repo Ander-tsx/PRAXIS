@@ -1,13 +1,7 @@
 'use server';
 
 import type { AdminUserState } from '@/lib/action-state';
-import {
-  ASSISTANT_PLANS,
-  type AdminUser,
-  ApiError,
-  GLOBAL_ROLES,
-  USER_STATUSES,
-} from '@praxis/commons';
+import { type AdminUser, ApiError, GLOBAL_ROLES, USER_STATUSES } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';
 
@@ -118,54 +112,15 @@ export async function setUserRoleAction(
   return { error: null, done: resultado.globalRole };
 }
 
-/**
- * Cambia el plan del asistente de una cuenta.
+/*
+ * 🕳️ Aquí estaba `setAssistantPlanAction`, que llamaba a
+ * `PUT /admin/users/:id/plan`.
  *
- * Es lo que sustituye a una pasarela de pago mientras no exista: PRO se concede
- * a mano desde el panel. Sigue el mismo camino que el cambio de rol —`PUT`,
- * motivo opcional, confirmación contra el `data` de la respuesta— porque es la
- * misma clase de decisión administrativa.
+ * Concedía el `PRO` **por persona** del asistente. Esa ruta ya no existe: el
+ * tope de IA lo pone el plan de la **organización** desde la etapa Enterprise, y
+ * lo que esto concedía no cambiaba ningún límite. Ver
+ * `docs/AUDITORIA-PLANES.md` (P5-P7).
  */
-export async function setAssistantPlanAction(
-  _prev: AdminUserState,
-  formData: FormData,
-): Promise<AdminUserState> {
-  const session = await getSession();
-  if (!session) {
-    return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', done: null };
-  }
-
-  const userId = String(formData.get('userId') ?? '');
-  const plan = String(formData.get('plan') ?? '');
-  const reason = String(formData.get('reason') ?? '').trim();
-
-  if (!ASSISTANT_PLANS.includes(plan as never)) {
-    return { error: 'Ese plan no existe.', done: null };
-  }
-
-  let resultado: { userId: string; plan: string };
-  try {
-    resultado = await createServerApiClient().put<{ userId: string; plan: string }>(
-      `/admin/users/${userId}/plan`,
-      { plan, ...(reason ? { reason } : {}) },
-    );
-  } catch (error) {
-    return { error: describeError(error), done: null };
-  }
-
-  /* Contra el `data`, no contra el status: es la regla del repo, y aquí evita
-     decir que alguien tiene PRO cuando la escritura no llegó a ocurrir. */
-  if (resultado?.plan !== plan) {
-    return {
-      error: 'El servidor respondió correctamente pero no guardó el plan.',
-      done: null,
-    };
-  }
-
-  revalidatePath('/');
-  revalidatePath('/actividad');
-  return { error: null, done: resultado.plan };
-}
 
 /**
  * Borra una cuenta de verdad.

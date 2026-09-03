@@ -77,13 +77,34 @@ export function quedan(actual: number, tope: Tope): Tope {
  * asiento. Dos escaleras obligaban a cada pantalla, cada guard y cada correo a
  * saber en cuál estabas, para siempre.
  *
- * `PLUS` y `PRO` se borraron en vez de sobrevivir como heredados porque lo
- * desplegado eran cuentas de prueba y no había a quién conservarle el escalón.
+ * ⚠️ **`PRO` ha vuelto, y no es aquel.** Aquel era un plan de la escalera
+ * individual; éste es un peldaño de **la** escalera, entre `FREE` y `TEAM`, y
+ * vale dentro de la organización que lo paga como todos los demás. Que se llame
+ * igual es porque es el nombre que la gente entiende, no porque quede nada de
+ * lo anterior: `PLUS` sigue borrado y el `PRO` **por usuario** del asistente se
+ * retiró el 2026-09-03 (ver `docs/AUDITORIA-PLANES.md`).
  */
 export enum PlanTier {
   /** Lo que tienes sin pagar nada. No se contrata: se es. */
   FREE = 'FREE',
-  /** El primer peldaño de pago. **Un mes gratis**, y al segundo se cobra. */
+  /**
+   * Una persona (o dos) que usan PRAX **en serio**.
+   *
+   * 🔴 **No es «Equipo pero más pequeño»: es el escalón que compra intensidad,
+   * no tamaño.** Da menos inventario que Equipo —5 proyectos frente a 25— y
+   * **más** IA por persona: 150 frente a 100. Es deliberado y es todo el
+   * sentido del plan; ver el catálogo de abajo.
+   *
+   * ⚠️ **No confundir con el `PRO` viejo.** Hubo un `PRO` por persona en
+   * `assistant.assistant_subscriptions`, anterior a las organizaciones, que se
+   * concedía a mano desde el panel de administración y solo gobernaba la cuota
+   * del asistente. Se retiró entero: ese sistema tenía su propio contador, su
+   * propia escalera y podía contradecir al plan de la organización. Éste es un
+   * plan del catálogo como los demás, se contrata por Stripe y vale dentro de
+   * la organización que lo paga.
+   */
+  PRO = 'PRO',
+  /** El primer peldaño de pago para un equipo. **Un mes gratis**. */
   TEAM = 'TEAM',
   /** Una empresa en marcha, con gente entrando y saliendo. */
   BUSINESS = 'BUSINESS',
@@ -220,10 +241,10 @@ export interface PlanSpec {
  * cuentas están en las letras pequeñas»*. Están puestos para que **nadie los
  * toque en un uso normal** y para que existan de verdad cuando alguien empuja.
  *
- * ⚠️ **`FREE.iaMensualPorPersona` es 13 porque ya lo era.** Sale de
- * `ASSISTANT_LIMITS`, que lleva meses en producción; bajarlo aquí sería
- * recortarle la cuota a gente que ya la tiene, en un commit que habla de otra
- * cosa.
+ * ⚠️ **`FREE.iaMensualPorPersona` es 13 porque ya lo era.** Es el mismo número
+ * que sigue vivo como `ASSISTANT_LIMITE_POR_DEFECTO` —la red de abajo del
+ * servicio, para quien lo llame por TCP sin pasar por el gateway—; bajarlo aquí
+ * sería recortarle la cuota a gente que ya la tiene.
  *
  * ⚠️ **`FREE` da 3 asientos y 3 proyectos** porque el plan gratuito tiene que
  * seguir sirviendo para lo que sirve hoy: una persona y un par de amigos con sus
@@ -246,6 +267,49 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     contratacion: PlanContratacion.NINGUNA,
     diasDePrueba: 0,
     envPrecio: null,
+    asientosMinimos: 1,
+  },
+  [PlanTier.PRO]: {
+    tier: PlanTier.PRO,
+    nombre: 'Pro',
+    resumen: 'Cinco proyectos y PRAX sin contar. Para quien lo usa todos los días.',
+    paraQuien: 'Una persona, o dos, que trabajan con PRAX a diario',
+    quotas: {
+      /* Cinco y no uno, aunque sea el plan «individual»: con uno solo, meter a
+         la primera persona obliga a saltar a Equipo, y ahí el salto es de 5 a 25
+         proyectos por un problema que era de una silla. */
+      asientos: 5,
+      proyectos: 5,
+      /**
+       * 🔴 **150, por encima de los 100 de Equipo, y no es una errata.**
+       *
+       * Es la decisión entera de este plan: Pro no compra tamaño, compra
+       * intensidad. Lo que de verdad cuesta dinero es cada mensaje —una llamada
+       * a Gemini contra una clave nuestra—, así que es lo que tiene sentido
+       * vender a quien usa el asistente todos los días sobre cinco proyectos.
+       *
+       * ⚠️ **Y no se escapa por arriba**, que es lo que hay que comprobar
+       * cuando un tope sube al bajar de plan: el techo total es este número por
+       * los asientos, así que Pro llega a 750 y Equipo a 1500. La escalera
+       * sigue subiendo donde importa, que es en el coste.
+       */
+      iaMensualPorPersona: 150,
+      automatizacionesPorProyecto: 10,
+      almacenamientoOrgMb: 2_048,
+      /* El punto medio real: 90 días no llegan a un trimestre cerrado y 365 es
+         lo que se paga en Equipo. */
+      historialAnalisisDias: 180,
+    },
+    contratacion: PlanContratacion.AUTOSERVICIO,
+    /**
+     * ⚠️ **Sin mes de prueba, y el de Equipo se queda donde está.**
+     *
+     * Los treinta días son «una decisión del dueño del producto, no una
+     * promoción que se pueda mover» (ver `diasDePrueba`), y están puestos en el
+     * primer peldaño **de equipo**. Regalarlos también aquí sería moverlos.
+     */
+    diasDePrueba: 0,
+    envPrecio: 'STRIPE_PRICE_PRO',
     asientosMinimos: 1,
   },
   [PlanTier.TEAM]: {
@@ -307,12 +371,15 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
 /** El catálogo como lista, en el orden de la tabla de precios. */
 export const PLAN_LIST: PlanSpec[] = [
   PLANS[PlanTier.FREE],
+  /* ⚠️ **El orden de la escalera es este, no el del enum.** La tabla de precios
+     se pinta de aquí, así que un plan nuevo va en su peldaño y no al final. */
+  PLANS[PlanTier.PRO],
   PLANS[PlanTier.TEAM],
   PLANS[PlanTier.BUSINESS],
   PLANS[PlanTier.ENTERPRISE],
 ];
 
-/** Los cuatro identificadores, para validar un `@IsIn`. */
+/** Los cinco identificadores, para validar un `@IsIn`. */
 export const PLAN_TIERS = Object.values(PlanTier);
 
 /**
@@ -439,9 +506,14 @@ export interface QuotaExceededDetails {
  */
 export const PLAN_RANK: Record<PlanTier, number> = {
   [PlanTier.FREE]: 0,
-  [PlanTier.TEAM]: 1,
-  [PlanTier.BUSINESS]: 2,
-  [PlanTier.ENTERPRISE]: 3,
+  /* ⚠️ **Pro va por debajo de Equipo aunque dé más IA por persona.** El orden es
+     declarado justo para esto: Pro da 150 mensajes y Equipo 100, así que
+     cualquier deducción automática lo pondría por encima. Lo que ordena la
+     escalera es el precio y el tamaño, no un eje suelto. */
+  [PlanTier.PRO]: 1,
+  [PlanTier.TEAM]: 2,
+  [PlanTier.BUSINESS]: 3,
+  [PlanTier.ENTERPRISE]: 4,
 };
 
 /**

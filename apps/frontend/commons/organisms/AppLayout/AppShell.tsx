@@ -324,6 +324,38 @@ function ArmazonInterno({
   }, [activeTab]);
 
   /**
+   * Si el contenido del cajón móvil está montado.
+   *
+   * ## 🔴 Por qué no basta con `mobileMenuOpen`
+   *
+   * El cajón se **monta siempre** para poder animar su salida con `transform`
+   * (ver su bloque). Pero dentro van `SidebarChatList` y `SidebarInboxList`, que
+   * no son marcado: son **suscripciones que piden datos al montarse**. Dejarlos
+   * montados sin más significaría que en un escritorio —donde el cajón está
+   * `md:hidden` y nunca se abre— esas listas se montan igual, duplicando cada
+   * petición del directorio de chats y cada suscripción al flujo.
+   *
+   * `display:none` no salva de eso: esconde, no desmonta.
+   *
+   * Así que el contenedor vive siempre y el **contenido** solo mientras hace
+   * falta: desde que se abre hasta que termina de salir. El retardo es el de la
+   * transición; sin él, al cerrar se vería un panel vacío deslizándose.
+   */
+  const [cajonMontado, setCajonMontado] = useState(false);
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      setCajonMontado(true);
+      return;
+    }
+    /* Espejo de `duration-200` de la transición. Si allí cambia, aquí también:
+       de más deja las listas pidiendo datos de balde, y de menos vacía el panel
+       antes de que termine de irse. */
+    const t = window.setTimeout(() => setCajonMontado(false), 200);
+    return () => window.clearTimeout(t);
+  }, [mobileMenuOpen]);
+
+  /**
    * Abrir la bandeja desde fuera del armazón.
    *
    * ⚠️ **La bandeja ya no tiene URL.** Cuando era una pantalla, la tarjeta de un
@@ -585,101 +617,141 @@ function ArmazonInterno({
          */}
         <LiveNotices />
 
-        {/* ── Cajón lateral (móvil) ────────────────────────────── */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-50 md:hidden">
-            <button
-              type="button"
-              aria-label="Cerrar menú"
-              onClick={() => setMobileMenuOpen(false)}
-              className="fixed inset-0 backdrop-blur-sm"
-              style={{ background: alpha(colors.overlay, 80) }}
-            />
+        {/**
+         * ── Cajón lateral (móvil) ──────────────────────────────
+         *
+         * ## Ocupa la pantalla entera, y entra animado
+         *
+         * Era una columna de `w-64` sobre un velo, que aparecía y desaparecía de
+         * golpe: `{mobileMenuOpen && …}` monta y desmonta, así que no hay estado
+         * de salida al que animar. En un teléfono, 256 px para un menú que
+         * ahora lleva **el árbol de proyectos, el directorio de chats y la
+         * bandeja** era la mitad de lo que hace falta para leer una fila.
+         *
+         * ⚠️ **Se monta siempre y se traslada con `transform`**, no se
+         * condiciona. Es lo que permite animar la salida —el nodo sigue ahí
+         * mientras se va— y además lo que hace que la transición corra en el
+         * compositor: animar `left` o `width` obliga a recalcular la
+         * maquetación en cada fotograma y en un teléfono se ve.
+         *
+         * `inert` cuando está cerrado: fuera del flujo del foco y del lector de
+         * pantalla. Sin él, un menú «invisible» a la derecha del viewport sigue
+         * siendo tabulable, que es el fallo clásico de este patrón.
+         *
+         * `motion-reduce:transition-none` porque un panel de pantalla completa
+         * deslizándose es justo lo que molesta a quien pide menos movimiento; el
+         * cambio instantáneo ahí es correcto, no un defecto.
+         */}
+        <div
+          className={`fixed inset-0 z-50 md:hidden ${mobileMenuOpen ? '' : 'pointer-events-none'}`}
+          inert={!mobileMenuOpen}
+        >
+          <button
+            type="button"
+            aria-label="Cerrar menú"
+            onClick={() => setMobileMenuOpen(false)}
+            className={`fixed inset-0 backdrop-blur-sm transition-opacity duration-200 motion-reduce:transition-none ${
+              mobileMenuOpen ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{ background: alpha(colors.overlay, 80) }}
+            tabIndex={mobileMenuOpen ? 0 : -1}
+          />
 
-            <div className="fixed inset-y-0 left-0 z-10 flex w-64 flex-col justify-between border-r border-border bg-[#202020] p-4">
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex items-center gap-2 mt-1">
-                  <Wordmark />
-                  <ByKyloo />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setMobileMenuOpen(false)}
-                  aria-label="Cerrar menú"
-                  className="rounded-md p-1 text-white transition-colors hover:text-text-primary"
-                >
-                  <svg
-                    className="h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={1.75}
-                    aria-hidden="true"
+          <div
+            className={`fixed inset-0 z-10 flex w-full flex-col justify-between bg-[#202020] p-4 transition-transform duration-200 ease-out motion-reduce:transition-none ${
+              mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}
+          >
+            {/* Solo mientras hace falta: ver `cajonMontado`. Sin esto, las listas
+                de dentro se montarían y pedirían datos también en escritorio. */}
+            {cajonMontado && (
+              <>
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex items-center gap-2 mt-1">
+                    <Wordmark />
+                    <ByKyloo />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMobileMenuOpen(false)}
+                    aria-label="Cerrar menú"
+                    className="rounded-md p-1 text-white transition-colors hover:text-text-primary"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+                    <svg
+                      className="h-6 w-6"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
 
-              <div className="flex flex-col gap-4 flex-1 overflow-y-auto scrollbar-none mb-6">
-                <OrgSwitcher
-                  name={user.name}
-                  plegada={false}
-                  organizaciones={organizaciones}
-                  activaId={organizacionActivaId ?? null}
-                  zonePath={zonePath}
-                />
+                <div className="flex flex-col gap-4 flex-1 overflow-y-auto scrollbar-none mb-6">
+                  <OrgSwitcher
+                    name={user.name}
+                    plegada={false}
+                    organizaciones={organizaciones}
+                    activaId={organizacionActivaId ?? null}
+                    zonePath={zonePath}
+                  />
 
-                {/**
-                 * 🔴 **Las tres pestañas, también aquí.**
-                 *
-                 * Este cajón tenía solo `NavList`, y las pestañas —con el
-                 * directorio de chats y la bandeja dentro— viven en el `<aside
-                 * hidden … md:flex>`, o sea **solo en escritorio**. Sumado a que
-                 * `ac4caf1` borró la entrada `/chat` de la lista canónica, el
-                 * resultado era que desde un teléfono no había **un solo enlace
-                 * hacia una conversación** en toda la aplicación: ni en el menú,
-                 * ni en el cajón, ni en ninguna pantalla.
-                 *
-                 * Comparte estado (`activeTab`) con la barra de escritorio a
-                 * propósito: es la misma preferencia de la misma persona, y ya
-                 * se guarda en `localStorage`.
-                 */}
-                <SidebarTabs
-                  activa={activeTab}
-                  onCambiar={setActiveTab}
-                  mensajesSinLeer={mensajesSinLeer}
-                  avisosSinLeer={avisosSinLeer}
-                />
+                  {/**
+                   * 🔴 **Las tres pestañas, también aquí.**
+                   *
+                   * Este cajón tenía solo `NavList`, y las pestañas —con el
+                   * directorio de chats y la bandeja dentro— viven en el `<aside
+                   * hidden … md:flex>`, o sea **solo en escritorio**. Sumado a que
+                   * `ac4caf1` borró la entrada `/chat` de la lista canónica, el
+                   * resultado era que desde un teléfono no había **un solo enlace
+                   * hacia una conversación** en toda la aplicación: ni en el menú,
+                   * ni en el cajón, ni en ninguna pantalla.
+                   *
+                   * Comparte estado (`activeTab`) con la barra de escritorio a
+                   * propósito: es la misma preferencia de la misma persona, y ya
+                   * se guarda en `localStorage`.
+                   */}
+                  <SidebarTabs
+                    activa={activeTab}
+                    onCambiar={setActiveTab}
+                    mensajesSinLeer={mensajesSinLeer}
+                    avisosSinLeer={avisosSinLeer}
+                  />
 
-                {/* Aquí sí se monta y se desmonta, al revés que en el escritorio:
+                  {/* Aquí sí se monta y se desmonta, al revés que en el escritorio:
                     el cajón entero solo existe mientras está abierto, así que
                     las suscripciones de estas listas ya viven en la barra de
                     escritorio cuando la hay, y en un teléfono no hay ninguna
                     barra que mantener viva por detrás. */}
-                {activeTab === 'home' && (
-                  <NavList
-                    navItems={navItems}
-                    activePath={activePathDeSecciones}
-                    onNavigate={() => setMobileMenuOpen(false)}
-                  />
-                )}
-                {activeTab === 'chat' && (
-                  <SidebarChatList
-                    zonePath={zonePath}
-                    plegada={false}
-                    organizacionActivaId={organizacionActivaId ?? null}
-                  />
-                )}
-                {activeTab === 'inbox' && <SidebarInboxList zonePath={zonePath} plegada={false} />}
-              </div>
+                  {activeTab === 'home' && (
+                    <NavList
+                      navItems={navItems}
+                      activePath={activePathDeSecciones}
+                      onNavigate={() => setMobileMenuOpen(false)}
+                    />
+                  )}
+                  {activeTab === 'chat' && (
+                    <SidebarChatList
+                      zonePath={zonePath}
+                      plegada={false}
+                      organizacionActivaId={organizacionActivaId ?? null}
+                    />
+                  )}
+                  {activeTab === 'inbox' && (
+                    <SidebarInboxList zonePath={zonePath} plegada={false} />
+                  )}
+                </div>
 
-              <div className="border-t border-border pt-4">
-                <UserCard user={user} activa={enCuenta} estadoSlot={estadoSlot} />
-              </div>
-            </div>
+                <div className="border-t border-border pt-4">
+                  <UserCard user={user} activa={enCuenta} estadoSlot={estadoSlot} />
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </AppShellContext.Provider>
   );

@@ -17,6 +17,10 @@ datasource db {
 /// Aquí solo está el identificador, que es lo único que hay que guardar.
 enum PlanTier {
   FREE
+  /// El peldaño entre Gratis y Equipo. **No es el `PRO` viejo del asistente**,
+  /// que vivía en otro esquema, iba por persona y se retiró: este es un plan de
+  /// la organización como los demás. Ver `plans.ts`.
+  PRO
   TEAM
   BUSINESS
   ENTERPRISE

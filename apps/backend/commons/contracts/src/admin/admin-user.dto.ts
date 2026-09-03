@@ -12,7 +12,6 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { ASSISTANT_PLANS, type AssistantPlanName } from '../assistant/assistant.dto';
 import { GLOBAL_ROLES, type GlobalRole } from '../roles/global-role';
 
 /**
@@ -99,25 +98,19 @@ export class SetUserRoleBodyDto {
   reason?: string;
 }
 
-/**
- * Cambia el plan del asistente de una cuenta.
+/*
+ * 🕳️ Aquí estaba `SetAssistantPlanBodyDto`, el cuerpo de
+ * `POST /admin/users/:id/assistant-plan`.
  *
- * ⚠️ **No hay pasarela de pago y esto es lo que hace las veces.** Pasar a PRO es
- * una decisión administrativa, no una compra: por eso vive en el panel y exige
- * el rol global, en vez de estar en la pantalla de la persona.
+ * Concedía a mano el `PRO` **por persona** del asistente, con la coletilla de
+ * que «no hay pasarela de pago». La hay desde hace tiempo, y el tope de IA lo
+ * decide el plan de la **organización** desde la etapa Enterprise: lo que
+ * concedía esta ruta no cambiaba ningún límite, solo la etiqueta que la pantalla
+ * enseñaba — que además podía contradecir al tope real.
+ *
+ * Retirado el 2026-09-03 con el resto del sistema. Ver
+ * `docs/AUDITORIA-PLANES.md` (P5-P7).
  */
-export class SetAssistantPlanBodyDto {
-  @ApiProperty({ enum: ASSISTANT_PLANS })
-  @IsIn(ASSISTANT_PLANS, { message: `plan debe ser uno de: ${ASSISTANT_PLANS.join(', ')}` })
-  plan: AssistantPlanName;
-
-  @ApiPropertyOptional({ description: 'Opcional. Se guarda en el registro.' })
-  @IsOptional()
-  @IsString()
-  @MinLength(4, { message: 'El motivo debe tener al menos 4 caracteres' })
-  @MaxLength(500)
-  reason?: string;
-}
 
 /** Fija el rol global de un usuario, reemplazando los que tuviera. */
 export class SetUserRoleDto {

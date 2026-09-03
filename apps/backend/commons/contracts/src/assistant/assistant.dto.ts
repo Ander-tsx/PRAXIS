@@ -13,54 +13,40 @@ import {
 } from 'class-validator';
 
 /**
- * Planes del asistente y cuánto da cada uno **al mes**.
+ * Cuántos mensajes al mes da el asistente **cuando nadie dice otra cosa**.
  *
- * Viven aquí y no en el servicio para que el contador del chat y el que
- * gobierna la cuota no puedan discrepar: un chat que dice «quedan 12» mientras
- * el backend rechaza el siguiente es peor que no enseñar contador.
+ * ## 🕳️ Aquí había dos planes, y eran un sistema entero
  *
- * ⚠️ **No hay pasarela de pago.** Pasar a `PRO` es hoy un `UPDATE` a mano en
- * `assistant.assistant_subscriptions`. No inventes una pantalla de suscripción:
- * prometería algo que no existe.
+ * Esto era `ASSISTANT_LIMITS = { FREE: 13, PRO: 250 }`, con su
+ * `AssistantPlanName`, su tabla `assistant.assistant_subscriptions`, su ruta en
+ * el panel de administración para concederlo a mano y su JSDoc explicando que
+ * *«no hay pasarela de pago»*.
+ *
+ * 🔴 **Era un segundo catálogo de planes, por persona, paralelo al de verdad.**
+ * Desde la etapa Enterprise quien decide el tope es el plan de la
+ * **organización** (`PlanQuotas.iaMensualPorPersona`), y llega en el payload de
+ * cada llamada. Lo de aquí no gobernaba nada… salvo el campo `plan` que el
+ * servicio seguía devolviendo, con el efecto de que una cuenta con el PRO viejo
+ * puesto a mano dentro de una organización gratuita recibía
+ * `{ plan: 'PRO', limite: 13 }`: la pantalla ponía «PRO» y el servidor negaba al
+ * mensaje 14. Dos verdades distintas en el mismo objeto.
+ *
+ * Se retiró entero el 2026-09-03 (`docs/AUDITORIA-PLANES.md`, P5-P7). El nombre
+ * `PRO` **sí existe** hoy, pero como peldaño del catálogo de organización, entre
+ * Gratis y Equipo — no tiene nada que ver con esto.
+ *
+ * ## Por qué el número se queda, aunque el plan se vaya
+ *
+ * ⚠️ **No es decorativo.** Es lo que responde el servicio si alguien lo llama
+ * por TCP **sin pasar por el gateway**, que es el único sitio que sabe resolver
+ * el plan de la organización. Sin él ese camino daría `undefined`, y `undefined
+ * >= n` es siempre `false`: mensajes infinitos y ni un error.
+ *
+ * **Trece y no cinco**, que era el valor original y sigue siendo el correcto: con
+ * cinco no se llega a ver de qué es capaz —dos preguntas para entenderlo, una
+ * que sale mal, y se acabó el mes—. Trece dan para una sesión de trabajo entera.
  */
-/**
- * Peticiones al asistente por mes y plan.
- *
- * ⚠️ El gratuito da para probarlo, no para trabajar con él, y es deliberado:
- * cada pregunta cuesta una llamada a Gemini contra una clave nuestra, así que
- * una cuenta recién creada no puede vaciar la cuota de todos. Con 50 bastaba
- * una tarde para agotarla.
- *
- * **Trece y no cinco.** Con cinco no se llega a ver de qué es capaz: dos
- * preguntas para entender qué hace, una que sale mal, y se acabó el mes. Trece
- * dan para una sesión de trabajo entera —que es lo que convence de pagar— y
- * siguen sin dar para usarlo a diario.
- *
- * ⚠️ **Este número está aquí y en ningún otro sitio.** Lo leen el servicio, la
- * cuota y la interfaz; un `5` escrito en una frase de pantalla es un error que
- * se borra, no un segundo sitio que actualizar. Y subirlo **regala mensajes a
- * quien ya se había quedado sin ellos este mes**: el límite se lee al consultar
- * la cuota, no se copia en la fila de consumo.
- *
- * PRO se concede por el webhook de Stripe al pagar —y se puede poner a mano
- * desde el panel de administración—, y es lo que se le da a quien tiene que
- * usarlo de verdad.
- */
-export const ASSISTANT_LIMITS = {
-  FREE: 13,
-  PRO: 250,
-} as const;
-
-export type AssistantPlanName = keyof typeof ASSISTANT_LIMITS;
-
-/**
- * Los planes que existen, como lista.
- *
- * Sale de las claves de `ASSISTANT_LIMITS` y no se escribe aparte: son la misma
- * verdad, y dos listas a mano acaban discrepando el día que se añada un plan.
- * Lo usan el validador del panel y el desplegable que lo pinta.
- */
-export const ASSISTANT_PLANS = Object.keys(ASSISTANT_LIMITS) as AssistantPlanName[];
+export const ASSISTANT_LIMITE_POR_DEFECTO = 13;
 
 /** Los cuatro papeles de un mensaje del hilo. */
 export const ASSISTANT_ROLES = ['user', 'model'] as const;
@@ -450,7 +436,14 @@ export interface AssistantConversation {
 }
 
 export interface AssistantQuota {
-  plan: AssistantPlanName;
+  /*
+   * 🕳️ Aquí iba `plan: AssistantPlanName`, del catálogo viejo por persona.
+   *
+   * Se retiró con él: el plan que importa es el de la organización, la pantalla
+   * lo tiene por su cuenta (`GET /me/billing/resumen`) y tenerlo también aquí
+   * era la vía por la que este objeto podía contradecirse a sí mismo. Lo que
+   * queda es lo que esta ruta sí sabe: cuánto llevas y cuánto te dan.
+   */
   usados: number;
   limite: number;
   /** `YYYY-MM`. El periodo que se está consumiendo. */

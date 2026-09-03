@@ -52,19 +52,15 @@ export async function estadoDeFacturacionAction(): Promise<EstadoDeFacturacion> 
     .catch(() => ({ disponible: false, gestionable: false }));
 }
 
-/**
- * La cuota de quien pregunta, para saber si el webhook ya llegó.
+/*
+ * 🕳️ Aquí estaba `cuotaPropiaAction`, que preguntaba `/me/assistant/quota` para
+ * ver si el webhook ya había concedido el plan tras volver del pago.
  *
- * ⚠️ **Existe por el hueco de D2**: al volver del pago el plan todavía puede
- * decir FREE durante unos segundos, porque quien lo concede es el webhook y no
- * la vuelta del navegador. La pantalla de enhorabuena vuelve a preguntar hasta
- * que diga PRO en vez de dar por hecho lo uno o lo otro.
+ * Se apoyaba en el campo `plan` de esa respuesta, que era del catálogo **por
+ * persona** y se ha retirado. Y no la llamaba nadie: quien resuelve ese hueco
+ * hoy es `PaymentReturn`, contra `GET /me/billing/resumen`, que es donde vive el
+ * plan de la organización — el único que concede algo.
  */
-export async function cuotaPropiaAction(): Promise<{ plan: 'FREE' | 'PRO' } | null> {
-  const api = await requireApi();
-  if (!api) return null;
-  return api.get<{ plan: 'FREE' | 'PRO' }>('/me/assistant/quota').catch(() => null);
-}
 
 export interface AperturaDePago {
   /** A dónde mandar el navegador. `null` si no se pudo abrir. */
