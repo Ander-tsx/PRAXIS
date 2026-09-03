@@ -1,11 +1,11 @@
 # Pasar Stripe a modo real
 
-> Escrito el 2026-09-03, al configurar el plan Pro. Hoy **todo apunta al
-> sandbox** (`sk_test_…`): no se cobra nada de verdad.
+> Escrito el 2026-09-03 al configurar el plan Pro, y **ejecutado el mismo día**.
+> Lo que queda pendiente está al final, en «Lo único que falta».
 >
-> ⚠️ **Los pasos 1, 2 y 4 no los puede hacer un agente**, y no es una limitación
-> del proyecto: activar la cuenta exige datos bancarios y fiscales, y las claves
-> son credenciales. Van a mano, siempre.
+> ⚠️ **Activar la cuenta y las dos claves no los puede hacer un agente**, y no es
+> una limitación del proyecto: lo primero exige datos bancarios y fiscales, y las
+> segundas son credenciales. Van a mano, siempre.
 
 ---
 
@@ -27,7 +27,7 @@ variables y los objetos de Stripe.
 
 ## Los cinco pasos
 
-### 1. Activar la cuenta 🔴 *solo tú*
+### 1. ✅ Activar la cuenta — **hecho**
 
 Stripe → **Activate account**. Pide razón social, RFC, domicilio y **cuenta
 bancaria** para los pagos. Sin esto no existe el modo real: el conmutador de
@@ -35,20 +35,20 @@ arriba a la izquierda seguirá diciendo «Sandbox».
 
 Suele tardar de minutos a un par de días según lo que pida verificar.
 
-### 2. Recrear los productos en modo real 🔴 *solo tú, o yo si me lo pides luego*
+### 2. ✅ Los productos en modo real — **hecho**
 
-⚠️ **Los objetos de prueba no existen en modo real.** No se migran, no se copian:
-son dos mundos separados. Los `price_…` de hoy son de sandbox y en producción
-darían `No such price`.
+Se resolvió con el «copy to live account» de Stripe, que trae los productos con
+**identificadores nuevos** — los de sandbox no existen en modo real y darían
+`No such price`. Los tres, ya verificados uno a uno:
 
-Hay que crear **tres precios**, uno por plan de autoservicio. Los de hoy, para
-copiarlos:
-
-| Plan | Producto | Importe | Recurrencia |
+| Plan | Producto | Importe | `price_…` de producción |
 |---|---|---|---|
-| Pro | PRAXIS PRO | $60.00 MXN | Mensual, **por asiento** |
-| Equipo | PRAXIS Equipo | $90.00 MXN | Mensual, **por asiento** |
-| Negocio | PRAXIS Empresa | $150.00 MXN | Mensual, **por asiento** |
+| Pro | PRAXIS PRO | $60.00 MXN | `price_1UBfUbRtjrkmFx5tc3B4F5hW` |
+| Equipo | PRAXIS Equipo | $90.00 MXN | `price_1UBfUbRtjrkmFx5t5Zry1pqI` |
+| Negocio | PRAXIS Empresa | $150.00 MXN | `price_1UBfUbRtjrkmFx5tBRTh6SNP` |
+
+Los tres: recurrentes, mensuales, MXN, «Flat rate» —o sea multiplicados por
+`quantity`, que es lo que los hace por asiento— y **sin periodo de prueba**.
 
 Tres detalles que no se pueden equivocar:
 
@@ -62,35 +62,45 @@ Tres detalles que no se pueden equivocar:
 - **La misma moneda en los tres.** Mezclar MXN y USD parte los informes y obliga
   a Stripe a decidir por su cuenta en el checkout.
 
-### 3. El webhook 🔴 *solo tú*
+### 3. ✅ El webhook — **creado, falta copiar su secreto**
 
-Stripe (ya en modo real) → **Developers → Webhooks → Add endpoint**:
+Destino `we_1UBfb0RtjrkmFx5tCdayMkrC`, activo, escuchando los **cuatro** eventos
+que el código maneja (`checkout.session.completed` y los tres de
+`customer.subscription.*`).
 
 ```
 https://usepraxis.space/api/webhooks/stripe
 ```
 
-Eventos: los de `checkout.session.*` y `customer.subscription.*`. Copia el
-`whsec_…` que aparece **una sola vez**.
+⚠️ **Va por el dominio del shell, no por el del `api`.** El gateway no tiene ruta
+pública: `web-shell/src/app/api/webhooks/stripe/route.ts` recibe y reenvía el
+cuerpo **byte a byte** al gateway, porque la firma se calcula sobre esos bytes
+exactos. Un `rewrite()` no valdría —Next los resuelve al construir— y
+`createGatewayProxy()` tampoco, porque borra `Authorization` para meter la
+cookie de sesión, y aquí no hay sesión: la autenticación **es** la firma.
 
 ⚠️ **El `whsec_` de sandbox no vale en modo real.** Son endpoints distintos con
 secretos distintos. Con el equivocado, el gateway rechaza **todos** los
 webhooks: el cobro se hace y el plan no se concede nunca.
 
-### 4. Las cinco variables en Railway 🔴 *solo tú (dos de ellas)*
+### 4. Las variables en Railway — **tres de cinco hechas**
 
-Servicio **`praxis-api`** → Variables:
+Servicio **`praxis-api`**:
 
-| Variable | Valor | ¿Secreto? |
-|---|---|---|
-| `STRIPE_SECRET_KEY` | `sk_live_…` | 🔴 **Sí** |
-| `STRIPE_WEBHOOK_SECRET` | `whsec_…` del paso 3 | 🔴 **Sí** |
-| `STRIPE_PRICE_PRO` | el `price_…` real de Pro | No |
-| `STRIPE_PRICE_TEAM` | el de Equipo | No |
-| `STRIPE_PRICE_BUSINESS` | el de Negocio | No |
+| Variable | Estado |
+|---|---|
+| `STRIPE_PRICE_PRO` | ✅ puesta, con el `price_…` de producción |
+| `STRIPE_PRICE_TEAM` | ✅ ídem |
+| `STRIPE_PRICE_BUSINESS` | ✅ ídem |
+| `STRIPE_SECRET_KEY` | 🔴 **falta** — `sk_live_…` |
+| `STRIPE_WEBHOOK_SECRET` | 🔴 **falta** — el `whsec_…` del paso 3 |
 
-Servicio **`praxis-web`** → `NEXT_PUBLIC_PRECIO_PRO`, `_TEAM`, `_BUSINESS` con
-las cifras sin símbolo (`60`, `90`, `150`).
+Servicio **`praxis-web`**: ✅ `NEXT_PUBLIC_PRECIO_PRO=60`, `_TEAM=90`,
+`_BUSINESS=150`.
+
+⚠️ **Todo está en cola, sin desplegar.** A propósito: sin las dos claves el
+gateway arranca con la facturación desactivada, así que desplegar ahora sería un
+reinicio para nada. Se despliega una vez, al final.
 
 ⚠️ **`praxis-web` necesita rebuild, no reinicio.** Las `NEXT_PUBLIC_*` se
 incrustan al construir; cambiarlas y reiniciar deja las de antes, sin ningún
@@ -111,6 +121,22 @@ Con una tarjeta de verdad, porque en modo real las de prueba no funcionan:
 4. Intentar Equipo con 20 asientos → debe rechazarlo («llega hasta 15 asientos»).
 
 ---
+
+## Lo único que falta
+
+**Dos claves, y las pega quien tenga acceso a la cuenta.** No las introduce un
+agente.
+
+1. Stripe → **Developers → API keys** → copia la **clave secreta** (`sk_live_…`).
+2. Stripe → **Workbench → Webhooks →** el destino `PRAXIS produccion` → sección
+   **Signing secret** → el icono del ojo para revelarlo (`whsec_…`).
+3. Railway → `praxis-api` → **Variables → New Variable**, una por una:
+   `STRIPE_SECRET_KEY` y `STRIPE_WEBHOOK_SECRET`.
+4. **Deploy** en `praxis-api`, y **Deploy** en `praxis-web`.
+
+⚠️ **`praxis-web` necesita construir, no reiniciar.** Las `NEXT_PUBLIC_*` se
+incrustan al construir; un reinicio dejaría la tabla sin precios y sin decir por
+qué.
 
 ## Lo que conviene saber antes de abrir la puerta
 
