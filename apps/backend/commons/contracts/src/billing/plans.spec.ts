@@ -101,7 +101,7 @@ describe('cuotas de un plan', () => {
       expect(porRango.map((plan) => plan.tier)).toEqual(PLAN_LIST.map((plan) => plan.tier));
     });
 
-    it('cada escalón da al menos tanto como el anterior, salvo la IA por persona', () => {
+    it('cada escalón da al menos tanto como el anterior, en todos los ejes', () => {
       /* No es una comprobación cosmética: un plan más caro que diera menos de
          algo se descubre cuando alguien lo contrata y pierde acceso a lo que
          tenía, que es la peor forma posible de descubrirlo.
@@ -109,19 +109,13 @@ describe('cuotas de un plan', () => {
          Se comprueba sobre **todas** las claves de golpe, y además que
          `SIN_TOPE`, una vez aparece, ya no vuelve atrás.
 
-         ⚠️ **`iaMensualPorPersona` queda fuera, y es una excepción escrita, no
-         un agujero.** Pro da 150 y Equipo 100: Pro no vende tamaño, vende
-         intensidad —cinco proyectos y el asistente sin contar—, así que en ese
-         eje concreto la escalera no es monótona a propósito.
-
-         🔴 **La consecuencia es real y hay que saberla:** alguien que suba de
-         Pro a Equipo pasa de 150 mensajes al mes a 100. Es lo que este `it`
-         avisaba, y se acepta porque el motivo de subir a Equipo es meter gente,
-         no preguntar más. Lo que **no** se acepta —y sí se comprueba, en el `it`
-         de abajo— es que baje el techo total. */
-      const ejes = (Object.keys(PLANS[PlanTier.FREE].quotas) as (keyof PlanQuotas)[]).filter(
-        (eje) => eje !== 'iaMensualPorPersona',
-      );
+         ⚠️ **Esta prueba se ganó su sitio con Pro.** El plan nació con 150
+         mensajes de IA —por encima de los 100 de Equipo, para vender intensidad
+         en vez de tamaño— y esto se puso en rojo. Tenía razón: subir de Pro a
+         Equipo habría hecho **perder** 50 mensajes al mes. Se bajó a 75, que
+         mantiene la promesa (casi seis veces el gratuito) sin romper la
+         escalera. No se relajó la prueba; se arregló el plan. */
+      const ejes = Object.keys(PLANS[PlanTier.FREE].quotas) as (keyof PlanQuotas)[];
 
       for (let i = 1; i < PLAN_LIST.length; i++) {
         const antes = PLAN_LIST[i - 1];
@@ -143,13 +137,14 @@ describe('cuotas de un plan', () => {
     });
 
     it('el techo total de IA no baja al subir de plan', () => {
-      /* La invariante que sustituye a la del eje suelto, y la que de verdad
-         protege el modelo: lo que cuesta dinero no son los mensajes por persona
-         sino **los mensajes**, y su techo es ese número por los asientos.
+      /* La de arriba no basta por sí sola: lo que cuesta dinero no son los
+         mensajes **por persona** sino los mensajes, y su techo es ese número por
+         los asientos. Dos planes pueden ser monótonos en cada eje suelto y aun
+         así cruzarse aquí.
 
-         Pro llega a 750 (150 × 5) y Equipo a 1500 (100 × 15), así que la
-         escalera sigue subiendo donde importa aunque el eje por persona baje.
-         Si alguien vuelve a mover uno de los dos números, esto salta. */
+         Hoy: Free 39, Pro 375, Equipo 1500, Negocio 30 000. Si alguien vuelve a
+         mover cualquiera de los dos números —y la tentación de subir la IA de un
+         plan pequeño es real, ya pasó una vez— esto salta. */
       const techo = (plan: (typeof PLAN_LIST)[number]): number => {
         const porPersona = plan.quotas.iaMensualPorPersona;
         const asientos = plan.quotas.asientos;

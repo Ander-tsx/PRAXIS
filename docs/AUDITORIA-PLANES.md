@@ -163,10 +163,22 @@ Hay **cuatro** rutas que aceptan un archivo y lo guardan como adjunto:
 | `POST /me/chats/:peerId/attachments` | ❌ |
 | `POST /me/assistant/attachments` | ❌ |
 
-Y la **medida** tiene el mismo hueco: `almacenamientoDe` suma
-`attachment_bytes_of_projects`, o sea solo los adjuntos de tarea. Un equipo que
-trabaje por chat puede subir gigabytes sin que el contador se mueva y sin que
-nadie le diga nada.
+Y la **medida** tiene el mismo hueco. La cadena entera, para que se vea:
+
+1. `exigirAlmacenamiento(userId, projectId, file.size)` deriva la organización
+   **del proyecto** y pide su tope al plan.
+2. `almacenamientoDe(organizationId)` pide los proyectos de esa organización
+   (`project_find_by_organization`), **descarta los `DELETED`** y manda la lista
+   a tasks-service.
+3. `AttachmentsService.bytesOfProjects` hace un
+   `taskAttachment.aggregate({ _sum: { size } })` sobre esos proyectos.
+4. El gateway compara `ocupados + nuevosBytes <= topeMb × 1024 × 1024`.
+
+O sea: se mide **lo que ocupa ahora** —borrar libera— con el tamaño real del
+archivo medido en el servidor, nunca uno declarado por el cliente. Todo eso está
+bien. Lo que falla es el **alcance**: `taskAttachment` son solo los adjuntos de
+tarea. Un equipo que trabaje por chat puede subir gigabytes sin que el contador
+se mueva y sin que nadie le diga nada.
 
 ⚠️ **No se arregla solo poniendo la llamada en las otras tres.** Dos de ellas no
 tienen proyecto —el chat privado y PRAX sin foco— y `exigirAlmacenamiento` deriva
@@ -250,22 +262,30 @@ usan PRAX en serio**, no para un equipo.
                     Gratis      Pro        Equipo
 Asientos              3          5          15
 Proyectos             3          5          25
-IA / persona / mes   13         150        100
+IA / persona / mes   13          75        100
 Automatizaciones      3          10         25
 Almacenamiento     200 MB      2 GB       10 GB
 Historial Análisis   90 d      180 d      365 d
 ```
 
-🔴 **`iaMensualPorPersona` es 150 en Pro y 100 en Equipo, y no es una errata.**
-Es la decisión central de este plan: *«solo 5 espacios pero con más uso del
-sistema»*. Pro no compra tamaño, compra **intensidad** — y la IA es lo que se
-paga de verdad, porque cada mensaje cuesta una llamada a Gemini contra una clave
-nuestra.
+**`iaMensualPorPersona` es 75: casi seis veces el gratuito, y por debajo de
+Equipo.**
 
-⚠️ Y no se escapa por arriba, que es lo que hay que comprobar en un tope que
-sube al bajar de plan: el techo total de IA es `iaMensualPorPersona × asientos`,
-así que Pro llega a **750** y Equipo a **1 500**. La escalera sigue siendo
-monótona donde importa, que es en el coste.
+🔴 **Estuvo en 150 y fue un error, que además se detectó solo.** La idea era
+vender intensidad en vez de tamaño y el número la llevaba demasiado lejos:
+`plans.spec.ts` afirma que *«cada escalón da al menos tanto como el anterior, en
+todos los ejes»* y se puso en rojo. Tenía razón — subir de Pro a Equipo habría
+hecho **perder** 50 mensajes al mes, o sea pagar más por menos, que es la peor
+forma posible de descubrir un plan.
+
+75 mantiene la promesa del encargo —«más uso del sistema»— sin romper nada. Lo
+que separa a Pro de Equipo es el **precio y el tamaño**, no un cruce en un eje.
+
+⚠️ **La prueba no se relajó: se arregló el plan.** Y se le añadió una hermana que
+no existía y que la de arriba no cubre: **el techo total** de IA
+(`porPersona × asientos`) tampoco puede bajar. Hoy: Free 39, Pro 375, Equipo
+1 500, Negocio 30 000. Dos planes pueden ser monótonos en cada eje suelto y aun
+así cruzarse ahí.
 
 **5 asientos y no 1**, aunque sea el plan «individual»: uno solo obliga a subir a
 Equipo en cuanto entra la primera persona, y ahí el salto es de 5 a 25 proyectos

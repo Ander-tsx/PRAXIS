@@ -90,10 +90,11 @@ export enum PlanTier {
   /**
    * Una persona (o dos) que usan PRAX **en serio**.
    *
-   * 🔴 **No es «Equipo pero más pequeño»: es el escalón que compra intensidad,
-   * no tamaño.** Da menos inventario que Equipo —5 proyectos frente a 25— y
-   * **más** IA por persona: 150 frente a 100. Es deliberado y es todo el
-   * sentido del plan; ver el catálogo de abajo.
+   * El escalón que faltaba: se saltaba de 3 proyectos y 13 mensajes de IA a 25
+   * y 100, con un salto de precio que solo tiene sentido si ya eres un equipo.
+   * Pro es para quien trabaja solo o de dos en dos y usa el asistente a diario:
+   * cinco proyectos, seis veces el gratuito en IA, y **por debajo de Equipo en
+   * todos los ejes** — lo que lo separa es el precio, no un cruce.
    *
    * ⚠️ **No confundir con el `PRO` viejo.** Hubo un `PRO` por persona en
    * `assistant.assistant_subscriptions`, anterior a las organizaciones, que se
@@ -272,7 +273,7 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
   [PlanTier.PRO]: {
     tier: PlanTier.PRO,
     nombre: 'Pro',
-    resumen: 'Cinco proyectos y PRAX sin contar. Para quien lo usa todos los días.',
+    resumen: 'Cinco proyectos y seis veces más PRAX que el gratuito, por poco dinero.',
     paraQuien: 'Una persona, o dos, que trabajan con PRAX a diario',
     quotas: {
       /* Cinco y no uno, aunque sea el plan «individual»: con uno solo, meter a
@@ -281,19 +282,20 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
       asientos: 5,
       proyectos: 5,
       /**
-       * 🔴 **150, por encima de los 100 de Equipo, y no es una errata.**
+       * Seis veces el gratuito, y por debajo de Equipo.
        *
-       * Es la decisión entera de este plan: Pro no compra tamaño, compra
-       * intensidad. Lo que de verdad cuesta dinero es cada mensaje —una llamada
-       * a Gemini contra una clave nuestra—, así que es lo que tiene sentido
-       * vender a quien usa el asistente todos los días sobre cinco proyectos.
+       * ⚠️ **Estuvo en 150 —por encima de los 100 de Equipo— y se bajó.** La
+       * idea era vender intensidad en vez de tamaño, y el número la llevaba
+       * demasiado lejos: rompía la escalera. Alguien que subiera de Pro a Equipo
+       * habría **perdido** 50 mensajes al mes, que es la peor forma de descubrir
+       * un plan — pagando más por menos.
        *
-       * ⚠️ **Y no se escapa por arriba**, que es lo que hay que comprobar
-       * cuando un tope sube al bajar de plan: el techo total es este número por
-       * los asientos, así que Pro llega a 750 y Equipo a 1500. La escalera
-       * sigue subiendo donde importa, que es en el coste.
+       * 75 mantiene la promesa sin romper nada: es **casi seis veces** los 13
+       * del gratuito, o sea de sobra para usarlo a diario sobre cinco proyectos,
+       * y sigue por debajo de los 100 de Equipo. Lo que separa a Pro de Equipo
+       * es el precio y el tamaño, no un cruce en un eje.
        */
-      iaMensualPorPersona: 150,
+      iaMensualPorPersona: 75,
       automatizacionesPorProyecto: 10,
       almacenamientoOrgMb: 2_048,
       /* El punto medio real: 90 días no llegan a un trimestre cerrado y 365 es
@@ -506,10 +508,6 @@ export interface QuotaExceededDetails {
  */
 export const PLAN_RANK: Record<PlanTier, number> = {
   [PlanTier.FREE]: 0,
-  /* ⚠️ **Pro va por debajo de Equipo aunque dé más IA por persona.** El orden es
-     declarado justo para esto: Pro da 150 mensajes y Equipo 100, así que
-     cualquier deducción automática lo pondría por encima. Lo que ordena la
-     escalera es el precio y el tamaño, no un eje suelto. */
   [PlanTier.PRO]: 1,
   [PlanTier.TEAM]: 2,
   [PlanTier.BUSINESS]: 3,

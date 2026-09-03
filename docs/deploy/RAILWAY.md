@@ -93,9 +93,18 @@ Railway les da variables propias (`DATABASE_URL`, `PGHOST`, `PGPORT`, `PGUSER`,
    # Stripe (opcional). Vacías = facturación apagada y nada se rompe.
    # El WEBHOOK_SECRET es nuevo: se crea al añadir el endpoint en Stripe
    # apuntando a  https://api-XXXX.up.railway.app/api/webhooks/stripe
+   #
+   # Un precio por plan de autoservicio, y son PRECIOS de Stripe (`price_…`),
+   # no productos. Cada uno se crea en el panel de Stripe con su tarifa **por
+   # asiento y mes**; el que falte deja su plan visible en la tabla pero **sin
+   # botón de compra**, que es lo correcto y no un fallo (ver `stripe.service.ts`).
+   #
+   # ⚠️ `STRIPE_PRICE_PLUS` ya no existe: PLUS se retiró en 2026-08-26, cuando
+   # las dos escaleras se colapsaron en una. Y `STRIPE_PRICE_PRO` **no es el PRO
+   # de antes** —aquel era una suscripción por persona, retirada el 2026-09-03—
+   # sino el peldaño del catálogo entre Gratis y Equipo.
    STRIPE_SECRET_KEY=
    STRIPE_PRICE_PRO=
-   STRIPE_PRICE_PLUS=
    STRIPE_PRICE_TEAM=
    STRIPE_PRICE_BUSINESS=
    STRIPE_WEBHOOK_SECRET=
