@@ -1,36 +1,127 @@
-import { createSessionRefreshProxy } from '@praxis/commons/auth';
+import {
+  SESSION_COOKIE,
+  createSessionRefreshProxy,
+  hasValidSessionToken,
+  redirectToZone,
+} from '@praxis/commons/auth';
+import { type NextRequest, NextResponse } from 'next/server';
 
 /**
- * Proxy del web-shell (en Next 16 sustituye a middleware.ts).
+ * Proxy del shell (en Next 16 sustituye a `middleware.ts`).
  *
- * Mantiene viva la sesión: el access token dura 15 minutos, así que se renueva
- * de forma transparente mientras el refresh token siga siendo válido. De lo
- * contrario, volver a una pestaña abierta hace 20 minutos mostraría "Iniciar
- * sesión" a alguien que sigue autenticado.
+ * Hace dos trabajos, y el segundo es nuevo desde F2 de la fusión de zonas:
  *
- * **No protege rutas.** El shell solo sirve la landing pública; cada zona
- * privada trae su propio guard (`dashboard-front/src/proxy.ts`). Es lo que
- * permite desplegar y probar una zona por su cuenta.
+ * 1. **Mantiene viva la sesión** en todo lo que sirve. El access token dura 15
+ *    minutos y el refresh 7 días, así que se renueva de forma transparente
+ *    mientras el refresh siga vivo. Sin esto, volver a una pestaña abierta hace
+ *    veinte minutos enseñaría «Iniciar sesión» a alguien que sigue dentro.
+ * 2. 🔴 **Protege los segmentos privados que ya se han fusionado.** Antes el
+ *    shell no protegía nada —cada zona traía su guard— y esto era solo la
+ *    renovación. Según entra cada zona (F2–F7), su prefijo se añade a
+ *    `PREFIJOS_PRIVADOS` y su `proxy.ts` desaparece.
+ *
+ * ⚠️ **El orden importa**: primero se renueva, después se comprueba la firma.
+ * Al revés, quien llega con el access caducado y el refresh bueno acabaría en
+ * el login — que es justo el caso que el paso 1 acaba de arreglar.
+ *
+ * ⚠️ Esto **no es la autorización**. La hace siempre el gateway, que además
+ * comprueba permisos por proyecto y rol global. Aquí se decide qué se sirve;
+ * lo que protege los datos está del otro lado.
+ *
+ * ⚠️ Y las Server Functions viajan como POST a la ruta donde se usan, así que
+ * un cambio de `matcher` puede dejarlas fuera sin avisar; cada una vuelve a
+ * comprobar la sesión por su cuenta.
+ * Verificado en:
+ * node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md
  */
-export const proxy = createSessionRefreshProxy();
+
+const refreshSession = createSessionRefreshProxy();
+
+/** La sirve `auth-front`, que todavía es zona aparte (entra en F7). */
+const LOGIN_PATH = '/auth/login';
+
+/**
+ * Los prefijos que exigen sesión **dentro de esta aplicación**.
+ *
+ * ⚠️ Crece con cada zona que entra, y la que entra borra su `proxy.ts`. Una
+ * zona movida cuyo prefijo se olvide aquí se sirve sin guard y no falla nada:
+ * la pantalla sale, el gateway devuelve 401 y se lee como una avería, no como
+ * una sesión que falta. `e2e/tests/ui/02-guards.spec.ts` lo cubre para las
+ * cinco.
+ */
+const PREFIJOS_PRIVADOS = ['/assistant'];
+
+function esPrivada(pathname: string): boolean {
+  return PREFIJOS_PRIVADOS.some(
+    (prefijo) => pathname === prefijo || pathname.startsWith(`${prefijo}/`),
+  );
+}
+
+/**
+ * El token que vale **después** de la renovación.
+ *
+ * `refreshSession` deja el resultado en las cookies de la respuesta:
+ * - renovó → cookie nueva con el token fresco;
+ * - el refresh también murió → cookie vacía, para no dejar cookies zombis;
+ * - no había nada que renovar → no toca la respuesta, y vale la de la petición.
+ */
+function resolveToken(request: NextRequest, response: NextResponse): string | undefined {
+  const fromResponse = response.cookies.get(SESSION_COOKIE);
+  if (fromResponse !== undefined) {
+    return fromResponse.value || undefined;
+  }
+  return request.cookies.get(SESSION_COOKIE)?.value;
+}
+
+export async function proxy(request: NextRequest): Promise<NextResponse> {
+  const response = await refreshSession(request);
+
+  if (!esPrivada(request.nextUrl.pathname)) return response;
+
+  /* Se verifica la **firma**, no solo que la cookie exista: una cookie caducada
+     o manipulada no puede abrir el área privada. */
+  if (await hasValidSessionToken(resolveToken(request, response))) {
+    return response;
+  }
+
+  /**
+   * `redirectToZone` y no `request.url`: el origen público viaja en
+   * `x-forwarded-host`, y redirigir sobre `request.url` sacaría al usuario al
+   * puerto interno. Ver ESTADO-ACTUAL §16.
+   */
+  const redirect = redirectToZone(request, LOGIN_PATH);
+
+  /* Se arrastran las cookies que puso el paso 1 — en este camino, el borrado de
+     las muertas. Sin esto se quedarían puestas e intentaríamos renovarlas en
+     cada navegación. */
+  for (const cookie of response.cookies.getAll()) {
+    redirect.cookies.set(cookie);
+  }
+
+  return redirect;
+}
 
 export const config = {
   /**
-   * Solo las páginas **del shell**.
+   * Lo que sirve esta aplicación, y nada más.
    *
-   * Se excluyen los assets de Next, el favicon, las rutas de API y **los
-   * prefijos de las zonas**: `/auth/*`, `/dashboard/*` y `/projects/*` los sirve otra app, que
-   * ya renueva la sesión en su propio proxy. Sin esta exclusión pagaríamos el
-   * salto de red al gateway dos veces por navegación.
+   * Se excluyen los assets de Next, el favicon, las fuentes y `api/` —que
+   * incluye tanto `/api/gateway`, que gestiona su propia renovación y no debe
+   * responder un redirect HTML a quien espera JSON, como
+   * **`/api/webhooks/stripe`, que no lleva sesión ninguna**: su autenticación
+   * es la firma de Stripe, y meterlo aquí sería romper el cobro.
+   *
+   * Y se excluyen **los prefijos de las zonas que todavía no se han fusionado**:
+   * las sirve otra app, que ya renueva la sesión en su propio proxy, y sin esta
+   * exclusión pagaríamos el salto de red al gateway dos veces por navegación.
+   * Cada zona que entra sale de esta lista y entra en `PREFIJOS_PRIVADOS`.
+   *
+   * ⚠️ `'/'` va aparte y es imprescindible: el patrón con lookahead negativo
+   * **no casa la raíz**. Sin esta entrada la landing nunca renovaba la sesión,
+   * que es justo el caso para el que nació este proxy.
    */
   matcher: [
-    /**
-     * ⚠️ `'/'` va aparte: el patrón con lookahead negativo **no casa la raíz**.
-     * Sin esta entrada la landing nunca renovaba la sesión, que es justo el
-     * caso para el que existe este proxy: volver a una pestaña abierta hace 20
-     * minutos y que el navbar siga diciendo "Ir al panel".
-     */
     '/',
-    '/((?!_next/static|_next/image|favicon.ico|api/|auth(?:/|$)|dashboard(?:/|$)|projects(?:/|$)).*)',
+    '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth(?:/|$)|main(?:/|$)|projects(?:/|$)|admin(?:/|$)|chat(?:/|$)).*)',
   ],
 };

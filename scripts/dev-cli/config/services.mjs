@@ -219,15 +219,6 @@ export const FRONTEND_APPS = [
     color: 96,
     descripcion: 'Mensajes directos y de proyecto',
   },
-  {
-    key: 'assistant-front',
-    pkg: '@praxis/assistant-front',
-    dir: 'apps/frontend/assistant-front',
-    port: 4107,
-    envFile: '.env.local',
-    color: 96,
-    descripcion: 'PRAX, el asistente',
-  },
 ];
 
 /**
@@ -275,7 +266,7 @@ export const ALL_SERVICES = [...BACKEND_SERVICES, ...FRONTEND_APPS];
 export const PRESETS = [
   {
     key: 'todo',
-    nombre: 'Todo — los 9 servicios y las 6 zonas',
+    nombre: 'Todo — los 9 servicios y las 5 zonas',
     backend: BACKEND_SERVICES.map((s) => s.key),
     frontend: true,
   },
@@ -293,7 +284,7 @@ export const PRESETS = [
   },
   {
     key: 'frontend',
-    nombre: 'Solo frontend — las 6 zonas (el backend ya está arriba)',
+    nombre: 'Solo frontend — las 5 zonas (el backend ya está arriba)',
     backend: [],
     frontend: true,
   },

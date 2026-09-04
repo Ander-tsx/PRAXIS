@@ -366,7 +366,10 @@ sobre una lista que alguien le cortó por detrás.
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · admin-front 4105 · chat-front 4106 · **assistant-front 4107** · 4108+ para zonas nuevas.
+**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · admin-front 4105 · chat-front 4106.
+
+🚫 **El 4107 también quedó libre: `/assistant` ya lo sirve el shell.** Fue la
+primera zona fusionada (F2). La URL no cambió.
 
 🚫 **El 4104 quedó libre: `reports-front` se archivó** (F1 de [PLAN-FUSION-ZONAS](docs/PLAN-FUSION-ZONAS.md)). `/reports` responde 404. Lo que **no** se tocó: `reports-service` en el 3005 y las once rutas de análisis del gateway, que PRAX sigue usando para contestar. No se reutiliza el 4104 para una zona nueva mientras dure la fusión: la etapa va a dejar **una sola** aplicación de frontend.
 

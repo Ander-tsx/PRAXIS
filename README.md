@@ -77,7 +77,6 @@ flowchart TB
         Proj["projects-front :4103\n/projects"]
         Adm["admin-front :4105\n/admin"]
         Chat["chat-front :4106\n/chat"]
-        AsstF["assistant-front :4107\n/assistant"]
     end
 
     subgraph gw["API Gateway :3000"]
@@ -177,7 +176,6 @@ PRAXIS/
 │   │   ├── projects-front/     # /projects — catálogo, Kanban, tareas, miembros
 │   │   ├── admin-front/        # /admin — cuentas, suspensión, auditoría (rol Admin)
 │   │   ├── chat-front/         # /chat — mensajería en tiempo real, canales, DMs
-│   │   ├── assistant-front/    # /assistant — interfaz del asistente conversacional
 │   │   └── commons/            # Atomic Design: atoms/, molecules/, organisms/
 │   │                           # + auth, api, tokens, hooks, theme
 │   ├── backend/

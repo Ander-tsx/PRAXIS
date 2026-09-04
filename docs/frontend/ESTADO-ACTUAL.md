@@ -2154,7 +2154,8 @@ que es justo lo que existe para evitar `permissions/me`.
 ### 26.2 Quién hace qué
 
 ```
-assistant-front (4107)   ← era reports-front (4104), archivada en F1
+web-shell → /assistant   ← era reports-front (4104), archivada en F1;
+                            y luego assistant-front (4107), fusionada en F2
    └─ Server Action ──► gateway :3000
                           /projects/:projectId/assistant/{quota,chat}
                           (JwtGuard + ProjectPermissionGuard, canViewProject)

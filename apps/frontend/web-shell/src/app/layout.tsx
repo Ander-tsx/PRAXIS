@@ -112,7 +112,15 @@ export default async function RootLayout({
       data-theme={theme}
       className={`${inter.variable} ${lora.variable} ${fraunces.variable} ${grotesk.variable} ${khteka.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col antialiased">{children}</body>
+      {/*
+        ⚠️ **Sin `flex flex-col`, y no es cosmético.**
+
+        Lo llevaba cuando esta app solo servía la landing. Desde F2 de la fusión
+        también sirve pantallas de la aplicación, y un `<body>` en columna flex
+        cambia cómo se reparte el alto de `AppShell`. La landing no lo echa de
+        menos: `LandingTemplate` ya trae su propio `flex min-h-screen flex-col`.
+      */}
+      <body className="min-h-full antialiased">{children}</body>
     </html>
   );
 }

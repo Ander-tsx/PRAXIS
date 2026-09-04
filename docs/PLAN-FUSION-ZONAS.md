@@ -358,7 +358,7 @@ más barata.
 |---|---|---|---|
 | **F0** | Línea base: `pnpm e2e:regresion` | — | ✅ 243/243 |
 | **F1** | Archivar `reports-front` | 7.415 | ✅ código · ⚠️ regresión a medias, ver Registro |
-| **F2** | Mover `assistant-front` → shell **(piloto del mecanismo)** | 757 | ⬜ |
+| **F2** | Mover `assistant-front` → shell **(piloto del mecanismo)** | 757 | ✅ código · ⚠️ e2e pendiente |
 | **F3** | Mover `chat-front` | 2.539 | ⬜ |
 | **F4** | Mover `admin-front` | 3.384 | ⬜ |
 | **F5** | Mover `dashboard-front` (`/main`) | 7.334 | ⬜ |
@@ -386,6 +386,41 @@ esta lista.
 6. Quitar su entrada de `rewrites()` en `web-shell/next.config.ts`.
 7. Borrar la app y su entrada del pm2, del `dev-cli` y de Terraform.
 8. `pnpm e2e:regresion`. Verde antes de la siguiente.
+
+#### Lo que enseñó el piloto (F2), y vale para las cinco que quedan
+
+1. 🔴 **`zonePath` pasa a ser la cadena vacía, no el prefijo.** Hace dos
+   trabajos en `AppShell` —prefijar el proxy (`${zonePath}/api/gateway`) y
+   **reconstruir la ruta del navegador**, porque dentro de una zona
+   `usePathname()` no incluye el `basePath`—. Fusionada no hay `basePath`: la
+   ruta ya viene entera y el proxy vive en `/api/gateway`. `""` es exactamente
+   lo que necesitan los dos cálculos, así que **`AppShell` no se toca** y las
+   zonas movidas conviven con las que faltan.
+2. 🔴 **Cuidado con quien compare `zonePath` con un literal.** `PraxLauncher`
+   hacía `zonePath === '/assistant'` para esconderse dentro de la pantalla de
+   PRAX; con `""` la comparación da `false` y **el lanzador aparecía encima de
+   la propia pantalla del asistente**. Se arregló mirando la ruta. Antes de
+   mover una zona: `grep -rn "zonePath ===" apps/frontend/commons`.
+3. **El `layout.tsx` raíz de la zona no se mueve, se descarta**: `<html>`,
+   `<body>` y las fuentes las pone el layout del shell. Lo único que sobrevive
+   es su `metadata`, que baja al segmento.
+4. **El `globals.css` de la zona tampoco se mueve.** Solo aportaba el `@source`
+   —cubierto por el `../**/*.tsx` del shell, que ahora incluye el código
+   movido— y los `@font-face` de Redaction con el `basePath` escrito a mano. El
+   shell ya los declara sin prefijo, y ya tiene las fuentes en `public/fonts/`.
+5. ⚠️ **El `<body>` del shell llevaba `flex flex-col`** de cuando solo servía la
+   landing. Eso cambia cómo reparte el alto `AppShell`, así que se quitó; la
+   landing no lo echa de menos porque `LandingTemplate` trae el suyo.
+6. **El `not-found.tsx` de la zona sí se queda**, como `app/<zona>/not-found.tsx`:
+   el más cercano en el árbol gana, y devuelve a esa sección en vez de a la
+   landing.
+7. **El `matcher` del shell excluye las zonas que aún no se han movido** y el
+   prefijo de la que entra pasa a `PREFIJOS_PRIVADOS`. Olvidarlo no falla:
+   la pantalla se sirve sin guard, el gateway responde 401 y se lee como avería.
+   `02-guards` lo cubre para las cinco.
+8. 🍎 El `matcher` del shell excluía `dashboard(?:/|$)`, y **esa zona se sirve en
+   `/main` desde hace meses**: llevaba desde entonces renovando la sesión dos
+   veces por navegación en el panel. Corregido de paso.
 
 ⚠️ **Y en cada zona, mirar la pantalla**, no solo el verde: el fallo de los
 `@source` no da error y las pruebas no miran los estilos.
@@ -489,6 +524,7 @@ ha hecho.
 | 2026-09-03 | **F0** | Línea base **243/243 en verde** (39,1 min). Un rojo, y era de la prueba: `06-chat-zona.spec.ts` buscaba `role="button"` donde `2d4d1a5` había puesto `role="tab"`. Corregido el localizador. Los rojos previstos del chat privado no aparecieron: ya estaban reescritos |
 | 2026-09-04 | **F1** | Zona archivada. Fuera: la app entera, sus `rewrites()`, su entrada de pm2 y de `dev-cli`, los helpers `reportHref`/`reportPath` —que solo usaba ella—, la fila `/reports/` de `OrgSwitcher` y el enlace muerto a Análisis de la tarjeta de gráfico. La costura del lienzo (`AccionDelLienzo`, `alAceptarGrafico`) **se conserva sin implementador**, para cuando el informe vuelva a tener sitio. `/reports` responde 404, comprobado. Las cinco zonas privadas entraron en `02-guards`: faltaban `chat` y `assistant`, que son justo las que la fusión va a meter bajo un único `matcher` |
 | 2026-09-04 | ⚠️ | **La regresión de F1 no se pudo cerrar: la máquina se queda sin memoria.** Cuatro intentos, muerto los cuatro por el sistema. Verde lo que llegó a correr: **las 195 de API enteras** y, de navegador, `01-publico`, `02-guards` —con las dos zonas nuevas— y `03-sesion` hasta la 31. Sin correr: `04-invitaciones`, `05-equipo`, `06-chat-zona`, `07-reglas`, `08-panel-de-tarea`. Ninguna toca Análisis, pero **el paso no está cerrado hasta que corran** |
+| 2026-09-04 | **F2** | `assistant-front` fusionada: `src/app/assistant/` dentro del shell, un solo `proxy.ts` con `PREFIJOS_PRIVADOS`, y fuera su app, su `rewrites()`, su proxy de gateway, su pm2 y su `dev-cli`. El 4107 queda libre y **la URL no cambió**. Verificado sin navegador: compila las 6, `/assistant` y `/assistant/algo` dan 307 al login sin sesión, y con una cookie de sesión responde **200 con PRAX y la barra lateral dentro**, sin un solo `/assistant/api/gateway` en el HTML. Dos trampas encontradas, las dos anotadas en la receta: `zonePath=""` y `PraxLauncher` comparando `zonePath` con un literal |
 | 2026-09-04 | 🔧 | De ahí salió el stack construido (`build:frontend`, `start:backend`, `start:frontend`): **315 MB el backend y 579 MB el frontend**, contra varios GB en vigilancia. No bastó — con todo apagado la máquina ya tenía 677 MB libres y 6,65 de 8 GB de swap ocupados— pero es el modo correcto de verificar de aquí en adelante |
 
 ---

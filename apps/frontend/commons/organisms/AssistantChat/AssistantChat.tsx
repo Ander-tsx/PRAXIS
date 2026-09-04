@@ -111,7 +111,8 @@ export interface AssistantChatProps {
    */
   projectId: string | null;
   /**
-   * El proxy del gateway de la zona que monta esto: `/assistant/api/gateway`,
+   * El proxy del gateway de quien monta esto: `/api/gateway` en la app
+   * fusionada, `/<zona>/api/gateway` en las que todavía no lo están,
    * `/reports/api/gateway`.
    *
    * ⚠️ **Los adjuntos no pueden ir por una Server Action y por eso hace falta.**

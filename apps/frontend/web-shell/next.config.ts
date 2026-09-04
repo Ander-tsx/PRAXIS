@@ -27,7 +27,6 @@ const nextConfig: NextConfig = {
     const projectsFrontUrl = process.env.PROJECTS_FRONT_URL ?? 'http://localhost:4103';
     const adminFrontUrl = process.env.ADMIN_FRONT_URL ?? 'http://localhost:4105';
     const chatFrontUrl = process.env.CHAT_FRONT_URL ?? 'http://localhost:4106';
-    const assistantFrontUrl = process.env.ASSISTANT_FRONT_URL ?? 'http://localhost:4107';
 
     return [
       {
@@ -75,23 +74,13 @@ const nextConfig: NextConfig = {
         destination: `${chatFrontUrl}/chat/:path*`,
       },
 
-      /**
-       * PRAX, el asistente. Séptima zona.
+      /*
+       * 🕳️ Aquí estaban las dos entradas de `/assistant`.
        *
-       * Salió de dentro de Análisis, donde era un panel al lado de los gráficos:
-       * ahí solo se le podía preguntar por el informe que estabas viendo, y sabe
-       * hacer bastante más. Sigue estando allí —con el proyecto ya puesto— pero
-       * ahora tiene pantalla propia.
-       *
-       * Las **dos** entradas, como todas: sin la primera, `/assistant` a secas
-       * —que es exactamente la ruta a la que lleva el menú— cae en el 404 del
-       * shell.
+       * PRAX fue la primera zona en fusionarse (F2 de PLAN-FUSION-ZONAS): ya no
+       * hay a dónde reescribir porque la pantalla la sirve esta misma
+       * aplicación, desde `src/app/assistant/`. La URL no cambió.
        */
-      { source: '/assistant', destination: `${assistantFrontUrl}/assistant` },
-      {
-        source: '/assistant/:path*',
-        destination: `${assistantFrontUrl}/assistant/:path*`,
-      },
 
       /**
        * ⚠️ Las rutas de voz (`/api/alexa/*`) **no van aquí**, aunque lo parezca.

@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { PRAX_NAME, PraxAvatar } from '../../atoms/PraxAvatar/PraxAvatar';
 import { usePrax } from './PraxContext';
 
@@ -25,11 +26,22 @@ import { usePrax } from './PraxContext';
  */
 export function PraxLauncher() {
   const prax = usePrax();
+  const pathname = usePathname();
   if (!prax) return null;
 
-  /* En `/assistant` PRAX **es** la pantalla: un lanzador que abre un minichat
-     encima del chat a pantalla completa no tiene sentido. */
-  if (prax.zonePath === '/assistant') return null;
+  /**
+   * En `/assistant` PRAX **es** la pantalla: un lanzador que abre un minichat
+   * encima del chat a pantalla completa no tiene sentido.
+   *
+   * 🔴 **Se mira la ruta, no `zonePath`.** Era `prax.zonePath === '/assistant'`,
+   * y eso dejó de valer en F2 de la fusión: un segmento de la app fusionada
+   * pasa `zonePath=""` —no tiene `basePath` que compensar— así que la
+   * comparación daba `false` y el lanzador aparecía **encima de la propia
+   * pantalla de PRAX**. `usePathname()` acierta en los dos mundos: en la zona
+   * sin fusionar devuelve `/` y `zonePath` completa el prefijo; ya fusionada
+   * devuelve `/assistant` entero.
+   */
+  if (`${prax.zonePath}${pathname === '/' ? '' : pathname}`.startsWith('/assistant')) return null;
 
   return (
     <button
