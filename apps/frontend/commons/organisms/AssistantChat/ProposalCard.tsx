@@ -103,9 +103,14 @@ export const SenalDeAceptarTodas = createContext(0);
 /**
  * La firma de «añadir este gráfico a mi lienzo».
  *
- * Es la misma que `aceptarGraficoAction` de `reports-front`. Se declara aquí
- * —y no se importa— porque el sentido de todo esto es que este paquete **no**
- * dependa de aquella zona.
+ * Era la misma que `aceptarGraficoAction` de `reports-front`. Se declaraba aquí
+ * —y no se importaba— porque el sentido de todo esto es que este paquete **no**
+ * dependa de la zona que dibuje el lienzo.
+ *
+ * ⚠️ **Desde F1 de PLAN-FUSION-ZONAS no la implementa nadie**: Análisis se
+ * archivó y no quedó ninguna pantalla con lienzo. La costura se conserva a
+ * propósito —el informe de «cuándo acabaría un proyecto» tiene que volver a
+ * algún sitio— pero hoy `AccionDelLienzo` vale `null` en todas partes.
  */
 export type AceptarGrafico = (
   projectId: string,
@@ -119,14 +124,14 @@ export type AceptarGrafico = (
  *
  * Porque las otras **valen en cualquier zona**: crear una tarea, comentar, mover
  * o borrar es lo mismo se pida desde donde se pida, y viven en
- * `commons/assistant/actions`. Aceptar un gráfico no: escribe en el lienzo, y el
- * lienzo lo dibuja `reports-front` — necesita su catálogo de widgets para saber
- * de qué tamaño nace la tarjeta, y revalida *aquella* página.
+ * `commons/assistant/actions`. Aceptar un gráfico no: escribe en un lienzo, y
+ * quien lo dibuje necesita su catálogo de widgets para saber de qué tamaño nace
+ * la tarjeta, y revalida *aquella* página.
  *
- * `null` es el caso normal en `assistant-front`, donde no hay lienzo delante. La
- * tarjeta entonces **no ofrece un botón que no llevaría a ninguna parte**: dice
- * dónde se coloca y enlaza a Análisis. Es el mismo criterio que apagar una acción
- * que va a dar 403 en vez de dejar que reviente al pulsarla.
+ * `null` era el caso de `assistant-front`, donde no hay lienzo delante; desde F1
+ * es el caso de todas. La tarjeta entonces **no ofrece un botón que no llevaría
+ * a ninguna parte**: describe el corte y ya. Es el mismo criterio que apagar una
+ * acción que va a dar 403 en vez de dejar que reviente al pulsarla.
  *
  * Contexto y no una prop encadenada porque entre `AssistantChat` y esta tarjeta
  * hay tres componentes que no tienen nada que ver con gráficos y tendrían que
@@ -1279,16 +1284,22 @@ export function ChartProposalCard({
       </p>
 
       {!aceptarGrafico && (
-        <p className="font-sans text-xs text-white">
-          Los grafos se colocan desde{' '}
-          {/* Cruza de zona → `<a>` duro, nunca `next/link`. Ver §16. */}
-          <a
-            href="/reports"
-            className="text-primary underline-offset-2 transition-colors hover:underline"
-          >
-            Análisis
-          </a>
-          , y ahí se queda puesto para la próxima vez.
+        /**
+         * ⚠️ **Hoy no hay ningún lienzo, así que este es el único caso.**
+         *
+         * Enlazaba a Análisis, que era donde se colocaba el gráfico. Esa zona se
+         * archivó en F1 de PLAN-FUSION-ZONAS —de sus quince gráficas solo una o
+         * dos daban valor, y llevaba meses sin entrada en el menú—, así que el
+         * enlace apuntaba a un 404: peor que no ofrecer nada, porque promete un
+         * sitio al que ir.
+         *
+         * La propuesta **no se esconde**, por el mismo motivo de siempre: que
+         * PRAX haya visto que este corte de los datos es interesante es parte de
+         * la respuesta. Lo que se quita es el destino que ya no existe.
+         */
+        <p className="font-sans text-xs text-text-secondary">
+          De momento no hay dónde colocarlo: el corte se describe aquí y se
+          vuelve a proponer cuando haga falta.
         </p>
       )}
 

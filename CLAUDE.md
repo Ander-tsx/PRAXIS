@@ -271,7 +271,7 @@ las siete sueltas y el paquete—. Antes de tocarlos, ESTADO-ACTUAL §44:
    sí se recorta en silencio. Misma regla que el inventario del asistente.
 
 **Para enlazar a un proyecto usa los helpers, nunca la plantilla a mano.**
-`projectHref` / `projectPath` / `reportHref` / `reportPath`, en
+`projectHref` / `projectPath`, en
 `commons/api/routes.ts`. El slug va en la URL y el UUID en la API, los dos son
 `string`, y equivocarse **no da error de compilación**: sale como una URL fea,
 un 403 o un desplegable vacío. Ya se coló en cinco sitios.
@@ -366,7 +366,9 @@ sobre una lista que alguien le cortó por detrás.
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · admin-front 4105 · chat-front 4106 · **assistant-front 4107** · 4108+ para zonas nuevas.
+**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · admin-front 4105 · chat-front 4106 · **assistant-front 4107** · 4108+ para zonas nuevas.
+
+🚫 **El 4104 quedó libre: `reports-front` se archivó** (F1 de [PLAN-FUSION-ZONAS](docs/PLAN-FUSION-ZONAS.md)). `/reports` responde 404. Lo que **no** se tocó: `reports-service` en el 3005 y las once rutas de análisis del gateway, que PRAX sigue usando para contestar. No se reutiliza el 4104 para una zona nueva mientras dure la fusión: la etapa va a dejar **una sola** aplicación de frontend.
 
 ⚠️ **`permissions` es 3002 y `projects` es 3003**, no al revés. Este documento los tuvo invertidos, y equivocarse no da un error claro: el servicio arranca, el gateway le habla al otro y las respuestas salen vacías o con `BAD_GATEWAY`. La lista de verdad está en `scripts/dev-cli/config/services.mjs`, que además la valida contra los `package.json` reales.
 
@@ -429,8 +431,25 @@ pnpm prisma:generate      # los 7 servicios con Prisma
 pnpm prisma:deploy        # aplica migraciones sin tocar los datos
 pnpm prisma:seed          # 5 seeds, en su orden de dependencia
 pnpm dev:backend          # gateway + los 9 microservicios
-pnpm dev:frontend         # las 7 zonas
+pnpm dev:frontend         # las 6 zonas
 ```
+
+🍎 🔴 **En una máquina de 8 GB, el modo desarrollo no cabe con las pruebas de
+punta a punta.** Diez servicios en `nest start --watch` y seis `next dev`
+mantienen cada uno un compilador y un vigilante en memoria; con Chromium encima,
+el sistema **mata los procesos a mitad de la corrida** y no queda ni un error en
+la suite: desaparecen y ya. Para verificar, se corre el stack **construido**:
+
+```bash
+pnpm build:frontend       # las zonas, --concurrency=1: importa el pico
+pnpm --filter "@praxis/gateway" --filter "@praxis/*-service" run build
+pnpm start:backend        # los 10, desde dist/   → ~315 MB en total
+pnpm start:frontend       # las zonas, desde .next/ → ~580 MB en total
+```
+
+⚠️ Se pierde la recarga en caliente: un cambio no se ve hasta reconstruir esa
+zona. Para **escribir** código, `dev:cli` con lo mínimo levantado; el stack
+construido es para **verificar**.
 
 ⚠️ **`prisma:reset` borra las tablas.** Es `migrate reset --force`: recrea el
 esquema de los 7 servicios con Prisma y siembra encima. Para aplicar una migración

@@ -64,16 +64,6 @@ export function projectPath(project: ConSlug, params?: ProjectParams): string {
   return `/${project.slug}${queryString(params)}`;
 }
 
-/** `/reports/rediseno-del-panel` — el informe, desde cualquier zona. */
-export function reportHref(project: ConSlug): string {
-  return `/reports/${project.slug}`;
-}
-
-/** `/rediseno-del-panel` — el informe, navegando dentro de reports-front. */
-export function reportPath(project: ConSlug): string {
-  return `/${project.slug}`;
-}
-
 /**
  * Los parámetros que entienden las pantallas de proyecto.
  *

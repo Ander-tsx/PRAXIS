@@ -75,7 +75,6 @@ flowchart TB
         Auth["auth-front :4101\n/auth"]
         Dash["dashboard-front :4102\n/dashboard"]
         Proj["projects-front :4103\n/projects"]
-        Rep["reports-front :4104\n/reports"]
         Adm["admin-front :4105\n/admin"]
         Chat["chat-front :4106\n/chat"]
         AsstF["assistant-front :4107\n/assistant"]
@@ -176,7 +175,6 @@ PRAXIS/
 │   │   ├── auth-front/         # /auth — login, registro, Google OAuth, verificación
 │   │   ├── dashboard-front/    # /dashboard — panel, alertas, invitaciones, Alexa link
 │   │   ├── projects-front/     # /projects — catálogo, Kanban, tareas, miembros
-│   │   ├── reports-front/      # /reports — métricas, Monte Carlo, asistente IA
 │   │   ├── admin-front/        # /admin — cuentas, suspensión, auditoría (rol Admin)
 │   │   ├── chat-front/         # /chat — mensajería en tiempo real, canales, DMs
 │   │   ├── assistant-front/    # /assistant — interfaz del asistente conversacional
@@ -447,8 +445,6 @@ gcloud builds submit --config=infra/ci/cloudbuild.yaml .
 ![Notificaciones](docs/assets/notifications-page.png)
 
 ![Chat](docs/assets/chat-page.png)
-
-![Analisís](docs/assets/reports-page.png)
 
 ![Tablero Kanban](docs/assets/kanban-board.png)
 

@@ -4,6 +4,9 @@
   "scripts": {
     "dev:backend": "turbo run dev --concurrency=16 --filter=\"./apps/backend/gateway\" --filter=\"./apps/backend/services/*\"",
     "dev:frontend": "turbo run dev --filter=\"./apps/frontend/*\"",
+    "build:frontend": "turbo run build --concurrency=1 --filter=\"./apps/frontend/*\"",
+    "start:backend": "turbo run start:prod --concurrency=16 --filter=\"./apps/backend/gateway\" --filter=\"./apps/backend/services/*\"",
+    "start:frontend": "turbo run start --concurrency=16 --filter=\"./apps/frontend/*\"",
     "dev:cli": "node scripts/dev-cli/index.mjs",
     "build": "turbo run build",
     "build:shared": "pnpm --filter @praxis/contracts --filter @praxis/observability --filter @praxis/domain-events run build",

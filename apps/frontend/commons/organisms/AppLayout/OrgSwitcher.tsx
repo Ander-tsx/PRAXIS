@@ -33,8 +33,13 @@ function etiquetaDePlan(tier?: string | null): string {
  * queda enseñando algo de otro sitio — o da un 403 sin explicar por qué.
  *
  * Estaba escrito como una sola comparación contra `/projects/`, así que
- * `/chat/proyecto/:id` y `/reports/:id` se quedaban abiertos. Es una lista
- * porque va a crecer con cada zona que enseñe un recurso de la organización.
+ * `/chat/proyecto/:id` se quedaba abierto. Es una lista porque va a crecer con
+ * cada pantalla que enseñe un recurso de la organización.
+ *
+ * ⚠️ `/reports/:id` salió de aquí al archivarse la zona de Análisis (F1 de
+ * PLAN-FUSION-ZONAS). Si el informe vuelve a tener pantalla propia, vuelve
+ * también esta línea: es de las que no fallan, solo dejan ver datos de la
+ * organización que se acaba de dejar.
  *
  * El valor es a dónde se sale: la raíz de esa misma zona, que sí se recalcula
  * con la organización nueva.
@@ -42,7 +47,6 @@ function etiquetaDePlan(tier?: string | null): string {
 const RUTAS_DE_UN_RECURSO: ReadonlyArray<readonly [prefijo: string, salida: string]> = [
   ['/projects/', '/projects'],
   ['/chat/proyecto/', '/chat'],
-  ['/reports/', '/reports'],
 ];
 
 export function OrgSwitcherSalida(pathname: string): string | null {

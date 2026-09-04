@@ -28,7 +28,7 @@ const LOCAL = '127.0.0.1';
  *
  * ⚠️ `ADMIN_FRONT_URL` la lee `web-shell/next.config.ts` pero **no aparece** en
  * su `.env.example`, y `admin-front` no tiene `.env.example` ninguno. Aquí van
- * las siete explícitas para que el despliegue no dependa de un valor por
+ * las seis explícitas para que el despliegue no dependa de un valor por
  * defecto que nadie documentó. `CHAT_FRONT_URL` está en el mismo caso desde
  * E3.
  */
@@ -36,7 +36,6 @@ const zonas = {
   AUTH_FRONT_URL: `http://${LOCAL}:4101`,
   DASHBOARD_FRONT_URL: `http://${LOCAL}:4102`,
   PROJECTS_FRONT_URL: `http://${LOCAL}:4103`,
-  REPORTS_FRONT_URL: `http://${LOCAL}:4104`,
   ADMIN_FRONT_URL: `http://${LOCAL}:4105`,
   CHAT_FRONT_URL: `http://${LOCAL}:4106`,
   ASSISTANT_FRONT_URL: `http://${LOCAL}:4107`,
@@ -79,7 +78,6 @@ module.exports = {
     zona('auth-front', 'auth-front', 4101),
     zona('dashboard-front', 'dashboard-front', 4102),
     zona('projects-front', 'projects-front', 4103),
-    zona('reports-front', 'reports-front', 4104),
     zona('admin-front', 'admin-front', 4105),
     zona('chat-front', 'chat-front', 4106),
     zona('assistant-front', 'assistant-front', 4107),

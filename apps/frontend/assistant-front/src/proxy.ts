@@ -27,7 +27,7 @@ import { type NextRequest, NextResponse } from 'next/server';
  *
  * ## Aquí no se comprueba ningún permiso, y no falta ninguno
  *
- * A diferencia de admin-front —que además exige rol— y de reports-front —que
+ * A diferencia de admin-front —que además exige rol— y de la archivada reports-front —que
  * exige `canViewReports` sobre un proyecto—, **PRAX no tiene puerta propia**:
  * cualquier cuenta con sesión puede abrir su pantalla. Lo que sí está acotado es
  * lo que puede *responder*, y eso se resuelve donde corresponde:

@@ -357,7 +357,7 @@ más barata.
 | # | Paso | Líneas | Estado |
 |---|---|---|---|
 | **F0** | Línea base: `pnpm e2e:regresion` | — | ✅ 243/243 |
-| **F1** | Archivar `reports-front` | 7.415 | ⬜ |
+| **F1** | Archivar `reports-front` | 7.415 | ✅ código · ⚠️ regresión a medias, ver Registro |
 | **F2** | Mover `assistant-front` → shell **(piloto del mecanismo)** | 757 | ⬜ |
 | **F3** | Mover `chat-front` | 2.539 | ⬜ |
 | **F4** | Mover `admin-front` | 3.384 | ⬜ |
@@ -389,6 +389,48 @@ esta lista.
 
 ⚠️ **Y en cada zona, mirar la pantalla**, no solo el verde: el fallo de los
 `@source` no da error y las pruebas no miran los estilos.
+
+### 🔴 En una máquina de 8 GB, la suite se corre contra el stack **construido**
+
+**El modo desarrollo no cabe.** Diez servicios con `nest start --watch` y siete
+`next dev` mantienen en memoria un compilador y un vigilante cada uno; con
+Chromium encima, el sistema mató los procesos **dos veces** en mitad de la
+corrida de F1 —en la prueba 200 de 245 la primera, en la 31 de 66 la segunda—.
+No deja error en la suite: los procesos desaparecen y ya.
+
+La salida no es partir la suite, es no arrancar el compilador:
+
+| Modo | Backend | Frontend |
+|---|---|---|
+| `dev` (vigilancia) | varios GB | varios GB |
+| **construido** | **315 MB** | **579 MB** |
+
+```bash
+pnpm build:shared                 # contracts, observability, domain-events
+pnpm --filter "@praxis/gateway" --filter "@praxis/*-service" run build
+pnpm build:frontend               # las 7 zonas, --concurrency=1 (el pico importa)
+
+pnpm start:backend                # los 10, desde dist/ (node dist/main)
+pnpm start:frontend               # las 7, desde .next/ (next start)
+
+pnpm e2e:regresion                # ya cabe entera, de una vez
+```
+
+Los tres scripts de arranque se añadieron en esta etapa (`build:frontend`,
+`start:backend`, `start:frontend`) y las tareas `start` / `start:prod` a
+`turbo.json`, persistentes y dependientes de `build`.
+
+⚠️ **Lo que se pierde es la recarga en caliente**: tocar código no se ve hasta
+reconstruir esa zona (`pnpm --filter @praxis/<zona> build` y reiniciar). Para
+escribir código sigue valiendo `dev:cli` con lo mínimo levantado; el stack
+construido es para **verificar**.
+
+⚠️ **`next start` implica `NODE_ENV=production`.** No rompe la sesión —Chrome
+trata `localhost` como origen seguro, así que la cookie `secure` se guarda igual—
+pero conviene saberlo si alguna prueba dependiera de algo propio de desarrollo.
+
+⚠️ Y esto es un argumento **a favor** de la fusión: al acabar queda **un**
+proceso de frontend en vez de siete.
 
 ---
 
@@ -445,6 +487,9 @@ ha hecho.
 | Fecha | Paso | Qué pasó |
 |---|---|---|
 | 2026-09-03 | **F0** | Línea base **243/243 en verde** (39,1 min). Un rojo, y era de la prueba: `06-chat-zona.spec.ts` buscaba `role="button"` donde `2d4d1a5` había puesto `role="tab"`. Corregido el localizador. Los rojos previstos del chat privado no aparecieron: ya estaban reescritos |
+| 2026-09-04 | **F1** | Zona archivada. Fuera: la app entera, sus `rewrites()`, su entrada de pm2 y de `dev-cli`, los helpers `reportHref`/`reportPath` —que solo usaba ella—, la fila `/reports/` de `OrgSwitcher` y el enlace muerto a Análisis de la tarjeta de gráfico. La costura del lienzo (`AccionDelLienzo`, `alAceptarGrafico`) **se conserva sin implementador**, para cuando el informe vuelva a tener sitio. `/reports` responde 404, comprobado. Las cinco zonas privadas entraron en `02-guards`: faltaban `chat` y `assistant`, que son justo las que la fusión va a meter bajo un único `matcher` |
+| 2026-09-04 | ⚠️ | **La regresión de F1 no se pudo cerrar: la máquina se queda sin memoria.** Cuatro intentos, muerto los cuatro por el sistema. Verde lo que llegó a correr: **las 195 de API enteras** y, de navegador, `01-publico`, `02-guards` —con las dos zonas nuevas— y `03-sesion` hasta la 31. Sin correr: `04-invitaciones`, `05-equipo`, `06-chat-zona`, `07-reglas`, `08-panel-de-tarea`. Ninguna toca Análisis, pero **el paso no está cerrado hasta que corran** |
+| 2026-09-04 | 🔧 | De ahí salió el stack construido (`build:frontend`, `start:backend`, `start:frontend`): **315 MB el backend y 579 MB el frontend**, contra varios GB en vigilancia. No bastó — con todo apagado la máquina ya tenía 677 MB libres y 6,65 de 8 GB de swap ocupados— pero es el modo correcto de verificar de aquí en adelante |
 
 ---
 

@@ -69,16 +69,20 @@ import { conversationIdDelError, cuotaDelError, describe, requireApi } from './h
  *
  * ## Por qué esto vive en `commons` y no en una zona
  *
- * Porque desde que PRAX tiene pantalla propia lo usan **dos**: `assistant-front`
- * —donde la conversación es toda la pantalla— y `reports-front`, donde es un
- * panel al lado de los gráficos. Duplicar novecientas líneas de acciones que
- * llaman a endpoints con permisos delicados es duplicar el sitio donde se puede
- * colar un fallo de autorización.
+ * Porque lo usaban **dos**: `assistant-front` —donde la conversación es toda la
+ * pantalla— y `reports-front`, donde era un panel al lado de los gráficos.
+ * Duplicar novecientas líneas de acciones que llaman a endpoints con permisos
+ * delicados es duplicar el sitio donde se puede colar un fallo de autorización.
  *
- * ⚠️ **`aceptarGraficoAction` NO está aquí**, y es la única que se quedó en
- * `reports-front`. Escribe en el lienzo, así que necesita el catálogo de widgets
- * —que es de aquella zona— y además revalida *su* página. Llega a la
- * conversación **inyectada por props**; donde no hay lienzo no se inyecta, y la
+ * ⚠️ Que hoy quede **uno** —`reports-front` se archivó en F1 de
+ * PLAN-FUSION-ZONAS— no devuelve estas acciones a la zona: la fusión va justo en
+ * la dirección contraria, y a partir de F8 la conversación se abre desde varias
+ * pantallas de la misma aplicación.
+ *
+ * ⚠️ **`aceptarGraficoAction` NO está aquí**, y era la única que se quedaba en
+ * `reports-front`. Escribía en el lienzo, así que necesitaba el catálogo de
+ * widgets de aquella zona y revalidaba *su* página. Llegaba a la conversación
+ * **inyectada por props**; desde que no hay lienzo no la inyecta nadie, y la
  * tarjeta lo dice en vez de ofrecer un botón que no llevaría a ninguna parte.
  *
  * ⚠️ **Nada de lo que llega aquí desde el chat es de fiar**, y no hace falta que

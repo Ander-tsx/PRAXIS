@@ -24,7 +24,7 @@ Estado por pieza:
 | `projects-front` | ✅ Funcional | Lista, detalle, espacios, tableros, tablero Kanban, tareas, checklists, miembros, roles y etiquetas. La zona más grande. Zona propia en el 4103. Ver §18–§24 y §28. |
 | `dashboard-front` | ✅ Funcional | Panel y datos del usuario, contra el backend real. Zona propia en el 4102. Ver §17. |
 | `admin-front` | ✅ Funcional | Cuentas, proyectos y registro de actividad. Zona propia en el 4105. Ver §31. |
-| `reports-front` | ✅ Funcional | Análisis y asistente. Zona propia en el 4104. Ver §25, §26, §29 y §30. |
+| `reports-front` | 🚫 **Archivada** | Análisis y asistente. Se retiró en F1 de [PLAN-FUSION-ZONAS](../PLAN-FUSION-ZONAS.md): de sus quince gráficas solo una o dos daban valor y llevaba meses sin entrada en el menú. `/reports` responde 404 y el 4104 queda libre. **`reports-service` y las once rutas de análisis del gateway siguen en pie** — PRAX las usa. §25, §26, §29 y §30 se conservan porque describen lo que hubo. |
 | `apps/mobile` | 🔴 Vacío | Solo `.gitkeep`. Fuera de alcance por ahora. |
 
 **Lo que bloqueaba todo** (§4.1 workspace, §4.2 puertos, §5.1 login, §12 errores del gateway) **ya está resuelto**. El siguiente bloqueante real es que no existe el proxy autenticado hacia el gateway desde una zona privada (§7).
@@ -2008,6 +2008,17 @@ simulación.
 
 ### 25.12 `reports-front`, la cuarta zona
 
+> 🚫 **Zona archivada el 2026-09-03** (F1 de
+> [PLAN-FUSION-ZONAS](../PLAN-FUSION-ZONAS.md)). Lo que sigue describe cómo
+> estuvo construida, no lo que hay hoy: el directorio `apps/frontend/reports-front`
+> ya no existe, `/reports` responde 404 y el 4104 está libre.
+>
+> **No se archivó la capacidad, solo la pantalla**: `reports-service` (3005) y
+> las once rutas de análisis del gateway siguen sirviendo a PRAX y a
+> `historialAnalisisDias`. Y queda una idea por rescatar — «cuándo acabaría un
+> proyecto» fue lo único que se consideró realmente útil, y merece un sitio
+> dentro de la pantalla del proyecto.
+
 Puerto **4104**, `basePath: '/reports'`, checklist de §17.7 completo. La entrada
 «Reportes» de la barra lateral deja de estar apagada después de haberlo estado
 desde el principio.
@@ -2143,7 +2154,7 @@ que es justo lo que existe para evitar `permissions/me`.
 ### 26.2 Quién hace qué
 
 ```
-reports-front (4104)
+assistant-front (4107)   ← era reports-front (4104), archivada en F1
    └─ Server Action ──► gateway :3000
                           /projects/:projectId/assistant/{quota,chat}
                           (JwtGuard + ProjectPermissionGuard, canViewProject)

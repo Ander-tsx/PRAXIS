@@ -107,7 +107,9 @@ test.describe('Sesión en el navegador', () => {
   test('con sesión se entra a las tres zonas privadas', async ({ page }) => {
     await crearCuentaYEntrar(page);
 
-    for (const ruta of ['/main', '/projects', '/reports']) {
+    /* `/reports` estaba en esta lista; la zona se archivó en F1 de la fusión y
+       hoy da 404. La sustituye `/chat`, que es privada y sigue viva. */
+    for (const ruta of ['/main', '/projects', '/chat']) {
       await page.goto(ruta);
       await expect(page, `${ruta} debería servirse con sesión`).not.toHaveURL(/\/auth\/login/);
     }
@@ -283,7 +285,7 @@ test.describe('Las personas de un proyecto', () => {
     /* `/main` es la bandeja de avisos hoy: la pantalla suelta de notificaciones
        se retiró (`/notifications` redirige a `/main`) y su equivalente vive en
        el panel y en la pestaña de bandeja del `AppShell`. */
-    for (const ruta of ['/reports', '/main']) {
+    for (const ruta of ['/chat', '/main']) {
       const respuesta = await page.goto(ruta);
       await page.waitForLoadState('networkidle');
 

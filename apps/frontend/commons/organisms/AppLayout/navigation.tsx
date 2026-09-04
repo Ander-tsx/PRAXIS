@@ -88,9 +88,12 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
 
-  /* «Análisis» (`/reports`) se retiró del sidebar: la pantalla de análisis no
-     daba valor y está pendiente decidir qué hacer con esa zona. El código de
-     `reports-front` sigue ahí, solo que ya no se enlaza desde la navegación. */
+  /* 🕳️ Aquí estaba «Análisis» → `/reports`.
+     Primero se retiró del sidebar —la pantalla no daba valor— y después se
+     archivó la zona entera en F1 de PLAN-FUSION-ZONAS: de sus quince gráficas
+     solo una o dos servían, y ninguna necesitaba una sección propia. `/reports`
+     responde 404 desde entonces; `reports-service` y las once rutas de análisis
+     del gateway siguen en pie, porque PRAX las usa para contestar. */
 
   /*
    * 🕳️ Aquí estaba «Suscripción» → `/billing`.

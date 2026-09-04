@@ -202,15 +202,6 @@ export const FRONTEND_APPS = [
     descripcion: 'Proyectos y tableros',
   },
   {
-    key: 'reports-front',
-    pkg: '@praxis/reports-front',
-    dir: 'apps/frontend/reports-front',
-    port: 4104,
-    envFile: '.env.local',
-    color: 96,
-    descripcion: 'Análisis: lienzo de gráficos',
-  },
-  {
     key: 'admin-front',
     pkg: '@praxis/admin-front',
     dir: 'apps/frontend/admin-front',
@@ -284,7 +275,7 @@ export const ALL_SERVICES = [...BACKEND_SERVICES, ...FRONTEND_APPS];
 export const PRESETS = [
   {
     key: 'todo',
-    nombre: 'Todo — los 9 servicios y las 7 zonas',
+    nombre: 'Todo — los 9 servicios y las 6 zonas',
     backend: BACKEND_SERVICES.map((s) => s.key),
     frontend: true,
   },
@@ -302,7 +293,7 @@ export const PRESETS = [
   },
   {
     key: 'frontend',
-    nombre: 'Solo frontend — las 7 zonas (el backend ya está arriba)',
+    nombre: 'Solo frontend — las 6 zonas (el backend ya está arriba)',
     backend: [],
     frontend: true,
   },

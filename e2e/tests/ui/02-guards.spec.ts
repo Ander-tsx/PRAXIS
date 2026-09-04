@@ -18,13 +18,25 @@ import { expect, test } from '@playwright/test';
  * Por eso cada zona tiene dos pruebas: la raíz y una ruta interior.
  */
 
-/** Las tres zonas privadas y una ruta interior de cada una. */
+/**
+ * Las cinco zonas privadas y una ruta interior de cada una.
+ *
+ * ⚠️ Están **todas** a propósito, y no era así: faltaban `chat-front` y
+ * `assistant-front`, que son justo las dos que llegaron después. La lista se
+ * completó al empezar la fusión de zonas, porque a partir de F8 los cinco
+ * prefijos los cubre **un solo `matcher`** y esta prueba pasa a ser lo que
+ * avisa si uno se queda fuera de él.
+ *
+ * `reports-front` salió de aquí: la zona se archivó en F1 y `/reports` responde
+ * 404 — que no es redirigir al login, así que no cabe en esta prueba.
+ */
 const ZONAS = [
   /* dashboard-front se sirve en `/main` (su `basePath`), no en `/dashboard`. */
   { nombre: 'dashboard-front', raiz: '/main', interior: '/main/settings' },
   { nombre: 'projects-front', raiz: '/projects', interior: '/projects/no-existe-este-slug' },
-  { nombre: 'reports-front', raiz: '/reports', interior: '/reports/no-existe-este-slug' },
   { nombre: 'admin-front', raiz: '/admin', interior: '/admin/actividad' },
+  { nombre: 'chat-front', raiz: '/chat', interior: '/chat/no-existe-este-peer' },
+  { nombre: 'assistant-front', raiz: '/assistant', interior: '/assistant/no-existe' },
 ] as const;
 
 test.describe('Sin sesión, todo lo privado manda al login', () => {

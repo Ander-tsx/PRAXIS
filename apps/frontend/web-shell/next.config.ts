@@ -25,7 +25,6 @@ const nextConfig: NextConfig = {
     const authFrontUrl = process.env.AUTH_FRONT_URL ?? 'http://localhost:4101';
     const dashboardFrontUrl = process.env.DASHBOARD_FRONT_URL ?? 'http://localhost:4102';
     const projectsFrontUrl = process.env.PROJECTS_FRONT_URL ?? 'http://localhost:4103';
-    const reportsFrontUrl = process.env.REPORTS_FRONT_URL ?? 'http://localhost:4104';
     const adminFrontUrl = process.env.ADMIN_FRONT_URL ?? 'http://localhost:4105';
     const chatFrontUrl = process.env.CHAT_FRONT_URL ?? 'http://localhost:4106';
     const assistantFrontUrl = process.env.ASSISTANT_FRONT_URL ?? 'http://localhost:4107';
@@ -45,11 +44,6 @@ const nextConfig: NextConfig = {
       {
         source: '/projects/:path*',
         destination: `${projectsFrontUrl}/projects/:path*`,
-      },
-      { source: '/reports', destination: `${reportsFrontUrl}/reports` },
-      {
-        source: '/reports/:path*',
-        destination: `${reportsFrontUrl}/reports/:path*`,
       },
       /**
        * El panel de administración. Las **dos** entradas, igual que las demás

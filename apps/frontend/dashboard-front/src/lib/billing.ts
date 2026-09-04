@@ -4,7 +4,7 @@
  * Se declara aquí y no se importa de `@praxis/contracts` porque ese paquete es
  * de backend —arrastra `class-validator` y los decoradores de Swagger— y el
  * frontend solo necesita la forma. Mismo tipo que ya vive en
- * `reports-front/src/lib/assistant.ts`; no se comparte porque cada zona
+ * `reports-front/src/lib/assistant.ts` (zona archivada); no se comparte porque cada zona
  * resuelve la cuota contra una ruta distinta (`/me/assistant/quota` aquí,
  * `/projects/:id/assistant/quota` allá) y no hay una tercera zona que lo
  * necesite todavía como para subirlo a `commons`.
