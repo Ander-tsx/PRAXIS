@@ -37,7 +37,7 @@ export function OrganizationForm() {
   /* Al crearla se entra directamente en su portal. Dejar a alguien en el
      formulario vacío tras crear algo obliga a preguntarse si funcionó. */
   useEffect(() => {
-    if (state.creada) router.push(`/organizations/${state.creada}`);
+    if (state.creada) router.push(`/main/organizations/${state.creada}`);
   }, [state.creada, router]);
 
   return (

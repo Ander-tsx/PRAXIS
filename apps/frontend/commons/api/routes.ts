@@ -23,45 +23,35 @@ import type { Project } from './domain';
  * Estas funciones convierten «acordarse de usar el slug» en algo que se hace
  * solo. **Si vas a escribir a mano una ruta de proyecto, usa esto en su lugar.**
  *
- * ## Ojo con el basePath
+ * ## Hubo dos, y ahora hay uno
  *
- * Las zonas son apps Next independientes con `basePath`. Dentro de
- * projects-front, Next añade `/projects` solo, así que un enlace **de la misma
- * zona** va sin prefijo. Por eso hay dos familias:
+ * Mientras el frontend fue un multi-zone, cada zona tenía `basePath` y Next se
+ * lo anteponía a los enlaces internos: `projectHref()` daba la ruta completa
+ * —para cruzar de zona, con `<a>`— y `projectPath()` la relativa, para navegar
+ * dentro de projects-front con `next/link`.
  *
- * - `projectHref()` — ruta completa del shell. Para enlazar **desde otra zona**
- *   (el panel, los avisos) y siempre con `<a>`, no con `next/link`.
- * - `projectPath()` — relativa a projects-front. Para `next/link` y `router`
- *   **dentro** de esa zona.
+ * 🔴 **`projectPath()` se retiró en F6 de la fusión de zonas.** Sin `basePath`
+ * no hay nada que anteponer, así que su valor —`/rediseno-del-panel`— habría
+ * llevado a la raíz de la aplicación, o sea a la landing pública. Y no habría
+ * dado ningún error: es una cadena válida y un enlace que responde 200.
  *
- * Ver ESTADO-ACTUAL §16.
+ * Queda `projectHref()`, que vale en los dos sitios.
  */
 
 /** Lo mínimo para construir un enlace: cualquier cosa con slug sirve. */
 type ConSlug = Pick<Project, 'slug'>;
 
 /**
- * `/projects/rediseno-del-panel` — ruta del shell, para cruzar de zona.
+ * `/projects/rediseno-del-panel` — la ruta de un proyecto, entera.
  *
  * ```tsx
- * <a href={projectHref(project)}>{project.name}</a>
- * <a href={projectHref(project, { board: task.boardId, task: task.id })}>…</a>
+ * <Link href={projectHref(project)}>{project.name}</Link>
+ * <Link href={projectHref(project, { board: task.boardId, task: task.id })}>…</Link>
+ * router.replace(projectHref(project, { tab: 'espacios', ws: id }));
  * ```
  */
 export function projectHref(project: ConSlug, params?: ProjectParams): string {
   return `/projects/${project.slug}${queryString(params)}`;
-}
-
-/**
- * `/rediseno-del-panel` — relativa, para navegar dentro de projects-front.
- *
- * ```tsx
- * <Link href={projectPath(project, { tab: 'equipo' })} replace>Equipo</Link>
- * router.replace(projectPath(project, { tab: 'espacios', ws: id }));
- * ```
- */
-export function projectPath(project: ConSlug, params?: ProjectParams): string {
-  return `/${project.slug}${queryString(params)}`;
 }
 
 /**

@@ -25,7 +25,7 @@ export function AcceptInvitation({ token }: { token: string }) {
   );
 
   useEffect(() => {
-    if (state.done) router.push(`/organizations/${state.done}`);
+    if (state.done) router.push(`/main/organizations/${state.done}`);
   }, [state.done, router]);
 
   return (

@@ -6,11 +6,13 @@
     "dev": "next dev --port 4100",
     "build": "next build",
     "start": "next start --port 4100",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run"
   },
   "dependencies": {
     "@praxis/commons": "workspace:*",
     "lenis": "^1.3.26",
+    "lucide-react": "^1.31.0",
     "next": "16.2.11",
     "react": "19.2.4",
     "react-dom": "19.2.4"
@@ -23,6 +25,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.0.0"
   }
 }

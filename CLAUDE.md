@@ -270,11 +270,16 @@ las siete sueltas y el paquete—. Antes de tocarlos, ESTADO-ACTUAL §44:
 3. ⚠️ **Un tramo de más de 365 días se rechaza con 400**, al revés que `days`, que
    sí se recorta en silencio. Misma regla que el inventario del asistente.
 
-**Para enlazar a un proyecto usa los helpers, nunca la plantilla a mano.**
-`projectHref` / `projectPath`, en
+**Para enlazar a un proyecto usa el helper, nunca la plantilla a mano.**
+`projectHref` (y `reportHref` mientras existió Análisis), en
 `commons/api/routes.ts`. El slug va en la URL y el UUID en la API, los dos son
 `string`, y equivocarse **no da error de compilación**: sale como una URL fea,
 un 403 o un desplegable vacío. Ya se coló en cinco sitios.
+
+🚫 **`projectPath()` ya no existe** (F6). Devolvía la ruta *sin* `/projects`
+porque Next se lo anteponía dentro de la zona; fusionado, su valor llevaba a la
+raíz de la aplicación —la landing— y tampoco daba error: es una cadena válida y
+una URL que responde 200.
 
 **Reglas al escribir un fetch:**
 
@@ -366,10 +371,10 @@ sobre una lista que alguien le cortó por detrás.
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 — **la última que queda por fusionar junto con `auth-front`**.
+**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · auth-front 4101 — **la única zona que queda**.
 
-🚫 **Los puertos 4102, 4105, 4106 y 4107 quedaron libres: `/main`, `/admin`,
-`/chat` y `/assistant` los sirve ya el shell** (F2 a F5). Las URLs no cambiaron,
+🚫 **Los puertos 4102, 4103, 4105, 4106 y 4107 quedaron libres: `/main`,
+`/projects`, `/admin`, `/chat` y `/assistant` los sirve ya el shell** (F2 a F6). Las URLs no cambiaron,
 y el rol global de `/admin` se sigue comprobando en su `layout.tsx`, no en el
 guard.
 

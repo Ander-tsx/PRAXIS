@@ -103,7 +103,7 @@ export function PraxScreen({
 
       /* Sin el basePath: Next añade `/assistant`. `push` y no `replace` para que
          el botón atrás devuelva al proyecto anterior. Ver §16. */
-      router.push(`/?${params.toString()}`);
+      router.push(`/assistant?${params.toString()}`);
     },
     [proyectos, router],
   );

@@ -23,7 +23,6 @@ const nextConfig: NextConfig = {
    */
   async rewrites() {
     const authFrontUrl = process.env.AUTH_FRONT_URL ?? 'http://localhost:4101';
-    const projectsFrontUrl = process.env.PROJECTS_FRONT_URL ?? 'http://localhost:4103';
 
     return [
       {
@@ -36,11 +35,12 @@ const nextConfig: NextConfig = {
        * Cuarta zona fusionada (F5). La cuenta —organizaciones, facturación,
        * papeles y ajustes— la sirve ya esta aplicación desde `src/app/main/`.
        */
-      { source: '/projects', destination: `${projectsFrontUrl}/projects` },
-      {
-        source: '/projects/:path*',
-        destination: `${projectsFrontUrl}/projects/:path*`,
-      },
+      /*
+       * 🕳️ Aquí estaban las dos entradas de `/projects`.
+       *
+       * Quinta y última zona privada fusionada (F6). Proyectos, tableros,
+       * tareas y reglas los sirve ya esta aplicación desde `src/app/projects/`.
+       */
       /*
        * 🕳️ Aquí estaban las dos entradas de `/admin`.
        *

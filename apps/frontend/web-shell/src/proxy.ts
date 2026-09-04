@@ -50,7 +50,7 @@ const LOGIN_PATH = '/auth/login';
  * una sesión que falta. `e2e/tests/ui/02-guards.spec.ts` lo cubre para las
  * cinco.
  */
-const PREFIJOS_PRIVADOS = ['/assistant', '/chat', '/admin', '/main'];
+const PREFIJOS_PRIVADOS = ['/assistant', '/chat', '/admin', '/main', '/projects'];
 
 /**
  * Rutas que no tienen pantalla: solo llevan a otra.
@@ -187,6 +187,6 @@ export const config = {
    */
   matcher: [
     '/',
-    '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth(?:/|$)|projects(?:/|$)).*)',
+    '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth(?:/|$)).*)',
   ],
 };
