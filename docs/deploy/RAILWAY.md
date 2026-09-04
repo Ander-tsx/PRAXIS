@@ -12,7 +12,7 @@ Dos contenedores, un Postgres, un Redis. Nada más.
 | **Postgres** | plugin de Railway | — | privado |
 | **Redis** | plugin de Railway | — | privado |
 | **`api`** | gateway + los 9 microservicios (pm2, se hablan por `127.0.0.1:300x`) | `infra/docker/images/backend.Dockerfile` | `:3000` |
-| **`web`** | web-shell + las 7 zonas Next (pm2, `127.0.0.1:410x`) | `infra/docker/images/frontend.Dockerfile` | `:4100` |
+| **`web`** | la aplicación Next, **un solo proceso** bajo pm2 | `infra/docker/images/frontend.Dockerfile` | `:4100` |
 
 Los Dockerfiles y los supervisores pm2 (`*.pm2.config.cjs`) ya existían para GCP y
 sirven tal cual: no hacen nada específico de Google. `api` y `web` se comunican por

@@ -42,18 +42,18 @@ test.describe('Invitar al proyecto', () => {
      * organización del dueño —por invitación y aceptación con su propio token—.
      * El plan gratuito da tres asientos: dueño + estas dos, y entran justas.
      */
-    const orgs = await (await page.request.get('/projects/api/gateway/me/organizations')).json();
+    const orgs = await (await page.request.get('/api/gateway/me/organizations')).json();
     const orgId = (Array.isArray(orgs?.data) ? orgs.data : [])[0]?.id as string;
     expect(orgId, 'La cuenta nueva trae su organización personal').toBeTruthy();
 
     const roles = await (
-      await page.request.get(`/projects/api/gateway/organizations/${orgId}/roles`)
+      await page.request.get(`/api/gateway/organizations/${orgId}/roles`)
     ).json();
     const roleId = (Array.isArray(roles?.data) ? roles.data : [])[0]?.id as string;
     expect(roleId, 'La organización trae al menos un papel asignable').toBeTruthy();
 
     for (const invitado of [primera, segunda]) {
-      const inv = await page.request.post(`/projects/api/gateway/organizations/${orgId}/members`, {
+      const inv = await page.request.post(`/api/gateway/organizations/${orgId}/members`, {
         data: { email: invitado.email, roleId },
       });
       expect(inv.ok(), `crear invitación de organización para ${invitado.email}`).toBeTruthy();

@@ -17,31 +17,29 @@ export interface ProjectCardProps {
    */
   equipo: UserProfile[] | null;
   /**
-   * A dónde lleva la tarjeta.
-   *
-   * ⚠️ **Lo construye quien la usa, y con el helper que le toca**: `projectPath`
-   * dentro de `projects-front`, `projectHref` desde cualquier otra zona. Los dos
-   * devuelven `string` y equivocarse no da error de compilación — da un 404 con
-   * el basePath repetido, o una URL sin prefijo que no resuelve. Ver §16.
+   * A dónde lleva la tarjeta. Se construye con `projectHref`, nunca a mano: el
+   * slug va en la URL y el UUID en la API, los dos son `string`, y confundirlos
+   * no da error de compilación.
    */
   href: string;
   /**
-   * ¿El destino está en la misma zona que quien pinta la tarjeta?
+   * ¿El destino lo sirve la misma aplicación que pinta la tarjeta?
    *
-   * Decide `next/link` (misma zona; Next añade el basePath solo) o `<a>` duro
-   * (otra zona; es una navegación entre apps del multi-zone y `next/link` le
-   * pondría el prefijo equivocado).
+   * Decide `next/link` o `<a>` duro. Mientras el frontend fue un multi-zone
+   * esto separaba zonas: `next/link` le habría puesto el `basePath` de la zona
+   * actual a una ruta de otra.
    *
-   * Por defecto `false`, que es el valor **seguro**: un `<a>` de más cuesta una
-   * carga completa, un `next/link` de más cuesta un 404.
+   * ⚠️ Desde la fusión (F6) las secciones privadas están en la misma app, así
+   * que casi siempre es `true`. Se conserva porque `auth-front` sigue fuera
+   * hasta F7, y porque el valor por defecto —`false`— es el **seguro**: un
+   * `<a>` de más cuesta una carga completa, un `next/link` de más, un 404.
    */
   sameZone?: boolean;
   /**
-   * El proxy de la zona que pinta, para las fotos del equipo.
+   * El proxy autenticado, para las fotos del equipo.
    *
-   * Las imágenes de avatar se sirven a través del gateway de cada zona
-   * (`/dashboard/api/gateway`, `/projects/api/gateway`…), así que este
-   * componente no puede saberlo por su cuenta.
+   * Es `/api/gateway` en la aplicación fusionada; se sigue pasando como prop
+   * porque este componente no puede saber quién lo monta.
    */
   gatewayPath: string;
 }

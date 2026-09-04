@@ -166,86 +166,23 @@ export const BACKEND_SERVICES = [
  */
 export const FRONTEND_APPS = [
   {
-    key: 'web-shell',
-    pkg: '@praxis/web-shell',
-    dir: 'apps/frontend/web-shell',
+    key: 'web',
+    pkg: '@praxis/web',
+    dir: 'apps/frontend/web',
     port: 4100,
     envFile: '.env.local',
     color: 95,
-    descripcion: 'Cáscara · landing y rewrites',
-  },
-  {
-    key: 'auth-front',
-    pkg: '@praxis/auth-front',
-    dir: 'apps/frontend/auth-front',
-    port: 4101,
-    envFile: '.env.local',
-    color: 96,
-    descripcion: 'Login y registro',
-  },
-  {
-    key: 'dashboard-front',
-    pkg: '@praxis/dashboard-front',
-    dir: 'apps/frontend/dashboard-front',
-    port: 4102,
-    envFile: '.env.local',
-    color: 96,
-    descripcion: 'Panel, avisos y ajustes',
-  },
-  {
-    key: 'projects-front',
-    pkg: '@praxis/projects-front',
-    dir: 'apps/frontend/projects-front',
-    port: 4103,
-    envFile: '.env.local',
-    color: 96,
-    descripcion: 'Proyectos y tableros',
-  },
-  {
-    key: 'reports-front',
-    pkg: '@praxis/reports-front',
-    dir: 'apps/frontend/reports-front',
-    port: 4104,
-    envFile: '.env.local',
-    color: 96,
-    descripcion: 'Análisis: lienzo de gráficos',
-  },
-  {
-    key: 'admin-front',
-    pkg: '@praxis/admin-front',
-    dir: 'apps/frontend/admin-front',
-    port: 4105,
-    envFile: '.env.local',
-    color: 96,
-    descripcion: 'Administración de la plataforma',
-  },
-  {
-    key: 'chat-front',
-    pkg: '@praxis/chat-front',
-    dir: 'apps/frontend/chat-front',
-    port: 4106,
-    envFile: '.env.local',
-    color: 96,
-    descripcion: 'Mensajes directos y de proyecto',
-  },
-  {
-    key: 'assistant-front',
-    pkg: '@praxis/assistant-front',
-    dir: 'apps/frontend/assistant-front',
-    port: 4107,
-    envFile: '.env.local',
-    color: 96,
-    descripcion: 'PRAX, el asistente',
+    descripcion: 'La aplicación web entera',
   },
 ];
 
 /**
  * El frontend se arranca **de una pieza, con turbo**, no zona a zona.
  *
- * Siete `next dev` lanzados por separado funcionan, pero turbo ya sabe el orden
- * y comparte la caché; y sobre todo, la lista de zonas vive en un único filtro
- * en vez de repetida aquí. Las entradas de `FRONTEND_APPS` siguen haciendo
- * falta para los `.env.local` y para saber qué puertos vigilar.
+ * Queda **una sola app** desde la fusión de zonas, así que esto es casi un
+ * alias; se conserva porque `pnpm dev:frontend` es lo que documenta el README y
+ * porque `FRONTEND_APPS` sigue haciendo falta para los `.env.local` y para
+ * saber qué puerto vigilar.
  */
 export const FRONTEND_TURBO_SERVICE = {
   key: 'frontend',
@@ -284,7 +221,7 @@ export const ALL_SERVICES = [...BACKEND_SERVICES, ...FRONTEND_APPS];
 export const PRESETS = [
   {
     key: 'todo',
-    nombre: 'Todo — los 9 servicios y las 7 zonas',
+    nombre: 'Todo — los 9 servicios y el frontend',
     backend: BACKEND_SERVICES.map((s) => s.key),
     frontend: true,
   },
@@ -302,7 +239,7 @@ export const PRESETS = [
   },
   {
     key: 'frontend',
-    nombre: 'Solo frontend — las 7 zonas (el backend ya está arriba)',
+    nombre: 'Solo frontend — la aplicación web (el backend ya está arriba)',
     backend: [],
     frontend: true,
   },

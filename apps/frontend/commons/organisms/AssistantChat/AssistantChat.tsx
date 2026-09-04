@@ -111,7 +111,8 @@ export interface AssistantChatProps {
    */
   projectId: string | null;
   /**
-   * El proxy del gateway de la zona que monta esto: `/assistant/api/gateway`,
+   * El proxy del gateway de quien monta esto: `/api/gateway` en la app
+   * fusionada, `/<zona>/api/gateway` en las que todavía no lo están,
    * `/reports/api/gateway`.
    *
    * ⚠️ **Los adjuntos no pueden ir por una Server Action y por eso hace falta.**
@@ -171,13 +172,15 @@ export interface AssistantChatProps {
    * ⚠️ **Es la única acción que llega por props**, y merece la pena entender por
    * qué las otras nueve no. Aquellas —crear una tarea, comentar, mover, borrar—
    * valen en cualquier zona y viven en `commons/assistant/actions`. Aceptar un
-   * gráfico escribe en el **lienzo**, que dibuja `reports-front`: necesita su
-   * catálogo de widgets para saber de qué tamaño nace la tarjeta, y revalida
-   * *aquella* página.
+   * gráfico escribe en un **lienzo**: quien lo dibuje necesita su catálogo de
+   * widgets para saber de qué tamaño nace la tarjeta, y revalida *aquella*
+   * página.
    *
-   * Sin ella —el caso de `assistant-front`, donde no hay ningún gráfico a la
-   * vista— la tarjeta enseña qué se propone y remite a Análisis, en vez de
-   * ofrecer un botón que no podría cumplir lo que promete.
+   * ⚠️ **Hoy no la pasa nadie**: Análisis se archivó en F1 de
+   * PLAN-FUSION-ZONAS y con ella el único lienzo que había. Sin esta prop la
+   * tarjeta enseña qué se propone y nada más, en vez de ofrecer un botón que no
+   * podría cumplir lo que promete. La costura se conserva para cuando el
+   * informe vuelva a tener sitio.
    */
   alAceptarGrafico?: AceptarGrafico;
   /**

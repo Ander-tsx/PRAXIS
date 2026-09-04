@@ -294,7 +294,7 @@ siguiente. La regresión completa (`pnpm e2e:regresion`) no se corre hasta C7.
 | C6 | **B7+B8+B9+F5** — los chats: organización común como puerta, y sin referencias en privado | ✅ |
 | C7 | **D8** — invitar a un proyecto ofrece la organización, no la plataforma | ✅ |
 | C8 | Documentación: contrato, pendientes, `CLAUDE.md` y este plan | ✅ |
-| C9 | **Regresión entera** (`pnpm e2e:regresion`) — en curso, ver Registro | ⬜ |
+| C9 | **Regresión entera** (`pnpm e2e:regresion`) | ✅ 2026-09-03: **243/243**, ver Registro |
 | C10 | Repaso visual del túnel — **solo oscuro**: el modo claro se retiró en `2aae679` (`getTheme()` fijo a `'dark'`, cookie y `ThemeToggle` dormidos), fuera de esta etapa. El repaso en claro ya no aplica | ⬜ |
 
 ### Lo que sí se ha comprobado, y lo que no
@@ -304,13 +304,17 @@ assistant) y las 8 zonas, con `tsc --noEmit`.
 
 ✅ **Las unitarias, verdes**: 16 tareas, ninguna en rojo.
 
-⬜ **La regresión de punta a punta no se ha corrido**, por decisión del dueño del
-producto: son lentas y correrlas entre iteraciones se hace eterno. Queda como
-C9 y hay que hacerla antes de dar la etapa por cerrada. **Se espera rojo** en
-las pruebas que afirmaban la regla vieja del plan —un miembro de una
-organización de pago conservando sus topes fuera de ella— y en las del chat
-privado que daban por hecho el proyecto en común. Esas se reescriben; cualquier
-otro rojo es un fallo de verdad.
+✅ **La regresión de punta a punta se corrió el 2026-09-03: 243 de 243 en
+verde**, al abrir la etapa de la fusión de zonas. Estuvo pendiente por decisión
+del dueño del producto —son lentas y correrlas entre iteraciones se hace
+eterno—, así que llegó dos tandas de cambios más tarde.
+
+⚠️ **Los rojos que este párrafo daba por seguros no aparecieron**, y conviene
+saber por qué: las pruebas que afirmaban la regla vieja —el chat privado con
+proyecto en común, los topes conservados fuera de la organización— se habían
+reescrito dentro de la propia etapa, según se iban cambiando. El único rojo fue
+de una prueba que se quedó atrás de una mejora de accesibilidad (`role="tab"`),
+y está anotado en [PLAN-FUSION-ZONAS.md](PLAN-FUSION-ZONAS.md).
 
 ⚠️ **C2 va a poner en rojo pruebas que hoy están verdes, y eso es lo correcto:**
 las que afirman que un miembro de una organización de pago tiene sus topes fuera

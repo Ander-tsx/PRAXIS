@@ -18,11 +18,11 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | [docs/frontend/ENCARGO-ENTERPRISE.md](docs/frontend/ENCARGO-ENTERPRISE.md) | Lo que pidió el dueño del producto para la etapa Enterprise, y lo que delegó. Literal, y sigue siendo válido |
 | [docs/frontend/PLAN-ENTERPRISE.md](docs/frontend/PLAN-ENTERPRISE.md) | 🚫 **Deprecado.** No es una fuente de verdad: sus decisiones las reemplaza el plan de abajo. Se conserva porque describe el código que ya existe |
 | [docs/frontend/PLAN-ORGANIZACIONES.md](docs/frontend/PLAN-ORGANIZACIONES.md) | Etapa cerrada — la organización pasó a contener los proyectos, a cobrarse por asiento y a tener papeles. Se conserva por sus once decisiones y su registro; la continúa el plan de abajo |
-| [docs/PLAN-ORGANIZACION-ACTIVA.md](docs/PLAN-ORGANIZACION-ACTIVA.md) | **Etapa en curso** — desaparece «Todas las organizaciones»: siempre hay una activa y todo cuelga de ella. El plan vale solo dentro de la organización que lo paga, y hay tope de tres por persona. ⚠️ Es el primer plan que **toca el backend**, por excepción acordada. Siete decisiones, cinco invariantes y el orden |
+| [docs/PLAN-ORGANIZACION-ACTIVA.md](docs/PLAN-ORGANIZACION-ACTIVA.md) | **Etapa cerrada salvo C10** — desaparece «Todas las organizaciones»: siempre hay una activa y todo cuelga de ella. El plan vale solo dentro de la organización que lo paga, y hay tope de tres por persona. ⚠️ Es el primer plan que **toca el backend**, por excepción acordada. Siete decisiones, cinco invariantes y el orden |
 | [docs/AUDITORIA-ORGANIZACION-CHAT-MOVIL.md](docs/AUDITORIA-ORGANIZACION-CHAT-MOVIL.md) | **Auditoría abierta** (2026-09-03) — los 30 hallazgos que dejaron la organización activa, la barra lateral segmentada y el rediseño monocromo. Proyectos que caen en la organización equivocada, insignias apuntando a entradas de menú que ya no existen, el chat privado negando el paso que el gateway concede, y el móvil sin una sola puerta a los chats. Con severidad, reproducción, orden propuesto y casilla por hallazgo — **se marca al cerrar cada uno** |
 | [docs/AUDITORIA-PLANES.md](docs/AUDITORIA-PLANES.md) | **Los planes de pago.** Qué promete el catálogo y qué aplica el servidor, cuota por cuota. Incluye el plan **Pro** (entre Gratis y Equipo: menos inventario, más IA) y la retirada del `PRO` viejo por persona. ⚠️ Contesta por escrito si la cuota de PRAX es personal o del equipo — **personal, una entera por miembro** |
 | [docs/deploy/STRIPE-MODO-REAL.md](docs/deploy/STRIPE-MODO-REAL.md) | Para pasar del sandbox a cobrar de verdad. Los cinco pasos, qué objetos hay que recrear (los de prueba **no se migran**) y las tres cosas que no se pueden equivocar. ⚠️ Activar la cuenta y las dos claves van a mano, siempre |
-| [docs/PLAN-FUSION-ZONAS.md](docs/PLAN-FUSION-ZONAS.md) | **Etapa siguiente, y punto de arranque.** Fusionar las Multi-Zones en un solo frontend: por qué nacieron (un requisito de una materia, no una decisión de arquitectura), por qué ya no se sostienen —las 8 apps corren en **un solo contenedor**, o sea todo el coste y ningún beneficio— y en qué orden se hace. ⚠️ Empieza por `pnpm e2e:regresion`, que lleva sin correrse desde agosto |
+| [docs/PLAN-FUSION-ZONAS.md](docs/PLAN-FUSION-ZONAS.md) | **Etapa cerrada** (2026-09-04, rama `feature/fusion-zonas`) — Multi-Zones fusionado en una sola aplicación. Por qué nacieron las zonas (un requisito de una materia, no una decisión de arquitectura), por qué no se sostenían —las 8 apps corrían en **un solo contenedor**, todo el coste y ningún beneficio— y cómo se hizo: ocho decisiones, seis invariantes y doce pasos (F0–F11), **ninguna URL cambiada**. Se conserva por el registro: cada paso anota qué trampa apareció, y varias no dan error —`revalidatePath` sin prefijo, `projectPath()`, un `redirect()` bajo un layout que ya hace streaming— |
 | [kyloo-design/SKILL.md](kyloo-design/SKILL.md) | **Antes de tocar cualquier pantalla.** Cómo se componen: filas en vez de tarjetas, tipografía como jerarquía, activo por tono. ⚠️ **Su paleta, sus radios y sus fuentes están revertidos** (`3fa9b87`) y no se reaplican sin pedirlo — lee el aviso de su cabecera. §13 es la de dentro de la aplicación |
 | [STRUCTURE.md](STRUCTURE.md) | Dónde va cada archivo nuevo |
 | [docs/backend/permissions.md](docs/backend/permissions.md) | Modelo de permisos de dos capas |
@@ -62,7 +62,26 @@ que salieron de ahí:
 
 **Next.js 16 tiene breaking changes.** Consulta `node_modules/next/dist/docs/` antes de usar una API que no hayas verificado en este repo.
 
-**Multi-Zones, no Module Federation** (el README miente). Cada microfrontend es una app Next independiente con `basePath: '/<zona>'`, expuesta por el `web-shell` vía `rewrites()`.
+🚫 **Ya no hay microfrontends.** El frontend es **una sola aplicación Next**,
+`apps/frontend/web`, sin `basePath`. Fue un Multi-Zones de siete zonas hasta la
+etapa de fusión ([PLAN-FUSION-ZONAS](docs/PLAN-FUSION-ZONAS.md)); ninguna URL
+cambió al juntarlas.
+
+Cómo está organizada por dentro:
+
+| Ruta | Qué es |
+|---|---|
+| `src/app/page.tsx` | La landing pública |
+| `src/app/auth/*` | Login, registro, verificación, y los diez route handlers de sesión (`/auth/api/*`) |
+| `src/app/(privado)/*` | Las cinco secciones privadas —`/main`, `/projects`, `/chat`, `/assistant`, `/admin`— bajo **un solo `layout.tsx`** que monta `AppShell` |
+| `src/app/api/gateway/[...path]` | El proxy autenticado, uno para todo |
+| `src/app/api/webhooks/stripe` | 🔴 El webhook de Stripe. No se toca |
+| `src/proxy.ts` | El guard único: renueva sesión, exige sesión en los prefijos privados y aplica la regla de solo-invitados en `/auth/login` y `/auth/signup` |
+
+⚠️ **Al añadir una sección privada, su prefijo va en `PREFIJOS_PRIVADOS` de
+`src/proxy.ts`.** Olvidarlo no falla: la pantalla se sirve sin guard, el gateway
+responde 401 y se lee como una avería, no como una sesión que falta.
+`e2e/tests/ui/02-guards.spec.ts` lo cubre para las cinco.
 
 **Atomic Design:**
 - Átomos y moléculas compartidos → `apps/frontend/commons/{atoms,molecules}/`
@@ -270,11 +289,16 @@ las siete sueltas y el paquete—. Antes de tocarlos, ESTADO-ACTUAL §44:
 3. ⚠️ **Un tramo de más de 365 días se rechaza con 400**, al revés que `days`, que
    sí se recorta en silencio. Misma regla que el inventario del asistente.
 
-**Para enlazar a un proyecto usa los helpers, nunca la plantilla a mano.**
-`projectHref` / `projectPath` / `reportHref` / `reportPath`, en
+**Para enlazar a un proyecto usa el helper, nunca la plantilla a mano.**
+`projectHref` (y `reportHref` mientras existió Análisis), en
 `commons/api/routes.ts`. El slug va en la URL y el UUID en la API, los dos son
 `string`, y equivocarse **no da error de compilación**: sale como una URL fea,
 un 403 o un desplegable vacío. Ya se coló en cinco sitios.
+
+🚫 **`projectPath()` ya no existe** (F6). Devolvía la ruta *sin* `/projects`
+porque Next se lo anteponía dentro de la zona; fusionado, su valor llevaba a la
+raíz de la aplicación —la landing— y tampoco daba error: es una cadena válida y
+una URL que responde 200.
 
 **Reglas al escribir un fetch:**
 
@@ -364,9 +388,25 @@ sobre una lista que alguien le cortó por detrás.
 
 ## Estado
 
-Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
+Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · admin-front 4105 · chat-front 4106 · **assistant-front 4107** · 4108+ para zonas nuevas.
+**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · **el frontend, 4100, en un solo proceso**.
+
+🚫 **Multi-Zones ya no existe.** Los puertos 4101 a 4107 quedaron libres: las
+siete zonas se fusionaron en `apps/frontend/web` entre F2 y F7
+([PLAN-FUSION-ZONAS](docs/PLAN-FUSION-ZONAS.md)) y **ninguna URL cambió**.
+Un `proxy.ts`, un `api/gateway`, un `globals.css` y un proceso de Node. El rol
+global de `/admin` se sigue comprobando en su `layout.tsx`, no en el guard.
+
+🔴 **En la app fusionada, una redirección sin pantalla va en el guard, no en un
+`page.tsx`.** Un `redirect()` de servidor dentro de una sección privada se
+ejecuta *después* de que su `layout.tsx` haya empezado a hacer streaming —montar
+el armazón pide el perfil y la navegación al gateway—, así que la cabecera ya
+salió como 200 y Next lo degrada a una redirección de cliente: **44 KB de HTML y
+dos llamadas al gateway para una pantalla que nadie ve**. Desde
+`REDIRECCIONES_EXACTAS` en `web/src/proxy.ts` son 9 bytes y un 307.
+
+🚫 **El 4104 quedó libre: `reports-front` se archivó** (F1 de [PLAN-FUSION-ZONAS](docs/PLAN-FUSION-ZONAS.md)). `/reports` responde 404. Lo que **no** se tocó: `reports-service` en el 3005 y las once rutas de análisis del gateway, que PRAX sigue usando para contestar. No se reutiliza el 4104 para una zona nueva mientras dure la fusión: la etapa va a dejar **una sola** aplicación de frontend.
 
 ⚠️ **`permissions` es 3002 y `projects` es 3003**, no al revés. Este documento los tuvo invertidos, y equivocarse no da un error claro: el servicio arranca, el gateway le habla al otro y las respuestas salen vacías o con `BAD_GATEWAY`. La lista de verdad está en `scripts/dev-cli/config/services.mjs`, que además la valida contra los `package.json` reales.
 
@@ -429,8 +469,25 @@ pnpm prisma:generate      # los 7 servicios con Prisma
 pnpm prisma:deploy        # aplica migraciones sin tocar los datos
 pnpm prisma:seed          # 5 seeds, en su orden de dependencia
 pnpm dev:backend          # gateway + los 9 microservicios
-pnpm dev:frontend         # las 7 zonas
+pnpm dev:frontend         # las 6 zonas
 ```
+
+🍎 🔴 **En una máquina de 8 GB, el modo desarrollo no cabe con las pruebas de
+punta a punta.** Diez servicios en `nest start --watch` y seis `next dev`
+mantienen cada uno un compilador y un vigilante en memoria; con Chromium encima,
+el sistema **mata los procesos a mitad de la corrida** y no queda ni un error en
+la suite: desaparecen y ya. Para verificar, se corre el stack **construido**:
+
+```bash
+pnpm build:frontend       # las zonas, --concurrency=1: importa el pico
+pnpm --filter "@praxis/gateway" --filter "@praxis/*-service" run build
+pnpm start:backend        # los 10, desde dist/   → ~315 MB en total
+pnpm start:frontend       # las zonas, desde .next/ → ~580 MB en total
+```
+
+⚠️ Se pierde la recarga en caliente: un cambio no se ve hasta reconstruir esa
+zona. Para **escribir** código, `dev:cli` con lo mínimo levantado; el stack
+construido es para **verificar**.
 
 ⚠️ **`prisma:reset` borra las tablas.** Es `migrate reset --force`: recrea el
 esquema de los 7 servicios con Prisma y siembra encima. Para aplicar una migración
@@ -476,4 +533,4 @@ para que un rojo esperado no tape uno nuevo. Detalle en el README.
   los tipos permitidos, pero **no hay husky instalado**: hoy no se valida en el commit,
   se respeta a mano.
 - Rama por feature (`feature/<nombre>`) → PR a `main`.
-- Formato: Biome en la raíz (2 espacios, ancho 100), ESLint solo en `web-shell`. `pnpm format` ya no reescribe el repo: config y código coinciden.
+- Formato: Biome en la raíz (2 espacios, ancho 100), ESLint solo en `web`. `pnpm format` ya no reescribe el repo: config y código coinciden.

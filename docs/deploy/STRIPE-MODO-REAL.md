@@ -72,8 +72,8 @@ que el código maneja (`checkout.session.completed` y los tres de
 https://usepraxis.space/api/webhooks/stripe
 ```
 
-⚠️ **Va por el dominio del shell, no por el del `api`.** El gateway no tiene ruta
-pública: `web-shell/src/app/api/webhooks/stripe/route.ts` recibe y reenvía el
+⚠️ **Va por el dominio de la web, no por el del `api`.** El gateway no tiene
+ruta pública: `web/src/app/api/webhooks/stripe/route.ts` recibe y reenvía el
 cuerpo **byte a byte** al gateway, porque la firma se calcula sobre esos bytes
 exactos. Un `rewrite()` no valdría —Next los resuelve al construir— y
 `createGatewayProxy()` tampoco, porque borra `Authorization` para meter la

@@ -12,8 +12,8 @@
 
 /**
  * ⚠️ Este secreto tiene que ser el MISMO en el gateway, en credentials-service
- * y en las 6 zonas del frontend. Cada zona verifica la firma de la cookie por
- * su cuenta; si no coinciden, la sesión se ve como inválida y todo redirige al
+ * y en el frontend, que verifica la firma de la cookie por su cuenta en el
+ * guard. Si no coinciden, la sesión se ve como inválida y todo redirige al
  * login sin decir por qué.
  *
  * Generándolo aquí una sola vez y repartiéndolo desde Secret Manager, ese

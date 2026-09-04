@@ -2,13 +2,14 @@
  * Las formas que devuelve `assistant-service` a través del gateway.
  *
  * Se declaran aquí y no se importan de `@praxis/contracts` por lo mismo que las
- * de `reports.ts` en `reports-front`: ese paquete es de backend —arrastra
+ * de `reports.ts` que hubo en `reports-front`: ese paquete es de backend —arrastra
  * `class-validator` y los decoradores de Swagger— y el frontend solo necesita la
  * forma.
  *
  * ⚠️ **Vive en `commons` y no en una zona** desde que PRAX tiene pantalla
- * propia: lo consumen `assistant-front` y `reports-front`, y las formas de una
- * respuesta no pueden estar declaradas dos veces.
+ * propia: lo consumían `assistant-front` y `reports-front` —esta última
+ * archivada en F1— y las formas de una respuesta no pueden estar declaradas dos
+ * veces.
  *
  * ⚠️ Los límites de cuota **no** se copian aquí. El backend los manda dentro de
  * `AssistantQuota.limite` en cada respuesta, y un segundo sitio donde apuntar

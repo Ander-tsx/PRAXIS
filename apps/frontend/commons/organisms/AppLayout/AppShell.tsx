@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import {
@@ -228,10 +229,11 @@ const UN_ANO = 60 * 60 * 24 * 365;
 /**
  * Dónde vive la pantalla de la cuenta.
  *
- * Ruta **absoluta y con el prefijo de zona**: la pantalla la sirve `dashboard`
- * y esta barra la pintan las seis zonas, así que desde `projects` o `reports`
- * hay que salir de la zona. Por eso es un `<a>` y no un `next/link`, que
- * prefijaría con el basePath de la zona actual (ESTADO-ACTUAL §16).
+ * Ruta absoluta, que desde F8 es lo normal: hay una sola aplicación y todas las
+ * secciones cuelgan de la raíz. Antes era absoluta **por obligación** —la
+ * pantalla la servía `dashboard-front` y esta barra la pintaban las seis zonas,
+ * así que había que salir de la zona con un `<a>` duro— y eso es exactamente la
+ * recarga completa que la fusión viene a quitar.
  */
 const CUENTA_HREF = '/main/profile';
 
@@ -564,14 +566,14 @@ function ArmazonInterno({
                 sesión, que es lo que esa tarjeta viene a decir. */}
             {plegada ? (
               /* Plegada, el enlace y el selector siguen siendo hermanos por lo
-                 mismo que desplegada: un botón dentro de un `<a>` no vale. */
+                 mismo que desplegada: un botón dentro de un enlace no vale. */
               <div
                 className={`mb-2 flex justify-center rounded-full p-1 transition-colors hover:bg-white/5 ${
                   enCuenta ? 'bg-white/5' : ''
                 }`}
               >
                 <span className="relative">
-                  <a
+                  <Link
                     href={CUENTA_HREF}
                     aria-current={enCuenta ? 'page' : undefined}
                     className="block"
@@ -585,7 +587,7 @@ function ArmazonInterno({
                       size="md"
                       src={user.avatarSrc ?? null}
                     />
-                  </a>
+                  </Link>
                   {estadoSlot && <span className="absolute bottom-0 right-0">{estadoSlot}</span>}
                 </span>
               </div>
@@ -794,29 +796,29 @@ function UserCard({
           coincida importa — es lo que enseña que el rojo significa «tuyo». */}
       {/**
        * El avatar y su punto **no van dentro del enlace**: el punto es un botón
-       * y un botón dentro de un `<a>` es HTML inválido —y en la práctica, un
+       * y un botón dentro de un enlace es HTML inválido —y en la práctica, un
        * clic que navega en vez de abrir el menú—. Por eso la ficha es una fila
        * con dos cosas: un enlace que ocupa el texto y el avatar, y el selector
        * de estado encima, fuera de él.
        */}
       <span className="relative shrink-0">
-        <a href={CUENTA_HREF} className="block" title="Tu cuenta">
+        <Link href={CUENTA_HREF} className="block" title="Tu cuenta">
           <Avatar
             label={user.name.trim() || user.email}
             mine
             size="md"
             src={user.avatarSrc ?? null}
           />
-        </a>
+        </Link>
         {estadoSlot && <span className="absolute bottom-0 right-0">{estadoSlot}</span>}
       </span>
       {/* El texto sí es el enlace a tu cuenta. */}
-      <a href={CUENTA_HREF} className="min-w-0 flex-1">
+      <Link href={CUENTA_HREF} className="min-w-0 flex-1">
         {user.name.trim() && (
           <p className="truncate font-sans text-sm font-semibold text-white">{user.name}</p>
         )}
         <p className="truncate font-sans text-xs text-white">{user.email}</p>
-      </a>
+      </Link>
     </div>
   );
 }
@@ -1438,7 +1440,7 @@ function SidebarProjectsTree({
         <span className="text-[11px] font-semibold uppercase tracking-wider text-white select-none block mb-1">
           Proyectos
         </span>
-        <a
+        <Link
           href="/projects"
           className="flex items-center gap-2 text-text-secondary hover:text-white text-[12px] py-1 transition-colors"
         >
@@ -1453,7 +1455,7 @@ function SidebarProjectsTree({
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
           Crear primer proyecto
-        </a>
+        </Link>
       </div>
     );
   }
@@ -1470,7 +1472,7 @@ function SidebarProjectsTree({
           <span className="text-[11px] font-semibold uppercase tracking-wider text-white select-none">
             Proyectos
           </span>
-          <a
+          <Link
             href="/projects"
             title="Ver todos los proyectos"
             className="rounded p-0.5 text-text-secondary hover:text-white transition-colors"
@@ -1489,7 +1491,7 @@ function SidebarProjectsTree({
                 d="M4 6h16M4 10h16M4 14h16M4 18h16"
               />
             </svg>
-          </a>
+          </Link>
         </div>
       )}
 
@@ -1505,7 +1507,7 @@ function SidebarProjectsTree({
 
           if (plegada) {
             return (
-              <a
+              <Link
                 key={project.id}
                 href={projectHref}
                 title={project.name}
@@ -1518,7 +1520,7 @@ function SidebarProjectsTree({
                   iconKey={project.iconKey}
                   color={project.color}
                 />
-              </a>
+              </Link>
             );
           }
 
@@ -1546,7 +1548,7 @@ function SidebarProjectsTree({
                   />
                 </span>
 
-                <a
+                <Link
                   href={projectHref}
                   className={`flex-1 min-w-0 truncate text-[13px] transition-colors ${
                     isActiveProject
@@ -1555,7 +1557,7 @@ function SidebarProjectsTree({
                   }`}
                 >
                   {project.name}
-                </a>
+                </Link>
               </div>
 
               <div
@@ -1577,7 +1579,7 @@ function SidebarProjectsTree({
                         const wsHref = `/projects/${project.slug}?tab=espacios&ws=${ws.id}`;
                         const isActiveWs = activePath.includes(`ws=${ws.id}`);
                         return (
-                          <a
+                          <Link
                             key={ws.id}
                             href={wsHref}
                             aria-current={isActiveWs ? 'page' : undefined}
@@ -1589,7 +1591,7 @@ function SidebarProjectsTree({
                           >
                             <WorkspaceLeafIcon />
                             <span className="truncate">{ws.name}</span>
-                          </a>
+                          </Link>
                         );
                       })
                     )}
@@ -1622,7 +1624,7 @@ function FilaDePersona({
   const presencia = usePresence(conversacion.peerId, peer?.presence);
 
   return (
-    <a
+    <Link
       href={`/chat/${conversacion.peerId}`}
       aria-current={activo ? 'page' : undefined}
       className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10 ${
@@ -1665,7 +1667,7 @@ function FilaDePersona({
           </span>
         </span>
       )}
-    </a>
+    </Link>
   );
 }
 
@@ -1682,7 +1684,7 @@ function FilaDeProyecto({
   plegada: boolean;
 }) {
   return (
-    <a
+    <Link
       href={`/chat/proyecto/${chat.project.id}`}
       aria-current={activo ? 'page' : undefined}
       className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10 ${
@@ -1723,7 +1725,7 @@ function FilaDeProyecto({
           </span>
         </span>
       )}
-    </a>
+    </Link>
   );
 }
 
@@ -2089,9 +2091,17 @@ function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: bo
             const actor = aviso.actorId ? directorio.get(aviso.actorId) : undefined;
             const sinLeer = !aviso.readAt;
             return (
-              <a
+              <Link
                 key={aviso.id}
-                href={destinoDeUnAviso(aviso)}
+                /**
+                 * ⚠️ `?? '#'`, y no estaba antes.
+                 *
+                 * `destinoDeUnAviso` devuelve `undefined` para los avisos que no
+                 * llevan a ninguna parte —los que no traen proyecto—, y un `<a>`
+                 * sin `href` es válido: se pinta como texto y no navega. `Link`
+                 * exige una URL, así que se le da una que no sale de aquí. El
+                 * comportamiento es el mismo; lo que cambia es el tipo. */
+                href={destinoDeUnAviso(aviso) ?? '#'}
                 onClick={() => alPulsar(aviso)}
                 className={`relative flex items-start gap-3 rounded-xl p-3 transition-colors hover:bg-white/5 ${
                   sinLeer ? 'bg-white/[0.04]' : ''
@@ -2134,7 +2144,7 @@ function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: bo
                 {sinLeer && (
                   <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                 )}
-              </a>
+              </Link>
             );
           })
         )}

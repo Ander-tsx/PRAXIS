@@ -5,9 +5,9 @@
  * único con IP pública; el gateway, la base de datos y Redis no son accesibles
  * desde internet ni por error.
  *
- * Eso es posible porque el navegador nunca habla con el backend: cada zona del
- * frontend expone su proxy (`/<zona>/api/gateway`) y la llamada al gateway sale
- * del servidor de Next, ya dentro de la red privada.
+ * Eso es posible porque el navegador nunca habla con el backend: el frontend
+ * expone su proxy (`/api/gateway`) y la llamada al gateway sale del servidor de
+ * Next, ya dentro de la red privada.
  */
 
 resource "google_compute_network" "vpc" {

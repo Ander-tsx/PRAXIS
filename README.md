@@ -46,7 +46,7 @@
 
 PRAXIS es una plataforma de gestión de proyectos construida sobre una arquitectura SOFEA (Service-Oriented Front-End Architecture). Combina tableros Kanban interactivos, un sistema de permisos granular de tres capas, reportes con pronósticos Monte Carlo, chat en tiempo real con SSE, automatizaciones que reaccionan a lo que pasa en el tablero, facturación con Stripe y un asistente conversacional impulsado por Gemini — accesible también por voz a través de una skill de Alexa.
 
-El frontend se organiza como **7 microfrontends Multi-Zone** de Next.js 16 más el `web-shell` que los sirve: cada zona es una aplicación independiente con su propio `basePath`, servida a través del shell mediante `rewrites()`. El backend son **9 microservicios NestJS** que se comunican por TCP nativo detrás de un API Gateway único.
+El frontend es **una sola aplicación Next.js 16** (`apps/frontend/web`), sin `basePath`: la landing pública, las pantallas de sesión y las cinco secciones privadas, con un guard único y un solo proxy autenticado hacia el backend. Fue un Multi-Zones de siete zonas hasta la etapa de fusión ([docs/PLAN-FUSION-ZONAS.md](docs/PLAN-FUSION-ZONAS.md)); ninguna URL cambió al juntarlas. El backend son **9 microservicios NestJS** que se comunican por TCP nativo detrás de un API Gateway único.
 
 Las automatizaciones no son un botón: `tasks` y `projects` escriben cada hecho en su *outbox*, un publicador lo vuelca en un stream de Redis y `automation` lo consume y evalúa las reglas del proyecto. Diez disparadores —cuatro de barrido y seis reactivos— y seis acciones que escriben por los mismos endpoints que usa la interfaz, con los permisos de quien escribió la regla. Ninguna regla abre una ruta de escritura nueva.
 
@@ -66,19 +66,12 @@ flowchart TB
         AlexaDevice["Alexa"]
     end
 
-    subgraph shell["web-shell :4100"]
-        Landing["Landing 3D"]
-        Rewrites["rewrites()"]
-    end
-
-    subgraph zones["Microfrontends Next.js 16"]
-        Auth["auth-front :4101\n/auth"]
-        Dash["dashboard-front :4102\n/dashboard"]
-        Proj["projects-front :4103\n/projects"]
-        Rep["reports-front :4104\n/reports"]
-        Adm["admin-front :4105\n/admin"]
-        Chat["chat-front :4106\n/chat"]
-        AsstF["assistant-front :4107\n/assistant"]
+    subgraph web["Aplicación web Next.js 16 :4100"]
+        Landing["Landing pública"]
+        AuthUI["/auth · sesión"]
+        Privado["(privado)\n/main · /projects · /chat · /assistant · /admin"]
+        Guard["proxy.ts\nguard único"]
+        GwProxy["/api/gateway\nproxy autenticado"]
     end
 
     subgraph gw["API Gateway :3000"]
@@ -105,9 +98,9 @@ flowchart TB
         Redis[("Redis 7\nSesiones · Caché · SSE · Stream de hechos")]
     end
 
-    Browser --> shell
-    Rewrites --> zones
-    zones -->|proxy autenticado| gw
+    Browser --> web
+    Guard --> Privado
+    GwProxy -->|proxy autenticado| gw
     AlexaDevice -->|Lambda → voiceToken| gw
     gw -->|TCP| services
     Cred & Perm & ProjS & Task & Alex & Asst & Automation & Bill --> PG
@@ -132,7 +125,7 @@ La plataforma se despliega en **Google Cloud Platform**. Consulta el esquema com
 | Componente | Recurso GCP | Detalle |
 | :--- | :--- | :--- |
 | Backend | MIG regional (e2-medium, 1–3 réplicas) | PM2 supervisa los 10 procesos Node.js: el gateway y los 9 microservicios |
-| Frontend | MIG regional (e2-medium, 1–3 réplicas) | PM2 supervisa las 8 apps Next.js: el shell y las 7 zonas |
+| Frontend | MIG regional (e2-medium, 1–3 réplicas) | PM2 supervisa **un** proceso Next.js. Fueron ocho hasta la fusión de zonas |
 | Base de datos | Cloud SQL PostgreSQL 16 (IP privada) | Backups 7 días, acceso exclusivo por VPC |
 | Caché/Sesiones | VM e2-micro con Redis 7 | Firewall solo desde el backend |
 | Almacenamiento | Cloud Storage (bucket privado) | Adjuntos de chat con acceso IAM |
@@ -149,9 +142,9 @@ La plataforma se despliega en **Google Cloud Platform**. Consulta el esquema com
 | Categoría | Tecnología | Uso |
 | :--- | :--- | :--- |
 | **Monorepo** | ![Turborepo](https://img.shields.io/badge/Turborepo-000?style=flat-square&logo=turborepo&logoColor=white) ![pnpm](https://img.shields.io/badge/pnpm_9-F69220?style=flat-square&logo=pnpm&logoColor=white) | Orquestación de tareas con caché y gestión de workspaces |
-| **Frontend** | ![Next.js](https://img.shields.io/badge/Next.js_16-000?style=flat-square&logo=next.js&logoColor=white) ![React](https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black) | 8 microfrontends Multi-Zone con Server Components |
+| **Frontend** | ![Next.js](https://img.shields.io/badge/Next.js_16-000?style=flat-square&logo=next.js&logoColor=white) ![React](https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black) | Una aplicación con App Router y Server Components |
 | **Estilos** | ![Tailwind](https://img.shields.io/badge/Tailwind_v4-38B2AC?style=flat-square&logo=tailwindcss&logoColor=white) | `@theme static` en CSS, sin `tailwind.config` |
-| **3D / Animación** | ![Three.js](https://img.shields.io/badge/Three.js-000?style=flat-square&logo=three.js&logoColor=white) ![GSAP](https://img.shields.io/badge/GSAP-88CE02?style=flat-square&logoColor=black) | Landing page interactiva del web-shell |
+| **3D / Animación** | ![Three.js](https://img.shields.io/badge/Three.js-000?style=flat-square&logo=three.js&logoColor=white) ![GSAP](https://img.shields.io/badge/GSAP-88CE02?style=flat-square&logoColor=black) | Landing page interactiva de la aplicación web |
 | **Backend** | ![NestJS](https://img.shields.io/badge/NestJS_11-E0234E?style=flat-square&logo=nestjs&logoColor=white) | Gateway REST + 9 microservicios TCP |
 | **ORM** | ![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white) | 8 schemas aislados, migraciones por servicio |
 | **Base de datos** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-4169E1?style=flat-square&logo=postgresql&logoColor=white) | Una instancia, schemas separados por dominio |
@@ -172,14 +165,7 @@ La plataforma se despliega en **Google Cloud Platform**. Consulta el esquema com
 PRAXIS/
 ├── apps/
 │   ├── frontend/
-│   │   ├── web-shell/          # Contenedor Multi-Zone — landing 3D, rewrites
-│   │   ├── auth-front/         # /auth — login, registro, Google OAuth, verificación
-│   │   ├── dashboard-front/    # /dashboard — panel, alertas, invitaciones, Alexa link
-│   │   ├── projects-front/     # /projects — catálogo, Kanban, tareas, miembros
-│   │   ├── reports-front/      # /reports — métricas, Monte Carlo, asistente IA
-│   │   ├── admin-front/        # /admin — cuentas, suspensión, auditoría (rol Admin)
-│   │   ├── chat-front/         # /chat — mensajería en tiempo real, canales, DMs
-│   │   ├── assistant-front/    # /assistant — interfaz del asistente conversacional
+│   │   ├── web/                # La aplicación entera: landing, /auth y (privado)
 │   │   └── commons/            # Atomic Design: atoms/, molecules/, organisms/
 │   │                           # + auth, api, tokens, hooks, theme
 │   ├── backend/
@@ -265,7 +251,7 @@ pnpm prisma:seed
 
 # 7. Arrancar todo
 pnpm dev:backend    # gateway + 9 microservicios
-pnpm dev:frontend   # web-shell + 7 zonas
+pnpm dev:frontend   # la aplicación web
 ```
 
 > [!IMPORTANT]
@@ -285,7 +271,7 @@ pnpm dev:frontend   # web-shell + 7 zonas
 | Comando | Descripción |
 | :--- | :--- |
 | `pnpm dev:backend` | Gateway + 9 microservicios |
-| `pnpm dev:frontend` | Web-shell + 7 microfrontends |
+| `pnpm dev:frontend` | La aplicación web (puerto 4100) |
 | `pnpm build` | Build de producción completo |
 | `pnpm build:shared` | Compila `contracts` + `observability` |
 
@@ -320,11 +306,11 @@ Los `.env` no se versionan. Cada microservicio tiene un `.env.example` con todas
 | `DATABASE_URL` | Cada servicio con Prisma | Conexión a PostgreSQL con `?schema=<nombre>` |
 | `REDIS_URL` | Gateway, credentials, projects | `redis://localhost:6379` |
 | `JWT_SECRET` | Gateway, credentials, **cada zona frontend** | **Debe ser idéntico** en los tres puntos |
-| `GATEWAY_URL` | Cada microfrontend | `http://localhost:3000` |
+| `GATEWAY_URL` | La aplicación web y el gateway | `http://localhost:3000` |
 | `GEMINI_API_KEY` | assistant-service | API key de Google Gemini |
 | `VOICE_JWT_SECRET` | alexa-service | Secreto propio — NO reutilizar `JWT_SECRET` |
 | `STRIPE_SECRET_KEY` | Gateway | Clave privada de Stripe |
-| `GOOGLE_CLIENT_ID` | credentials, auth-front | OAuth 2.0 para login con Google |
+| `GOOGLE_CLIENT_ID` | credentials, web | OAuth 2.0 para login con Google |
 
 > [!TIP]
 > Copia los `.env.example` de cada servicio y ajusta solo los secretos. El `dev:cli` sincroniza automáticamente los `.env` y `.env.local` necesarios.
@@ -447,8 +433,6 @@ gcloud builds submit --config=infra/ci/cloudbuild.yaml .
 ![Notificaciones](docs/assets/notifications-page.png)
 
 ![Chat](docs/assets/chat-page.png)
-
-![Analisís](docs/assets/reports-page.png)
 
 ![Tablero Kanban](docs/assets/kanban-board.png)
 
