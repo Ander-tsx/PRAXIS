@@ -5,7 +5,7 @@ import {
   updateProfileAction,
   uploadAvatarAction,
   uploadCoverAction,
-} from '@/app/main/profile/actions';
+} from '@/app/(privado)/main/profile/actions';
 import { Avatar, alpha, colors, FloatingLabelInput, FloatingLabelTextarea } from '@praxis/commons';
 
 export function EditProfileModal({

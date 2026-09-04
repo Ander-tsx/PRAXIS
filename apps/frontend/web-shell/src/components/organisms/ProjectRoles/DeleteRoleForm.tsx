@@ -1,6 +1,6 @@
 'use client';
 
-import { deleteRoleAction } from '@/app/projects/[id]/actions';
+import { deleteRoleAction } from '@/app/(privado)/projects/[id]/actions';
 import { ROLE_INITIAL_STATE } from '@/lib/projects/action-state';
 import { Button, type ProjectRole, useAccion } from '@praxis/commons';
 import { useEffect, useState } from 'react';

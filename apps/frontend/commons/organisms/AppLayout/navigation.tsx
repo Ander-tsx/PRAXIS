@@ -5,9 +5,10 @@ import { PraxAvatar } from '../../atoms/PraxAvatar/PraxAvatar';
 /**
  * Un enlace de la barra lateral del área privada.
  *
- * `href` es siempre una ruta **del shell**, sin el basePath de ninguna zona:
- * la barra lateral cruza zonas, así que sus enlaces son navegación dura
- * (`<a>`), no `next/link`. Ver ESTADO-ACTUAL §16.
+ * `href` es siempre una ruta absoluta de la aplicación. Lo era ya cuando esto
+ * era un multi-zone —la barra cruzaba zonas— pero entonces obligaba además a
+ * navegación dura; desde F8 los pinta `next/link` y cambiar de sección deja de
+ * recargar la página.
  */
 export interface AppNavItem {
   label: string;
@@ -101,7 +102,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
    * Se quitó de la barra lateral: el plan es de la organización activa, así que
    * su sitio es el portal de la organización («Plan y asientos», con su botón de
    * contratar que ahora abre Stripe directo). La tabla comparativa
-   * (`/billing`) **sigue existiendo** —la ruta no se toca— y se llega
+   * (`/main/billing`) **sigue existiendo** —la ruta no se toca— y se llega
    * por «Comparar los planes» desde ese portal y desde el aviso de cuota del
    * asistente. Una entrada de barra lateral para una tabla de precios era la
    * tercera de tres que hablaban de lo mismo.

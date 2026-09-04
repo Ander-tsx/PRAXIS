@@ -1,6 +1,6 @@
 'use client';
 
-import { deleteAccountAction } from '@/app/main/profile/actions';
+import { deleteAccountAction } from '@/app/(privado)/main/profile/actions';
 import { Button, Input, alpha, colors } from '@praxis/commons';
 import { useId, useState } from 'react';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { moveTaskAction, reorderColumnsAction } from '@/app/projects/[id]/actions';
+import { moveTaskAction, reorderColumnsAction } from '@/app/(privado)/projects/[id]/actions';
 import { COLUMN_INITIAL_STATE, TASK_INITIAL_STATE } from '@/lib/projects/action-state';
 import {
   type Board,

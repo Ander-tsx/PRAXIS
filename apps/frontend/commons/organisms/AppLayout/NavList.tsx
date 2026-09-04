@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { colors } from '../../tokens';
 import type { AppNavItem } from './navigation';
@@ -216,11 +217,20 @@ export function NavList({
 
                   return (
                     /**
-                     * `<a>` y no `next/link`: estos destinos los sirven otras zonas del
-                     * multi-zone, y el router prefijaría la ruta con el basePath de la
-                     * zona actual. Ver ESTADO-ACTUAL §16.
+                     * 🔴 **`next/link`, y ese es el premio entero de la fusión.**
+                     *
+                     * Eran `<a>` duros por obligación: cada destino lo servía otra
+                     * aplicación del multi-zone y el router habría prefijado la ruta con
+                     * el `basePath` de la zona actual. El precio era que **cambiar de
+                     * sección recargaba la página**: se remontaba el armazón, se volvía a
+                     * pedir el directorio de chats y se cerraba y reabría la conexión SSE.
+                     *
+                     * Desde F8 las cinco secciones cuelgan del mismo layout, así que esto
+                     * es navegación del router: la barra no parpadea y el flujo no se
+                     * corta. ⚠️ Volver a poner un `<a>` aquí deshace la fusión sin que
+                     * falle nada.
                      */
-                    <a
+                    <Link
                       key={claveItem}
                       href={item.href}
                       onClick={onNavigate}
@@ -262,7 +272,7 @@ export function NavList({
                             {item.badge > 99 ? '99+' : item.badge}
                           </span>
                         ))}
-                    </a>
+                    </Link>
                   );
                 })}
               </div>

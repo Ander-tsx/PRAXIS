@@ -4,7 +4,7 @@ import {
   createWorkspaceAction,
   deleteWorkspaceAction,
   updateWorkspaceAction,
-} from '@/app/projects/[id]/actions';
+} from '@/app/(privado)/projects/[id]/actions';
 import { EntityPanel } from '@/components/molecules/EntityMenu';
 import { WORKSPACE_INITIAL_STATE } from '@/lib/projects/action-state';
 import { WORKSPACE_NAME_MAX, validateWorkspace } from '@/lib/projects/validation';

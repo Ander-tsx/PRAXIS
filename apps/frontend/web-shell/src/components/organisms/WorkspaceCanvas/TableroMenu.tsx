@@ -1,6 +1,6 @@
 'use client';
 
-import { deleteBoardAction, updateBoardAction } from '@/app/projects/[id]/actions';
+import { deleteBoardAction, updateBoardAction } from '@/app/(privado)/projects/[id]/actions';
 import { EntityMenu } from '@/components/molecules/EntityMenu';
 import { BOARD_INITIAL_STATE } from '@/lib/projects/action-state';
 import { BOARD_NAME_MAX, validateBoard } from '@/lib/projects/validation';

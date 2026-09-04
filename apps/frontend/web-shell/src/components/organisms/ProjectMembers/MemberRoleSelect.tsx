@@ -1,6 +1,6 @@
 'use client';
 
-import { changeMemberRoleAction } from '@/app/projects/[id]/actions';
+import { changeMemberRoleAction } from '@/app/(privado)/projects/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/projects/action-state';
 import { type ProjectRole, Select, useAccion } from '@praxis/commons';
 import { useRef, useState } from 'react';

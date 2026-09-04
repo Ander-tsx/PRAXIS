@@ -1,6 +1,6 @@
 'use client';
 
-import { respondInvitationAction } from '@/app/projects/[id]/invitation-actions';
+import { respondInvitationAction } from '@/app/(privado)/projects/[id]/invitation-actions';
 import { INVITATION_RESPONSE_INITIAL_STATE } from '@/lib/projects/action-state';
 import { Badge, Button, type MyInvitation, alpha, colors, useAccion } from '@praxis/commons';
 

@@ -12,7 +12,7 @@ import {
   reactDirectAction,
   sendDirectMessageAction,
   uploadDirectAttachmentAction,
-} from '@/app/chat/actions';
+} from '@/app/(privado)/chat/actions';
 import {
   Avatar,
   Badge,

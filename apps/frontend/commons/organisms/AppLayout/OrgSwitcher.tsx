@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import React, { useEffect, useRef, useState } from 'react';
 import { Glyph, glyphByKey } from '../../atoms/GlyphPicker';
 import { OrgIdentityModal } from './OrgIdentityModal';
@@ -221,7 +222,7 @@ export function OrgSwitcher({
 
               {/* Nombre, icono y color de la organización. Ya no abre un modal:
                   navega a su portal (`#configuracion`), donde vive toda la
-                  configuración de la organización. `<a>` duro y ruta absoluta
+                  configuración de la organización. Ruta absoluta
                   con `/dashboard` porque el destino lo sirve otra zona del
                   multi-zone y este selector se monta en las siete. El backend
                   sigue exigiendo `canManageOrganization`; la pantalla enseña la
@@ -582,12 +583,15 @@ function UpgradeModal({ onClose, zonePath }: { onClose: () => void; zonePath: st
             de equipo.
           </p>
         </div>
-        <a
-          href="/billing"
+        <Link
+          /* ⚠️ `/main/billing`. Era `/billing`, y esa ruta no existe en ninguna
+             parte desde que «Suscripción» salió de la barra lateral: el botón
+             llevaba a un 404. */
+          href="/main/billing"
           className="mt-4 px-8 py-3 bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.3)]"
         >
           Ver planes y precios
-        </a>
+        </Link>
       </div>
     </ModalWrapper>
   );

@@ -1,0 +1,82 @@
+import { setPresenceAction } from '@/app/(privado)/presence-actions';
+import { AppShell, PresenceFooter, avatarHref, displayName } from '@praxis/commons';
+import { loadPrivateChrome } from '@praxis/commons/auth';
+import { getSidebarPlegada } from '@praxis/commons/theme';
+
+/**
+ * El armazón del área privada. **Uno para las cinco secciones.**
+ *
+ * ## Esto es el motivo de la fusión, no una consecuencia
+ *
+ * Hubo cinco copias de este archivo, una por zona, y eran idénticas salvo el
+ * comentario. Daba igual que lo fueran: cada zona era una aplicación Next
+ * distinta, así que cambiar de sección era una **carga completa de página** y
+ * el armazón se montaba de cero cada vez. Con él se rehacían la barra lateral,
+ * el proveedor del directorio de chats y —lo que de verdad se notaba— **la
+ * conexión SSE**, que se cerraba y se volvía a abrir en cada salto.
+ *
+ * Al colgar las cinco de un grupo de rutas, Next mantiene este layout montado
+ * mientras solo cambie lo que hay debajo: la barra no parpadea, el directorio
+ * no se vuelve a pedir y el flujo de avisos no se corta.
+ *
+ * ⚠️ **Para que eso ocurra, los enlaces del menú tienen que ser `next/link`.**
+ * Un `<a>` es una navegación del navegador y vuelve a montarlo todo, que es
+ * exactamente lo que había antes. Eran `<a>` obligatoriamente mientras cruzaban
+ * de zona; ver `NavList`.
+ *
+ * ## Lo que NO va aquí
+ *
+ * El rol de administración. Lo comprueba `admin/layout.tsx`, un piso más abajo,
+ * porque solo esa sección lo exige y porque puede explicar por qué no se entra
+ * en vez de rebotar en silencio. La sesión la exige el guard, antes de llegar.
+ */
+export default async function PrivadoLayout({ children }: { children: React.ReactNode }) {
+  const {
+    profile,
+    navItems,
+    organizaciones,
+    organizacionActivaId,
+    mensajesSinLeer,
+    avisosSinLeer,
+  } = await loadPrivateChrome();
+
+  /* La cookie del pliegue, leída en el servidor: sin esto la barra se serviría
+     desplegada y se plegaría al hidratar, parpadeando en cada navegación. */
+  const plegada = await getSidebarPlegada();
+
+  return (
+    <AppShell
+      navItems={navItems}
+      /**
+       * 🔴 **Vacío, y ya no puede ser otra cosa.**
+       *
+       * `zonePath` hacía dos trabajos: prefijar el proxy del gateway y
+       * reconstruir la ruta del navegador, porque dentro de una zona
+       * `usePathname()` llegaba sin el `basePath`. Aquí no hay `basePath` ni
+       * zonas: la ruta viene entera y el proxy es `/api/gateway`.
+       */
+      zonePath=""
+      plegadaInicial={plegada}
+      /* El selector de organización de la barra: la lista y cuál se mira. Las
+         dos las resuelve `loadPrivateChrome`, así que aquí no cuestan nada. */
+      organizaciones={organizaciones}
+      organizacionActivaId={organizacionActivaId}
+      /* Las dos insignias de las pestañas de la barra: `loadPrivateChrome` ya
+         las trae, y a partir de aquí las mantiene vivas el propio armazón
+         escuchando el flujo. Ver `AppShellProps.mensajesSinLeer`. */
+      mensajesSinLeer={mensajesSinLeer}
+      avisosSinLeer={avisosSinLeer}
+      user={{
+        name: displayName(profile),
+        email: profile.credential.email,
+        avatarSrc: avatarHref(profile.avatarUrl, '/api/gateway'),
+        presence: profile.presence ?? null,
+      }}
+      /* El selector de estado se dibuja sobre la esquina del avatar: la esfera
+         **es** el botón. Ver `PresenceFooter`. */
+      estadoSlot={<PresenceFooter presencia={profile.presence} onCambiar={setPresenceAction} />}
+    >
+      {children}
+    </AppShell>
+  );
+}

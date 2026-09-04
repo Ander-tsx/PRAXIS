@@ -1,6 +1,6 @@
 'use client';
 
-import { guardarIdentidadOrgAction } from '@/app/main/team/actions';
+import { guardarIdentidadOrgAction } from '@/app/(privado)/main/team/actions';
 import { ORGANIZACION_INITIAL_STATE } from '@/lib/main/action-state';
 import {
   Button,

@@ -1,6 +1,6 @@
 'use client';
 
-import { createColumnAction } from '@/app/projects/[id]/actions';
+import { createColumnAction } from '@/app/(privado)/projects/[id]/actions';
 import { COLUMN_INITIAL_STATE } from '@/lib/projects/action-state';
 import { COLUMN_NAME_MAX } from '@/lib/projects/validation';
 import { alpha, colors, useAccion } from '@praxis/commons';

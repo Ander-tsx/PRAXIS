@@ -1,6 +1,6 @@
 'use client';
 
-import { setPresenceAction } from '@/app/main/profile/actions';
+import { setPresenceAction } from '@/app/(privado)/main/profile/actions';
 import { PRESENCES, type Presence, alpha, colors, presenceOf } from '@praxis/commons';
 import { useState } from 'react';
 

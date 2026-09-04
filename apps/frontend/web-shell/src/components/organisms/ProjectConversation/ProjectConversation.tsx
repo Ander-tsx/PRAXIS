@@ -1,6 +1,6 @@
 'use client';
 
-import { previewDeEnlaceAction } from '@/app/chat/actions';
+import { previewDeEnlaceAction } from '@/app/(privado)/chat/actions';
 import {
   deleteProjectAttachmentAction,
   deleteProjectMessageAction,
@@ -11,7 +11,7 @@ import {
   reactProjectAction,
   sendProjectMessageAction,
   uploadProjectAttachmentAction,
-} from '@/app/chat/proyecto-actions';
+} from '@/app/(privado)/chat/proyecto-actions';
 import {
   type ChatMessagePage,
   ChatPanel,

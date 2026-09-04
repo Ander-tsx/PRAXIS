@@ -1,6 +1,6 @@
 'use client';
 
-import { cambiarAsientosAction } from '@/app/main/team/actions';
+import { cambiarAsientosAction } from '@/app/(privado)/main/team/actions';
 import { ORGANIZACION_INITIAL_STATE } from '@/lib/main/action-state';
 import { FloatingLabelInput, useAccion } from '@praxis/commons';
 import { useId, useState } from 'react';

@@ -1,6 +1,6 @@
 'use client';
 
-import { inviteMemberAction } from '@/app/projects/[id]/actions';
+import { inviteMemberAction } from '@/app/(privado)/projects/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/projects/action-state';
 import { Button, Input, type ProjectRole, QuotaNotice, Select, useAccion } from '@praxis/commons';
 import { createApiClient } from '@praxis/commons/api';

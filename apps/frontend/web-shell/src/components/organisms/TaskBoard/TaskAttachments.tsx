@@ -1,6 +1,6 @@
 'use client';
 
-import { deleteAttachmentAction, uploadAttachmentAction } from '@/app/projects/[id]/actions';
+import { deleteAttachmentAction, uploadAttachmentAction } from '@/app/(privado)/projects/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/projects/action-state';
 import {
   ATTACHMENT_ALLOWED_MIME,

@@ -1,6 +1,6 @@
 'use client';
 
-import { toggleAutomationRuleAction } from '@/app/projects/[id]/actions';
+import { toggleAutomationRuleAction } from '@/app/(privado)/projects/[id]/actions';
 import { AUTOMATION_RULE_INITIAL_STATE } from '@/lib/projects/action-state';
 import { Button, alpha, colors, useAccion } from '@praxis/commons';
 

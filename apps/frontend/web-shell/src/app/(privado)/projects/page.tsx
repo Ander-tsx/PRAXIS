@@ -2,7 +2,7 @@ import {
   borradorDePlantillaAction,
   crearProyectoDesdePlantillaAction,
   createProjectAction,
-} from '@/app/projects/root-actions';
+} from '@/app/(privado)/projects/root-actions';
 import { PraxCreateProjectTrigger } from '@/components/organisms/PraxCreateProjectTrigger';
 import {
   AppHeader,

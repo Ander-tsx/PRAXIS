@@ -4,7 +4,7 @@ import {
   cambiarRolAction,
   invitarMiembroAction,
   quitarMiembroAction,
-} from '@/app/main/team/actions';
+} from '@/app/(privado)/main/team/actions';
 import { INVITAR_MIEMBRO_INITIAL_STATE, ORGANIZACION_INITIAL_STATE } from '@/lib/main/action-state';
 import { FloatingLabelInput, useAccion, Avatar } from '@praxis/commons';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { createBoardAction } from '@/app/projects/[id]/actions';
+import { createBoardAction } from '@/app/(privado)/projects/[id]/actions';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { BOARD_INITIAL_STATE } from '@/lib/projects/action-state';
 import { BOARD_NAME_MAX, validateBoard } from '@/lib/projects/validation';

@@ -1,6 +1,6 @@
 'use client';
 
-import { updateProfileAction } from '@/app/main/settings/actions';
+import { updateProfileAction } from '@/app/(privado)/main/settings/actions';
 import { UPDATE_PROFILE_INITIAL_STATE } from '@/lib/main/action-state';
 import { NAME_MAX, validateProfile } from '@/lib/main/validation';
 import { Button, Input, alpha, colors, useAccion } from '@praxis/commons';

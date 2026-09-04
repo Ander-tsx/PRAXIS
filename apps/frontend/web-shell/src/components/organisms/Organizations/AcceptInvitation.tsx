@@ -1,6 +1,6 @@
 'use client';
 
-import { aceptarInvitacionAction } from '@/app/main/team/actions';
+import { aceptarInvitacionAction } from '@/app/(privado)/main/team/actions';
 import { ORGANIZACION_INITIAL_STATE } from '@/lib/main/action-state';
 import { Button, useAccion } from '@praxis/commons';
 import { useRouter } from 'next/navigation';

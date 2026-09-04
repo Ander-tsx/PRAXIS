@@ -1,6 +1,6 @@
 'use client';
 
-import { deleteTaskAction, updateTaskAction } from '@/app/projects/[id]/actions';
+import { deleteTaskAction, updateTaskAction } from '@/app/(privado)/projects/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/projects/action-state';
 import {
   FloatingLabelInput,

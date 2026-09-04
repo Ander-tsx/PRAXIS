@@ -1,6 +1,6 @@
 'use client';
 
-import { cancelInvitationAction } from '@/app/projects/[id]/actions';
+import { cancelInvitationAction } from '@/app/(privado)/projects/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/projects/action-state';
 import {
   Badge,

@@ -1,6 +1,6 @@
 'use client';
 
-import { removeMemberAction } from '@/app/projects/[id]/actions';
+import { removeMemberAction } from '@/app/(privado)/projects/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/projects/action-state';
 import { Button, Dialog, useAccion } from '@praxis/commons';
 import { useEffect, useState } from 'react';

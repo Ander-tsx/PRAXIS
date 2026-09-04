@@ -4,7 +4,7 @@ import {
   type ProjectInventory,
   deleteProjectAction,
   projectInventoryAction,
-} from '@/app/projects/[id]/actions';
+} from '@/app/(privado)/projects/[id]/actions';
 import { DELETE_PROJECT_INITIAL_STATE } from '@/lib/projects/action-state';
 import { Button, Dialog, Input, alpha, colors, useAccion } from '@praxis/commons';
 import { useEffect, useId, useState, useTransition } from 'react';

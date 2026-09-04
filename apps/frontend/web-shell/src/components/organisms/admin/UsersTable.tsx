@@ -1,6 +1,6 @@
 'use client';
 
-import { deleteUserAction } from '@/app/admin/actions';
+import { deleteUserAction } from '@/app/(privado)/admin/actions';
 import { RowActions } from '@/components/molecules/RowActions';
 import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin/admin';
 import {

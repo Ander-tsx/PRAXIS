@@ -1,6 +1,6 @@
 'use client';
 
-import { saveRoleAction } from '@/app/projects/[id]/actions';
+import { saveRoleAction } from '@/app/(privado)/projects/[id]/actions';
 import { ROLE_INITIAL_STATE } from '@/lib/projects/action-state';
 import { ROLE_NAME_MAX, validateRole } from '@/lib/projects/validation';
 import {

@@ -1,6 +1,6 @@
 'use client';
 
-import { saveProjectSettingsAction } from '@/app/projects/[id]/actions';
+import { saveProjectSettingsAction } from '@/app/(privado)/projects/[id]/actions';
 import {
   FloatingLabelInput,
   FloatingLabelTextarea,

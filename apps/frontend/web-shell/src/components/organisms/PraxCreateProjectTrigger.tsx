@@ -1,6 +1,6 @@
 'use client';
 
-import { createProjectAction } from '@/app/projects/root-actions';
+import { createProjectAction } from '@/app/(privado)/projects/root-actions';
 import { FloatingLabelInput, FloatingLabelTextarea, usePrax } from '@praxis/commons';
 import { useCallback, useEffect, useState } from 'react';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { saveAutomationRuleAction } from '@/app/projects/[id]/actions';
+import { saveAutomationRuleAction } from '@/app/(privado)/projects/[id]/actions';
 import { AUTOMATION_RULE_INITIAL_STATE } from '@/lib/projects/action-state';
 import {
   type AutomationCatalog,

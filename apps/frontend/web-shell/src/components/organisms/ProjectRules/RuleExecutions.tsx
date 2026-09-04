@@ -1,6 +1,6 @@
 'use client';
 
-import { reviewAutomationsAction } from '@/app/projects/[id]/actions';
+import { reviewAutomationsAction } from '@/app/(privado)/projects/[id]/actions';
 import { REVIEW_INITIAL_STATE } from '@/lib/projects/action-state';
 import type { AutomationCatalog, OpcionesDelProyecto } from '@/lib/projects/automation-catalog';
 import { describeExecutionContext, describeReviewSummary } from '@/lib/projects/automation-draft';

@@ -1,6 +1,6 @@
 'use client';
 
-import { deleteLabelAction, saveLabelAction } from '@/app/projects/[id]/actions';
+import { deleteLabelAction, saveLabelAction } from '@/app/(privado)/projects/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/projects/action-state';
 import {
   Input,

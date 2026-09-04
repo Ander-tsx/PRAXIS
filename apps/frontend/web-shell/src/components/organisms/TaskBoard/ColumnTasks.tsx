@@ -1,6 +1,6 @@
 'use client';
 
-import { createTaskAction } from '@/app/projects/[id]/actions';
+import { createTaskAction } from '@/app/(privado)/projects/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/projects/action-state';
 import type { Column, Label, Task, UserProfile } from '@praxis/commons';
 import { DONE_COLUMN_COLOR, alpha, colors, useAccion } from '@praxis/commons';

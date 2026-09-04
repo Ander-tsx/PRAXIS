@@ -1,6 +1,6 @@
 'use client';
 
-import { respondInvitationAction } from '@/app/main/invitations-actions';
+import { respondInvitationAction } from '@/app/(privado)/main/invitations-actions';
 import { NoticePanel } from '@/components/molecules/NoticePanel';
 import { INVITATION_RESPONSE_INITIAL_STATE } from '@/lib/main/action-state';
 import { Badge, Button, type MyInvitation, alpha, colors, useAccion } from '@praxis/commons';
