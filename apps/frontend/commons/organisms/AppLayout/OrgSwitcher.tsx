@@ -134,7 +134,10 @@ export function OrgSwitcher({
   }
 
   return (
-    <div className="relative" ref={popoverRef}>
+    /* `shrink-0` por lo mismo que las pestañas: es un hijo de un `flex flex-col`
+       con scroll, y sin esto el navegador lo comprime cuando el contenido de
+       debajo crece. Ver el aviso de `SidebarTabs`. */
+    <div className="relative shrink-0" ref={popoverRef}>
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}

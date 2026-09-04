@@ -1152,10 +1152,27 @@ function SidebarTabs({
     <div
       role="tablist"
       aria-label="Secciones de la barra lateral"
+      /**
+       * 🔴 **`shrink-0`, y no es cosmético.**
+       *
+       * Esta fila vive dentro de un `flex flex-col` con `overflow-y-auto`, y por
+       * defecto un hijo de flex tiene `flex-shrink: 1`. Cuando el contenido de
+       * la pestaña activa es alto, el navegador **comprime a sus hermanos** — y
+       * a esta fila, que además lleva `overflow-x-auto`, la aplasta hasta
+       * dejarla invisible.
+       *
+       * Se veía solo en «Inicio» y solo en móvil, que es lo que lo hacía
+       * desconcertante: «Chat» y «Bandeja» llevan su propio
+       * `max-h-[calc(100dvh-13rem)]` con scroll interno, así que nunca empujan;
+       * `NavList` no tiene tope y crece cuanto haga falta. El resultado era
+       * quedarse en Inicio **sin ninguna forma de volver a las otras dos**,
+       * exactamente el fallo que el `plegada` de aquí abajo venía a evitar en
+       * escritorio.
+       */
       className={
         plegada
-          ? 'mb-4 flex flex-col items-center gap-1'
-          : 'mb-4 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap px-1 scrollbar-none'
+          ? 'mb-4 flex shrink-0 flex-col items-center gap-1'
+          : 'mb-4 flex shrink-0 items-center gap-1.5 overflow-x-auto whitespace-nowrap px-1 scrollbar-none'
       }
     >
       {pestanas.map((pestana) => {
@@ -1259,6 +1276,17 @@ function SidebarProjectsTree({
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(() => desplegadosGuardados());
 
+  /**
+   * Los proyectos cuyo detalle ya se pidió, para no volver a pedirlo.
+   *
+   * Ver el efecto de más abajo: sin este registro, un proyecto **sin espacios**
+   * se pedía en bucle infinito y agotaba el limitador del gateway.
+   *
+   * Un `ref` y no estado: cambiarlo no tiene que repintar nada, y como estado
+   * sería una dependencia del propio efecto que lo escribe.
+   */
+  const espaciosPedidos = useRef<Set<string>>(new Set());
+
   const cargar = useCallback(() => {
     fetchProjectsTree(zonePath, organizacionActivaId)
       .then((lista) => {
@@ -1300,8 +1328,16 @@ function SidebarProjectsTree({
    * entera, pero era una bomba de relojería para el día que dejara de hacerlo.
    */
   useEffect(() => {
-    window.addEventListener('focus', cargar);
-    return () => window.removeEventListener('focus', cargar);
+    function alVolver() {
+      /* ⚠️ Se olvida lo ya pedido, y solo aquí. Sin esto, un espacio creado en
+         otra pestaña no aparecería nunca: el registro de `espaciosPedidos` está
+         para cortar el bucle, no para cachear para siempre. Volver a la ventana
+         es exactamente el momento en que puede haber cambiado algo. */
+      espaciosPedidos.current.clear();
+      cargar();
+    }
+    window.addEventListener('focus', alVolver);
+    return () => window.removeEventListener('focus', alVolver);
   }, [cargar]);
 
   /**
@@ -1309,22 +1345,58 @@ function SidebarProjectsTree({
    *
    * Es lo que convierte las 51 peticiones en dos o tres: el detalle de un
    * proyecto se pide cuando su fila se abre, no al pintar la barra.
+   *
+   * ## 🔴 Y «una vez» hay que llevarlo escrito, no deducirlo del resultado
+   *
+   * La primera versión decidía qué pedir con `p.workspaces.length === 0`, y eso
+   * es un bucle infinito en cuanto **un proyecto no tiene espacios**, que es un
+   * estado perfectamente normal:
+   *
+   * 1. Se pide el detalle de ese proyecto y vuelve con cero espacios.
+   * 2. `setProjects(previos => previos.map(…))` devuelve **un array nuevo**
+   *    aunque no haya cambiado ni un elemento.
+   * 3. La identidad nueva vuelve a disparar este efecto.
+   * 4. El proyecto sigue con `workspaces.length === 0`, así que sigue pendiente.
+   *    Vuelta al paso 1.
+   *
+   * El resultado era una ráfaga continua de `GET /projects/:id` que agotaba el
+   * limitador del gateway —300 por minuto y por cuenta— en segundos. A partir de
+   * ahí **todo** respondía 429: los espacios volvían vacíos («ningún proyecto
+   * tiene workspaces») y la propia página del proyecto, renderizada en el
+   * servidor con la misma sesión, caía a `notFound()`. De ahí el «a veces carga
+   * y a veces da 404», que parecía intermitente y era exactamente esto.
+   *
+   * Se arregla con un registro de lo ya pedido. Un `ref` y no estado: cambiarlo
+   * no tiene que repintar nada, y si fuera estado volvería a ser una dependencia
+   * de este mismo efecto.
    */
   useEffect(() => {
     const pendientes = projects
-      .filter((p) => expanded.has(p.id) && p.workspaces.length === 0)
+      .filter((p) => expanded.has(p.id) && !espaciosPedidos.current.has(p.id))
       .map((p) => p.id);
     if (pendientes.length === 0) return;
+
+    /* Se marcan **antes** de pedir, no al volver: entre la petición y su
+       respuesta puede haber varios renders, y marcar después dejaría la misma
+       ventana por la que se colaba el bucle. */
+    for (const id of pendientes) espaciosPedidos.current.add(id);
 
     let vigente = true;
     fetchWorkspaces(zonePath, pendientes).then((porProyecto) => {
       if (!vigente) return;
-      setProjects((previos) =>
-        previos.map((p) => {
+      setProjects((previos) => {
+        let cambio = false;
+        const siguiente = previos.map((p) => {
           const espacios = porProyecto.get(p.id);
-          return espacios?.length ? { ...p, workspaces: espacios } : p;
-        }),
-      );
+          if (!espacios?.length) return p;
+          cambio = true;
+          return { ...p, workspaces: espacios };
+        });
+        /* Se devuelve el mismo array si no cambió nada. Es la segunda mitad del
+           arreglo: sin esto, cada respuesta repinta el árbol entero aunque no
+           traiga ninguna novedad. */
+        return cambio ? siguiente : previos;
+      });
     });
     return () => {
       vigente = false;
