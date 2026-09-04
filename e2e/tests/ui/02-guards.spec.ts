@@ -102,7 +102,10 @@ test.describe('Sin sesión, todo lo privado manda al login', () => {
      * intentaría `JSON.parse` de un documento HTML y el error resultante no
      * diría nada sobre la sesión.
      */
-    const respuesta = await request.get('http://localhost:4102/main/api/gateway/users/me');
+    /* ⚠️ Contra el shell y por el proxy **único**. Iba directa al 4102 —el
+       puerto interno de dashboard-front— y ese puerto ya no existe: la fusión
+       (F5) dejó un solo proceso en el 4100 y un solo `/api/gateway`. */
+    const respuesta = await request.get('http://localhost:4100/api/gateway/users/me');
 
     expect(respuesta.status()).toBe(401);
     expect(respuesta.headers()['content-type']).toContain('application/json');

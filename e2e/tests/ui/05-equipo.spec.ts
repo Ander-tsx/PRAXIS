@@ -93,7 +93,7 @@ test.describe('Equipo del proyecto — el asiento', () => {
     /* Una cuenta que existe pero no pertenece a la organización de quien invita:
        registrada por el proxy de la zona, sin gastar un login. */
     const fuera = correoUnico('fuera-de-org');
-    const alta = await page.request.post('/projects/api/gateway/auth/register', {
+    const alta = await page.request.post('/api/gateway/auth/register', {
       data: { email: fuera, password: 'Prueba@12345!' },
     });
     expect(alta.status()).toBe(201);

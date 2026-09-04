@@ -138,11 +138,16 @@ export async function entrarConCuenta(page: Page, email: string): Promise<void> 
  *
  * ## Por dónde se crea entonces
  *
- * Por **el mismo camino autenticado que usa la zona**: el proxy de
- * projects-front. `page.request` comparte el almacén de cookies del contexto,
- * así que la cookie httpOnly de sesión viaja sola y el proxy le pone la cabecera
- * de autorización. No se salta la sesión, ni los guards, ni los permisos — es
+ * Por **el mismo camino autenticado que usa la aplicación**: su proxy del
+ * gateway. `page.request` comparte el almacén de cookies del contexto, así que
+ * la cookie httpOnly de sesión viaja sola y el proxy le pone la cabecera de
+ * autorización. No se salta la sesión, ni los guards, ni los permisos — es
  * exactamente la petición que haría el navegador.
+ *
+ * ⚠️ Era `/projects/api/gateway/projects`, el proxy de la zona. Con la fusión
+ * (F6) hay **uno solo**, en `/api/gateway`, y el viejo dejó de existir: la
+ * llamada devolvía el 404 de la aplicación —HTML, no JSON— y las once pruebas
+ * que pasan por aquí morían antes de empezar.
  *
  * ## Qué se pierde y qué no
  *
@@ -153,7 +158,7 @@ export async function entrarConCuenta(page: Page, email: string): Promise<void> 
  * formulario de alta, y es porque no hay ninguno que cubrir.
  */
 export async function crearProyectoParaLaPrueba(page: Page, nombre: string): Promise<void> {
-  const respuesta = await page.request.post('/projects/api/gateway/projects', {
+  const respuesta = await page.request.post('/api/gateway/projects', {
     data: { name: nombre },
   });
 

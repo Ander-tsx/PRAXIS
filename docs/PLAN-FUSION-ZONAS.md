@@ -17,6 +17,7 @@
 | ✅ **Correr `pnpm e2e:regresion` ANTES de tocar nada** | Hecho el 2026-09-03: **243 de 243 en verde**. Ver «La línea base» |
 | ✅ **El alcance exacto de la fusión** | Confirmado el 2026-09-03: **una sola app, auth y shell incluidos**. Ver «El alcance confirmado» |
 | ✅ **Rama de trabajo** | `feature/fusion-zonas`. Todo lo de esta etapa se hace ahí |
+| ✅ **Etapa terminada** | F0–F11 cerradas el 2026-09-04, con la regresión de cierre en verde. Falta el PR a `main` |
 
 ---
 
@@ -357,17 +358,17 @@ más barata.
 | # | Paso | Líneas | Estado |
 |---|---|---|---|
 | **F0** | Línea base: `pnpm e2e:regresion` | — | ✅ 243/243 |
-| **F1** | Archivar `reports-front` | 7.415 | ✅ código · ⚠️ regresión a medias, ver Registro |
-| **F2** | Mover `assistant-front` → shell **(piloto del mecanismo)** | 757 | ✅ código · ⚠️ e2e pendiente |
-| **F3** | Mover `chat-front` | 2.539 | ✅ código · ⚠️ e2e pendiente |
-| **F4** | Mover `admin-front` | 3.384 | ✅ código · ⚠️ e2e pendiente |
-| **F5** | Mover `dashboard-front` (`/main`) | 7.334 | ✅ código · ⚠️ e2e pendiente |
-| **F6** | Mover `projects-front` | 18.791 | ✅ código · ⚠️ e2e pendiente |
-| **F7** | Mover `auth-front` (la pública) | 2.138 | ✅ código · ⚠️ e2e pendiente |
-| **F8** | Un solo `(privado)/layout.tsx`: el armazón deja de remontarse | — | ✅ código · ⚠️ e2e pendiente |
+| **F1** | Archivar `reports-front` | 7.415 | ✅ |
+| **F2** | Mover `assistant-front` → shell **(piloto del mecanismo)** | 757 | ✅ |
+| **F3** | Mover `chat-front` | 2.539 | ✅ |
+| **F4** | Mover `admin-front` | 3.384 | ✅ |
+| **F5** | Mover `dashboard-front` (`/main`) | 7.334 | ✅ |
+| **F6** | Mover `projects-front` | 18.791 | ✅ |
+| **F7** | Mover `auth-front` (la pública) | 2.138 | ✅ |
+| **F8** | Un solo `(privado)/layout.tsx`: el armazón deja de remontarse | — | ✅ |
 | **F9** | Limpieza: `rewrites()` fuera, pm2 a un proceso, Dockerfile, `dev-cli`, puertos, documentación | — | ✅ |
 | **F10** | Renombrar `web-shell` → `web` | — | ✅ |
-| **F11** | `pnpm e2e:regresion` de cierre | — | ⬜ |
+| **F11** | `pnpm e2e:regresion` de cierre | — | ✅ **26/26 archivos en verde** |
 
 ### La receta de cada zona (F2–F7)
 
@@ -535,6 +536,8 @@ ha hecho.
 | 2026-09-04 | 🕳️ | Dos enlaces muertos encontrados y arreglados de paso: el botón «Ver planes y precios» del portal de organización apuntaba a `/billing`, que no existe desde que Suscripción salió de la barra lateral, y `destinoDeUnAviso` podía devolver `undefined` —válido en un `<a>`, no en un `Link`— |
 | 2026-09-04 | **F9** | Limpieza. Fuera el `rewrites()` entero —catorce entradas—, el pm2 baja de ocho procesos a uno, el Dockerfile compila una sola app y el `dev-cli` lista una sola entrada de frontend. Los `globals.css` y los `@font-face` con `basePath` se fueron solos con cada zona; el de la aplicación ya los declaraba sin prefijo. Y la documentación: `CLAUDE.md`, `README`, `STRUCTURE`, los dos de despliegue y la skill de diseño, cuya §12 describía una restricción —«cruzar de zona obliga a navegación dura»— que ya no existe |
 | 2026-09-04 | **F10** | `apps/frontend/web-shell` → `apps/frontend/web`, y el paquete a `@praxis/web`. El nombre pasó a mentir en cuanto entró la primera sección. ESTADO-ACTUAL **no se reescribe**: describe el multi-zone en media docena de sitios y ese es su valor. Lleva un aviso en la cabecera con la tabla de traducción |
+| 2026-09-04 | **F11** | **Regresión de cierre en verde: los 26 archivos.** Las 18 de API pasaron a la primera. De las 8 de navegador, 6 salieron rojas y **cinco eran pruebas atadas a la arquitectura vieja**, no fallos: la fixture que crea proyectos llamaba a `/projects/api/gateway` —el proxy de la zona, que ya no existe: devolvía el 404 en HTML y mataba once pruebas antes de empezar—, `02-guards` pedía al puerto interno 4102, y `04`/`05` llamaban al proxy de proyectos. La sexta, `06-chat-zona`, fallaba **porque la fusión funcionó**: exigía que el SSE saliera por `/chat/api/gateway` y sale por `/api/gateway`. Se reescribió al revés —ahora vigila que **ningún** flujo lleve prefijo de sección, que es como esto se rompería sin dar error— y el archivo se renombró a `06-chat.spec.ts` |
+| 2026-09-04 | ⚠️ | `07-reglas` dio un rojo que **no era de la fusión**: pasa aislada, y al repetir el archivo el rojo se movió a otra prueba distinta. Son 25 pruebas y 8,8 minutos en un solo archivo, con el límite de 10 logins por minuto de por medio y la máquina en presión de memoria. En la corrida final quedó verde. Anotado como flaky bajo carga, no como regresión |
 | 2026-09-04 | 🕳️ | Encontrado de paso, **no arreglado**: `/main/roles` redirige a `/main/organizations/:id/roles`, que **no existe en ninguna app**. Es anterior a la fusión —la ruta no está en la barra lateral, solo se llega escribiéndola— y no es trabajo de esta etapa. Para la auditoría |
 | 2026-09-04 | 🍎 | **Un `pkill -f "next start"` no mata el servidor**: `next start` deja un proceso `next-server`, así que el shell viejo seguía escuchando en el 4100 con las reescrituras de antes y el nuevo moría con `EADDRINUSE`. Se mata por `next-server` |
 | 2026-09-04 | 🔧 | De ahí salió el stack construido (`build:frontend`, `start:backend`, `start:frontend`): **315 MB el backend y 579 MB el frontend**, contra varios GB en vigilancia. No bastó — con todo apagado la máquina ya tenía 677 MB libres y 6,65 de 8 GB de swap ocupados— pero es el modo correcto de verificar de aquí en adelante |

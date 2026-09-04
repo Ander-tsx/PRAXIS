@@ -73,7 +73,7 @@ async function parejaQueSePuedeEscribir(
   return { duenno, invitado };
 }
 
-test.describe('El chat en su propia zona', () => {
+test.describe('El chat como sección de la aplicación', () => {
   test('se abre en /chat, no en /dashboard/chat, y pinta la conversación', async ({ page }) => {
     const api = await contextoDePeticion.newContext({
       baseURL: process.env.E2E_GATEWAY_URL ?? 'http://localhost:3000',
@@ -142,7 +142,7 @@ test.describe('El chat en su propia zona', () => {
     expect(page.url(), 'No debe quedar rastro de /dashboard/chat').not.toContain('/dashboard/chat');
   });
 
-  test('el flujo en vivo se abre contra el proxy de ESTA zona', async ({ page }) => {
+  test('el flujo en vivo se abre contra el proxy único, y trae el mensaje', async ({ page }) => {
     const api = await contextoDePeticion.newContext({
       baseURL: process.env.E2E_GATEWAY_URL ?? 'http://localhost:3000',
     });
@@ -153,20 +153,24 @@ test.describe('El chat en su propia zona', () => {
      *
      * La primera versión de esta prueba enviaba un mensaje y comprobaba que
      * salía en pantalla sin recargar. Pasaba — y también pasaba con el
-     * `zonePath` puesto a `/dashboard`, y hasta con uno inventado que no existe.
-     * O sea que no probaba nada: al caerse el flujo, la reconexión acaba
-     * provocando un refresco del árbol de servidor y el mensaje entra igual, por
-     * el camino de respaldo. Una prueba que pasa con el sujeto roto es peor que
-     * no tenerla, porque da por cubierto lo que no lo está.
+     * `zonePath` puesto a otra zona, y hasta con uno inventado. O sea que no
+     * probaba nada: al caerse el flujo, la reconexión acaba provocando un
+     * refresco del árbol de servidor y el mensaje entra igual, por el camino de
+     * respaldo. Una prueba que pasa con el sujeto roto es peor que no tenerla.
      *
-     * Lo que **sí** distingue una cosa de otra es contra qué URL se abre el
-     * `EventSource`. `FuenteEnVivo` lo abre contra
-     * `<zonePath>/api/gateway/me/notifications/stream`, y `zonePath` lo pone el
-     * layout de la zona. Si se quedara en `/dashboard`, seguiría funcionando
-     * —el shell reescribe `/dashboard/*` a la otra zona, que tiene su propio
-     * proxy— y esta zona estaría hablando por la puerta de otra: invisible
-     * mirando la pantalla, y roto en cuanto las zonas se sirvan por separado,
-     * que es justo lo que un multi-zone permite.
+     * ## Lo que vigila ahora, que no es lo mismo que antes
+     *
+     * Mientras hubo zonas, esto comprobaba que **cada una abriera su propio**
+     * `<zonePath>/api/gateway/...`: hablar por la puerta de otra zona era
+     * invisible mirando la pantalla y se rompía en cuanto se sirvieran por
+     * separado.
+     *
+     * Desde la fusión (F3 y F8) hay **un solo** proxy, así que lo que se vigila
+     * es lo contrario: que `zonePath` se quedara en `""` y el flujo salga por
+     * `/api/gateway`. Si alguien le devolviera un prefijo —`/chat`, por
+     * ejemplo— la URL sería `/chat/api/gateway/...`, que en esta aplicación es
+     * un 404: el flujo no abriría y el chat volvería a enterarse de los
+     * mensajes solo al recargar, sin un error en ninguna consola.
      */
     const flujos: string[] = [];
     page.on('request', (peticion) => {
@@ -176,36 +180,22 @@ test.describe('El chat en su propia zona', () => {
     });
 
     await entrarConCuenta(page, duenno.email);
-
-    /* ⚠️ Se vacía **después de entrar y antes de ir al chat**. Entrar aterriza
-       en `/projects`, que abre su propio flujo por su propio proxy —eso está
-       bien y es lo que debe pasar—, y sin este corte el primer elemento sería
-       el de esa zona: la prueba fallaría acusando a la zona equivocada. Le pasó
-       a esta misma prueba al escribirla. */
-    flujos.length = 0;
-
     await page.goto(`/chat/${invitado.userId}`);
 
-    /**
-     * Se exige que **aparezca** el de esta zona, no que sean todos.
-     *
-     * ⚠️ Y no es una aserción débil por comodidad: exigir «todos» falla por un
-     * motivo que no es el que se vigila. Al navegar fuera del panel su flujo se
-     * rompe, `useReconexion` reintenta, y ese reintento sale por
-     * `/dashboard/...` mientras la página vieja se descarga. Es correcto: cada
-     * zona reconecta por su puerta.
-     *
-     * Los dientes siguen puestos: si el `zonePath` de esta zona estuviera mal,
-     * **nunca** aparecería un flujo contra `/chat/api/gateway`, y esto se pondría
-     * rojo por espera agotada.
-     */
-    const DEL_CHAT = '/chat/api/gateway/me/notifications/stream';
+    const PROXY_UNICO = '/api/gateway/me/notifications/stream';
     await expect
-      .poll(() => flujos.includes(DEL_CHAT), {
+      .poll(() => flujos.includes(PROXY_UNICO), {
         timeout: 20_000,
-        message: `chat-front no abrió su flujo en vivo. Abiertos: ${flujos.join(', ') || 'ninguno'}`,
+        message: `No se abrió el flujo en vivo contra el proxy único. Abiertos: ${flujos.join(', ') || 'ninguno'}`,
       })
       .toBe(true);
+
+    /* ⚠️ Y que **ninguno** salga con un prefijo de sección delante, que es la
+       forma en que esto se rompería sin dar error. */
+    expect(
+      flujos.filter((ruta) => ruta !== PROXY_UNICO),
+      'Ningún flujo debería llevar un prefijo de sección delante del proxy',
+    ).toEqual([]);
 
     /* Y una vez comprobado por dónde sale, que efectivamente traiga el mensaje.
        Sin `reload()`: si hiciera falta recargar, no sería tiempo real. */
