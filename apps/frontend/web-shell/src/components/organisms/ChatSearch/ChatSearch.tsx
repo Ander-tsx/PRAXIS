@@ -14,8 +14,8 @@ import {
 export function ChatSearch({
   contactos,
   directorio,
-  zonePath,
-}: { contactos: ChatContact[]; directorio: Directory; zonePath: string }) {
+  gatewayPath,
+}: { contactos: ChatContact[]; directorio: Directory; gatewayPath: string }) {
   const [search, setSearch] = useState('');
 
   const filtered = contactos.filter((c) => {
@@ -73,13 +73,14 @@ export function ChatSearch({
               return (
                 <Link
                   key={contacto.userId}
-                  href={`/${contacto.userId}`}
+                  /* ⚠️ Ruta completa: ya no hay `basePath` que el router anteponga. */
+                  href={`/chat/${contacto.userId}`}
                   className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group"
                 >
                   <AvatarRow
                     userId={contacto.userId}
                     profile={profile}
-                    zonePath={zonePath}
+                    gatewayPath={gatewayPath}
                     name={name}
                   />
                   <div className="flex flex-col min-w-0 flex-1">
@@ -104,13 +105,13 @@ export function ChatSearch({
 function AvatarRow({
   userId,
   profile,
-  zonePath,
+  gatewayPath,
   name,
-}: { userId: string; profile: any; zonePath: string; name: string }) {
+}: { userId: string; profile: any; gatewayPath: string; name: string }) {
   const presencia = usePresence(userId, profile?.presence);
   return (
     <Avatar
-      src={avatarHref(profile?.avatarUrl, `${zonePath}/api/gateway`)}
+      src={avatarHref(profile?.avatarUrl, gatewayPath)}
       presence={presencia}
       label={name}
     />

@@ -1,3 +1,4 @@
+import { recordarConversacion } from '@/lib/ultimo-chat';
 import {
   SESSION_COOKIE,
   createSessionRefreshProxy,
@@ -49,7 +50,7 @@ const LOGIN_PATH = '/auth/login';
  * una sesión que falta. `e2e/tests/ui/02-guards.spec.ts` lo cubre para las
  * cinco.
  */
-const PREFIJOS_PRIVADOS = ['/assistant'];
+const PREFIJOS_PRIVADOS = ['/assistant', '/chat'];
 
 function esPrivada(pathname: string): boolean {
   return PREFIJOS_PRIVADOS.some(
@@ -81,6 +82,26 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   /* Se verifica la **firma**, no solo que la cookie exista: una cookie caducada
      o manipulada no puede abrir el área privada. */
   if (await hasValidSessionToken(resolveToken(request, response))) {
+    /**
+     * Se anota qué conversación se está abriendo, para poder volver a ella.
+     *
+     * Va **aquí y no en la página** porque por el proxy pasa toda navegación:
+     * no hay que acordarse en cada pantalla ni gastar una petición. Y va
+     * **después** de validar la sesión: sin ella no hay nada que recordar.
+     *
+     * 🔴 ⚠️ **«Toda navegación» incluye los prefetch, y eso era el fallo.** Por
+     * aquí pasa una petición por cada `<Link>` del directorio que entra en el
+     * viewport, sin que nadie haya pulsado: escribían todas la cookie y ganaba
+     * la última en llegar, así que Mensajes abría una conversación al azar.
+     * `recordarConversacion` los descarta por cabecera; el porqué entero está
+     * en su nota. Si esta llamada se mueve, ese filtro se va con ella.
+     *
+     * Vino del `proxy.ts` de `chat-front` con F3 de la fusión. ⚠️ Y con la
+     * fusión cambió otra vez la ruta que ve: ya no hay `basePath` que Next
+     * recorte, así que llega `/chat/<uuid>` entero. La resta la hace
+     * `recordarConversacion`.
+     */
+    recordarConversacion(request, response);
     return response;
   }
 
@@ -122,6 +143,6 @@ export const config = {
    */
   matcher: [
     '/',
-    '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth(?:/|$)|main(?:/|$)|projects(?:/|$)|admin(?:/|$)|chat(?:/|$)).*)',
+    '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth(?:/|$)|main(?:/|$)|projects(?:/|$)|admin(?:/|$)).*)',
   ],
 };

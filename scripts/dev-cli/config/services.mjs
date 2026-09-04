@@ -210,15 +210,6 @@ export const FRONTEND_APPS = [
     color: 96,
     descripcion: 'Administración de la plataforma',
   },
-  {
-    key: 'chat-front',
-    pkg: '@praxis/chat-front',
-    dir: 'apps/frontend/chat-front',
-    port: 4106,
-    envFile: '.env.local',
-    color: 96,
-    descripcion: 'Mensajes directos y de proyecto',
-  },
 ];
 
 /**
@@ -266,7 +257,7 @@ export const ALL_SERVICES = [...BACKEND_SERVICES, ...FRONTEND_APPS];
 export const PRESETS = [
   {
     key: 'todo',
-    nombre: 'Todo — los 9 servicios y las 5 zonas',
+    nombre: 'Todo — los 9 servicios y las 4 zonas',
     backend: BACKEND_SERVICES.map((s) => s.key),
     frontend: true,
   },
@@ -284,7 +275,7 @@ export const PRESETS = [
   },
   {
     key: 'frontend',
-    nombre: 'Solo frontend — las 5 zonas (el backend ya está arriba)',
+    nombre: 'Solo frontend — las 4 zonas (el backend ya está arriba)',
     backend: [],
     frontend: true,
   },

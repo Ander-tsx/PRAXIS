@@ -76,7 +76,6 @@ flowchart TB
         Dash["dashboard-front :4102\n/dashboard"]
         Proj["projects-front :4103\n/projects"]
         Adm["admin-front :4105\n/admin"]
-        Chat["chat-front :4106\n/chat"]
     end
 
     subgraph gw["API Gateway :3000"]
@@ -175,7 +174,6 @@ PRAXIS/
 │   │   ├── dashboard-front/    # /dashboard — panel, alertas, invitaciones, Alexa link
 │   │   ├── projects-front/     # /projects — catálogo, Kanban, tareas, miembros
 │   │   ├── admin-front/        # /admin — cuentas, suspensión, auditoría (rol Admin)
-│   │   ├── chat-front/         # /chat — mensajería en tiempo real, canales, DMs
 │   │   └── commons/            # Atomic Design: atoms/, molecules/, organisms/
 │   │                           # + auth, api, tokens, hooks, theme
 │   ├── backend/

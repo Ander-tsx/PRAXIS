@@ -41,10 +41,10 @@ async function requireApi() {
 
 /** Revalida la conversación del proyecto y la bandeja, que enseña el último. */
 function revalidarChat(projectId: string) {
-  /* Rutas **internas** de la zona, sin el basePath. Ver la nota gemela en
-     `actions.ts`. */
-  revalidatePath(`/proyecto/${projectId}`);
-  revalidatePath('/');
+  /* Rutas completas, con `/chat` delante: ya no hay `basePath`. Ver la nota
+     gemela en `actions.ts`. */
+  revalidatePath(`/chat/proyecto/${projectId}`);
+  revalidatePath('/chat');
 }
 
 function describe(error: unknown, fallback: string): string {

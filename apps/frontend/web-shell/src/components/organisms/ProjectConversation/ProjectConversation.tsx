@@ -1,6 +1,6 @@
 'use client';
 
-import { previewDeEnlaceAction } from '@/app/(private)/actions';
+import { previewDeEnlaceAction } from '@/app/chat/actions';
 import {
   deleteProjectAttachmentAction,
   deleteProjectMessageAction,
@@ -11,7 +11,7 @@ import {
   reactProjectAction,
   sendProjectMessageAction,
   uploadProjectAttachmentAction,
-} from '@/app/(private)/proyecto-actions';
+} from '@/app/chat/proyecto-actions';
 import {
   type ChatMessagePage,
   ChatPanel,
@@ -134,7 +134,7 @@ export function ProjectConversation({
       directorio={directorio}
       currentUserId={currentUserId}
       acciones={acciones}
-      gatewayPath="/chat/api/gateway"
+      gatewayPath="/api/gateway"
       rutaCanal={`/projects/${projectId}/chat`}
       canWrite={canWrite}
       participantes={otrosDelEquipo}
@@ -163,7 +163,9 @@ export function ProjectConversation({
               <h2 className="truncate font-display text-2xl text-text-primary">{projectName}</h2>
             </div>
             <p className="font-sans text-xs text-white">
-              Chat del equipo · {/* Cruza de zona, así que `<a>` duro y no `<Link>`. */}
+              Chat del equipo ·{' '}
+              {/* ⚠️ `/projects` sigue siendo zona aparte hasta F6: `<a>` duro, no
+                  `<Link>`, o el router intentaría resolverla dentro de esta app. */}
               <a
                 href={`/projects/${projectSlug}`}
                 className="underline underline-offset-2 transition-opacity hover:opacity-80"

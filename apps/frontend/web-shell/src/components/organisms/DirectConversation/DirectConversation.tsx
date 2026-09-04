@@ -12,7 +12,7 @@ import {
   reactDirectAction,
   sendDirectMessageAction,
   uploadDirectAttachmentAction,
-} from '@/app/(private)/actions';
+} from '@/app/chat/actions';
 import {
   Avatar,
   Badge,
@@ -152,7 +152,7 @@ export function DirectConversation({
       directorio={directorio}
       currentUserId={currentUserId}
       acciones={acciones}
-      gatewayPath="/chat/api/gateway"
+      gatewayPath="/api/gateway"
       rutaCanal={`/me/chats/${peerId}`}
       /* Lo decide la página contra la respuesta del gateway. Ver la prop. */
       canWrite={canWrite}
@@ -221,7 +221,7 @@ function Encabezado({
   const avatarElement = (
     <Avatar
       label={nombre}
-      src={perfil?.avatarUrl ? `/chat/api/gateway${perfil.avatarUrl}` : null}
+      src={perfil?.avatarUrl ? `/api/gateway${perfil.avatarUrl}` : null}
       presence={perfil?.presence}
       size="xl"
     />
@@ -252,7 +252,7 @@ function Encabezado({
             <div className="relative z-10 flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-200">
               {perfil?.avatarUrl ? (
                 <img
-                  src={`/chat/api/gateway${perfil.avatarUrl}`}
+                  src={`/api/gateway${perfil.avatarUrl}`}
                   alt={nombre}
                   className="max-h-[70vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
                 />
@@ -353,8 +353,10 @@ function MenuOpciones({ peerId, mutedInicial }: { peerId: string; mutedInicial: 
       setBorrando(false);
       setConfirmandoBorrado(false);
     } else {
-      /* Ruta **interna**: el router de Next le antepone el basePath (`/chat`). */
-      router.push('/');
+      /* ⚠️ Ruta completa. Era `'/'` porque el router anteponía el `basePath`
+         de la zona; desde F3 de la fusión no hay ninguno, y un `'/'` sacaría a
+         la landing pública después de borrar una conversación. */
+      router.push('/chat');
     }
   }
 

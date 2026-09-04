@@ -15,8 +15,18 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-/** El proxy de esta zona, para las fotos. Su basePath es `/chat`. */
-const ZONE_PATH = '/chat';
+/**
+ * El prefijo de esta sección dentro de la aplicación.
+ *
+ * ⚠️ **Va escrito en cada enlace, y antes no.** Mientras el chat fue una zona,
+ * `/chat` era su `basePath` y el router lo ponía solo: los enlaces internos
+ * eran `/<peerId>`. Desde F3 de la fusión no hay `basePath` que poner, así que
+ * un `/<peerId>` llevaría a la raíz de la aplicación — a la landing.
+ */
+const CHAT_PATH = '/chat';
+
+/** El proxy autenticado, ya uno solo para toda la aplicación. */
+const GATEWAY_PATH = '/api/gateway';
 
 interface PageProps {
   searchParams: Promise<{ lista?: string }>;
@@ -31,7 +41,7 @@ interface PageProps {
  *
  * ```ts
  * const isMobile = /mobile|android|iphone|ipad|ipod/i.test(userAgent);
- * if (!isMobile && recordada) redirect(`/${recordada}`);
+ * if (!isMobile && recordada) redirect(`${CHAT_PATH}/${recordada}`);
  * ```
  *
  * Dos problemas, y el segundo es el gordo.
@@ -83,7 +93,7 @@ export default async function ChatVacioPage({ searchParams }: PageProps) {
       ? deProyecto.some((chat) => chat.project.id === recordada.slice('proyecto/'.length))
       : directas.some((conversacion) => conversacion.peerId === recordada);
 
-    if (accesible) redirect(`/${recordada}`);
+    if (accesible) redirect(`${CHAT_PATH}/${recordada}`);
   }
 
   /* Un solo viaje al directorio para todo lo que pinta un nombre: los
@@ -122,7 +132,7 @@ export default async function ChatVacioPage({ searchParams }: PageProps) {
             .map((chat) => (
               <Link
                 key={chat.project.id}
-                href={`/proyecto/${chat.project.id}`}
+                href={`${CHAT_PATH}/proyecto/${chat.project.id}`}
                 className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-white/5"
               >
                 <ProjectMonogram
@@ -146,7 +156,7 @@ export default async function ChatVacioPage({ searchParams }: PageProps) {
           {directas.map((conversacion) => (
             <Link
               key={conversacion.peerId}
-              href={`/${conversacion.peerId}`}
+              href={`${CHAT_PATH}/${conversacion.peerId}`}
               className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-white/5"
             >
               <Avatar
@@ -154,7 +164,7 @@ export default async function ChatVacioPage({ searchParams }: PageProps) {
                 size="sm"
                 src={avatarHref(
                   directorio.perfiles.get(conversacion.peerId)?.avatarUrl,
-                  `${ZONE_PATH}/api/gateway`,
+                  GATEWAY_PATH,
                 )}
               />
               <span className="flex min-w-0 flex-1 flex-col">
@@ -171,7 +181,7 @@ export default async function ChatVacioPage({ searchParams }: PageProps) {
         </section>
       )}
 
-      <ChatSearch contactos={contactos} directorio={directorio} zonePath={ZONE_PATH} />
+      <ChatSearch contactos={contactos} directorio={directorio} gatewayPath={GATEWAY_PATH} />
     </div>
   );
 }

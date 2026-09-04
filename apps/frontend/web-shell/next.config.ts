@@ -26,7 +26,6 @@ const nextConfig: NextConfig = {
     const dashboardFrontUrl = process.env.DASHBOARD_FRONT_URL ?? 'http://localhost:4102';
     const projectsFrontUrl = process.env.PROJECTS_FRONT_URL ?? 'http://localhost:4103';
     const adminFrontUrl = process.env.ADMIN_FRONT_URL ?? 'http://localhost:4105';
-    const chatFrontUrl = process.env.CHAT_FRONT_URL ?? 'http://localhost:4106';
 
     return [
       {
@@ -60,19 +59,13 @@ const nextConfig: NextConfig = {
         destination: `${adminFrontUrl}/admin/:path*`,
       },
 
-      /**
-       * El chat, que hasta E3 vivía dentro de `/dashboard/chat`. Las **dos**
-       * entradas, como todas: sin la primera, `/chat` a secas —que es la
-       * pantalla a la que lleva el menú— cae en el 404 del shell.
+      /*
+       * 🕳️ Aquí estaban las dos entradas de `/chat`.
        *
-       * Las direcciones viejas siguen funcionando: hay una redirección de
-       * cortesía en `redirects()`, más abajo.
+       * Segunda zona fusionada (F3). Las pantallas viven en `src/app/chat/` y
+       * la URL no cambió — incluida la redirección de cortesía desde
+       * `/dashboard/chat`, que sigue más abajo en `redirects()`.
        */
-      { source: '/chat', destination: `${chatFrontUrl}/chat` },
-      {
-        source: '/chat/:path*',
-        destination: `${chatFrontUrl}/chat/:path*`,
-      },
 
       /*
        * 🕳️ Aquí estaban las dos entradas de `/assistant`.

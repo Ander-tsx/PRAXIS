@@ -46,13 +46,14 @@ async function requireApi() {
  * transición del App Router.
  */
 function revalidarChat(peerId: string) {
-  /* Rutas **internas** de la zona, sin el basePath: aquí `/chat` es el
-     basePath, así que la conversación es `/<peerId>` y la bandeja es `/`.
-     Con las de cuando esto vivía en dashboard-front no habría error — Next no
-     se queja de revalidar una ruta que no existe—: simplemente no refrescaría
-     nada. Ver E3.3. */
-  revalidatePath(`/${peerId}`);
-  revalidatePath('/');
+  /* ⚠️ **Rutas completas, con `/chat` delante.** Ya no hay `basePath` que Next
+     recorte: desde F3 de la fusión el chat es un segmento de la aplicación, así
+     que la conversación es `/chat/<peerId>` y la bandeja `/chat`.
+     Equivocarse aquí **no da ningún error** —Next no se queja de revalidar una
+     ruta que no existe—: simplemente deja de refrescar. Ya pasó al mudar el
+     chat a su propia zona (E3.3), y esta es la misma trampa al revés. */
+  revalidatePath(`/chat/${peerId}`);
+  revalidatePath('/chat');
 }
 
 function describe(error: unknown, fallback: string): string {
