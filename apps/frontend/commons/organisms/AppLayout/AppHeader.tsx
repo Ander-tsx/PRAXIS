@@ -6,7 +6,17 @@ import { PraxLauncher } from './PraxLauncher';
 
 export interface AppHeaderProps {
   anchoCompleto?: boolean;
-  /** Título de la pantalla. */
+  /**
+   * Cómo se llama la pantalla.
+   *
+   * ⚠️ **Ya no se pinta**, y el nombre del componente se ha quedado grande: no
+   * hay cabecera. Se conserva porque sigue siendo útil para quien no ve la
+   * pantalla — va como `aria-label` de `<main>`, que es lo que hace que un
+   * lector de pantalla pueda saltar a la región y decir a qué región salta.
+   *
+   * No se retira la prop: la pasan las veinte y pico pantallas del área privada
+   * y quitarla sería un renombrado global a cambio de nada.
+   */
   title: string;
   /**
    * La pantalla ocupa el alto disponible y **no desplaza**.
@@ -16,32 +26,56 @@ export interface AppHeaderProps {
    * el contenedor se queda del alto exacto de la ventana y quien desplaza es lo
    * que haya dentro.
    *
-   * ⚠️ **Lo pide una pantalla que es un chat**, donde la cabecera y el
-   * compositor tienen que quedarse quietos y solo los mensajes se mueven. Sin
-   * esto había que adivinar el alto con `100dvh` menos la barra menos el
-   * relleno — un cálculo que se rompe en cuanto cualquiera de los tres cambia.
+   * ⚠️ **Lo pide una pantalla que es un chat**, donde el compositor tiene que
+   * quedarse quieto y solo los mensajes se mueven. Sin esto había que adivinar
+   * el alto con `100dvh` menos la barra menos el relleno — un cálculo que se
+   * rompe en cuanto cualquiera de los tres cambia.
    */
   lleno?: boolean;
-  /** Zona derecha: la acción principal de la pantalla, si la tiene. */
+  /**
+   * Zona derecha de la antigua cabecera.
+   *
+   * ⚠️ **No lo usa ninguna pantalla**, y se comprobó antes de retirar la barra:
+   * las acciones principales viven dentro del contenido (el «Nuevo proyecto» de
+   * la rejilla, por ejemplo). Se conserva la prop y **no** se pinta: si alguna
+   * pantalla vuelve a necesitar una acción fija, hay que decidir dónde va ahora
+   * que no hay franja superior, no colarla aquí sin sitio.
+   */
   headerSlot?: ReactNode;
   children: ReactNode;
 }
 
 /**
- * Cabecera y contenido de una pantalla del área privada.
+ * El contenido de una pantalla del área privada.
  *
- * Va **dentro de cada page**, al revés que `AppShell`, y a propósito: el título
- * y la acción de la derecha son lo único de esta zona de la pantalla que cambia
- * al navegar. Dejándolos aquí, el `loading.tsx` cubre exactamente lo que está
- * cargando y ni la barra lateral ni los datos de quien ha entrado parpadean.
+ * ## 🕳️ Aquí había una cabecera, y se retiró entera
  *
- * El botón del menú móvil vive aquí porque visualmente está en la cabecera, pero
- * lo que abre es el cajón de `AppShell`: por eso pide la función por contexto en
- * vez de recibirla por props a través de media aplicación.
+ * Era una franja de `h-16` con el título de la pantalla —«Proyectos», «Mensajes
+ * directos»—, el botón del menú móvil y el lanzador de PRAX. El título repetía
+ * lo que ya dicen la entrada marcada en la barra lateral y el propio contenido,
+ * y se llevaba cuatro rem de alto en **todas** las pantallas y en todos los
+ * tamaños. En un teléfono eso es una fila entera de tablero.
+ *
+ * Lo que había dentro y sí hacía falta se ha reubicado:
+ *
+ * - **El botón del menú** pasa a flotar arriba a la izquierda, solo en móvil.
+ *   ⚠️ No se podía simplemente borrar: es la **única** forma de abrir el cajón
+ *   en un teléfono, y sin él no se llega ni a los proyectos ni a los chats. Es
+ *   el mismo agujero que ya se arregló una vez.
+ * - **PRAX** se va abajo a la derecha, flotando. Ver `PraxLauncher`.
+ *
+ * ## El título sigue existiendo, pero solo para quien no ve
+ *
+ * `aria-label` en `<main>`. Un `<main>` sin nombre obliga a un lector de
+ * pantalla a leer contenido hasta deducir dónde está; con nombre, la región se
+ * anuncia. Es gratis y no ocupa un píxel.
+ *
+ * Va **dentro de cada page**, al revés que `AppShell`, y a propósito: así el
+ * `loading.tsx` cubre exactamente lo que está cargando y ni la barra lateral ni
+ * los datos de quien ha entrado parpadean.
  */
 export function AppHeader({
   title,
-  headerSlot,
   lleno = false,
   anchoCompleto = false,
   children,
@@ -55,43 +89,30 @@ export function AppHeader({
 
   return (
     <>
-      <header className="flex h-16 shrink-0 items-center justify-between gap-4 px-4 sm:px-6 bg-transparent">
-        <div className="flex min-w-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={openMenu}
-            aria-label="Abrir menú"
-            className="rounded-md p-1 text-white transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
-          >
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.75}
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-
-          <h1 className="truncate font-display text-lg text-text-primary">{title}</h1>
-        </div>
-
-        {/**
-         * La derecha: la acción de la pantalla y, pegado al borde, **PRAX**.
-         *
-         * Ese hueco tenía antes las insignias de rol global y plan (`cuentaSlot`
-         * → `CuentaEnCabecera`). Se retiraron: dos datos que se iban a mirar a
-         * Configuración una vez, no de reojo. En su sitio va el asistente, que sí
-         * se usa desde cualquier pantalla. `PraxLauncher` sale en **todas** sin
-         * que cada página se acuerde, porque `AppHeader` va en todas.
-         */}
-        <div className="flex shrink-0 items-center gap-3">
-          {headerSlot}
-          <PraxLauncher />
-        </div>
-      </header>
+      {/**
+       * El menú, flotando y **solo en móvil**.
+       *
+       * `fixed` y no `absolute`: tiene que quedarse quieto mientras `<main>` se
+       * desplaza. Con fondo y borde propios porque ahora flota sobre contenido
+       * cualquiera —una tabla, un tablero— y un icono suelto ahí no se ve.
+       */}
+      <button
+        type="button"
+        onClick={openMenu}
+        aria-label="Abrir menú"
+        className="fixed left-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#202020] text-text-primary shadow-lg transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
+      >
+        <svg
+          className="h-5 w-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.75}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
 
       {/**
        * ⚠️ **El scroll suave va aquí y no en `html`.**
@@ -107,6 +128,7 @@ export function AppHeader({
        * no un defecto.
        */}
       <main
+        aria-label={title}
         className={`relative flex-1 bg-[#191919] motion-safe:scroll-smooth ${
           /* `overflow-hidden` y no `auto`: con `lleno`, el que desplaza es un
              hijo, y dejar aquí un scroll de reserva produce dos barras
@@ -115,13 +137,23 @@ export function AppHeader({
         }`}
       >
         <div
-          className={`mx-auto w-full ${anchoCompleto ? 'p-0 max-w-full' : `p-4 sm:p-6 ${plegada ? 'max-w-[1584px]' : 'max-w-[1400px]'}`} ${
-            lleno ? 'flex h-full min-h-0 flex-col' : ''
-          }`}
+          className={`mx-auto w-full ${
+            anchoCompleto
+              ? 'p-0 max-w-full'
+              : /* ⚠️ `pt-16` en móvil y `sm:pt-6` a partir de ahí: el botón del
+                   menú flota sobre esta esquina, y sin ese hueco taparía la
+                   primera línea de cualquier pantalla. En escritorio no existe,
+                   así que no se paga. */
+                `px-4 pb-4 pt-16 sm:p-6 ${plegada ? 'max-w-[1584px]' : 'max-w-[1400px]'}`
+          } ${lleno ? 'flex h-full min-h-0 flex-col' : ''}`}
         >
           {children}
         </div>
       </main>
+
+      {/* PRAX, flotando abajo a la derecha. Sale en todas las pantallas porque
+          `AppHeader` va en todas. Ver `PraxLauncher`. */}
+      <PraxLauncher />
     </>
   );
 }

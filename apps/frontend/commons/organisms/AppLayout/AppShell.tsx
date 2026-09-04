@@ -37,6 +37,7 @@ import {
 } from '../../notifications/avisos';
 import { alpha, colors } from '../../tokens';
 import { KylooWordmark } from '../KylooWordmark';
+import { DirectorioDeChatsProvider, useDirectorioDeChats } from './DirectorioDeChats';
 import { DockColumn, DockProvider } from './DockPanel';
 import { NavList } from './NavList';
 import { OrgSwitcher } from './OrgSwitcher';
@@ -271,20 +272,27 @@ export function AppShell(props: AppShellProps) {
       {/* Por encima de todo lo que pinte un avatar: el punto de estado de
           cualquier persona se corrige solo desde aquí. */}
       <LivePresences>
-        {/* El cajón lateral, por encima del armazón: la columna la pinta él y
-            el contenido lo proyecta la página, así que el proveedor tiene que
-            envolver a los dos. Ver `DockPanel`. */}
-        <DockProvider>
-          {/* PRAX global: el lanzador de la cabecera y el minichat (flotante o
+        {/* El directorio de conversaciones, **una sola vez para las dos barras**.
+            Dentro de `LiveSource` porque se suscribe al flujo; por encima del
+            armazón porque lo leen el `<aside>` de escritorio y el cajón móvil, y
+            en un teléfono los dos están montados a la vez. Ver
+            `DirectorioDeChatsProvider`. */}
+        <DirectorioDeChatsProvider gatewayPath={`${props.zonePath}/api/gateway`}>
+          {/* El cajón lateral, por encima del armazón: la columna la pinta él y
+              el contenido lo proyecta la página, así que el proveedor tiene que
+              envolver a los dos. Ver `DockPanel`. */}
+          <DockProvider>
+            {/* PRAX global: el lanzador de la cabecera y el minichat (flotante o
               acoplado). Dentro de `DockProvider` porque el modo acoplado usa su
               columna. Ver `PraxWindow`. */}
-          <PraxProvider
-            zonePath={props.zonePath}
-            organizacionActivaId={props.organizacionActivaId ?? null}
-          >
-            <ArmazonInterno {...props} />
-          </PraxProvider>
-        </DockProvider>
+            <PraxProvider
+              zonePath={props.zonePath}
+              organizacionActivaId={props.organizacionActivaId ?? null}
+            >
+              <ArmazonInterno {...props} />
+            </PraxProvider>
+          </DockProvider>
+        </DirectorioDeChatsProvider>
       </LivePresences>
     </LiveSource>
   );
@@ -1596,21 +1604,6 @@ function SidebarProjectsTree({
   );
 }
 
-/**
- * Cuánto se espera antes de volver a pedir las conversaciones.
- *
- * ## 🔴 Sin esto eran seis peticiones por mensaje
- *
- * `fetchChats` pide `/me/chats`, `/me/chats/projects` y `/users?ids=…`, y estaba
- * atado **directamente** a `chat.mensaje` y a `chat.leido`. Y `chat.leido` se
- * dispara con cada mensaje que llega mientras tienes la conversación abierta, o
- * sea que un chat de equipo animado disparaba las tres dos veces por mensaje.
- *
- * Es el mismo goteo que `useMessageCount` ya resolvió con la misma ventana y por
- * el mismo motivo. Ver `ESPERA_DE_RECONCILIACION_MS` allí.
- */
-const ESPERA_DEL_DIRECTORIO_MS = 700;
-
 /** Una fila de conversación privada. Fuera del componente: ver `SidebarChatList`. */
 function FilaDePersona({
   conversacion,
@@ -1812,86 +1805,18 @@ function SidebarChatList({
   const browserPath = zonePath + (pathname === '/' ? '' : pathname);
   const gatewayPath = `${zonePath}/api/gateway`;
 
-  const [directas, setDirectas] = useState<DirectConversation[]>([]);
-  const [deProyecto, setDeProyecto] = useState<ProjectChatSummary[]>([]);
-  const [directorio, setDirectorio] = useState<Map<string, UserProfile>>(new Map());
-  const [loading, setLoading] = useState(true);
+  /**
+   * Los datos vienen del proveedor, **no de aquí**.
+   *
+   * ⚠️ Este componente se pinta dos veces —el `<aside>` de escritorio y el cajón
+   * móvil— y el `<aside>` es `display:none` en móvil, o sea que **sigue
+   * montado**. Con el estado dentro, eran dos instancias pidiendo lo mismo y la
+   * del cajón arrancaba de cero con su esqueleto cada vez que se abría. Ver
+   * `DirectorioDeChatsProvider`.
+   */
+  const { directas, deProyecto, directorio, cargando } = useDirectorioDeChats();
   const [busqueda, setBusqueda] = useState('');
 
-  const api = useMemo(() => createApiClient({ gatewayPath }), [gatewayPath]);
-
-  const pedir = useCallback(() => {
-    /* Las dos en paralelo: iban encadenadas con `await`, y no dependen una de
-       la otra. Cada una degrada por su cuenta — que falle la de equipo no debe
-       borrar las privadas. */
-    Promise.all([
-      api.get<DirectConversation[]>('/me/chats').catch(() => null),
-      api.get<ProjectChatSummary[]>('/me/chats/projects').catch(() => null),
-    ])
-      .then(async ([privadas, equipos]) => {
-        if (privadas) setDirectas(privadas);
-        if (equipos) setDeProyecto(equipos);
-
-        const ids = [
-          ...new Set([
-            ...(privadas ?? []).map((c) => c.peerId),
-            ...(equipos ?? []).map((c) => c.ultimo?.authorId).filter((id): id is string => !!id),
-          ]),
-        ];
-        if (ids.length === 0) return;
-
-        const perfiles = await api
-          .get<Paginated<UserProfile>>(`/users?ids=${ids.join(',')}`)
-          .catch(() => null);
-        if (perfiles) {
-          setDirectorio(new Map(perfiles.items.map((u: UserProfile) => [u.id, u])));
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [api]);
-
-  /**
-   * La misma petición, agrupada.
-   *
-   * Ver `ESPERA_DEL_DIRECTORIO_MS`: sin esta ventana, una conversación viva
-   * dispara tres peticiones por mensaje recibido y otras tres por la marca de
-   * lectura que provoca.
-   */
-  const temporizador = useRef<number | null>(null);
-  const pedirAgrupado = useCallback(() => {
-    if (temporizador.current !== null) return;
-    temporizador.current = window.setTimeout(() => {
-      temporizador.current = null;
-      pedir();
-    }, ESPERA_DEL_DIRECTORIO_MS);
-  }, [pedir]);
-
-  useEffect(
-    () => () => {
-      if (temporizador.current !== null) window.clearTimeout(temporizador.current);
-    },
-    [],
-  );
-
-  useEffect(() => {
-    pedir();
-  }, [pedir]);
-
-  useLiveEvent('chat.mensaje', pedirAgrupado);
-  useLiveEvent('chat.leido', pedirAgrupado);
-  /* Tras un corte se pide entero y sin esperar: hay un hueco real que rellenar. */
-  useReconnection(pedir);
-
-  /**
-   * Los chats de equipo **de la organización activa**.
-   *
-   * Un chat de proyecto es 1:1 con un proyecto, y un proyecto pertenece a una
-   * sola organización, así que el directorio se acota igual que el árbol lateral
-   * y la lista de proyectos. Los privados **no** se filtran: una conversación
-   * privada no es de ninguna organización, y esconder una con mensajes sin leer
-   * al cambiar de organización es peor que la incoherencia que evitaría (D5 de
-   * PLAN-ORGANIZACION-ACTIVA).
-   */
   const termino = busqueda.trim().toLowerCase();
   const proyectosVisibles = deProyecto
     .filter((c) => !organizacionActivaId || c.project.organizationId === organizacionActivaId)
@@ -1903,7 +1828,7 @@ function SidebarChatList({
     return (peer ? personLabel(peer) : 'Alguien').toLowerCase().includes(termino);
   });
 
-  if (loading) {
+  if (cargando) {
     return (
       <div className="flex flex-col gap-2 px-1">
         <div className="h-10 animate-pulse rounded-xl bg-white/5" />
