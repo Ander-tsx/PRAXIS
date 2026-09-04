@@ -273,6 +273,19 @@ export function presentacionDe(tipo: string): Presentacion {
  * descripción, en `commons/styles/theme.css`.
  */
 export const RELLENO_POR_TEMA: Record<'dark' | 'light', string> = {
-  dark: '#2c354a', // A lighter elevated surface for high contrast
-  light: '#1e2535', // Dark background on light theme for high contrast
+  /**
+   * ⚠️ **Neutro, no azul pizarra.** Estaba en `#2c354a`, que venía de la paleta
+   * anterior —la de los tokens `--color-surface`, azulados— y se quedó cuando la
+   * interfaz pasó al monocromo: el panel es `#191919` y la barra `#202020`, los
+   * dos grises puros. Una píldora azulada encima se leía como de otra
+   * aplicación.
+   *
+   * `#2b2b2b` es un peldaño por encima de la barra lateral: se despega del fondo
+   * sin competir con él, que es lo que tiene que hacer algo que aparece encima
+   * de lo que estás leyendo y se va solo.
+   */
+  dark: '#2b2b2b',
+  /* El claro se conserva por si vuelve el tema: hoy `getTheme()` devuelve
+     siempre `'dark'` y esta entrada no la lee nadie. */
+  light: '#f2f2f2',
 };

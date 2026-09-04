@@ -119,7 +119,9 @@ export function ProjectHeader({
           {project.description && (
             <p
               title={project.description}
-              className="min-w-0 flex-1 truncate font-serif text-sm italic text-white"
+              /* Compacta: una sola línea siempre. Aquí la cabecera va pegada
+                 arriba mientras se desplaza, y dos líneas la harían saltar. */
+              className="min-w-0 flex-1 truncate font-serif text-sm italic text-text-secondary"
             >
               {project.description}
             </p>
@@ -162,9 +164,34 @@ export function ProjectHeader({
         </div>
 
         {project.description ? (
-          <p className="max-w-2xl font-serif text-lg italic text-white">{project.description}</p>
+          /**
+           * La descripción, con sitio para leerse.
+           *
+           * Antes iba en `max-w-2xl` sin más y compartía el aire con todo lo
+           * demás. Al retirarse la cabecera de la aplicación quedaron cuatro rem
+           * libres arriba, y este es el contenido que mejor los aprovecha: es lo
+           * único de esta pantalla que es prosa.
+           *
+           * ⚠️ **Y con tope, que era la otra mitad del encargo.** `line-clamp-3`
+           * en vez de dejarla correr: el campo admite hasta
+           * `PROJECT_DESCRIPTION_MAX` (500 caracteres), que a este tamaño son
+           * siete u ocho líneas y empujan el tablero por debajo del pliegue.
+           * Tres líneas caben de un vistazo y el `title` deja el texto entero a
+           * un puntero de distancia.
+           *
+           * `max-w-prose` y no un ancho en píxeles: acota por **medida de
+           * lectura** —unos 65 caracteres por línea—, que es lo que hace que un
+           * párrafo se siga sin perder el renglón. Un `max-w-2xl` da lo mismo en
+           * una frase corta y demasiado en una larga.
+           */
+          <p
+            title={project.description}
+            className="line-clamp-3 max-w-prose font-serif text-lg italic leading-relaxed text-text-secondary"
+          >
+            {project.description}
+          </p>
         ) : (
-          <p className="font-serif text-lg italic text-white">Sin descripción</p>
+          <p className="font-serif text-lg italic text-text-disabled">Sin descripción</p>
         )}
       </div>
 

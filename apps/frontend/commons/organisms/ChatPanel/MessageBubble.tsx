@@ -607,11 +607,24 @@ export function MessageBubble({
    * La flecha del desplegable se apoya en un degradado del color de la burbuja
    * para despegarse del texto, y un degradado del mismo color translúcido se
    * suma al fondo que ya hay debajo: quedaba un manchón más oscuro en la
-   * esquina en vez de una transición limpia. `color-mix` contra el fondo de la
-   * página da exactamente el mismo tinte que se veía antes, pero como un color
-   * sólido del que la esquina puede tirar.
+   * esquina en vez de una transición limpia. `color-mix` da el tinte como un
+   * color sólido del que la esquina sí puede tirar.
+   *
+   * ## El morado, ajustado
+   *
+   * ⚠️ Mezclaba `primary` al 16% contra `#080807` —casi negro— y el resultado
+   * era un `#18172f` que **queda a la misma claridad que el fondo de la
+   * aplicación** (`#191919`) y solo se diferencia en el tono. Eso es lo peor de
+   * los dos mundos: no se despega, y el poco azul que tiene destaca como una
+   * mancha. De ahí que el contraste se leyera como malo pese a ser un color
+   * «fuerte».
+   *
+   * Ahora se mezcla al 20% contra `#262430`, un gris ya elevado. Sale un violeta
+   * apagado claramente **por encima** del fondo, que es lo que hace que la
+   * burbuja se lea como una superficie y no como un tinte. Sigue siendo el
+   * morado de la marca: cambia el tono, no la identidad.
    */
-  const fondo = mine ? `color-mix(in srgb, ${colors.primary} 16%, #080807)` : '#131312';
+  const fondo = mine ? `color-mix(in srgb, ${colors.primary} 20%, #262430)` : '#131312';
 
   /**
    * Si la flecha del desplegable tiene algo que desplegar.
