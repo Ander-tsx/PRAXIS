@@ -15,7 +15,7 @@
  * Dónde aterriza el usuario tras iniciar sesión o registrarse.
  *
  * Es el panel, no la landing: quien acaba de identificarse quiere su área
- * privada. La sirve el web-shell y la protege su `proxy.ts`.
+ * privada. La sirve esta misma aplicación y la protege su `proxy.ts`.
  */
 export const POST_AUTH_DESTINATION = '/projects';
 

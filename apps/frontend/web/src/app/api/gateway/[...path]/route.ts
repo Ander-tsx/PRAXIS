@@ -1,7 +1,7 @@
 import { createGatewayProxy } from '@praxis/commons/auth';
 
 /**
- * Proxy autenticado del web-shell.
+ * El proxy autenticado de la aplicación. Uno para todo.
  *
  * `/api/gateway/projects` → `GATEWAY_URL/api/projects` con el Bearer leído de
  * la cookie httpOnly. Toda la lógica vive en @praxis/commons/auth para que

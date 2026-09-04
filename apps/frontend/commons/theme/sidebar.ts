@@ -17,7 +17,7 @@ import { cookies } from 'next/headers';
  * almacenamiento del navegador, y por eso vive en esta misma carpeta.
  *
  * ⚠️ `path: '/'` por lo mismo que las otras dos: el navegador ve un único
- * origen —el del web-shell— y las cinco zonas tienen que leer la misma cookie.
+ * origen —el de la aplicación— y todas sus pantallas tienen que leer la misma cookie.
  * Sin eso, plegarla en el panel no la plegaría en proyectos.
  *
  * No es `httpOnly` a propósito: la escribe el botón desde el cliente. No

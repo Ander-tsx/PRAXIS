@@ -1,9 +1,10 @@
 /**
- * Nombres y atributos de las cookies de sesión, compartidos por todas las
- * zonas del multi-zone.
+ * Nombres y atributos de las cookies de sesión.
  *
- * Van con `path: '/'` a propósito: el navegador ve un único origen (el del
- * web-shell) y cada zona necesita leer la misma cookie.
+ * Van con `path: '/'` a propósito. Era obligatorio en el multi-zone —el
+ * navegador veía un único origen y cada zona tenía que leer la misma cookie— y
+ * desde la fusión ya no hace falta, pero se conserva: quitarlo no gana nada y
+ * romperlo es fácil.
  */
 
 export const SESSION_COOKIE = 'praxis_session';

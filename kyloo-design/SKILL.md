@@ -3,7 +3,7 @@ name: kyloo-design
 description: >-
   La filosofía de diseño de Praxis-como-producto-de-Kyloo: monocromo por
   zonas, tipografía como interfaz, cero tarjetas. Nace del rediseño de la
-  landing (`apps/frontend/web-shell`) y documenta las decisiones, los
+  landing (`apps/frontend/web`) y documenta las decisiones, los
   patrones reutilizables y las trampas ya mordidas para cuando se refactorice
   el resto del sistema. Úsala antes de tocar cualquier pantalla que deba
   sentirse "Kyloo", no solo la landing.
@@ -15,7 +15,7 @@ Este documento no es el sistema de diseño de Kyloo (eso vive en su propio
 repo, `bykyloo.com`). Es **cómo lo adaptamos** cuando Praxis se convirtió en
 "un producto de Kyloo": qué tomamos prestado, qué dejamos fuera a propósito,
 y qué aprendimos reconstruyendo la landing entera para llegar ahí. Se escribió
-tras acabar ese rediseño (`apps/frontend/web-shell`, sección `/`) y está
+tras acabar ese rediseño (`apps/frontend/web`, sección `/`) y está
 pensado para reusarse cuando le toque el turno a las zonas de producto
 (`dashboard-front`, `projects-front`, etc.) — que no son la landing y no
 todo aquí aplica igual, pero el criterio sí.
@@ -90,12 +90,12 @@ todo aquí aplica igual, pero el criterio sí.
 
 ## 2. Color: monocromo por zonas
 
-Los siete tokens viven en **`commons/styles/landing-theme.css`** — no en
-`web-shell`. Nacieron ahí, pero en cuanto una segunda zona los necesitó
-(`auth-front`, ver §12) subieron a `commons` el mismo día, siguiendo la
-regla de Atomic Design del propio repo: algo que usan ≥2 zonas no se
-duplica, se comparte. `web-shell` y `auth-front` importan ese archivo desde
-su propio `globals.css`; ninguna de las dos declara los valores a mano.
+Los siete tokens viven en **`commons/styles/landing-theme.css`**, no en el
+`globals.css` de la aplicación. Nacieron en la landing, pero en cuanto una
+segunda pantalla los necesitó (login y registro, ver §12) subieron a `commons`
+el mismo día, siguiendo la regla de Atomic Design del propio repo: algo que usa
+más de una pantalla no se duplica, se comparte. El `globals.css` de `web` lo
+importa; no declara los valores a mano.
 
 Dos clases, nunca un tema por componente:
 
@@ -376,11 +376,22 @@ lenguaje:
 
 ## 12. Cruzar de zona: el panel de acceso
 
-El primer sitio fuera de `web-shell` que adoptó este sistema fue login y
-registro (`auth-front`), y el motivo por el que existe esta sección es que
-cruzar de zona tiene una restricción real que no tiene la landing sola.
+> 🚫 **La restricción que dio origen a esta sección ya no existe.** El frontend
+> se fusionó en una sola aplicación (`docs/PLAN-FUSION-ZONAS.md`, F2–F7): la
+> landing y las pantallas de sesión viven en la misma app, así que el salto
+> entre `/` y `/auth/login` puede ser `next/link` y **sí** cabe un desplegable
+> con estado de React cruzando esa frontera.
+>
+> El resto de la sección se conserva porque describe el panel tal como está
+> construido y por qué. Lo que ya no vale es la obligación de navegación dura
+> —el `<a href>` y el `window.location` de más abajo— que puede simplificarse
+> cuando alguien toque esa pantalla.
 
-**La restricción:** en Multi-Zones cada zona es una app Next
+El primer sitio fuera de la landing que adoptó este sistema fue login y
+registro, y el motivo por el que existía esta sección es que cruzar de zona
+tenía una restricción real que la landing sola no tenía.
+
+**La restricción, mientras hubo zonas:** en Multi-Zones cada zona era una app Next
 independiente, cosida por `rewrites()`. Navegar de `/` (`web-shell`) a
 `/auth/login` (`auth-front`) es **siempre** una carga de página completa —
 no hay router compartido entre las dos, así que un desplegable de verdad
@@ -445,14 +456,14 @@ copia la composición, no des por hecho que el motion también aplica.
 **Lo que subió a `commons` para que esto funcionara**, todo por la misma
 regla del repo (algo que usan ≥2 zonas no se duplica):
 
-- `ShaderCanvas` — de `web-shell/.../PublicFooter/` a
+- `ShaderCanvas` — de `web/.../PublicFooter/` a
   `commons/organisms/ShaderCanvas/`. Lleva `three.js` como dependencia real
   de `commons` (no de cada zona por separado), siguiendo el mismo precedente
   que ya tenían `lucide-react`/`jose`/`sileo` ahí.
-- `KylooWordmark` — de `web-shell/.../PublicFooter/` a
+- `KylooWordmark` — de `web/.../PublicFooter/` a
   `commons/organisms/KylooWordmark/`, por el mismo motivo: ahora lo monta
   también `AuthPanel`.
-- Los tokens `--l-*` (y la variante `.cold`) — de `web-shell/globals.css` a
+- Los tokens `--l-*` (y la variante `.cold`) — de `web/src/app/globals.css` a
   `commons/styles/landing-theme.css` (§2), con la extensión de `--color-*`/
   `--radius-*`/`--font-display` que hizo posible reskinar `AuthForm` sin
   tocarlo.

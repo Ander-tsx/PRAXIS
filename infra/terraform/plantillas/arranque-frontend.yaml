@@ -50,7 +50,7 @@ write_files:
     owner: root
     content: |
       [Unit]
-      Description=Frontend de PRAXIS (web-shell + 5 zonas)
+      Description=Frontend de PRAXIS (una sola aplicación Next)
       Wants=gcr-online.target docker.service
       After=gcr-online.target docker.service
 

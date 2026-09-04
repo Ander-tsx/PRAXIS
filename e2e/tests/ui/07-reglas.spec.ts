@@ -97,7 +97,7 @@ test.describe('Reglas del proyecto', () => {
    *
    * En `next dev` la primera visita a una ruta la compila sobre la marcha —
    * decenas de segundos en una máquina cargada—, y el proxy del shell entre
-   * `web-shell` y `projects-front` corta la conexión antes de que termine.
+   * la aplicación corta la conexión antes de que termine.
    * Sin esto, el primer test de la tanda paga esa compilación entera y puede
    * agotar su propio timeout por algo que no tiene nada que ver con Reglas.
    * El resultado se descarta a propósito: solo importa que Turbopack haya

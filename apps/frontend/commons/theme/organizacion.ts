@@ -12,7 +12,7 @@ import { cookies } from 'next/headers';
  * completa de página, así que pasaría constantemente.
  *
  * ⚠️ `path: '/'` por lo mismo que las otras dos: el navegador ve un único origen
- * —el del web-shell— y las siete zonas tienen que leer la misma cookie. Sin eso,
+ * —el de la aplicación— y todas sus pantallas tienen que leer la misma cookie. Sin eso,
  * cambiar de organización en el panel no la cambiaría en proyectos.
  *
  * ## 🔴 No es una credencial, y por eso no protege nada

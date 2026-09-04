@@ -365,8 +365,8 @@ más barata.
 | **F6** | Mover `projects-front` | 18.791 | ✅ código · ⚠️ e2e pendiente |
 | **F7** | Mover `auth-front` (la pública) | 2.138 | ✅ código · ⚠️ e2e pendiente |
 | **F8** | Un solo `(privado)/layout.tsx`: el armazón deja de remontarse | — | ✅ código · ⚠️ e2e pendiente |
-| **F9** | Limpieza: `rewrites()` fuera, `globals.css` unificado, fuentes sin `basePath`, pm2 a un proceso, Dockerfile, `dev-cli`, puertos | — | ⬜ |
-| **F10** | Renombrar `web-shell` → `web` | — | ⬜ |
+| **F9** | Limpieza: `rewrites()` fuera, pm2 a un proceso, Dockerfile, `dev-cli`, puertos, documentación | — | ✅ |
+| **F10** | Renombrar `web-shell` → `web` | — | ✅ |
 | **F11** | `pnpm e2e:regresion` de cierre | — | ⬜ |
 
 ### La receta de cada zona (F2–F7)
@@ -533,6 +533,8 @@ ha hecho.
 | 2026-09-04 | **F8** | **El premio.** Las cinco secciones cuelgan de un grupo `(privado)` con un único `layout.tsx`: había cinco copias idénticas del mismo armazón y cada salto entre secciones lo remontaba entero, rehaciendo la barra, el proveedor del directorio de chats y **la conexión SSE**. El rol de `/admin` baja a su propio layout, que ya solo comprueba eso. Y los enlaces del menú pasan de `<a>` a `next/link` — sin eso el layout compartido no sirve de nada, porque una navegación del navegador lo remonta igual. Verificado: las doce URLs siguen respondiendo 200 y ninguna cambió |
 | 2026-09-04 | 🍎 | El paso de `<a>` a `<Link>` se hizo con una expresión regular y **se comió cinco comentarios** que contenían `` `<a>` `` como prosa. Compilaba igual. Es exactamente lo que avisa CLAUDE.md sobre los renombrados globales; se revisó el diff buscando prosa, no solo que compilara |
 | 2026-09-04 | 🕳️ | Dos enlaces muertos encontrados y arreglados de paso: el botón «Ver planes y precios» del portal de organización apuntaba a `/billing`, que no existe desde que Suscripción salió de la barra lateral, y `destinoDeUnAviso` podía devolver `undefined` —válido en un `<a>`, no en un `Link`— |
+| 2026-09-04 | **F9** | Limpieza. Fuera el `rewrites()` entero —catorce entradas—, el pm2 baja de ocho procesos a uno, el Dockerfile compila una sola app y el `dev-cli` lista una sola entrada de frontend. Los `globals.css` y los `@font-face` con `basePath` se fueron solos con cada zona; el de la aplicación ya los declaraba sin prefijo. Y la documentación: `CLAUDE.md`, `README`, `STRUCTURE`, los dos de despliegue y la skill de diseño, cuya §12 describía una restricción —«cruzar de zona obliga a navegación dura»— que ya no existe |
+| 2026-09-04 | **F10** | `apps/frontend/web-shell` → `apps/frontend/web`, y el paquete a `@praxis/web`. El nombre pasó a mentir en cuanto entró la primera sección. ESTADO-ACTUAL **no se reescribe**: describe el multi-zone en media docena de sitios y ese es su valor. Lleva un aviso en la cabecera con la tabla de traducción |
 | 2026-09-04 | 🕳️ | Encontrado de paso, **no arreglado**: `/main/roles` redirige a `/main/organizations/:id/roles`, que **no existe en ninguna app**. Es anterior a la fusión —la ruta no está en la barra lateral, solo se llega escribiéndola— y no es trabajo de esta etapa. Para la auditoría |
 | 2026-09-04 | 🍎 | **Un `pkill -f "next start"` no mata el servidor**: `next start` deja un proceso `next-server`, así que el shell viejo seguía escuchando en el 4100 con las reescrituras de antes y el nuevo moría con `EADDRINUSE`. Se mata por `next-server` |
 | 2026-09-04 | 🔧 | De ahí salió el stack construido (`build:frontend`, `start:backend`, `start:frontend`): **315 MB el backend y 579 MB el frontend**, contra varios GB en vigilancia. No bastó — con todo apagado la máquina ya tenía 677 MB libres y 6,65 de 8 GB de swap ocupados— pero es el modo correcto de verificar de aquí en adelante |

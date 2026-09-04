@@ -2,7 +2,7 @@
  * Nombre y atributos de la cookie de tema, compartidos por todas las zonas.
  *
  * Va con `path: '/'` por el mismo motivo que las de sesión (`../auth/cookies`):
- * el navegador ve un único origen — el del web-shell — y las cinco zonas
+ * el navegador ve un único origen — el de la aplicación — y todas sus pantallas
  * necesitan leer la misma cookie para estampar `data-theme` sin parpadeo.
  */
 

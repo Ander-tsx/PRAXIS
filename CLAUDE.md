@@ -62,7 +62,26 @@ que salieron de ahí:
 
 **Next.js 16 tiene breaking changes.** Consulta `node_modules/next/dist/docs/` antes de usar una API que no hayas verificado en este repo.
 
-**Multi-Zones, no Module Federation** (el README miente). Cada microfrontend es una app Next independiente con `basePath: '/<zona>'`, expuesta por el `web-shell` vía `rewrites()`.
+🚫 **Ya no hay microfrontends.** El frontend es **una sola aplicación Next**,
+`apps/frontend/web`, sin `basePath`. Fue un Multi-Zones de siete zonas hasta la
+etapa de fusión ([PLAN-FUSION-ZONAS](docs/PLAN-FUSION-ZONAS.md)); ninguna URL
+cambió al juntarlas.
+
+Cómo está organizada por dentro:
+
+| Ruta | Qué es |
+|---|---|
+| `src/app/page.tsx` | La landing pública |
+| `src/app/auth/*` | Login, registro, verificación, y los diez route handlers de sesión (`/auth/api/*`) |
+| `src/app/(privado)/*` | Las cinco secciones privadas —`/main`, `/projects`, `/chat`, `/assistant`, `/admin`— bajo **un solo `layout.tsx`** que monta `AppShell` |
+| `src/app/api/gateway/[...path]` | El proxy autenticado, uno para todo |
+| `src/app/api/webhooks/stripe` | 🔴 El webhook de Stripe. No se toca |
+| `src/proxy.ts` | El guard único: renueva sesión, exige sesión en los prefijos privados y aplica la regla de solo-invitados en `/auth/login` y `/auth/signup` |
+
+⚠️ **Al añadir una sección privada, su prefijo va en `PREFIJOS_PRIVADOS` de
+`src/proxy.ts`.** Olvidarlo no falla: la pantalla se sirve sin guard, el gateway
+responde 401 y se lee como una avería, no como una sesión que falta.
+`e2e/tests/ui/02-guards.spec.ts` lo cubre para las cinco.
 
 **Atomic Design:**
 - Átomos y moléculas compartidos → `apps/frontend/commons/{atoms,molecules}/`
@@ -369,16 +388,15 @@ sobre una lista que alguien le cortó por detrás.
 
 ## Estado
 
-Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
+Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · **el frontend, 4100, en un solo proceso**.
+**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · **el frontend, 4100, en un solo proceso**.
 
 🚫 **Multi-Zones ya no existe.** Los puertos 4101 a 4107 quedaron libres: las
-siete zonas se fusionaron en `apps/frontend/web-shell` entre F2 y F7
+siete zonas se fusionaron en `apps/frontend/web` entre F2 y F7
 ([PLAN-FUSION-ZONAS](docs/PLAN-FUSION-ZONAS.md)) y **ninguna URL cambió**.
-Un `proxy.ts`, un `api/gateway`, un `globals.css` y un proceso de Node. Las URLs no cambiaron,
-y el rol global de `/admin` se sigue comprobando en su `layout.tsx`, no en el
-guard.
+Un `proxy.ts`, un `api/gateway`, un `globals.css` y un proceso de Node. El rol
+global de `/admin` se sigue comprobando en su `layout.tsx`, no en el guard.
 
 🔴 **En la app fusionada, una redirección sin pantalla va en el guard, no en un
 `page.tsx`.** Un `redirect()` de servidor dentro de una sección privada se
@@ -386,7 +404,7 @@ ejecuta *después* de que su `layout.tsx` haya empezado a hacer streaming —mon
 el armazón pide el perfil y la navegación al gateway—, así que la cabecera ya
 salió como 200 y Next lo degrada a una redirección de cliente: **44 KB de HTML y
 dos llamadas al gateway para una pantalla que nadie ve**. Desde
-`REDIRECCIONES_EXACTAS` en `web-shell/src/proxy.ts` son 9 bytes y un 307.
+`REDIRECCIONES_EXACTAS` en `web/src/proxy.ts` son 9 bytes y un 307.
 
 🚫 **El 4104 quedó libre: `reports-front` se archivó** (F1 de [PLAN-FUSION-ZONAS](docs/PLAN-FUSION-ZONAS.md)). `/reports` responde 404. Lo que **no** se tocó: `reports-service` en el 3005 y las once rutas de análisis del gateway, que PRAX sigue usando para contestar. No se reutiliza el 4104 para una zona nueva mientras dure la fusión: la etapa va a dejar **una sola** aplicación de frontend.
 
@@ -515,4 +533,4 @@ para que un rojo esperado no tape uno nuevo. Detalle en el README.
   los tipos permitidos, pero **no hay husky instalado**: hoy no se valida en el commit,
   se respeta a mano.
 - Rama por feature (`feature/<nombre>`) → PR a `main`.
-- Formato: Biome en la raíz (2 espacios, ancho 100), ESLint solo en `web-shell`. `pnpm format` ya no reescribe el repo: config y código coinciden.
+- Formato: Biome en la raíz (2 espacios, ancho 100), ESLint solo en `web`. `pnpm format` ya no reescribe el repo: config y código coinciden.

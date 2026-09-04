@@ -9,6 +9,33 @@
 
 ---
 
+> # 🚫 Multi-Zones ya no existe
+>
+> **Actualizado el 2026-09-04.** El frontend es **una sola aplicación Next**,
+> `apps/frontend/web`, sin `basePath`. Las siete zonas se fusionaron entre F2 y
+> F7 de [PLAN-FUSION-ZONAS](../PLAN-FUSION-ZONAS.md), y `reports-front` se
+> archivó antes (F1). **Ninguna URL cambió.**
+>
+> Este documento describe el multi-zone en muchos sitios —§16 y §17 enteras, y
+> media docena de incidencias que solo tenían sentido con zonas— y **se conserva
+> así a propósito**: es el registro de por qué se decidió cada cosa y de qué
+> mordió. Lo que hay que traducir al leerlo:
+>
+> | Donde dice | Hoy es |
+> |---|---|
+> | `web-shell`, `auth-front`, `dashboard-front`, `projects-front`, `chat-front`, `admin-front`, `assistant-front` | Secciones de `apps/frontend/web`: `/`, `/auth`, `/main`, `/projects`, `/chat`, `/admin`, `/assistant` |
+> | `reports-front` | Archivada (F1). `reports-service` y las rutas del gateway siguen |
+> | «el `basePath` de la zona» | No hay `basePath`: las rutas se escriben enteras |
+> | «un `<a>` duro porque cruza de zona» | `next/link`: todo es la misma app |
+> | «el `proxy.ts` de la zona» | `web/src/proxy.ts`, uno solo |
+> | «`/<zona>/api/gateway`» | `/api/gateway`, uno solo |
+>
+> Lo que **sigue siendo cierto** y no depende de las zonas: el modelo de sesión
+> con cookie httpOnly, el proxy autenticado, el reparto de Atomic Design y todas
+> las trampas del backend.
+
+---
+
 ## 1. Resumen ejecutivo
 
 PRAXIS es un monorepo **SOFEA**: microfrontends Next.js sobre un backend de microservicios NestJS.
@@ -18,7 +45,7 @@ Estado por pieza:
 
 | Pieza | Estado | Comentario |
 |---|---|---|
-| `web-shell` | ✅ Funcional | Landing pública consciente de la sesión + rewrites hacia las zonas. Ya no sirve páginas de negocio: es la cáscara. Ver §17.0. |
+| `web` (era `web-shell`) | ✅ Funcional | **La aplicación entera** desde la fusión: landing pública, `/auth` y las cinco secciones privadas. Ya no reescribe hacia ninguna parte. Ver §17.0 para lo que fue. |
 | `auth-front` | ✅ Funcional | Login, signup, session, logout y refresh verificados end-to-end. Ver §13. |
 | `commons` | 🟡 Parcial | 5 átomos + 5 moléculas + tokens. Falta capa de organismos, cliente HTTP, tipos de dominio, estado de sesión. |
 | `projects-front` | ✅ Funcional | Lista, detalle, espacios, tableros, tablero Kanban, tareas, checklists, miembros, roles y etiquetas. La zona más grande. Zona propia en el 4103. Ver §18–§24 y §28. |
@@ -41,12 +68,12 @@ Estado por pieza:
 | 3D / animación (solo landing) | three, @react-three/fiber, @react-three/drei, gsap | — |
 | Auth en BFF | `jose` | `^5.9.6` |
 | Monorepo | pnpm workspaces + Turborepo | pnpm 9 / turbo 2 |
-| Lint/format | Biome (raíz) + ESLint (solo `web-shell`) | biome 1.8 |
+| Lint/format | Biome (raíz) + ESLint (solo `web`) | biome 1.8 |
 | Node | 20 | `.nvmrc` |
 
 ⚠️ Next.js 16 es una versión con breaking changes. Hay que consultar `node_modules/next/dist/docs/` antes de usar una API que no esté ya verificada en este repo (regla recogida en CLAUDE.md). Se respeta esa regla.
 
-**No se usa Module Federation** pese a lo que dice el README. La estrategia real es **Next.js Multi-Zones**: cada microfrontend es una app Next independiente con su propio `basePath`, y el `web-shell` la expone vía `rewrites()`.
+**No se usa Module Federation** pese a lo que decía el README. La estrategia era **Next.js Multi-Zones**: cada microfrontend, una app Next independiente con su propio `basePath`, expuesta por el `web-shell` vía `rewrites()`. 🚫 **Desde 2026-09-04 tampoco es eso**: hay una sola aplicación. Ver el aviso de la cabecera.
 
 ---
 

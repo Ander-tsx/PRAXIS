@@ -35,44 +35,54 @@ PRAXIS/
 
 ## `apps/` — el código que se ejecuta
 
-### `apps/frontend/` — ocho aplicaciones Next.js 16
+### `apps/frontend/` — una aplicación Next.js 16 y su librería
 
-**Multi-Zones, no Module Federation.** Cada zona es una app de Next independiente
-con su propio `basePath`, su propio `package.json` y su propio puerto. El
-`web-shell` las sirve todas bajo un único origen mediante `rewrites()`. Cada una
-se puede levantar sola.
+**Una sola app, sin `basePath`.** Fueron ocho —un Multi-Zones: el shell y siete
+zonas, cada una con su `package.json`, su puerto y su `basePath`— hasta la etapa
+de fusión ([docs/PLAN-FUSION-ZONAS.md](docs/PLAN-FUSION-ZONAS.md)). Se juntaron
+porque el despliegue nunca las separó: las ocho corrían en el mismo contenedor,
+o sea todo el coste de Multi-Zones y ninguno de sus beneficios. **Ninguna URL
+cambió al fusionarlas.**
 
-| Carpeta | Ruta pública | Puerto | Qué es |
-|---|---|---|---|
-| `web-shell/` | `/` | 4100 | La cáscara: landing pública, `rewrites()` y renovación de sesión. **No sirve páginas de negocio.** |
-| `auth-front/` | `/auth` | 4101 | Entrar, registrarse, Google OAuth, verificación de correo |
-| `dashboard-front/` | `/dashboard` | 4102 | Panel, avisos, invitaciones, ajustes, vinculación con Alexa |
-| `projects-front/` | `/projects` | 4103 | Catálogo, tablero Kanban, tareas, miembros, reglas |
-| `reports-front/` | `/reports` | 4104 | Análisis: lienzo de gráficos y pronóstico Monte Carlo |
-| `admin-front/` | `/admin` | 4105 | Administración de la plataforma (rol global) |
-| `chat-front/` | `/chat` | 4106 | Mensajería en tiempo real por SSE |
-| `assistant-front/` | `/assistant` | 4107 | PRAX, el asistente conversacional |
+| Carpeta | Qué es |
+|---|---|
+| `web/` | La aplicación entera. Puerto 4100 |
+| `commons/` | Átomos, moléculas y organismos compartidos, el cliente de API y los helpers de sesión |
 
-Dentro de cada zona:
+Dentro de `web/src`:
 
 ```
-<zona>/src/
-├── app/                     → rutas del App Router. Aquí vive la lógica de negocio
-│   └── api/gateway/[...path]/route.ts   → el proxy autenticado de la zona
-├── components/
-│   ├── organisms/           → piezas con estructura, propias del dominio de la zona
-│   └── templates/           → composición de una pantalla
-├── lib/                     → utilidades de la zona
-└── proxy.ts                 → el guard de la zona
+web/src/
+├── app/
+│   ├── page.tsx                        → la landing pública
+│   ├── layout.tsx                      → el <html>, las fuentes y el tema. Uno para todo
+│   ├── auth/                           → login, registro, verificación…
+│   │   └── api/                        → los diez route handlers de sesión (/auth/api/*)
+│   ├── (privado)/                      → las cinco secciones privadas
+│   │   ├── layout.tsx                  → el armazón (AppShell). Montado UNA vez
+│   │   ├── main/  projects/  chat/  assistant/  admin/
+│   │   └── presence-actions.ts
+│   └── api/
+│       ├── gateway/[...path]/route.ts  → el proxy autenticado, uno para todo
+│       ├── webhooks/stripe/route.ts    → 🔴 el webhook. No se toca
+│       └── alexa/[...path]/route.ts    → paso al gateway para la skill de voz
+├── components/{atoms,molecules,organisms,templates}/
+├── lib/{auth,main,projects,admin}/     → utilidades, agrupadas por sección
+└── proxy.ts                            → el guard único
 ```
 
-### `apps/frontend/commons/` — lo que comparten las ocho zonas
+⚠️ **El grupo `(privado)` no aparece en la URL** —un grupo de rutas nunca lo
+hace— y es lo que permite que las cinco secciones compartan un solo armazón. Es
+el motivo entero de la fusión: antes cada salto entre secciones remontaba la
+barra lateral, el directorio de chats y la conexión SSE.
+
+### `apps/frontend/commons/` — la librería compartida
 
 | Carpeta | Qué contiene |
 |---|---|
 | `atoms/` | Piezas sin estructura: `Button`, `Input`, `Avatar`, `Badge`, `Select`… |
 | `molecules/` | Composiciones reutilizables: `AuthForm`, `DataTable`, `Dialog`, `ThemeToggle`… |
-| `organisms/` | Solo lo que usan **≥2 zonas**: `AppLayout`, `ChatPanel`, `LiveNotices`… |
+| `organisms/` | Solo lo que usan **≥2 secciones**: `AppLayout`, `ChatPanel`, `LiveNotices`… |
 | `api/` | Cliente del gateway, rutas (`routes.ts`) y tipos de dominio |
 | `auth/` | Sesión y cliente de servidor. **Código de servidor: nunca se importa desde un componente cliente** |
 | `hooks/` | `useAccion`, `useRefrescoAgrupado` y demás |
@@ -81,8 +91,13 @@ Dentro de cada zona:
 | `realtime/`, `assistant/`, `billing/`, `theme/`, `template/` | Piezas de cada dominio transversal |
 
 > **Atomic Design con una regla de ascenso:** un organismo sube a
-> `commons/organisms/` solo cuando lo usan dos zonas o más. Antes de eso vive en
-> la zona que lo usa.
+> `commons/organisms/` solo cuando lo usan dos secciones o más. Antes de eso
+> vive en `web/src/components/`, junto a la sección que lo usa.
+>
+> ⚠️ La regla nació cuando las secciones eran aplicaciones distintas y compartir
+> obligaba a subir a `commons`. Sigue valiendo por otro motivo: `commons` es lo
+> que se lee para saber qué es transversal, y meterlo todo ahí lo convierte en
+> una carpeta de todo.
 
 > **La lógica de negocio (fetch, estado, validación) vive solo en las pages.**
 > Moléculas y organismos reciben slots `ReactNode` y props.
@@ -213,8 +228,10 @@ e2e/
 
 ## `stubs/` y `security/`
 
-Vacíos (`.gitkeep`). `stubs/next-ts/` está reservado para la plantilla de una
-zona nueva; el procedimiento real está escrito en ESTADO-ACTUAL §17.7.
+Vacíos (`.gitkeep`). `stubs/next-ts/` estaba reservado para la plantilla de una
+zona nueva del multi-zone; ya no hay zonas nuevas que crear — una sección nueva
+es una carpeta dentro de `web/src/app/(privado)/` y una línea en
+`PREFIJOS_PRIVADOS`.
 
 ---
 
@@ -249,5 +266,5 @@ el segundo en desarrollo.
 
 > ¿No sabes dónde va un archivo? ¿Es código que se ejecuta → `apps/`? ¿Lo
 > comparten dos capas → `packages/`? ¿Es documentación → `docs/`? ¿Es
-> infraestructura → `infra/`? ¿Lo usan dos zonas del frontend →
+> infraestructura → `infra/`? ¿Lo usan dos secciones del frontend →
 > `apps/frontend/commons/`?

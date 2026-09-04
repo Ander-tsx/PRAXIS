@@ -35,7 +35,7 @@ module.exports = {
   apps: [
     {
       name: 'web',
-      cwd: '/app/apps/frontend/web-shell',
+      cwd: '/app/apps/frontend/web',
       script: 'node_modules/next/dist/bin/next',
       args: 'start --port 4100',
       interpreter: 'node',

@@ -1,7 +1,7 @@
 /**
  * El wordmark real de Kyloo — geometría copiada literal de su propio
  * `src/components/icons.tsx` (`KylooO`, `KylooOSolid`, `KylooLetters`,
- * `KylooWordmark`). Organismo compartido: lo usan `web-shell` (cierre del
+ * `KylooWordmark`). Organismo compartido: lo usan la landing (cierre del
  * footer) y `auth-front` (zona ambiental de `AuthPanel`), así que cada zona
  * que lo monte tiene que cargar Khteka en su propio `layout.tsx` con la
  * variable `--font-khteka` — si no la carga, el texto cae a su *fallback*

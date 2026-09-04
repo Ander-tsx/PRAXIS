@@ -44,7 +44,7 @@ COPY apps/backend/services/projects/package.json        apps/backend/services/pr
 COPY apps/backend/services/reports/package.json         apps/backend/services/reports/
 COPY apps/backend/services/tasks/package.json           apps/backend/services/tasks/
 COPY apps/frontend/commons/package.json                 apps/frontend/commons/
-COPY apps/frontend/web-shell/package.json               apps/frontend/web-shell/
+COPY apps/frontend/web/package.json                     apps/frontend/web/
 COPY packages/shared-devtools/package.json              packages/shared-devtools/
 COPY e2e/package.json                                   e2e/
 
@@ -100,7 +100,7 @@ ENV NEXT_PUBLIC_PRECIO_BUSINESS=$NEXT_PUBLIC_PRECIO_BUSINESS
 # ⚠️ Tailwind v4 descarta en silencio las utilidades que no encuentra al
 # escanear. Si algún `@source` de commons/styles/theme.css se rompiera, esto
 # compilaría igual y el resultado saldría sin estilos. Ver CLAUDE.md.
-RUN pnpm --filter "@praxis/web-shell" run build
+RUN pnpm --filter "@praxis/web" run build
 
 # ───────────────────────── runtime ──────────────────────────
 FROM base AS runtime

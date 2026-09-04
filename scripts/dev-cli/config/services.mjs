@@ -166,9 +166,9 @@ export const BACKEND_SERVICES = [
  */
 export const FRONTEND_APPS = [
   {
-    key: 'web-shell',
-    pkg: '@praxis/web-shell',
-    dir: 'apps/frontend/web-shell',
+    key: 'web',
+    pkg: '@praxis/web',
+    dir: 'apps/frontend/web',
     port: 4100,
     envFile: '.env.local',
     color: 95,

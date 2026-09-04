@@ -87,17 +87,17 @@ export const metadata: Metadata = {
 };
 
 /**
- * El shell lee la cookie de tema (`praxis_theme`, la misma que las otras
- * zonas) y estampa `data-theme` en el `<html>` — pero ya no es para la
- * landing: es monocroma y fija (ver `globals.css`, clases `.landing` /
- * `.landing-light`), sin selector propio, sea cual sea el tema con el que
- * alguien entre a la aplicación.
+ * El layout raíz de **toda** la aplicación: la landing pública, las pantallas
+ * de sesión y las cinco secciones privadas.
  *
- * ¿Entonces por qué seguir leyéndola aquí? Porque `web-shell` también sirve
- * `not-found.tsx`, y porque el `data-theme` del `<html>` es lo que ve el
- * navegador un instante entre que sale de la landing y carga la siguiente
- * zona — quitarlo aquí produciría un parpadeo de tema en esa transición
- * aunque la propia landing no lo use para nada.
+ * Lee la cookie de tema (`praxis_theme`) y estampa `data-theme` en el `<html>`.
+ * No es para la landing —es monocroma y fija, ver `globals.css`, clases
+ * `.landing` / `.landing-light`— sino para todo lo demás, que sí lo usa.
+ *
+ * ⚠️ **Aquí viven las fuentes y el `<html>`/`<body>`, una sola vez.** Cuando
+ * esto era un multi-zone cada zona repetía este archivo entero: cinco
+ * declaraciones de las mismas familias y cinco `<body>` que tenían que coincidir
+ * entre sí para que cruzar de zona no cambiara nada a la vista.
  */
 export default async function RootLayout({
   children,

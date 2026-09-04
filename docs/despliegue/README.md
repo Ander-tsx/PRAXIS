@@ -18,7 +18,7 @@ y avisa de lo que va a parecer roto sin estarlo.
         └──────────────┬───────────────┘
                        ▼
         ┌──────────────────────────────┐
-        │  Grupo FRONTEND (autoescala) │  web-shell :4100
+        │  Grupo FRONTEND (autoescala) │  web :4100
         │  1 → 3 máquinas              │  + 5 zonas en :4101-4105
         └──────────────┬───────────────┘
                        ▼
