@@ -1,8 +1,8 @@
 'use client';
 
 import { setUserStatusAction } from '@/app/admin/actions';
-import { ADMIN_USER_INITIAL_STATE } from '@/lib/action-state';
-import { ESTADOS, nombreDe } from '@/lib/admin';
+import { ADMIN_USER_INITIAL_STATE } from '@/lib/admin/action-state';
+import { ESTADOS, nombreDe } from '@/lib/admin/admin';
 import { type AdminUser, Button, Dialog, Textarea, useAccion } from '@praxis/commons';
 import { useEffect } from 'react';
 

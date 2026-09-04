@@ -1,4 +1,4 @@
-import { ACCIONES, fechaYHora } from '@/lib/admin';
+import { ACCIONES, fechaYHora } from '@/lib/admin/admin';
 import { type AdminActivityEntry, Badge, type DataColumn, DataTable } from '@praxis/commons';
 
 /**

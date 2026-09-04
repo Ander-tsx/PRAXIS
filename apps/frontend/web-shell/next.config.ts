@@ -23,7 +23,6 @@ const nextConfig: NextConfig = {
    */
   async rewrites() {
     const authFrontUrl = process.env.AUTH_FRONT_URL ?? 'http://localhost:4101';
-    const dashboardFrontUrl = process.env.DASHBOARD_FRONT_URL ?? 'http://localhost:4102';
     const projectsFrontUrl = process.env.PROJECTS_FRONT_URL ?? 'http://localhost:4103';
 
     return [
@@ -31,12 +30,12 @@ const nextConfig: NextConfig = {
         source: '/auth/:path*',
         destination: `${authFrontUrl}/auth/:path*`,
       },
-      /**
-       * dashboard-front es `/main`. El shell no se mete con el enrutado interno,
-       * todo lo que empieza por ahí se le manda a la zona.
+      /*
+       * 🕳️ Aquí estaban las dos entradas de `/main`.
+       *
+       * Cuarta zona fusionada (F5). La cuenta —organizaciones, facturación,
+       * papeles y ajustes— la sirve ya esta aplicación desde `src/app/main/`.
        */
-      { source: '/main', destination: `${dashboardFrontUrl}/main` },
-      { source: '/main/:path*', destination: `${dashboardFrontUrl}/main/:path*` },
       { source: '/projects', destination: `${projectsFrontUrl}/projects` },
       {
         source: '/projects/:path*',

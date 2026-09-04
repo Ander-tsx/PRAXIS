@@ -1,6 +1,6 @@
 'use client';
 
-import { type AdminOrganization, fechaYHora } from '@/lib/admin';
+import { type AdminOrganization, fechaYHora } from '@/lib/admin/admin';
 import { Badge, type DataColumn, DataTable } from '@praxis/commons';
 import { useMemo } from 'react';
 

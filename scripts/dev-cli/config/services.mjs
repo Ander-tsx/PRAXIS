@@ -184,15 +184,6 @@ export const FRONTEND_APPS = [
     descripcion: 'Login y registro',
   },
   {
-    key: 'dashboard-front',
-    pkg: '@praxis/dashboard-front',
-    dir: 'apps/frontend/dashboard-front',
-    port: 4102,
-    envFile: '.env.local',
-    color: 96,
-    descripcion: 'Panel, avisos y ajustes',
-  },
-  {
     key: 'projects-front',
     pkg: '@praxis/projects-front',
     dir: 'apps/frontend/projects-front',
@@ -248,7 +239,7 @@ export const ALL_SERVICES = [...BACKEND_SERVICES, ...FRONTEND_APPS];
 export const PRESETS = [
   {
     key: 'todo',
-    nombre: 'Todo — los 9 servicios y las 3 zonas',
+    nombre: 'Todo — los 9 servicios y las 2 zonas',
     backend: BACKEND_SERVICES.map((s) => s.key),
     frontend: true,
   },
@@ -266,7 +257,7 @@ export const PRESETS = [
   },
   {
     key: 'frontend',
-    nombre: 'Solo frontend — las 3 zonas (el backend ya está arriba)',
+    nombre: 'Solo frontend — las 2 zonas (el backend ya está arriba)',
     backend: [],
     frontend: true,
   },

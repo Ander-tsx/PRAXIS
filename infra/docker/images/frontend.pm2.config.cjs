@@ -28,13 +28,12 @@ const LOCAL = '127.0.0.1';
  *
  * ⚠️ `ADMIN_FRONT_URL` la lee `web-shell/next.config.ts` pero **no aparece** en
  * su `.env.example`, y `admin-front` no tiene `.env.example` ninguno. Aquí van
- * las tres explícitas para que el despliegue no dependa de un valor por
+ * las dos explícitas para que el despliegue no dependa de un valor por
  * defecto que nadie documentó. `CHAT_FRONT_URL` está en el mismo caso desde
  * E3.
  */
 const zonas = {
   AUTH_FRONT_URL: `http://${LOCAL}:4101`,
-  DASHBOARD_FRONT_URL: `http://${LOCAL}:4102`,
   PROJECTS_FRONT_URL: `http://${LOCAL}:4103`,
 };
 
@@ -73,7 +72,6 @@ module.exports = {
     /* Las zonas primero: el shell reescribe hacia ellas y así una petición
        temprana no llega antes de que exista el destino. */
     zona('auth-front', 'auth-front', 4101),
-    zona('dashboard-front', 'dashboard-front', 4102),
     zona('projects-front', 'projects-front', 4103),
 
     /* Lo único que ve el balanceador. Su `/` es la landing pública, que además

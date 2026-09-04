@@ -2,7 +2,7 @@
 
 import { deleteProjectAction } from '@/app/admin/projects/actions';
 import { RowActions } from '@/components/molecules/RowActions';
-import { ESTADOS_PROYECTO, fechaYHora } from '@/lib/admin';
+import { ESTADOS_PROYECTO, fechaYHora } from '@/lib/admin/admin';
 import {
   type AdminProject,
   Badge,

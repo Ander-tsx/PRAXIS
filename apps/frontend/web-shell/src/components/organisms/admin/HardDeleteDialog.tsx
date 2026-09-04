@@ -1,6 +1,6 @@
 'use client';
 
-import { ADMIN_USER_INITIAL_STATE, type AdminUserState } from '@/lib/action-state';
+import { ADMIN_USER_INITIAL_STATE, type AdminUserState } from '@/lib/admin/action-state';
 import { Button, Dialog, Input, alpha, colors, useAccion } from '@praxis/commons';
 import { useEffect, useState } from 'react';
 

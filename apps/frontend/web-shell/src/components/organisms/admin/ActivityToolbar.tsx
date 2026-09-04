@@ -1,6 +1,6 @@
 'use client';
 
-import { ACCIONES } from '@/lib/admin';
+import { ACCIONES } from '@/lib/admin/admin';
 import {
   ADMIN_ACTIONS,
   type AdminActionName,

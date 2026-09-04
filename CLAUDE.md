@@ -366,11 +366,20 @@ sobre una lista que alguien le cortó por detrás.
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103.
+**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 — **la última que queda por fusionar junto con `auth-front`**.
 
-🚫 **El 4107, el 4106 y el 4105 quedaron libres: `/assistant`, `/chat` y
-`/admin` los sirve ya el shell** (F2, F3 y F4). Las URLs no cambiaron, y el rol
-global de `/admin` se sigue comprobando en su `layout.tsx`, no en el guard.
+🚫 **Los puertos 4102, 4105, 4106 y 4107 quedaron libres: `/main`, `/admin`,
+`/chat` y `/assistant` los sirve ya el shell** (F2 a F5). Las URLs no cambiaron,
+y el rol global de `/admin` se sigue comprobando en su `layout.tsx`, no en el
+guard.
+
+🔴 **En la app fusionada, una redirección sin pantalla va en el guard, no en un
+`page.tsx`.** Un `redirect()` de servidor dentro de una sección privada se
+ejecuta *después* de que su `layout.tsx` haya empezado a hacer streaming —montar
+el armazón pide el perfil y la navegación al gateway—, así que la cabecera ya
+salió como 200 y Next lo degrada a una redirección de cliente: **44 KB de HTML y
+dos llamadas al gateway para una pantalla que nadie ve**. Desde
+`REDIRECCIONES_EXACTAS` en `web-shell/src/proxy.ts` son 9 bytes y un 307.
 
 🚫 **El 4104 quedó libre: `reports-front` se archivó** (F1 de [PLAN-FUSION-ZONAS](docs/PLAN-FUSION-ZONAS.md)). `/reports` responde 404. Lo que **no** se tocó: `reports-service` en el 3005 y las once rutas de análisis del gateway, que PRAX sigue usando para contestar. No se reutiliza el 4104 para una zona nueva mientras dure la fusión: la etapa va a dejar **una sola** aplicación de frontend.
 

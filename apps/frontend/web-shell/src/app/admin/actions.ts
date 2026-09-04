@@ -1,6 +1,6 @@
 'use server';
 
-import type { AdminUserState } from '@/lib/action-state';
+import type { AdminUserState } from '@/lib/admin/action-state';
 import { type AdminUser, ApiError, GLOBAL_ROLES, USER_STATUSES } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';

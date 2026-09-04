@@ -74,7 +74,10 @@ export function PraxScreen({
          nueva a propósito — arrastrar un hilo de un proyecto a otro mezclaría dos
          contextos en la ventana del modelo. */
       if (!siguiente) {
-        router.push('/');
+        /* ⚠️ `/assistant`, no `'/'`. Cuando esto era una zona con `basePath`,
+           el router anteponía `/assistant` solo; fusionado, un `'/'` saca a la
+           landing pública en vez de reiniciar la conversación. */
+        router.push('/assistant');
         return;
       }
 

@@ -2,7 +2,7 @@
 
 import { deleteUserAction } from '@/app/admin/actions';
 import { RowActions } from '@/components/molecules/RowActions';
-import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin';
+import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin/admin';
 import {
   type AdminUser,
   Avatar,

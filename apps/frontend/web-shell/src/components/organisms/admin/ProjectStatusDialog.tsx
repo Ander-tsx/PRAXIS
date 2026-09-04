@@ -1,8 +1,8 @@
 'use client';
 
 import { setProjectStatusAction } from '@/app/admin/projects/actions';
-import { ADMIN_PROJECT_INITIAL_STATE } from '@/lib/action-state';
-import { ESTADOS_PROYECTO } from '@/lib/admin';
+import { ADMIN_PROJECT_INITIAL_STATE } from '@/lib/admin/action-state';
+import { ESTADOS_PROYECTO } from '@/lib/admin/admin';
 import {
   type AdminProject,
   Button,

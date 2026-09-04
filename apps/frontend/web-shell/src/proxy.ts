@@ -50,7 +50,31 @@ const LOGIN_PATH = '/auth/login';
  * una sesión que falta. `e2e/tests/ui/02-guards.spec.ts` lo cubre para las
  * cinco.
  */
-const PREFIJOS_PRIVADOS = ['/assistant', '/chat', '/admin'];
+const PREFIJOS_PRIVADOS = ['/assistant', '/chat', '/admin', '/main'];
+
+/**
+ * Rutas que no tienen pantalla: solo llevan a otra.
+ *
+ * 🔴 **Van aquí y no en un `page.tsx` con `redirect()`, y la diferencia se mide.**
+ * Un `redirect()` de servidor dentro de una sección privada se ejecuta *después*
+ * de que su `layout.tsx` haya empezado a hacer streaming —montar el armazón pide
+ * el perfil y la navegación al gateway—, así que la cabecera ya salió como 200 y
+ * Next tiene que degradarlo a una redirección de cliente: **44 KB de HTML y dos
+ * llamadas al gateway para una pantalla que nadie llega a ver**. Medido en F5.
+ *
+ * Desde aquí es un 307 limpio, sin render.
+ *
+ * ⚠️ Se aplican **después** de comprobar la sesión: sin ella, a estas rutas les
+ * toca el login, no el destino.
+ */
+const REDIRECCIONES_EXACTAS: Record<string, string> = {
+  /* El panel dejó de tener pantalla propia: los proyectos tienen la suya y lo
+     que queda bajo `/main/*` es la cuenta. */
+  '/main': '/projects',
+  /* Cortesía: la pantalla pasó de `perfil` a `profile` y los marcadores viejos
+     no se pueden corregir desde aquí. */
+  '/main/perfil': '/main/profile',
+};
 
 /**
  * ⚠️ **`/admin` exige además rol global, y eso NO se comprueba aquí.**
@@ -114,6 +138,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
      * `recordarConversacion`.
      */
     recordarConversacion(request, response);
+
+    const destino = REDIRECCIONES_EXACTAS[request.nextUrl.pathname];
+    if (destino) {
+      const salto = redirectToZone(request, destino);
+      for (const cookie of response.cookies.getAll()) salto.cookies.set(cookie);
+      return salto;
+    }
+
     return response;
   }
 
@@ -155,6 +187,6 @@ export const config = {
    */
   matcher: [
     '/',
-    '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth(?:/|$)|main(?:/|$)|projects(?:/|$)).*)',
+    '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth(?:/|$)|projects(?:/|$)).*)',
   ],
 };

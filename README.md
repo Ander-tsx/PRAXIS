@@ -73,7 +73,6 @@ flowchart TB
 
     subgraph zones["Microfrontends Next.js 16"]
         Auth["auth-front :4101\n/auth"]
-        Dash["dashboard-front :4102\n/dashboard"]
         Proj["projects-front :4103\n/projects"]
     end
 
@@ -170,7 +169,6 @@ PRAXIS/
 │   ├── frontend/
 │   │   ├── web-shell/          # Contenedor Multi-Zone — landing 3D, rewrites
 │   │   ├── auth-front/         # /auth — login, registro, Google OAuth, verificación
-│   │   ├── dashboard-front/    # /dashboard — panel, alertas, invitaciones, Alexa link
 │   │   ├── projects-front/     # /projects — catálogo, Kanban, tareas, miembros
 │   │   └── commons/            # Atomic Design: atoms/, molecules/, organisms/
 │   │                           # + auth, api, tokens, hooks, theme
