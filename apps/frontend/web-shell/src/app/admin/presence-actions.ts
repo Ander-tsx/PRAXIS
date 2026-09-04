@@ -29,7 +29,10 @@ export async function setPresenceAction(presence: Presence): Promise<string | nu
 
     /* El armazón se pinta en el layout: es lo que hay que revalidar para que
        el punto cambie en todas las pantallas de la zona. */
-    revalidatePath('/', 'layout');
+    /* ⚠️ `/admin` y no `/`: sin `basePath` que Next recorte, un `'/'` aquí
+       revalidaría el layout raíz de toda la aplicación —la landing incluida—.
+       En F8, con un solo layout privado, esto pasa a ser una sola llamada. */
+    revalidatePath('/admin', 'layout');
     return actualizado.presence ?? presence;
   } catch {
     return null;

@@ -1,6 +1,6 @@
 import { FilterBar } from '@/components/molecules/FilterBar';
-import { AdminHeader } from '@/components/organisms/AdminHeader';
-import { OrganizationsTable } from '@/components/organisms/OrganizationsTable';
+import { AdminHeader } from '@/components/organisms/admin/AdminHeader';
+import { OrganizationsTable } from '@/components/organisms/admin/OrganizationsTable';
 import { type AdminOrganizationPage, FILAS_POR_PAGINA } from '@/lib/admin';
 import { AppHeader, Pagination, colors } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';

@@ -137,8 +137,9 @@ export async function deleteDirectChatAction(peerId: string): Promise<{ error: s
     return { error: describe(error, 'No se pudo ocultar la conversación.') };
   }
 
-  // Redirigir o revalidar el directorio
-  revalidatePath('/');
+  /* El directorio de conversaciones. ⚠️ `/chat`, no `/`: sin `basePath` que
+     Next recorte, un `'/'` revalidaría la landing pública. */
+  revalidatePath('/chat');
   return { error: null };
 }
 

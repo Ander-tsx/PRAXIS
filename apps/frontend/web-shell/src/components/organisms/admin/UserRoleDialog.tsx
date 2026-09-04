@@ -1,6 +1,6 @@
 'use client';
 
-import { setUserRoleAction } from '@/app/(private)/actions';
+import { setUserRoleAction } from '@/app/admin/actions';
 import { ADMIN_USER_INITIAL_STATE } from '@/lib/action-state';
 import { ROLES, nombreDe } from '@/lib/admin';
 import {

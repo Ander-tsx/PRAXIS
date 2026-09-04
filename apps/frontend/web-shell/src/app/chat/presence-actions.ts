@@ -29,7 +29,15 @@ export async function setPresenceAction(presence: Presence): Promise<string | nu
 
     /* El armazón se pinta en el layout: es lo que hay que revalidar para que
        el punto cambie en todas las pantallas de la zona. */
-    revalidatePath('/', 'layout');
+    /**
+     * ⚠️ **La ruta lleva la sección delante, y antes no.** Sin `basePath` que
+     * Next recorte, un `'/'` aquí revalidaría el layout raíz de toda la
+     * aplicación —la landing incluida— en vez del armazón privado.
+     *
+     * En F8, con un solo `(privado)/layout.tsx`, los tres `presence-actions`
+     * de las secciones se funden en uno y esto vuelve a ser una sola llamada.
+     */
+    revalidatePath('/chat', 'layout');
     return actualizado.presence ?? presence;
   } catch {
     return null;

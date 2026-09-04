@@ -1,6 +1,6 @@
 import { FilterBar } from '@/components/molecules/FilterBar';
-import { AdminHeader } from '@/components/organisms/AdminHeader';
-import { UsersTable } from '@/components/organisms/UsersTable';
+import { AdminHeader } from '@/components/organisms/admin/AdminHeader';
+import { UsersTable } from '@/components/organisms/admin/UsersTable';
 import { type AdminUserPage, ESTADOS, FILAS_POR_PAGINA } from '@/lib/admin';
 import { AppHeader, Pagination, type UserStatusName, colors } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';

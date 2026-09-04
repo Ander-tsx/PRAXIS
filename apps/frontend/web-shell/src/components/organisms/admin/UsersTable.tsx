@@ -1,6 +1,6 @@
 'use client';
 
-import { deleteUserAction } from '@/app/(private)/actions';
+import { deleteUserAction } from '@/app/admin/actions';
 import { RowActions } from '@/components/molecules/RowActions';
 import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin';
 import {
@@ -263,7 +263,7 @@ function AvatarConPresencia({ usuario, esMiCuenta }: { usuario: AdminUser; esMiC
       label={nombreDe(usuario)}
       mine={esMiCuenta}
       size="md"
-      src={avatarHref(usuario.avatarUrl, '/admin/api/gateway')}
+      src={avatarHref(usuario.avatarUrl, '/api/gateway')}
       presence={undefined}
     />
   );

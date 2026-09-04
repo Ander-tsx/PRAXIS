@@ -61,8 +61,8 @@ export async function setProjectStatusAction(
     };
   }
 
-  revalidatePath('/projects');
-  revalidatePath('/actividad');
+  revalidatePath('/admin/projects');
+  revalidatePath('/admin/actividad');
   return { error: null, done: actualizado.status };
 }
 
@@ -102,8 +102,8 @@ export async function deleteProjectAction(
     return { error: describeError(error), done: null };
   }
 
-  revalidatePath('/projects');
-  revalidatePath('/actividad');
+  revalidatePath('/admin/projects');
+  revalidatePath('/admin/actividad');
   return { error: null, done: projectId };
 }
 

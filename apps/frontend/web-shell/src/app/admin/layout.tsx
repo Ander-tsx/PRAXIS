@@ -1,5 +1,5 @@
-import { setPresenceAction } from '@/app/(private)/presence-actions';
-import { AccessDenied } from '@/components/organisms/AccessDenied';
+import { setPresenceAction } from '@/app/admin/presence-actions';
+import { AccessDenied } from '@/components/organisms/admin/AccessDenied';
 import {
   AppHeader,
   AppShell,
@@ -50,7 +50,9 @@ export default async function PrivateLayout({ children }: { children: React.Reac
   return (
     <AppShell
       navItems={navItems}
-      zonePath="/admin"
+      /* Vacío, no `"/admin"`: sin `basePath`, `usePathname()` ya devuelve la
+         ruta entera y el proxy es `/api/gateway`. Ver `app/assistant/layout.tsx`. */
+      zonePath=""
       plegadaInicial={plegada}
       /* El selector de organización de la barra: la lista y cuál se mira. Las
          dos las resuelve `loadPrivateChrome`, así que aquí no cuestan nada. */
@@ -64,7 +66,7 @@ export default async function PrivateLayout({ children }: { children: React.Reac
       user={{
         name: displayName(profile),
         email: profile.credential.email,
-        avatarSrc: avatarHref(profile.avatarUrl, '/admin/api/gateway'),
+        avatarSrc: avatarHref(profile.avatarUrl, '/api/gateway'),
         presence: profile.presence ?? null,
       }}
       /* El selector de estado se dibuja sobre la esquina del avatar: la

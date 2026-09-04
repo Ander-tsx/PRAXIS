@@ -75,7 +75,6 @@ flowchart TB
         Auth["auth-front :4101\n/auth"]
         Dash["dashboard-front :4102\n/dashboard"]
         Proj["projects-front :4103\n/projects"]
-        Adm["admin-front :4105\n/admin"]
     end
 
     subgraph gw["API Gateway :3000"]
@@ -173,7 +172,6 @@ PRAXIS/
 │   │   ├── auth-front/         # /auth — login, registro, Google OAuth, verificación
 │   │   ├── dashboard-front/    # /dashboard — panel, alertas, invitaciones, Alexa link
 │   │   ├── projects-front/     # /projects — catálogo, Kanban, tareas, miembros
-│   │   ├── admin-front/        # /admin — cuentas, suspensión, auditoría (rol Admin)
 │   │   └── commons/            # Atomic Design: atoms/, molecules/, organisms/
 │   │                           # + auth, api, tokens, hooks, theme
 │   ├── backend/

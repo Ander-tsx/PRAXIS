@@ -25,7 +25,6 @@ const nextConfig: NextConfig = {
     const authFrontUrl = process.env.AUTH_FRONT_URL ?? 'http://localhost:4101';
     const dashboardFrontUrl = process.env.DASHBOARD_FRONT_URL ?? 'http://localhost:4102';
     const projectsFrontUrl = process.env.PROJECTS_FRONT_URL ?? 'http://localhost:4103';
-    const adminFrontUrl = process.env.ADMIN_FRONT_URL ?? 'http://localhost:4105';
 
     return [
       {
@@ -43,21 +42,13 @@ const nextConfig: NextConfig = {
         source: '/projects/:path*',
         destination: `${projectsFrontUrl}/projects/:path*`,
       },
-      /**
-       * El panel de administración. Las **dos** entradas, igual que las demás
-       * zonas: sin la primera, `/admin` a secas no casa con `/:path*` y cae en el
-       * 404 del shell.
+      /*
+       * 🕳️ Aquí estaban las dos entradas de `/admin`.
        *
-       * El shell no comprueba nada aquí —no protege ninguna zona— y no hace falta:
-       * admin-front exige sesión en su `proxy.ts`, rol de administración en su
-       * layout, y el gateway exige el rol otra vez en las cuatro rutas de
-       * `/api/admin`.
+       * Tercera zona fusionada (F4). El rol global se sigue comprobando en
+       * `app/admin/layout.tsx`, no en el guard, y el gateway lo exige otra vez
+       * en las rutas de `/api/admin`.
        */
-      { source: '/admin', destination: `${adminFrontUrl}/admin` },
-      {
-        source: '/admin/:path*',
-        destination: `${adminFrontUrl}/admin/:path*`,
-      },
 
       /*
        * 🕳️ Aquí estaban las dos entradas de `/chat`.

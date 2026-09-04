@@ -1,6 +1,6 @@
 'use client';
 
-import { setUserStatusAction } from '@/app/(private)/actions';
+import { setUserStatusAction } from '@/app/admin/actions';
 import { ADMIN_USER_INITIAL_STATE } from '@/lib/action-state';
 import { ESTADOS, nombreDe } from '@/lib/admin';
 import { type AdminUser, Button, Dialog, Textarea, useAccion } from '@praxis/commons';

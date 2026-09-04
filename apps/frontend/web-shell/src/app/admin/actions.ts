@@ -61,8 +61,8 @@ export async function setUserStatusAction(
     };
   }
 
-  revalidatePath('/');
-  revalidatePath('/actividad');
+  revalidatePath('/admin');
+  revalidatePath('/admin/actividad');
   return { error: null, done: actualizado.status };
 }
 
@@ -107,8 +107,8 @@ export async function setUserRoleAction(
     };
   }
 
-  revalidatePath('/');
-  revalidatePath('/actividad');
+  revalidatePath('/admin');
+  revalidatePath('/admin/actividad');
   return { error: null, done: resultado.globalRole };
 }
 
@@ -161,8 +161,8 @@ export async function deleteUserAction(
     return { error: describeError(error), done: null };
   }
 
-  revalidatePath('/');
-  revalidatePath('/actividad');
+  revalidatePath('/admin');
+  revalidatePath('/admin/actividad');
   return { error: null, done: userId };
 }
 

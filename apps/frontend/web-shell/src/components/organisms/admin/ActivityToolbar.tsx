@@ -51,12 +51,12 @@ export function ActivityToolbar({ accion, desde, hasta }: ActivityToolbarProps) 
     if (valores.desde) params.set('desde', valores.desde);
     if (valores.hasta) params.set('hasta', valores.hasta);
     const qs = params.toString();
-    router.push(qs ? `/actividad?${qs}` : '/actividad');
+    router.push(qs ? `/admin/actividad?${qs}` : '/admin/actividad');
   }
 
   function limpiar() {
     setValores({ accion: '', desde: '', hasta: '' });
-    router.push('/actividad');
+    router.push('/admin/actividad');
   }
 
   const hayFiltros = Boolean(valores.accion || valores.desde || valores.hasta);

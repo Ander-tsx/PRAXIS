@@ -50,7 +50,19 @@ const LOGIN_PATH = '/auth/login';
  * una sesión que falta. `e2e/tests/ui/02-guards.spec.ts` lo cubre para las
  * cinco.
  */
-const PREFIJOS_PRIVADOS = ['/assistant', '/chat'];
+const PREFIJOS_PRIVADOS = ['/assistant', '/chat', '/admin'];
+
+/**
+ * ⚠️ **`/admin` exige además rol global, y eso NO se comprueba aquí.**
+ *
+ * Lo hace `app/admin/layout.tsx`, y a propósito: este archivo corre en cada
+ * navegación y saber el rol exige preguntar al gateway, mientras que el layout
+ * ya está pidiendo el usuario de todas formas. Y un rebote silencioso al panel
+ * se lee como un enlace roto; el layout puede explicarlo (`AccessDenied`).
+ *
+ * Ni lo uno ni lo otro es la autorización de verdad: la hace el gateway, que
+ * exige rol `Admin` en las rutas de `/api/admin`.
+ */
 
 function esPrivada(pathname: string): boolean {
   return PREFIJOS_PRIVADOS.some(
@@ -143,6 +155,6 @@ export const config = {
    */
   matcher: [
     '/',
-    '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth(?:/|$)|main(?:/|$)|projects(?:/|$)|admin(?:/|$)).*)',
+    '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth(?:/|$)|main(?:/|$)|projects(?:/|$)).*)',
   ],
 };

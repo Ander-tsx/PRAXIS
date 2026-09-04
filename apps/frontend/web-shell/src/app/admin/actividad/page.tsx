@@ -1,6 +1,6 @@
-import { ActivityTable } from '@/components/organisms/ActivityTable';
-import { ActivityToolbar } from '@/components/organisms/ActivityToolbar';
-import { AdminHeader } from '@/components/organisms/AdminHeader';
+import { ActivityTable } from '@/components/organisms/admin/ActivityTable';
+import { ActivityToolbar } from '@/components/organisms/admin/ActivityToolbar';
+import { AdminHeader } from '@/components/organisms/admin/AdminHeader';
 import { type AdminActivityPage, FILAS_POR_PAGINA } from '@/lib/admin';
 import { ADMIN_ACTIONS, type AdminActionName, AppHeader, Pagination } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';

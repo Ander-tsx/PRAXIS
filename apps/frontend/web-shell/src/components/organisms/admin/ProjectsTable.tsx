@@ -1,6 +1,6 @@
 'use client';
 
-import { deleteProjectAction } from '@/app/(private)/projects/actions';
+import { deleteProjectAction } from '@/app/admin/projects/actions';
 import { RowActions } from '@/components/molecules/RowActions';
 import { ESTADOS_PROYECTO, fechaYHora } from '@/lib/admin';
 import {
