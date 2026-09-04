@@ -371,10 +371,12 @@ sobre una lista que alguien le cortó por detrás.
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · auth-front 4101 — **la única zona que queda**.
+**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · **el frontend, 4100, en un solo proceso**.
 
-🚫 **Los puertos 4102, 4103, 4105, 4106 y 4107 quedaron libres: `/main`,
-`/projects`, `/admin`, `/chat` y `/assistant` los sirve ya el shell** (F2 a F6). Las URLs no cambiaron,
+🚫 **Multi-Zones ya no existe.** Los puertos 4101 a 4107 quedaron libres: las
+siete zonas se fusionaron en `apps/frontend/web-shell` entre F2 y F7
+([PLAN-FUSION-ZONAS](docs/PLAN-FUSION-ZONAS.md)) y **ninguna URL cambió**.
+Un `proxy.ts`, un `api/gateway`, un `globals.css` y un proceso de Node. Las URLs no cambiaron,
 y el rol global de `/admin` se sigue comprobando en su `layout.tsx`, no en el
 guard.
 

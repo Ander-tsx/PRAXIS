@@ -172,26 +172,17 @@ export const FRONTEND_APPS = [
     port: 4100,
     envFile: '.env.local',
     color: 95,
-    descripcion: 'Cáscara · landing y rewrites',
-  },
-  {
-    key: 'auth-front',
-    pkg: '@praxis/auth-front',
-    dir: 'apps/frontend/auth-front',
-    port: 4101,
-    envFile: '.env.local',
-    color: 96,
-    descripcion: 'Login y registro',
+    descripcion: 'La aplicación web entera',
   },
 ];
 
 /**
  * El frontend se arranca **de una pieza, con turbo**, no zona a zona.
  *
- * Siete `next dev` lanzados por separado funcionan, pero turbo ya sabe el orden
- * y comparte la caché; y sobre todo, la lista de zonas vive en un único filtro
- * en vez de repetida aquí. Las entradas de `FRONTEND_APPS` siguen haciendo
- * falta para los `.env.local` y para saber qué puertos vigilar.
+ * Queda **una sola app** desde la fusión de zonas, así que esto es casi un
+ * alias; se conserva porque `pnpm dev:frontend` es lo que documenta el README y
+ * porque `FRONTEND_APPS` sigue haciendo falta para los `.env.local` y para
+ * saber qué puerto vigilar.
  */
 export const FRONTEND_TURBO_SERVICE = {
   key: 'frontend',
@@ -230,7 +221,7 @@ export const ALL_SERVICES = [...BACKEND_SERVICES, ...FRONTEND_APPS];
 export const PRESETS = [
   {
     key: 'todo',
-    nombre: 'Todo — los 9 servicios y las 2 apps de frontend',
+    nombre: 'Todo — los 9 servicios y el frontend',
     backend: BACKEND_SERVICES.map((s) => s.key),
     frontend: true,
   },
@@ -248,7 +239,7 @@ export const PRESETS = [
   },
   {
     key: 'frontend',
-    nombre: 'Solo frontend — el shell y auth (el backend ya está arriba)',
+    nombre: 'Solo frontend — la aplicación web (el backend ya está arriba)',
     backend: [],
     frontend: true,
   },

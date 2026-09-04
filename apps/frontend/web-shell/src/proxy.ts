@@ -38,8 +38,31 @@ import { type NextRequest, NextResponse } from 'next/server';
 
 const refreshSession = createSessionRefreshProxy();
 
-/** La sirve `auth-front`, que todavía es zona aparte (entra en F7). */
+/** La pantalla de entrada. Desde F7 la sirve esta misma aplicación. */
 const LOGIN_PATH = '/auth/login';
+
+/**
+ * Las pantallas de sesión, que son **solo para quien no la tiene**.
+ *
+ * Era el `proxy.ts` entero de `auth-front`, y es la regla inversa a la de
+ * `PREFIJOS_PRIVADOS`: aquí no se echa a quien no tiene sesión, se echa a quien
+ * sí la tiene — enseñarle el formulario de entrada a alguien que ya entró es
+ * una pantalla muerta.
+ *
+ * ⚠️ **Rutas exactas, no un prefijo.** `/auth/verify-email` y
+ * `/auth/reset-password` se abren desde un enlace del correo y tienen que
+ * funcionar con sesión puesta: quien confirma su correo en el navegador donde
+ * ya estaba dentro no puede acabar rebotado.
+ */
+const SOLO_INVITADOS = new Set(['/auth/login', '/auth/signup']);
+
+/**
+ * A dónde va quien ya tiene sesión y pide una pantalla de entrada.
+ *
+ * El área privada, no la landing: quien acaba de identificarse quiere su
+ * trabajo. Es el mismo destino que usa el formulario al terminar.
+ */
+const DESTINO_TRAS_ENTRAR = '/projects';
 
 /**
  * Los prefijos que exigen sesión **dentro de esta aplicación**.
@@ -112,8 +135,24 @@ function resolveToken(request: NextRequest, response: NextResponse): string | un
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const response = await refreshSession(request);
+  const { pathname } = request.nextUrl;
 
-  if (!esPrivada(request.nextUrl.pathname)) return response;
+  /**
+   * Las pantallas de entrada: quien ya tiene sesión no las ve.
+   *
+   * ⚠️ Se **verifica la firma**, no basta con que la cookie exista: con un token
+   * caducado hay que poder llegar al login para volver a entrar, y mirar solo la
+   * presencia de la cookie dejaría a esa persona encerrada fuera.
+   */
+  if (SOLO_INVITADOS.has(pathname)) {
+    if (!(await hasValidSessionToken(resolveToken(request, response)))) return response;
+
+    const salto = redirectToZone(request, DESTINO_TRAS_ENTRAR);
+    for (const cookie of response.cookies.getAll()) salto.cookies.set(cookie);
+    return salto;
+  }
+
+  if (!esPrivada(pathname)) return response;
 
   /* Se verifica la **firma**, no solo que la cookie exista: una cookie caducada
      o manipulada no puede abrir el área privada. */
@@ -139,7 +178,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
      */
     recordarConversacion(request, response);
 
-    const destino = REDIRECCIONES_EXACTAS[request.nextUrl.pathname];
+    const destino = REDIRECCIONES_EXACTAS[pathname];
     if (destino) {
       const salto = redirectToZone(request, destino);
       for (const cookie of response.cookies.getAll()) salto.cookies.set(cookie);
@@ -185,8 +224,5 @@ export const config = {
    * **no casa la raíz**. Sin esta entrada la landing nunca renovaba la sesión,
    * que es justo el caso para el que nació este proxy.
    */
-  matcher: [
-    '/',
-    '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth(?:/|$)).*)',
-  ],
+  matcher: ['/', '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth/api/).*)'],
 };

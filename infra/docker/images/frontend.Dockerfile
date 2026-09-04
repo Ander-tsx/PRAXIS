@@ -1,13 +1,11 @@
 # syntax=docker/dockerfile:1.7
 #
-# Imagen del frontend: el shell y las 7 zonas en un solo contenedor.
+# Imagen del frontend: **una sola aplicación Next**.
 #
-# Multi-Zones se apoya en los `rewrites()` del shell hacia cada zona. Metiéndolas
-# todas en la misma máquina esos saltos son loopback y los valores por defecto
-# de `next.config.ts` (`http://localhost:41xx`) siguen siendo los correctos en
-# producción, no solo en desarrollo.
-#
-# Solo el shell (4100) sale de la máquina; las zonas escuchan en localhost.
+# Fueron ocho —el shell y siete zonas de un multi-zone—, todas en este mismo
+# contenedor y bajo el mismo pm2. O sea: se pagaba el coste entero de
+# Multi-Zones y no se recibía su único beneficio, que es desplegar cada zona por
+# separado. La fusión (`docs/PLAN-FUSION-ZONAS.md`) las juntó en una.
 #
 # Se construye desde la RAÍZ del repo:
 #   docker build -f infra/docker/images/frontend.Dockerfile -t praxis-frontend .
@@ -45,14 +43,7 @@ COPY apps/backend/services/permissions/package.json     apps/backend/services/pe
 COPY apps/backend/services/projects/package.json        apps/backend/services/projects/
 COPY apps/backend/services/reports/package.json         apps/backend/services/reports/
 COPY apps/backend/services/tasks/package.json           apps/backend/services/tasks/
-COPY apps/frontend/admin-front/package.json             apps/frontend/admin-front/
-COPY apps/frontend/assistant-front/package.json         apps/frontend/assistant-front/
-COPY apps/frontend/auth-front/package.json              apps/frontend/auth-front/
-COPY apps/frontend/chat-front/package.json              apps/frontend/chat-front/
 COPY apps/frontend/commons/package.json                 apps/frontend/commons/
-COPY apps/frontend/dashboard-front/package.json         apps/frontend/dashboard-front/
-COPY apps/frontend/projects-front/package.json          apps/frontend/projects-front/
-COPY apps/frontend/reports-front/package.json           apps/frontend/reports-front/
 COPY apps/frontend/web-shell/package.json               apps/frontend/web-shell/
 COPY packages/shared-devtools/package.json              packages/shared-devtools/
 COPY e2e/package.json                                   e2e/
@@ -109,15 +100,7 @@ ENV NEXT_PUBLIC_PRECIO_BUSINESS=$NEXT_PUBLIC_PRECIO_BUSINESS
 # ⚠️ Tailwind v4 descarta en silencio las utilidades que no encuentra al
 # escanear. Si algún `@source` de commons/styles/theme.css se rompiera, esto
 # compilaría igual y el resultado saldría sin estilos. Ver CLAUDE.md.
-RUN pnpm --filter "@praxis/web-shell" \
-         --filter "@praxis/auth-front" \
-         --filter "@praxis/dashboard-front" \
-         --filter "@praxis/chat-front" \
-         --filter "@praxis/projects-front" \
-         --filter "@praxis/reports-front" \
-         --filter "@praxis/admin-front" \
-         --filter "@praxis/assistant-front" \
-         run build
+RUN pnpm --filter "@praxis/web-shell" run build
 
 # ───────────────────────── runtime ──────────────────────────
 FROM base AS runtime
@@ -134,7 +117,7 @@ RUN npm install --global pm2@5 && npm cache clean --force
 COPY --from=build /app /app
 COPY infra/docker/images/frontend.pm2.config.cjs /app/pm2.config.cjs
 
-# Solo el shell. Las zonas (4101-4105) quedan en loopback.
+# El único puerto que hay. Antes las zonas ocupaban del 4101 al 4107 en loopback.
 EXPOSE 4100
 
 CMD ["pm2-runtime", "start", "/app/pm2.config.cjs"]

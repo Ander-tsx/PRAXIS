@@ -1306,43 +1306,6 @@ importers:
         specifier: ^8.20.0
         version: 8.65.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
 
-  apps/frontend/auth-front:
-    dependencies:
-      '@praxis/commons':
-        specifier: workspace:*
-        version: link:../commons
-      jose:
-        specifier: ^5.9.6
-        version: 5.10.0
-      next:
-        specifier: 16.2.11
-        version: 16.2.11(@babel/core@7.29.7)(@playwright/test@1.62.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      react:
-        specifier: 19.2.4
-        version: 19.2.4
-      react-dom:
-        specifier: 19.2.4
-        version: 19.2.4(react@19.2.4)
-    devDependencies:
-      '@tailwindcss/postcss':
-        specifier: ^4
-        version: 4.3.3
-      '@types/node':
-        specifier: ^20
-        version: 20.19.43
-      '@types/react':
-        specifier: ^19
-        version: 19.2.17
-      '@types/react-dom':
-        specifier: ^19
-        version: 19.2.3(@types/react@19.2.17)
-      tailwindcss:
-        specifier: ^4
-        version: 4.3.3
-      typescript:
-        specifier: ^5
-        version: 5.9.3
-
   apps/frontend/commons:
     dependencies:
       jose:
@@ -1385,6 +1348,9 @@ importers:
       '@praxis/commons':
         specifier: workspace:*
         version: link:../commons
+      jose:
+        specifier: ^5.9.6
+        version: 5.10.0
       lenis:
         specifier: ^1.3.26
         version: 1.3.26(react@19.2.4)

@@ -22,13 +22,15 @@ const nextConfig: NextConfig = {
    * La API de rewrites() no ha cambiado en Next.js 16 respecto a versiones anteriores.
    */
   async rewrites() {
-    const authFrontUrl = process.env.AUTH_FRONT_URL ?? 'http://localhost:4101';
 
     return [
-      {
-        source: '/auth/:path*',
-        destination: `${authFrontUrl}/auth/:path*`,
-      },
+      /*
+       * 🕳️ Aquí estaba el rewrite de `/auth/:path*`.
+       *
+       * Sexta y última zona fusionada (F7). Las pantallas de sesión y los diez
+       * route handlers que hablan con el gateway viven ya en `src/app/auth/`.
+       * Las URLs no cambiaron, ni las públicas ni las de `/auth/api/*`.
+       */
       /*
        * 🕳️ Aquí estaban las dos entradas de `/main`.
        *
