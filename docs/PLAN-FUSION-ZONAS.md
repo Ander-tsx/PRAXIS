@@ -14,8 +14,9 @@
 |---|---|
 | ✅ **Fusionar las zonas** | Aceptado por el dueño del producto |
 | ✅ **`reports-front` se archiva** | Ver «La decisión sobre Análisis» |
-| ⬜ **Correr `pnpm e2e:regresion` ANTES de tocar nada** | Es el primer paso de la conversación nueva |
-| ⬜ **El alcance exacto de la fusión** | Propuesta abajo; falta confirmarla |
+| ✅ **Correr `pnpm e2e:regresion` ANTES de tocar nada** | Hecho el 2026-09-03: **243 de 243 en verde**. Ver «La línea base» |
+| ✅ **El alcance exacto de la fusión** | Confirmado el 2026-09-03: **una sola app, auth y shell incluidos**. Ver «El alcance confirmado» |
+| ✅ **Rama de trabajo** | `feature/fusion-zonas`. Todo lo de esta etapa se hace ahí |
 
 ---
 
@@ -181,7 +182,43 @@ un fallo de verdad.
 **Sin esa línea base verde, la fusión no tiene red.** Es un cambio que toca
 todo, y hay que poder decir «esto funcionaba antes» con pruebas, no con memoria.
 
-### 2. El helper `<Link>` vs `<a>` — 2 horas, opcional
+#### La línea base — 2026-09-03
+
+✅ **243 de 243 en verde**, 39 minutos, un solo worker.
+
+Dos cosas que no salieron como se esperaba aquí arriba:
+
+- **Los rojos previstos del chat privado no aparecieron.** Las pruebas que
+  afirmaban la regla vieja —«compartís proyecto»— ya se habían reescrito a
+  «compartís organización» dentro de la propia etapa. No hay nada que reescribir.
+- **La suite tiene 243 pruebas, no 81.** Ese número venía del comentario de
+  `playwright.config.ts`, que quedó viejo. El filtro `--grep-invert @security`
+  sigue haciendo lo suyo; lo que creció es la suite.
+
+Hubo **un rojo**, y era de la prueba, no del producto:
+
+> `06-chat-zona.spec.ts:103` esperaba `getByRole('button', { name: 'Chat' })` y
+> agotaba los 120 s enteros.
+
+`2d4d1a5` convirtió las tres secciones de la barra lateral en un `tablist` de
+verdad, así que esos controles son `role="tab"` y un `getByRole('button', …)` no
+los casa. El localizador se corrigió a `getByRole('tab', …)` y el archivo entero
+pasa (4/4). ⚠️ Es exactamente el tipo de rojo que hay que separar del otro: la
+accesibilidad mejoró y la prueba se quedó atrás.
+
+### 2. El helper `<Link>` vs `<a>` — 🚫 **se salta**
+
+Decidido el 2026-09-03: se va directo a la fusión. El helper existía para
+aliviar la queja sin comprometerse a fusionar; una vez fusionado, **todo enlace
+pasa a ser interno y el helper se borra solo**. Hacerlo ahora es trabajo que
+nace muerto.
+
+Se conserva la descripción de abajo porque explica el mecanismo — y porque si la
+fusión se parase a mitad, este es el parche que la sustituye.
+
+<details>
+<summary>El helper, tal como estaba propuesto</summary>
+
 
 Arregla hoy la queja concreta sin comprometerse a la fusión:
 
@@ -198,6 +235,8 @@ fusión— y **si se fusiona, el helper se simplifica solo**: todo pasa a ser
 interno. Hacerlo antes no es trabajo tirado, pero se puede saltar e ir directo a
 la fusión.
 
+</details>
+
 ### 3. Archivar `reports-front`
 
 Más pequeño y aislado que la fusión. Hacerlo antes reduce lo que hay que mover.
@@ -207,6 +246,149 @@ Más pequeño y aislado que la fusión. Hacerlo antes reduce lo que hay que move
 Con la regresión verde antes y después.
 
 ### 5. `pnpm e2e:regresion` otra vez
+
+---
+
+## El alcance confirmado
+
+**Una sola aplicación Next. Las ocho zonas dentro, `auth-front` y `web-shell`
+incluidos.**
+
+La propuesta anterior —fusionar las seis privadas y dejar fuera auth y el
+shell— se descartó al leer los guards. El argumento que la sostenía era que
+cada zona se protege sola y que un fallo en el guard único las desprotegería a
+todas. No se sostiene, por cinco motivos, en orden de peso:
+
+1. 🔴 **El guard no es la frontera de autorización. Lo es el gateway**, y lo
+   dicen los propios guards. `admin-front/src/proxy.ts`: *«Esconder la pantalla
+   es cortesía; lo que protege los datos está del otro lado»*. Igual en
+   `dashboard-front/src/proxy.ts`: *«la autorización real la hace siempre el
+   gateway»*. Saltarse el guard sirve una página que a continuación pide sin
+   token y come un 401. Lo que se filtra son pantallas vacías, no datos.
+2. **Menos `matcher`, menos fallos de `matcher`.** La lista de trampas de este
+   documento son justo eso: el lookahead que no casa `'/'`, encontrado zona a
+   zona, una por una, durante meses. Siete matchers se revisan siete veces; uno
+   se revisa una. El radio de daño sube y la probabilidad baja — y la
+   probabilidad es por donde este repositorio ha sangrado.
+3. **Dejar una sola zona fuera mantiene vivas todas las trampas de
+   Multi-Zones**: el prefijo de `basePath` en `<Link>`, el `basePath` de cada
+   `@font-face`, el 404 del `.next/` desaparecido, los `rewrites()` del shell.
+   Y el salto que quedaría fuera —login → aplicación— es el que da todo el
+   mundo, una vez por sesión.
+4. **El guard de `auth-front` son 52 líneas y es la regla inversa**: solo
+   invitados, y solo en `/login` y `/signup`. En una sola app eso es una lista
+   de rutas públicas de diez líneas. No es una frontera de seguridad, es una
+   regla de experiencia de uso.
+5. El ahorro pasa de **8 procesos → 1**, no de 8 → 3.
+
+### 🔴 La decisión que desactiva los dos riesgos: la app fusionada **es** el shell
+
+No se crea `apps/frontend/web` y se mueve todo dentro. **`web-shell` crece
+hasta ser la aplicación entera**, y las zonas entran como segmentos de su
+`app/`.
+
+Es lo que convierte los dos riesgos serios de esta migración en no-eventos:
+
+| Riesgo | Con app nueva | Con el shell creciendo |
+|---|---|---|
+| `/api/webhooks/stripe` | Hay que mover la ruta que cobra. Si se rompe, **se cobra y no se concede plan**, en silencio | **No se mueve.** Se queda donde está, byte a byte igual |
+| `default_service` del balanceador (`infra/terraform/frontend.tf:309`) | Hay que repuntarlo a la app nueva | **No se toca.** Ya apunta al shell |
+
+Y hay un tercer regalo: el shell **no tiene `basePath`**, así que sirve desde la
+raíz. Una zona que entra como `src/app/main/*` conserva su URL `/main/...` sin
+que nadie escriba un solo `basePath`. Las URLs no cambian **ninguna**, que es
+justo lo que el renombrado `dashboard` → `main` enseñó por las malas.
+
+⚠️ El directorio seguirá llamándose `web-shell` mientras dure la migración, y
+el nombre pasará a mentir en cuanto entre la primera zona. Renombrarlo a `web`
+es el **último** paso, cuando ya no quede ningún consumidor que lo nombre —
+`pnpm-workspace.yaml`, `turbo.json`, el pm2, el Dockerfile, el `dev-cli` y
+Terraform.
+
+---
+
+## Las ocho decisiones
+
+| # | Decisión | Por qué |
+|---|---|---|
+| **D1** | **La app fusionada es `web-shell`**, que crece. No se crea una app nueva | Deja quieto el webhook de Stripe y el `default_service`. Ver arriba |
+| **D2** | **Entran las ocho zonas**, `auth-front` incluido | El guard no es la autorización; dejar una fuera conserva todas las trampas |
+| **D3** | **Una zona por commit**, con `pnpm e2e:regresion` verde antes de la siguiente | Un commit que mueve siete zonas no se puede revisar ni revertir a medias |
+| **D4** | Las zonas privadas caen en **un solo grupo de rutas `(privado)`** con un único `layout.tsx` | Es el premio de verdad: `AppShell`, el proveedor del directorio y **el SSE** se montan una vez y sobreviven a la navegación entre secciones |
+| **D5** | **`reports-front` se archiva primero**, antes de mover nada | Quita 7.415 líneas del trabajo. Y es reversible: se borra la zona, no la capacidad |
+| **D6** | **Un solo proxy autenticado**, el que ya existe en `/api/gateway`. Los ~21 literales `'/<zona>/api/gateway'` se corrigen zona a zona, al moverla | Corregirlos todos de golpe rompe las zonas que aún no se han movido |
+| **D7** | **Un solo `globals.css`**, con los `@font-face` sin `basePath` y una sola copia de las fuentes en `public/fonts/` | Hoy cada zona repite el bloque con su prefijo escrito a mano |
+| **D8** | **Un solo `proxy.ts`**: renueva siempre, exige sesión en los prefijos privados, aplica la regla de solo-invitados en `/auth/login` y `/auth/signup`, y excluye `api/`, `_next/static`, `_next/image` y `fonts/` | Es la suma de los ocho guards actuales, que ya son casi el mismo archivo |
+
+---
+
+## Los seis invariantes
+
+Lo que **no puede cambiar** durante toda la migración. Si algo de esto se mueve,
+se ha salido del alcance.
+
+1. 🔴 **Ninguna URL cambia.** Ni una. `/main`, `/projects/<slug>`, `/chat/<peerId>`,
+   `/admin`, `/assistant`, `/auth/login`, `/reports` (que pasa a 404 a
+   propósito). El backend tiene URLs escritas a mano —el `success_url` de
+   Stripe, el enlace de invitación— y ya nos mordió una vez.
+2. 🔴 **`/api/webhooks/stripe` no se toca.** Ni el archivo, ni su ruta, ni el
+   `matcher` que lo excluye. Sigue siendo un route handler que reenvía el
+   cuerpo crudo. Nada de `rewrite()`, nada de `createGatewayProxy()`.
+3. **El rol global de `/admin` se comprueba en su `layout.tsx`, no en el
+   guard**, y sigue igual después de fusionar. Un guard genérico que solo mira
+   sesión no puede quedarse como única puerta de esa zona.
+4. **Los `@source` de Tailwind tienen que cubrir el código movido.** Se
+   descartan clases en silencio, sin un solo error. Comprobación por zona: abrir
+   la pantalla movida y mirar si tiene estilos, no si compila.
+5. **Las cookies siguen con `path: '/'`.** Fusionar hace que deje de ser
+   necesario, pero quitarlo no es urgente y romperlo es fácil.
+6. **`reports-service`, las once rutas de análisis del gateway y
+   `historialAnalisisDias` no se tocan.** Lo que se archiva es la zona del
+   frontend; PRAX sigue pidiendo informes.
+
+---
+
+## El orden de ejecución
+
+Cada línea es un commit. La casilla se marca **al terminar**, con la regresión
+verde. Las zonas van de menor a mayor, para que el mecanismo se depure en la
+más barata.
+
+| # | Paso | Líneas | Estado |
+|---|---|---|---|
+| **F0** | Línea base: `pnpm e2e:regresion` | — | ✅ 243/243 |
+| **F1** | Archivar `reports-front` | 7.415 | ⬜ |
+| **F2** | Mover `assistant-front` → shell **(piloto del mecanismo)** | 757 | ⬜ |
+| **F3** | Mover `chat-front` | 2.539 | ⬜ |
+| **F4** | Mover `admin-front` | 3.384 | ⬜ |
+| **F5** | Mover `dashboard-front` (`/main`) | 7.334 | ⬜ |
+| **F6** | Mover `projects-front` | 18.791 | ⬜ |
+| **F7** | Mover `auth-front` (la pública) | 2.138 | ⬜ |
+| **F8** | Un solo `(privado)/layout.tsx`: el armazón deja de remontarse | — | ⬜ |
+| **F9** | Limpieza: `rewrites()` fuera, `globals.css` unificado, fuentes sin `basePath`, pm2 a un proceso, Dockerfile, `dev-cli`, puertos | — | ⬜ |
+| **F10** | Renombrar `web-shell` → `web` | — | ⬜ |
+| **F11** | `pnpm e2e:regresion` de cierre | — | ⬜ |
+
+### La receta de cada zona (F2–F7)
+
+Se repite igual siete veces. El piloto F2 existe para descubrir qué le falta a
+esta lista.
+
+1. `src/app/**` de la zona → `web-shell/src/app/<zona>/**`, **quitando su
+   `layout.tsx` raíz**: el `<html>`/`<body>` y las fuentes ya los pone el shell.
+   Lo que sobreviva de ese layout (metadata) baja al segmento.
+2. `src/components`, `src/lib`, `src/hooks` de la zona → bajo un directorio
+   propio en el shell, para que dos zonas no choquen de nombre.
+3. Borrar el `proxy.ts` de la zona; su regla se suma al del shell.
+4. Borrar su `api/gateway/[...path]/route.ts`; se usa el del shell.
+5. Cambiar sus literales `'/<zona>/api/gateway'` por `'/api/gateway'` y su
+   `zonePath` — **solo los de esa zona**.
+6. Quitar su entrada de `rewrites()` en `web-shell/next.config.ts`.
+7. Borrar la app y su entrada del pm2, del `dev-cli` y de Terraform.
+8. `pnpm e2e:regresion`. Verde antes de la siguiente.
+
+⚠️ **Y en cada zona, mirar la pantalla**, no solo el verde: el fallo de los
+`@source` no da error y las pruebas no miran los estilos.
 
 ---
 
@@ -255,8 +437,21 @@ No bloquean la fusión, pero conviene no perderlos de vista. Detalle en
 
 ---
 
+## Registro
+
+Una línea por paso cerrado, con lo que se aprendió. Lo que no está aquí, no se
+ha hecho.
+
+| Fecha | Paso | Qué pasó |
+|---|---|---|
+| 2026-09-03 | **F0** | Línea base **243/243 en verde** (39,1 min). Un rojo, y era de la prueba: `06-chat-zona.spec.ts` buscaba `role="button"` donde `2d4d1a5` había puesto `role="tab"`. Corregido el localizador. Los rojos previstos del chat privado no aparecieron: ya estaban reescritos |
+
+---
+
 ## Estado del stack al escribir esto
 
+- **La rama de trabajo es `feature/fusion-zonas`.** Sale de `3c611d8`
+  (`main`). Todo lo de esta etapa vive ahí; `main` no se toca hasta el PR.
 - **Todo commiteado y subido.** Último commit relevante: `3c611d8`.
 - **Stripe en modo real**, con la cuenta activada, los tres precios de producción
   y el webhook creado. Ver [deploy/STRIPE-MODO-REAL.md](deploy/STRIPE-MODO-REAL.md).

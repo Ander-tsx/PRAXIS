@@ -100,7 +100,10 @@ test.describe('El chat en su propia zona', () => {
      * de sin leer. El mensaje está enviado y sin leer, así que tiene que haber
      * un 1.
      */
-    await page.getByRole('button', { name: 'Chat' }).first().click();
+    /* ⚠️ `role="tab"`, no `button`: `2d4d1a5` convirtió las tres secciones de la
+       barra en un `tablist` de verdad. Un `getByRole('button', …)` no casa un
+       `role="tab"` y se queda esperando los 120 s enteros. */
+    await page.getByRole('tab', { name: 'Chat' }).first().click();
 
     const fila = page.locator(`a[href="/chat/${invitado.userId}"]`);
     await expect(fila).toBeVisible({ timeout: 15_000 });
