@@ -110,10 +110,6 @@ function AvatarRow({
 }: { userId: string; profile: any; gatewayPath: string; name: string }) {
   const presencia = usePresence(userId, profile?.presence);
   return (
-    <Avatar
-      src={avatarHref(profile?.avatarUrl, gatewayPath)}
-      presence={presencia}
-      label={name}
-    />
+    <Avatar src={avatarHref(profile?.avatarUrl, gatewayPath)} presence={presencia} label={name} />
   );
 }

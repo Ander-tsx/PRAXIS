@@ -1298,8 +1298,8 @@ export function ChartProposalCard({
          * la respuesta. Lo que se quita es el destino que ya no existe.
          */
         <p className="font-sans text-xs text-text-secondary">
-          De momento no hay dónde colocarlo: el corte se describe aquí y se
-          vuelve a proponer cuando haga falta.
+          De momento no hay dónde colocarlo: el corte se describe aquí y se vuelve a proponer cuando
+          haga falta.
         </p>
       )}
 

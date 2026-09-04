@@ -29,10 +29,16 @@ WORKDIR /app
 # Solo los manifiestos primero: mientras no cambie ninguno, Docker reutiliza la
 # capa del install aunque haya cambiado todo el código.
 #
-# Están los 24 paquetes del workspace, incluidos los del frontend que esta
+# Están los 17 paquetes del workspace, incluidos los dos del frontend que esta
 # imagen no usa. No es un descuido: `--frozen-lockfile` compara el lockfile
 # contra *todos* los miembros declarados en pnpm-workspace.yaml, y si falta un
 # package.json aborta. El install sí se filtra a `apps/backend`.
+#
+# 🔴 **Y sobrar tampoco vale.** Un `COPY` de un archivo que no existe **falla el
+# build**, así que esta lista tiene que seguir a los miembros del workspace en
+# los dos sentidos. Eran nueve del frontend hasta la fusión de zonas; siete de
+# esas rutas desaparecieron a la vez, y con ellas se habría caído la imagen del
+# **backend**, que es donde menos se busca.
 FROM base AS deps
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
@@ -53,15 +59,8 @@ COPY apps/backend/services/permissions/package.json     apps/backend/services/pe
 COPY apps/backend/services/projects/package.json        apps/backend/services/projects/
 COPY apps/backend/services/reports/package.json         apps/backend/services/reports/
 COPY apps/backend/services/tasks/package.json           apps/backend/services/tasks/
-COPY apps/frontend/admin-front/package.json             apps/frontend/admin-front/
-COPY apps/frontend/assistant-front/package.json         apps/frontend/assistant-front/
-COPY apps/frontend/chat-front/package.json              apps/frontend/chat-front/
-COPY apps/frontend/auth-front/package.json              apps/frontend/auth-front/
 COPY apps/frontend/commons/package.json                 apps/frontend/commons/
-COPY apps/frontend/dashboard-front/package.json         apps/frontend/dashboard-front/
-COPY apps/frontend/projects-front/package.json          apps/frontend/projects-front/
-COPY apps/frontend/reports-front/package.json           apps/frontend/reports-front/
-COPY apps/frontend/web-shell/package.json               apps/frontend/web-shell/
+COPY apps/frontend/web/package.json                     apps/frontend/web/
 COPY packages/shared-devtools/package.json              packages/shared-devtools/
 COPY e2e/package.json                                   e2e/
 

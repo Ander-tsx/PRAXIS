@@ -3,9 +3,11 @@
  *
  * Esta es la única puerta pública de todo el sistema.
  *
- * Cada máquina corre las 6 apps Next. El shell escucha en el 4100 y reescribe
- * hacia las zonas por 127.0.0.1, así que cada máquina se basta sola y escalar
- * es sumar copias idénticas.
+ * Cada máquina corre **una** app Next, en el 4100. Fueron ocho —el shell y
+ * siete zonas de un multi-zone, todas en esta misma máquina, con el shell
+ * reescribiendo hacia ellas por 127.0.0.1— hasta la fusión de zonas. Cada
+ * máquina se basta sola y escalar es sumar copias idénticas, igual que antes;
+ * lo que cambió es que ahora es un proceso en vez de ocho.
  */
 
 # ─────────────────────── plantilla de máquina ───────────────────────

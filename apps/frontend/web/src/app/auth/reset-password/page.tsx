@@ -78,7 +78,10 @@ function Formulario() {
           Esta pantalla se abre desde el enlace que te mandamos por correo. Pide uno nuevo si
           llegaste aquí de otra forma.
         </p>
-        <Link href="/auth/forgot-password" className="font-sans text-sm text-primary hover:underline">
+        <Link
+          href="/auth/forgot-password"
+          className="font-sans text-sm text-primary hover:underline"
+        >
           Pedir un enlace
         </Link>
       </Marco>

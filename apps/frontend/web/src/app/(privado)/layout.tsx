@@ -73,7 +73,7 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
         presence: profile.presence ?? null,
       }}
       /* El selector de estado se dibuja sobre la esquina del avatar: la esfera
-         **es** el botón. Ver `PresenceFooter`. */
+       **es** el botón. Ver `PresenceFooter`. */
       estadoSlot={<PresenceFooter presencia={profile.presence} onCambiar={setPresenceAction} />}
     >
       {children}

@@ -1,10 +1,10 @@
 #cloud-config
 #
-# Arranque de una máquina del frontend: el shell y las 5 zonas.
+# Arranque de una máquina del frontend: la aplicación Next, un solo proceso.
 #
 # Solo necesita dos cosas de fuera: dónde está el gateway (la IP del
 # balanceador interno) y el JWT_SECRET, que debe coincidir con el del backend
-# para que los guards de cada zona validen la cookie de sesión.
+# para que el guard valide la cookie de sesión.
 
 write_files:
   # ─────────────────────────────────────────────────────────────
@@ -71,9 +71,10 @@ write_files:
       ExecStartPre=-/usr/bin/docker rm -f praxis-frontend
       ExecStartPre=/usr/bin/docker pull ${imagen}
 
-      # --network host porque los rewrites() del shell apuntan a
-      # 127.0.0.1:4101-4106. Las zonas solo son alcanzables desde la propia
-      # máquina; el cortafuegos únicamente deja entrar al 4100.
+      # --network host: lo pedían los rewrites() del multi-zone, que salían a
+      # 127.0.0.1:4101-4107. Con una sola app ya no hace falta, pero se conserva
+      # —el chequeo de salud y el cortafuegos están afinados sobre él, y
+      # cambiarlo no gana nada. El cortafuegos solo deja entrar al 4100.
       ExecStart=/usr/bin/docker run --rm --name praxis-frontend \
         --network host \
         --env-file /run/praxis.env \
