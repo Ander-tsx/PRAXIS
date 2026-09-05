@@ -476,7 +476,7 @@ function ArmazonInterno({
             }`}
           >
             {!plegada && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-baseline gap-2">
                 <Wordmark />
                 <ByKyloo />
               </div>
@@ -677,7 +677,7 @@ function ArmazonInterno({
             {cajonMontado && (
               <>
                 <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-baseline gap-2 mt-1">
                     <Wordmark />
                     <ByKyloo />
                   </div>
@@ -833,7 +833,7 @@ function UserCard({
 function Wordmark() {
   return (
     <span
-      className="select-none text-lg font-extrabold tracking-tight text-primary"
+      className="select-none text-2xl font-extrabold tracking-tight text-primary"
       style={{ fontFamily: 'var(--font-grotesk)' }}
     >
       Praxis
@@ -850,9 +850,9 @@ function Wordmark() {
  */
 function ByKyloo() {
   return (
-    <span className="flex items-center gap-1.5 text-white">
-      <span className="font-mono text-[0.55rem] uppercase tracking-[0.18em]">By</span>
-      <KylooWordmark className="h-2.5 w-auto" />
+    <span className="flex items-baseline gap-1.5 text-white">
+      <span className="font-mono text-xs uppercase tracking-[0.18em]">By</span>
+      <KylooWordmark className="h-3.5 w-auto translate-y-[3.5px]" />
     </span>
   );
 }
