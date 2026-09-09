@@ -5,11 +5,22 @@ import { useState } from 'react';
 export function TeamTabs({
   members,
   roles,
+  inicial = 'members',
 }: {
   members: React.ReactNode;
   roles: React.ReactNode;
+  /**
+   * Con qué pestaña se abre.
+   *
+   * Existe para que «Roles y permisos» de la barra lateral entre directamente en
+   * la suya: esa entrada no tiene pantalla propia —los papeles son de una
+   * organización, y la que vale es la activa— así que redirige aquí. Sin esto
+   * caía en «Miembros» y había que dar un clic más para llegar a lo que se
+   * había pulsado.
+   */
+  inicial?: 'members' | 'roles';
 }) {
-  const [activeTab, setActiveTab] = useState<'members' | 'roles'>('members');
+  const [activeTab, setActiveTab] = useState<'members' | 'roles'>(inicial);
 
   const tabs = [
     {

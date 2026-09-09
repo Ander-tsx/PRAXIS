@@ -118,6 +118,45 @@ export function useAccion<Estado, Carga = FormData>(
       setLanzadas((cuantas) => cuantas + 1);
       try {
         return await accion(estado, carga);
+      } catch (fallo) {
+        /**
+         * 🔴 **Una Server Action que se rompe por el camino tumbaba la pantalla
+         * entera.**
+         *
+         * Las acciones de este repositorio ya devuelven `{ error }` en vez de
+         * lanzar — están escritas así a propósito—. Pero hay fallos que ocurren
+         * **antes de que su cuerpo llegue a ejecutarse**: el cuerpo de la
+         * petición pasa del tope de Next (`413 Body exceeded …`), la red se
+         * corta a mitad del envío, el servidor devuelve un 500 al deserializar.
+         * Ahí no hay ningún `try` de la acción que pueda atrapar nada, porque la
+         * acción no ha empezado.
+         *
+         * Sin este `catch`, esa promesa rechazada sube por `useActionState`
+         * hasta el `error.tsx` más cercano, y lo que ve la persona es la página
+         * de error del segmento —«No pudimos cargar esta página»— sobre un
+         * formulario que estaba perfectamente vivo. Peor: el mensaje sugiere
+         * cerrar sesión, que no arregla nada, y «Reintentar» «funciona» porque
+         * lo único roto era el envío.
+         *
+         * Pasó de verdad al adjuntar un PDF de más de 1 MB — ver
+         * `bodySizeLimit` en el `next.config.ts` de `web`, que era la causa—.
+         *
+         * ## Por qué se parte de `inicial` y no del estado que había
+         *
+         * Porque la acción **no llegó a hacer nada**, así que todo lo que un
+         * estado usa para decir «esto salió bien» —`done`, `savedName`,
+         * `createdId`— tiene que volver a su valor de partida. Con
+         * `{ ...estado, error }` un envío fallido detrás de uno bueno seguiría
+         * enseñando el «Guardado» del anterior junto al error del nuevo.
+         *
+         * ⚠️ **Y si el estado no tiene `error`, se relanza.** Este hook es
+         * genérico: inventarle un campo a una forma que no lo declara sería
+         * mentirle al tipo y, sobre todo, tragarse un fallo que nadie va a
+         * pintar. Los 45 puntos del repositorio lo tienen; el día que alguien
+         * escriba uno sin él, prefiere verlo.
+         */
+        if (!tieneCampoError(inicial)) throw fallo;
+        return { ...inicial, error: mensajeDeFallo(fallo) } as Awaited<Estado>;
       } finally {
         /* El macrotask es lo que deja fuera de la transición este apagado. Ver
            la explicación de arriba: sin él, esta línea se cuelga con ella. */
@@ -126,7 +165,7 @@ export function useAccion<Estado, Carga = FormData>(
         }, 0);
       }
     },
-    [accion],
+    [accion, inicial],
   );
 
   const [estado, despachar] = useActionState<Awaited<Estado>, Carga>(
@@ -177,4 +216,33 @@ export function useAccion<Estado, Carga = FormData>(
   }, [enMarcha, lanzadas]);
 
   return [estado, enviar, enMarcha];
+}
+
+/**
+ * ¿Este estado sabe enseñar un error?
+ *
+ * Se mira la forma en ejecución y no el tipo: `Estado` es genérico y aquí no hay
+ * nada que TypeScript pueda comprobar por nosotros.
+ */
+function tieneCampoError(estado: unknown): estado is { error: string | null } {
+  return typeof estado === 'object' && estado !== null && 'error' in estado;
+}
+
+/**
+ * Qué se le enseña a la persona cuando el envío se rompe antes de llegar.
+ *
+ * ⚠️ **El texto de Next no vale tal cual.** Dice «Body exceeded 1 MB limit» con
+ * un enlace a su documentación de configuración: describe el problema de quien
+ * escribió la aplicación, no el de quien está adjuntando un archivo. Se traduce
+ * a la única frase que sirve ahí —el archivo pesa demasiado— y el resto cae en
+ * un mensaje genérico que al menos dice qué hacer.
+ */
+function mensajeDeFallo(fallo: unknown): string {
+  const texto = fallo instanceof Error ? fallo.message : String(fallo);
+
+  if (/body exceeded/i.test(texto)) {
+    return 'El archivo es demasiado grande para enviarlo. Prueba con uno más ligero.';
+  }
+
+  return 'No se pudo enviar. Puede haber sido un corte de red: vuelve a intentarlo.';
 }

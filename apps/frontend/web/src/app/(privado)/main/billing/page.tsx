@@ -113,7 +113,17 @@ export default async function BillingPage({
           destino="checkout"
           tier={plan.tier}
           organizationId={organizationId}
-          seats={Math.max(plan.asientosMinimos, organizacion.seatsUsed)}
+          /**
+           * ⚠️ **Se lleva los asientos CONTRATADOS, no los ocupados.**
+           *
+           * Estaba con `seatsUsed`, y eso es lo que se está usando ahora
+           * mismo — no lo que se paga. Una organización con 8 contratados y 5
+           * dentro cambiaba de plan y salía con **5**: perdía tres asientos por
+           * los que venía pagando, en silencio y sin nada que lo dijera, porque
+           * el plan nuevo sí aparecía en la barra lateral. Se toma el mayor de
+           * los dos por si el mínimo del plan destino es más alto.
+           */
+          seats={Math.max(plan.asientosMinimos, organizacion.seats)}
         >
           Cambiar a {plan.nombre}
         </CheckoutButton>
@@ -130,12 +140,32 @@ export default async function BillingPage({
     );
   };
 
+  /**
+   * El tope de asientos del plan contratado, o `null` si es ilimitado.
+   *
+   * 🔴 **Contratar un plan NO da sus asientos: da derecho a comprarlos.** Es la
+   * confusión que trajo esta pantalla al taller. Alguien paga «Equipo», la barra
+   * lateral pone «Plan Equipo», y sigue con los asientos que tenía —el mínimo—
+   * porque `Subscription.seats` es lo que se contrata en Stripe y el catálogo
+   * solo pone el **techo**. Nada falla, nada avisa: el equipo simplemente no
+   * cabe, y el mensaje que sale al invitar habla de asientos ocupados, no de
+   * que falte comprarlos.
+   *
+   * No se arregla dando el máximo al pagar —el precio es **por asiento**, así
+   * que regalarlos sería regalar dinero—, se arregla **diciéndolo**: de aquí
+   * sale la línea que separa las dos cifras.
+   *
+   * `SIN_TOPE` es `null` y un plan sin `spec` también da `null`: los dos se
+   * pintan igual —«sin tope»— así que el `??` los junta a propósito.
+   */
+  const topeDeAsientos = spec?.quotas.asientos ?? null;
+
   const tuPlanSlot = esGratis ? null : (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6 rounded-2xl border border-white/10 bg-[#191919] p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <span className="font-sans text-xs font-semibold uppercase tracking-wider text-primary">
-            Plan actual
+            Tu plan
           </span>
           <h2 className="font-sans text-2xl font-semibold tracking-tight text-white">
             {spec?.nombre ?? organizacion.tier}
@@ -156,33 +186,73 @@ export default async function BillingPage({
             Cada persona de la organización ocupa uno; las invitaciones sin aceptar también.
           </p>
         </div>
+
+        {/**
+         * ⚠️ **Las dos cifras, juntas y dichas con todas las letras.**
+         *
+         * «Contratados» es lo que se paga y lo que de verdad limita; el tope del
+         * plan es solo hasta dónde se puede subir sin cambiar de plan. Verlas
+         * separadas —una aquí y otra en la tabla de abajo— es exactamente lo que
+         * hacía leer «Equipo: 15 asientos» como «tengo 15».
+         */}
+        <p className="max-w-2xl rounded-r-lg border-l-2 border-primary bg-primary/5 py-3 pl-4 pr-4 font-sans text-sm text-white/80">
+          Tienes <strong className="font-semibold text-white">{organizacion.seats}</strong>{' '}
+          {organizacion.seats === 1 ? 'asiento contratado' : 'asientos contratados'}
+          {topeDeAsientos !== null ? (
+            <>
+              , y {spec?.nombre ?? 'tu plan'} admite hasta{' '}
+              <strong className="font-semibold text-white">{topeDeAsientos}</strong>.
+            </>
+          ) : (
+            <>, y {spec?.nombre ?? 'tu plan'} no tiene tope.</>
+          )}{' '}
+          <strong className="font-semibold text-white">
+            Pagar el plan no compra los asientos:
+          </strong>{' '}
+          el precio es por asiento y los añades tú aquí abajo. El tope del plan es hasta dónde
+          puedes llegar, no lo que ya tienes.
+        </p>
+
         <SeatsPanel
           organizationId={organizationId}
           contratados={organizacion.seats}
           ocupados={organizacion.seatsUsed}
+          tope={topeDeAsientos}
+          nombreDelPlan={spec?.nombre ?? organizacion.tier}
         />
       </div>
     </div>
   );
 
+  /**
+   * Una sola pestaña: lo tuyo arriba, la comparativa debajo.
+   *
+   * Antes eran dos —«Tu plan» y «Todos los planes»— y los asientos vivían en la
+   * primera, que es la que nadie abre después del primer día. Ver `BillingTabs`.
+   */
   const planesSlot = (
-    <div className="flex flex-col gap-6">
-      {esGratis && (
+    <div className="flex flex-col gap-8">
+      {tuPlanSlot}
+
+      <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-1.5">
-          <h2 className="font-sans text-xl font-medium tracking-tight text-white">Elige tu plan</h2>
+          <h2 className="font-sans text-xl font-medium tracking-tight text-white">
+            {esGratis ? 'Elige tu plan' : 'Compara los planes'}
+          </h2>
           <p className="max-w-2xl font-sans text-sm text-white/60">
-            Estás en el plan gratuito. Sube de plan para desbloquear más asientos, más proyectos,
-            más capacidad y más consultas al asistente.
+            {esGratis
+              ? 'Estás en el plan gratuito. Sube de plan para desbloquear más asientos, más proyectos, más capacidad y más consultas al asistente.'
+              : 'Las cifras de cada columna son topes: hasta dónde deja llegar ese plan. Los asientos se contratan aparte, uno a uno.'}
           </p>
         </div>
-      )}
-      <PlanCatalog
-        planes={catalogo.planes}
-        disponibles={catalogo.disponibles}
-        resumen={resumen}
-        precios={precios()}
-        accionDe={accionDe}
-      />
+        <PlanCatalog
+          planes={catalogo.planes}
+          disponibles={catalogo.disponibles}
+          resumen={resumen}
+          precios={precios()}
+          accionDe={accionDe}
+        />
+      </div>
     </div>
   );
 
@@ -242,7 +312,7 @@ export default async function BillingPage({
           </p>
         )}
 
-        <BillingTabs tuPlan={tuPlanSlot} planes={planesSlot} historial={historialSlot} />
+        <BillingTabs planes={planesSlot} historial={historialSlot} />
       </div>
     </AppHeader>
   );

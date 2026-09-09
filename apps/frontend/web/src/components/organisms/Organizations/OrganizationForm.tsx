@@ -34,10 +34,24 @@ export function OrganizationForm() {
 
   const nombreId = useId();
 
-  /* Al crearla se entra directamente en su portal. Dejar a alguien en el
-     formulario vacío tras crear algo obliga a preguntarse si funcionó. */
+  /**
+   * Al crearla se entra directamente en ella. Dejar a alguien en el formulario
+   * vacío tras crear algo obliga a preguntarse si funcionó.
+   *
+   * 🔴 **Iba a `/main/organizations/:id`, que no existe: 404.** El mismo fallo
+   * que tenían aceptar una invitación y «Roles y permisos» — esa pantalla nunca
+   * se escribió—. Y aquí era peor: la organización **sí** quedaba creada, así
+   * que el error decía justo lo contrario de lo que había pasado.
+   *
+   * Se sale a Equipo, que es lo primero que se hace con una organización recién
+   * creada: meter gente. Y se deja **activa** antes de navegar, porque si no,
+   * Equipo abriría sobre la anterior — la cookie es un filtro, no una llave
+   * (ver `OrgSwitcher`).
+   */
   useEffect(() => {
-    if (state.creada) router.push(`/main/organizations/${state.creada}`);
+    if (!state.creada) return;
+    document.cookie = `praxis_org=${state.creada}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+    router.push('/main/team');
   }, [state.creada, router]);
 
   return (

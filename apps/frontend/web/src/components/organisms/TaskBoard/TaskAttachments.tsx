@@ -1,7 +1,11 @@
 'use client';
 
-import { deleteAttachmentAction, uploadAttachmentAction } from '@/app/(privado)/projects/[id]/actions';
+import {
+  deleteAttachmentAction,
+  uploadAttachmentAction,
+} from '@/app/(privado)/projects/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/projects/action-state';
+import { validateAttachment } from '@/lib/projects/validation';
 import {
   ATTACHMENT_ALLOWED_MIME,
   ATTACHMENT_MAX_BYTES,
@@ -15,7 +19,7 @@ import {
   personLabel,
   useAccion,
 } from '@praxis/commons';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PdfViewer } from './PdfViewer';
 import { SECTION_PANEL } from './section-panel';
 
@@ -32,11 +36,21 @@ export interface TaskAttachmentsProps {
 /**
  * Archivos adjuntos de una tarea.
  *
- * ⚠️ **La descarga apunta al proxy de la zona, no al gateway.** El gateway está
- * en otro puerto y la sesión vive en una cookie httpOnly del origen de la
+ * ⚠️ **La descarga apunta al proxy de la aplicación, no al gateway.** El gateway
+ * está en otro puerto y la sesión vive en una cookie httpOnly del origen de la
  * aplicación: un enlace directo a `:3000` iría sin credenciales y devolvería
- * 401. `/projects/api/gateway/...` es el mismo origen, así que la cookie viaja
- * sola y el proxy pone la cabecera de autorización.
+ * 401. `/api/gateway/...` es el mismo origen, así que la cookie viaja sola y el
+ * proxy pone la cabecera de autorización.
+ *
+ * 🔴 **Era `/projects/api/gateway/...` y daba 404 desde la fusión de zonas.**
+ * Ese prefijo existía porque projects-front tenía `basePath: '/projects'` y Next
+ * se lo anteponía solo; fusionado (F6), el proxy es uno y vive en
+ * `/api/gateway`. La ruta vieja no da un error legible: `/projects/...` sigue
+ * casando con el segmento dinámico `[id]` del proyecto, así que el navegador
+ * recibe **la pantalla de un proyecto que no existe** —un 404 de Next, en HTML—
+ * donde esperaba un PDF. De ahí que el marco del visor saliera en blanco y la
+ * descarga guardara un archivo roto, sin un solo error en la consola.
+ * Es la misma trampa que `projectPath()`, anotada en CLAUDE.md.
  */
 export function TaskAttachments({
   projectId,
@@ -49,6 +63,16 @@ export function TaskAttachments({
 }: TaskAttachmentsProps) {
   const [state, formAction, uploading] = useAccion(uploadAttachmentAction, TASK_INITIAL_STATE);
   const formRef = useRef<HTMLFormElement>(null);
+  /**
+   * Lo que el navegador rechaza sin llegar a enviar.
+   *
+   * ⚠️ **Aquí no había validación de cliente, y es la regla del repositorio.**
+   * `validateAttachment` solo corría dentro de la Server Action, así que elegir
+   * un archivo de 40 MB significaba subirlo entero para que lo rechazaran al
+   * otro lado. Ahora el mensaje sale al elegirlo y señala el campo, que es el
+   * motivo por el que la regla existe.
+   */
+  const [rechazo, setRechazo] = useState<string | null>(null);
 
   /** Se limpia al confirmar el servidor, para poder subir otro seguido. */
   useEffect(() => {
@@ -102,11 +126,15 @@ export function TaskAttachments({
                `accept` se puede saltar eligiendo «todos los archivos». */
             accept={ATTACHMENT_ALLOWED_MIME.join(',')}
             aria-label="Archivo que adjuntar"
+            onChange={(evento) => {
+              const elegido = evento.target.files?.[0];
+              setRechazo(elegido ? validateAttachment(elegido.type, elegido.size) : null);
+            }}
             className="flex-1 cursor-pointer font-sans text-xs text-white file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:font-sans file:text-xs file:font-semibold file:text-white"
           />
           <button
             type="submit"
-            disabled={uploading}
+            disabled={uploading || rechazo !== null}
             className="shrink-0 cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             style={{ background: alpha(colors.primary, 20) }}
           >
@@ -115,9 +143,11 @@ export function TaskAttachments({
         </form>
       )}
 
-      {state.error && (
+      {/* El del navegador manda sobre el del servidor: si el archivo ni siquiera
+          se puede enviar, lo que diga el intento anterior ya no viene al caso. */}
+      {(rechazo ?? state.error) && (
         <p role="alert" className="font-sans text-xs" style={{ color: colors.error }}>
-          {state.error}
+          {rechazo ?? state.error}
         </p>
       )}
     </section>
@@ -140,7 +170,7 @@ function AttachmentRow({
   const [state, deleteAction, deleting] = useAccion(deleteAttachmentAction, TASK_INITIAL_STATE);
 
   /** Mismo origen que la aplicación: la cookie de sesión viaja sola. */
-  const href = `/projects/api/gateway/tasks/${taskId}/attachments/${file.id}/content`;
+  const href = `/api/gateway/tasks/${taskId}/attachments/${file.id}/content`;
   const preview = isPreviewableImage(file.mimeType);
   /* Solo PDF desde que la subida se cerró a ese tipo. Sigue comprobándose por
      archivo porque los adjuntos de antes conservan el suyo. */

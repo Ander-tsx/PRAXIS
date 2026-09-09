@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   type ReactNode,
@@ -21,21 +21,21 @@ import type {
   ProjectChatSummary,
   UserProfile,
 } from '../../api/domain';
-import type { Paginated } from '../../api/envelope';
 import { personLabel } from '../../api/domain';
+import type { Paginated } from '../../api/envelope';
 import { avatarHref } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
 import { ProjectMonogram } from '../../atoms/ProjectMonogram';
-import { LivePresences, LiveSource, useLiveEvent, useReconnection } from '../../realtime';
-import { usePresence } from '../../realtime/presence';
-import { useMessageCount } from '../../realtime/useMessageCount';
-import { avisarDeAvisosLeidos, useNoticeCount } from '../../realtime/useNoticeCount';
 import {
   ABRIR_BANDEJA_EVENT,
   type AvisoLegible,
   describirAviso,
   destinoDeAviso,
 } from '../../notifications/avisos';
+import { LivePresences, LiveSource, useLiveEvent, useReconnection } from '../../realtime';
+import { usePresence } from '../../realtime/presence';
+import { useMessageCount } from '../../realtime/useMessageCount';
+import { avisarDeAvisosLeidos, useNoticeCount } from '../../realtime/useNoticeCount';
 import { alpha, colors } from '../../tokens';
 import { KylooWordmark } from '../KylooWordmark';
 import { DirectorioDeChatsProvider, useDirectorioDeChats } from './DirectorioDeChats';
@@ -852,7 +852,27 @@ function ByKyloo() {
   return (
     <span className="flex items-baseline gap-1.5 text-white">
       <span className="font-mono text-xs uppercase tracking-[0.18em]">By</span>
-      <KylooWordmark className="h-3.5 w-auto translate-y-[3.5px]" />
+      {/**
+       * El lettermark **lleva a kyloo.com.mx**, y solo él: «By» se queda fuera
+       * del enlace porque es la preposición de la frase, no parte de la marca.
+       *
+       * ⚠️ `noopener` no es opcional: sin él la página que se abre recibe un
+       * `window.opener` con el que puede redirigir la nuestra. Es la misma regla
+       * que `CheckoutButton` al abrir el portal de Stripe.
+       *
+       * Es un `<a>` y no un `Link` de Next a propósito: sale de la aplicación,
+       * así que no hay nada que prefetchear ni ninguna ruta que resolver.
+       */}
+      <a
+        href="https://kyloo.com.mx"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Kyloo — abre kyloo.com.mx en una pestaña nueva"
+        title="kyloo.com.mx"
+        className="inline-flex rounded-sm opacity-100 transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <KylooWordmark className="h-3.5 w-auto translate-y-[3.5px]" />
+      </a>
     </span>
   );
 }
@@ -2108,23 +2128,23 @@ function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: bo
                 }`}
               >
                 {!plegada && (
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10">
-                    {actor?.avatarUrl ? (
-                      <img
-                        src={avatarHref(actor.avatarUrl, `${zonePath}/api/gateway`) ?? undefined}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <span className="font-sans text-[11px] font-bold text-white">
-                        {/* `personLabel` y no `actor.name`: aquel no existe en
-                            `UserProfile` —el nombre son `firstName`/`lastName`—
-                            y esto se escribió sobre un `any`, así que compilaba
-                            y pintaba «S» para todo el mundo. */}
-                        {(actor ? personLabel(actor) : 'S').charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </span>
+                  /**
+                   * El mismo `Avatar` que el tablero y la ficha de la barra, no
+                   * un círculo dibujado aquí.
+                   *
+                   * ⚠️ **Sin foto pintaba UNA sola letra**, mientras que el
+                   * resto del producto pinta dos: la misma persona salía como
+                   * «A» en la bandeja y «AT» en su tarea, que es aprenderse dos
+                   * veces lo mismo. `Avatar` ya trae la regla de iniciales, el
+                   * repliegue cuando la foto no carga y el tono de «eres tú»;
+                   * copiarla aquí era garantizar que divergieran.
+                   */
+                  <Avatar
+                    size="base"
+                    label={actor ? personLabel(actor) : 'Sistema'}
+                    src={avatarHref(actor?.avatarUrl, `${zonePath}/api/gateway`)}
+                    className="shrink-0"
+                  />
                 )}
                 <div className={`flex min-w-0 flex-1 flex-col ${plegada ? 'hidden' : ''}`}>
                   {/* Sin leer pesa más y va en blanco; leído baja a secundario.
