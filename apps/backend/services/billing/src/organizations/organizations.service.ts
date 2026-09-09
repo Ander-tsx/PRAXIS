@@ -417,7 +417,7 @@ export class OrganizationsService {
       iconKey: string | null;
       color: string | null;
       createdAt: Date;
-      subscription: { tier: string; seats: number } | null;
+      subscription: { tier: string; status: string; seats: number } | null;
       _count?: { members: number };
     },
     membresia: { role: { name: string; permissions: unknown } },
@@ -440,6 +440,13 @@ export class OrganizationsService {
         ? permisosDeDueno()
         : normalizarPermisosOrg(membresia.role.permissions),
       seats: organizacion.subscription?.seats ?? 1,
+      /* ⚠️ **Y el tope de verdad al lado, que no siempre es ese número.** Es lo
+         que aplica la puerta de invitar desde A1 (`asientos.ts`): el menor entre
+         lo contratado y lo que admite el plan. Enseñar solo lo contratado
+         después de cancelar deja la pantalla diciendo «3 de 15» mientras el
+         cuarto invitado recibe un error — que es la pareja de siempre, la tabla
+         prometiendo lo que el guard niega. */
+      seatsCap: topeDeAsientos(organizacion.subscription).tope,
       /* `_count.members` cuenta invitadas **y** activas, que es justo lo que
          significa un asiento gastado. Ver la nota de `OrganizationMember`. */
       seatsUsed: organizacion._count?.members ?? 0,

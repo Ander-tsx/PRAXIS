@@ -324,6 +324,18 @@ export interface OrganizationView {
   myPermissions: OrganizationPermissions;
   /** Asientos pagados. `1` en la personal. */
   seats: number;
+  /**
+   * Cuánta gente cabe **de verdad**. `null` = sin tope (solo Empresa).
+   *
+   * ⚠️ **No es `seats`, y la diferencia solo aparece cuando duele.** `seats` es
+   * lo que se contrató en Stripe; esto es el menor entre eso y lo que admite el
+   * plan, que es lo que aplica la puerta de invitar (A1 de
+   * `docs/PLAN-ASIENTOS-CONGELADOS.md`). Coinciden siempre salvo después de
+   * bajar de plan o cancelar: ahí `seats` conserva el número de la última
+   * suscripción y enseñarlo a solas deja la pantalla diciendo «3 de 15» mientras
+   * el cuarto invitado recibe un error.
+   */
+  seatsCap: number | null;
   /** Asientos gastados: miembros activos **más invitaciones vivas**. */
   seatsUsed: number;
   /**

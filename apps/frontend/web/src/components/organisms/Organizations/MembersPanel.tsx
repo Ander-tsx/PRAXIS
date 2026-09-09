@@ -6,14 +6,16 @@ import {
   quitarMiembroAction,
 } from '@/app/(privado)/main/team/actions';
 import { INVITAR_MIEMBRO_INITIAL_STATE, ORGANIZACION_INITIAL_STATE } from '@/lib/main/action-state';
-import { FloatingLabelInput, useAccion, Avatar } from '@praxis/commons';
+import { Avatar, FloatingLabelInput, useAccion } from '@praxis/commons';
 
 import type {
   OrganizationMemberView,
   OrganizationPermissions,
   OrganizationRoleView,
+  Tope,
 } from '@praxis/commons/billing/planes';
-import { useId, useState, useRef, useEffect } from 'react';
+import { cabe } from '@praxis/commons/billing/planes';
+import { useEffect, useId, useRef, useState } from 'react';
 
 export function MembersPanel({
   organizationId,
@@ -26,14 +28,22 @@ export function MembersPanel({
   miembros: OrganizationMemberView[];
   permisos: OrganizationPermissions;
   roles: OrganizationRoleView[];
-  asientos: { contratados: number; ocupados: number };
+  /**
+   * ⚠️ **El tope es el que aplica el servidor, no lo contratado.** Son dos
+   * números y coinciden salvo después de bajar de plan; el de abajo es el menor
+   * de los dos (`OrganizationView.seatsCap`). Con lo contratado a secas, el
+   * formulario de invitar sigue abierto y el error llega del servidor.
+   */
+  asientos: { tope: Tope; ocupados: number };
 }) {
   const puedeGestionar = permisos.canManageMembers;
-  const quedan = asientos.contratados - asientos.ocupados;
+  /* Con `cabe()` y nunca con un `<`: sin tope, `ocupados < null` es `false` y
+     el plan Empresa sería el único que no deja invitar. Ver `Tope`. */
+  const quedaSitio = cabe(asientos.ocupados, asientos.tope);
 
   return (
     <div className="flex flex-col gap-6">
-      {puedeGestionar && <Invitar organizationId={organizationId} sinAsientos={quedan <= 0} />}
+      {puedeGestionar && <Invitar organizationId={organizationId} sinAsientos={!quedaSitio} />}
 
       <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#191919]">
         <table className="w-full text-left font-sans text-sm text-white">

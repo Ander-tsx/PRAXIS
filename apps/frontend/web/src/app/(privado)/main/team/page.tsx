@@ -61,8 +61,14 @@ export default async function TeamPage({
           </h1>
           <p className="max-w-2xl font-sans text-sm text-white/70">
             Administra los miembros, sus roles y los niveles de acceso para{' '}
-            <strong className="text-white font-medium">{org.name}</strong>. Actualmente tienes{' '}
-            {org.seatsUsed} de {org.seats} asientos ocupados.
+            <strong className="text-white font-medium">{org.name}</strong>.{' '}
+            {/* ⚠️ El tope es `seatsCap` —lo que aplica el servidor— y no `seats`,
+                que es lo contratado en Stripe. Después de bajar de plan o de
+                cancelar no son el mismo número, y el que se enseña tiene que ser
+                el que va a negar la invitación. */}
+            {org.seatsCap === null
+              ? `Ahora mismo hay ${org.seatsUsed} asientos ocupados, y tu plan no tiene tope.`
+              : `Ahora mismo hay ${org.seatsUsed} de ${org.seatsCap} asientos ocupados.`}
           </p>
         </header>
 
@@ -80,7 +86,7 @@ export default async function TeamPage({
                     miembros={miembros}
                     permisos={permisos}
                     roles={roles}
-                    asientos={{ contratados: org.seats, ocupados: org.seatsUsed }}
+                    asientos={{ tope: org.seatsCap, ocupados: org.seatsUsed }}
                   />
                 ) : (
                   <Vacio>No se pudo leer la lista de miembros.</Vacio>
