@@ -251,8 +251,15 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
       promete un tope que el servidor no aplica, el plan de pago vale menos de lo
       que dice y el gratuito da más — y nadie se queja hasta el día que se
       aplica. Si añades un número a `PlanQuotas`, **el commit que lo añade es el
-      que tiene que invocarlo**. Ya pasó dos veces: con `organizacionesPropias` y
-      con estas tres.
+      que tiene que invocarlo**. Ya pasó **tres** veces: con
+      `organizacionesPropias`, con estas tres, y con **`asientos`** —que solo
+      salía en el informe de `GET /me/billing/resumen`, describiendo el exceso
+      sin impedirlo, mientras la única puerta miraba `Subscription.seats`—. La
+      tercera la tapó A1 de `docs/PLAN-ASIENTOS-CONGELADOS.md` el 2026-09-09: el
+      tope de asientos es **`min(Subscription.seats, quotas.asientos)`**, en
+      `services/billing/src/organizations/asientos.ts`, y sin suscripción vigente
+      es el del plan gratuito — el `seats` de una cancelada es el recuerdo de lo
+      que se pagaba, no lo que se contrata.
     - **Las automatizaciones se cuentan al ACTIVAR, no al crear**, porque la
       cuota es de reglas en marcha. Son **dos puertas** —crear con `ENABLED` y
       reactivar una pausada— y la segunda es la que se olvida.
