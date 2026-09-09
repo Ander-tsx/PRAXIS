@@ -12,6 +12,7 @@ import {
   PlanTier,
   ProjectPermission,
   SubscriptionStatus,
+  cabe,
   cabenEn,
   estaVigente,
   normalizarPermisosOrg,
@@ -22,6 +23,7 @@ import {
 } from '@praxis/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { mensajeSinAsientos, topeDeAsientos } from './asientos';
 
 /**
  * El error que este servicio devuelve cuando algo no se puede hacer.
@@ -695,16 +697,13 @@ export class OrganizationsService {
       } as Fallo;
     }
 
-    const asientos = organizacion.subscription?.seats ?? 1;
-    if (ocupados >= asientos) {
-      /* ⚠️ Se cuenta antes de escribir y con las invitaciones dentro. Si una
-         invitación no ocupara asiento se podrían mandar mil sobre tres, y el
-         tope se rompería en el momento de aceptarlas — con la organización ya
-         por encima de lo que paga y nada que hacer salvo echar a alguien. */
-      return {
-        error: `No quedan asientos: ${ocupados} de ${asientos} ocupados, contando las invitaciones pendientes.`,
-        codigo: 'SIN_ASIENTOS',
-      } as Fallo;
+    /* ⚠️ Se cuenta antes de escribir y con las invitaciones dentro. Si una
+       invitación no ocupara asiento se podrían mandar mil sobre tres, y el tope
+       se rompería en el momento de aceptarlas — con la organización ya por
+       encima de lo que paga y nada que hacer salvo echar a alguien. */
+    const asientos = topeDeAsientos(organizacion.subscription);
+    if (!cabe(ocupados, asientos.tope)) {
+      return { error: mensajeSinAsientos(ocupados, asientos), codigo: 'SIN_ASIENTOS' } as Fallo;
     }
 
     /* El papel que se pide, o el que la organización tenga por defecto. Y si se
@@ -1468,12 +1467,9 @@ export class OrganizationsService {
       return { ok: true };
     }
 
-    const asientos = organizacion.subscription?.seats ?? 1;
-    if (ocupados >= asientos) {
-      return {
-        error: `No quedan asientos: ${ocupados} de ${asientos} ocupados, contando las invitaciones pendientes.`,
-        codigo: 'SIN_ASIENTOS',
-      } as Fallo;
+    const asientos = topeDeAsientos(organizacion.subscription);
+    if (!cabe(ocupados, asientos.tope)) {
+      return { error: mensajeSinAsientos(ocupados, asientos), codigo: 'SIN_ASIENTOS' } as Fallo;
     }
 
     await this.prisma.organizationMember.create({
