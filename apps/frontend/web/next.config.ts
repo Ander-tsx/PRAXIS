@@ -7,6 +7,44 @@ const nextConfig: NextConfig = {
    */
   transpilePackages: ['@praxis/commons'],
 
+  experimental: {
+    serverActions: {
+      /**
+       * 🔴 **El tope de Next son 1 MB, y por aquí suben archivos de 25.**
+       *
+       * Los adjuntos no van por un route handler: viajan **dentro del cuerpo de
+       * una Server Action** (`uploadAttachmentAction` en tareas,
+       * `uploadDirectAttachmentAction` en el chat), así que los limita esta
+       * cifra y no la del gateway.
+       *
+       * Sin ponerla, Next corta en `1024 * 1024` —el valor está a pelo en
+       * `next/dist/server/app-render/action-handler.js`— y responde **413 `Body
+       * exceeded 1 MB limit.`**. Y ese 413 es especialmente malo:
+       *
+       * 1. Es **incoherente con lo que la propia interfaz promete**. El cliente
+       *    valida contra `ATTACHMENT_MAX_BYTES` (10 MB) y
+       *    `CHAT_ATTACHMENT_MAX_BYTES` (25 MB), y el backend acepta esos mismos
+       *    números. O sea: la aplicación decía que sí a un PDF de 4 MB y lo
+       *    rechazaba una capa más abajo.
+       * 2. Ocurre **antes** de que corra el cuerpo de la acción, así que el
+       *    `try/catch` que esa acción sí tiene no llega a verlo: la promesa se
+       *    rechaza y la pantalla se iba al `error.tsx`. La red de seguridad para
+       *    eso está en `commons/hooks/useAccion`; esto es la causa.
+       * 3. **No se notaba con archivos pequeños**, que son los que uno prueba.
+       *    Se leía como un fallo intermitente de red.
+       *
+       * 30 MB, no 25: el multipart y el sobre RSC ocupan además del archivo, y
+       * quedarse justo en el tope haría fallar precisamente el archivo que la
+       * validación acaba de dar por bueno.
+       *
+       * ⚠️ **Si sube `CHAT_ATTACHMENT_MAX_BYTES`, esto sube con él.** Son la
+       * misma decisión escrita en dos sitios, y el que se quede corto no da un
+       * error que hable de él.
+       */
+      bodySizeLimit: '30mb',
+    },
+  },
+
   /*
    * 🕳️ Aquí vivían los `rewrites()` del multi-zone: catorce entradas que
    * mandaban `/auth`, `/main`, `/projects`, `/reports`, `/admin`, `/chat` y
