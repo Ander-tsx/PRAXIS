@@ -7,6 +7,7 @@ export * from './GlyphPicker';
 export * from './PraxAvatar';
 export * from './ProjectMonogram';
 export * from './Select';
+export * from './Skeleton';
 export * from './Sparkle';
 export * from './StatItem';
 export * from './Textarea';

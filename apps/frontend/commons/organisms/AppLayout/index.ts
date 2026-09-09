@@ -11,6 +11,10 @@ export { AppShell, useAppShell } from './AppShell';
 export type { AppShellProps, AppShellUser } from './AppShell';
 export { AppHeader } from './AppHeader';
 export type { AppHeaderProps } from './AppHeader';
+/* El armazón del `loading.tsx`, pegado a `AppHeader` porque su caja tiene que
+   ser la misma. Ver la nota de `PageSkeleton`. */
+export { PageSkeleton } from './PageSkeleton';
+export type { PageSkeletonProps } from './PageSkeleton';
 export { NavList } from './NavList';
 export * from './navigation';
 export { PresenceFooter } from './PresenceFooter';

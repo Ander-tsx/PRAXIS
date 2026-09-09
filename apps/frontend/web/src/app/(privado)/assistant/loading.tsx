@@ -1,40 +1,42 @@
+import { PageSkeleton, Skeleton, SkeletonCircle } from '@praxis/commons';
+
 /**
- * Esqueleto del contenido, **sin la barra lateral**: vive en el layout y Next la
- * conserva entre navegaciones (ESTADO-ACTUAL §23).
+ * Esqueleto de PRAX: su ficha, el selector de proyecto y la conversación.
  *
- * La forma imita la de la pantalla: la ficha de PRAX arriba, el selector de
- * proyecto y el cuerpo de la conversación. Un esqueleto que no se parece a lo
- * que va a salir hace que la página «salte» al cargar, que es peor que no tener
- * esqueleto.
+ * Las burbujas alternan lado igual que en el chat, y por lo mismo: es la
+ * silueta lo que hace reconocible una conversación antes de que haya texto.
  */
-
-function Block({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-[#202020] ${className}`} />;
-}
-
 export default function AssistantLoading() {
   return (
-    <>
-      <header className="flex h-16 shrink-0 items-center border-b border-white/10 bg-[#191919] px-4 sm:px-6">
-        <Block className="h-6 w-32" />
-      </header>
-
-      <main className="relative flex-1 overflow-y-auto bg-[#0c0c0b]" aria-busy="true">
-        <span className="sr-only">Cargando</span>
-
-        <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 p-4 sm:p-6">
-          <div className="flex items-center gap-4">
-            <Block className="h-20 w-20 rounded-2xl" />
-            <div className="flex flex-1 flex-col gap-2">
-              <Block className="h-8 w-48" />
-              <Block className="h-4 w-72 opacity-70" />
-            </div>
+    <PageSkeleton title="Asistente" lleno>
+      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col gap-6">
+        <div className="flex shrink-0 items-center gap-4">
+          <Skeleton className="h-16 w-16 shrink-0 rounded-2xl" fuerte />
+          <div className="flex flex-1 flex-col gap-2">
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-4 w-72" />
           </div>
-
-          <Block className="h-12" />
-          <Block className="h-72" />
         </div>
-      </main>
-    </>
+
+        {/* El selector de proyecto: se puede hablar con PRAX sin ninguno. */}
+        <Skeleton className="h-11 w-full shrink-0 max-w-xs rounded-lg" />
+
+        <div className="flex min-h-0 flex-1 flex-col justify-end gap-3">
+          <div className="flex items-end gap-2">
+            <SkeletonCircle className="h-8 w-8 shrink-0" fuerte />
+            <Skeleton className="h-16 w-3/5 rounded-2xl" />
+          </div>
+          <div className="flex flex-row-reverse items-end gap-2">
+            <Skeleton className="h-11 w-2/5 rounded-2xl" fuerte />
+          </div>
+          <div className="flex items-end gap-2">
+            <SkeletonCircle className="h-8 w-8 shrink-0" fuerte />
+            <Skeleton className="h-24 w-4/5 rounded-2xl" />
+          </div>
+        </div>
+
+        <Skeleton className="h-14 w-full shrink-0 rounded-xl" />
+      </div>
+    </PageSkeleton>
   );
 }

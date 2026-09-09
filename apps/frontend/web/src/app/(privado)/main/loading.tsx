@@ -1,46 +1,37 @@
+import { PageSkeleton, Skeleton } from '@praxis/commons';
+
 /**
- * Esqueleto del contenido, **sin la barra lateral**.
+ * El repliegue de `/main/*`, para lo que no trae esqueleto propio.
  *
- * Antes reproducía el armazón entero, porque el armazón vivía dentro de cada
- * page: al navegar se desmontaba y había que dibujarlo de nuevo. Ahora vive en
- * el layout y Next lo conserva, así que este fallback solo cubre lo que de
- * verdad está cargando. Dibujar aquí unos enlaces y un nombre de mentira, sobre
- * los de verdad que ya están en pantalla, era puro parpadeo.
+ * ⚠️ **A propósito es el más neutro de todos, y no es pereza.** Cubre a
+ * cualquier pantalla futura bajo `/main` que nadie se haya acordado de dotar
+ * del suyo, y ahí acertar la forma es imposible: un esqueleto que promete una
+ * rejilla de tarjetas delante de un formulario es peor que uno que solo dice
+ * «viene una cabecera y viene contenido».
+ *
+ * Las que sí tienen forma conocida traen la suya y pisan a este: `billing`,
+ * `team`, `profile` y `organizations/new`. Cuando se añada una pantalla nueva
+ * bajo `/main`, lo correcto es darle su `loading.tsx` — no ensanchar este.
+ *
+ * ⚠️ `/main` en sí **no tiene página**: la redirección a `/projects` la resuelve
+ * el guard (`REDIRECCIONES_EXACTAS` en `proxy.ts`), así que este archivo nunca
+ * se pinta para la ruta desnuda.
  */
-
-function Block({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-[#202020] ${className}`} />;
-}
-
-export default function DashboardLoading() {
+export default function MainLoading() {
   return (
-    <>
-      <header className="flex h-16 shrink-0 items-center border-b border-white/10 bg-[#191919] px-4 sm:px-6">
-        <Block className="h-6 w-32" />
-      </header>
+    <PageSkeleton title="Cuenta">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-16">
+        <header className="flex flex-col gap-3 border-b border-white/[0.08] pb-6">
+          <Skeleton className="h-8 w-56" />
+          <Skeleton className="h-4 w-full max-w-lg" />
+        </header>
 
-      <main className="relative flex-1 overflow-y-auto bg-[#0c0c0b]" aria-busy="true">
-        <span className="sr-only">Cargando</span>
-
-        <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-8 p-4 sm:p-6">
-          <div className="flex flex-col gap-3">
-            <Block className="h-9 w-72" />
-            <Block className="h-5 w-52 opacity-60" />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <Block className="h-32" />
-            <Block className="h-32 opacity-80" />
-            <Block className="h-32 opacity-60" />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Block className="h-40" />
-            <Block className="h-40 opacity-80" />
-            <Block className="h-40 opacity-60" />
-          </div>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
         </div>
-      </main>
-    </>
+      </div>
+    </PageSkeleton>
   );
 }
