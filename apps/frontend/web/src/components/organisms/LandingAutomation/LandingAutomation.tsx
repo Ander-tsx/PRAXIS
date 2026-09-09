@@ -1,5 +1,6 @@
 'use client';
 
+import { SectionEyebrow } from '@/components/molecules/SectionEyebrow';
 /**
  * Automatización — un flujo, no una tarjeta con una maqueta de formulario
  * dentro. "Cuando → Si → Entonces" se lee de izquierda a derecha como lo que
@@ -74,9 +75,7 @@ export function LandingAutomation() {
     >
       <div className="mx-auto max-w-5xl">
         <div className="mb-16 flex flex-col gap-5 md:mb-24 md:max-w-2xl">
-          <Reveal innerClassName="font-mono text-xs font-medium uppercase tracking-widest">
-            <span style={{ color: 'var(--l-fg-muted)' }}>Automatización</span>
-          </Reveal>
+          <SectionEyebrow>Automatización</SectionEyebrow>
           <Reveal delay={0.05} innerClassName="text-4xl md:text-6xl" duration={0.9}>
             <span style={{ fontFamily: 'var(--font-fraunces)', fontWeight: 500 }}>
               Reglas que reaccionan solas.

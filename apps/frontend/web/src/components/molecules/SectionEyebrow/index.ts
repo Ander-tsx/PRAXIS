@@ -1,0 +1,1 @@
+export { SectionEyebrow } from './SectionEyebrow';

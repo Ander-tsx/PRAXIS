@@ -1,5 +1,6 @@
 'use client';
 
+import { SectionEyebrow } from '@/components/molecules/SectionEyebrow';
 /**
  * Cómo funciona — cada rol con sus pasos y una frase grande al lado, no una
  * maqueta de panel. La versión anterior mostraba una tarjeta con datos de
@@ -125,9 +126,7 @@ export function LandingHowItWorks() {
     >
       <div className="relative z-10 mx-auto max-w-5xl">
         <div className="mb-16 flex flex-col gap-5 md:mb-4 md:max-w-2xl">
-          <Reveal innerClassName="font-mono text-xs font-medium uppercase tracking-widest">
-            <span style={{ color: 'var(--l-fg-muted)' }}>Cómo funciona</span>
-          </Reveal>
+          <SectionEyebrow>Cómo funciona</SectionEyebrow>
           <Reveal delay={0.05} innerClassName="text-4xl italic md:text-6xl" duration={0.9}>
             <span style={{ fontFamily: 'var(--font-fraunces)', fontWeight: 500 }}>
               Cómo usan Praxis los equipos.

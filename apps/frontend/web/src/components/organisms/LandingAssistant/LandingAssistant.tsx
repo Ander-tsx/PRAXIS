@@ -1,5 +1,6 @@
 'use client';
 
+import { SectionEyebrow } from '@/components/molecules/SectionEyebrow';
 /**
  * Asistente — la conversación como guion, no como maqueta de chat. Sin
  * burbujas, sin tarjeta: una etiqueta de quién habla y el texto, igual que se
@@ -58,9 +59,7 @@ export function LandingAssistant() {
     >
       <div className="mx-auto max-w-5xl">
         <div className="mb-16 flex flex-col gap-5 md:mb-24 md:max-w-2xl">
-          <Reveal innerClassName="font-mono text-xs font-medium uppercase tracking-widest">
-            <span style={{ color: 'var(--l-fg-muted)' }}>Asistente</span>
-          </Reveal>
+          <SectionEyebrow>Asistente</SectionEyebrow>
           <Reveal delay={0.05} innerClassName="text-4xl md:text-6xl" duration={0.9}>
             <span style={{ fontFamily: 'var(--font-fraunces)', fontWeight: 500 }}>
               PRAX propone, tú decides.
