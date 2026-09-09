@@ -1,6 +1,6 @@
 # Plan de asientos congelados — bajar de plan no puede echar a nadie
 
-> Etapa **abierta y sin empezar**. Nace de una pregunta del dueño del producto el
+> Etapa **abierta**, con **A1 entregada** el 2026-09-09. Nace de una pregunta del dueño del producto el
 > 2026-09-09: *«tengo 5 personas y el mes gratis del plan Equipo; ¿qué pasa
 > cuando se acabe? ¿se expulsa gente? ¿pierdo proyectos?»*.
 >
@@ -47,7 +47,11 @@ cuota de PRAX (100 → 13 por persona y mes), el almacenamiento (10 GB → 200 M
 las automatizaciones activas (25 → 3 por proyecto) y el historial de análisis
 (365 → 90 días).
 
-### 🔴 Lo malo: el tope de asientos del plan gratuito no lo aplica nadie
+### 🔴 Lo malo: el tope de asientos del plan gratuito no lo aplicaba nadie
+
+> ✅ **Arreglado el 2026-09-09** (A1, `48fe695` + `831effe`). Lo de abajo es el
+> diagnóstico tal y como se escribió, que es lo que explica por qué existe
+> `asientos.ts`. Lo que hay hoy está al final, en el registro.
 
 La única puerta de asientos está en billing-service, y mira
 `Subscription.seats` —lo **contratado en Stripe**— no la cuota del plan:
@@ -178,7 +182,7 @@ de cinco no suele ser quien se quedó fuera. Es la misma asimetría que ya resue
 
 | # | Paso | Dónde |
 |---|---|---|
-| A1 | Tapar el agujero: aplicar `min(seats, quotas.asientos)` al invitar | billing-service |
+| ✅ A1 | Tapar el agujero: aplicar `min(seats, quotas.asientos)` al invitar | billing-service |
 | A2 | `orderMiembrosPorAntiguedad` + cálculo del corte, con el dueño fuera | billing-service |
 | A3 | `billing_frozen_members` por TCP, y `SEAT_FROZEN` en `fallos.ts` | billing-service + gateway |
 | A4 | `QuotaService.exigirAsientoVivo` y su uso en los guards de escritura | gateway |
@@ -207,12 +211,56 @@ demás. Si esta etapa se aplaza, A1 no debería aplazarse con ella.
    cookie.
 4. **¿Y sus tareas asignadas?** Siguen asignadas a quien no puede tocarlas.
    ¿Se avisa en el tablero, se deja como está, o se ofrece reasignar?
-5. **¿Qué se hace con las organizaciones que hoy ya están por encima?** Al
-   entregar A1 pasarían a tener gente congelada de un día para otro, sin haber
-   hecho nada. Hace falta decidir si hay periodo de gracia y cuánto.
+5. ~~**¿Qué se hace con las organizaciones que hoy ya están por encima?**~~
+   **Contestada al entregar A1, y la premisa era falsa.** A1 no congela a nadie:
+   solo cierra la puerta de *entrar*. Una organización que hoy tenga cinco dentro
+   y baje a tres se queda con los cinco escribiendo con normalidad y sin poder
+   meter a un sexto — que es exactamente lo que ya hace el tope de proyectos al
+   bajar de plan (trampa 24 de CLAUDE.md). No hace falta periodo de gracia para
+   A1. La pregunta **sigue viva para A4**, que es la que sí deja a alguien en
+   solo lectura, y ahí el periodo de gracia hay que decidirlo.
 
 ---
 
 ## Registro
 
-*(vacío — la etapa no ha empezado)*
+| Fecha | Paso | Qué se hizo |
+|---|---|---|
+| 2026-09-09 | **A1** | El agujero, tapado. Tres commits en `main` |
+
+### A1 — `b88147d`, `48fe695`, `831effe`
+
+**El tope pasa a ser `min(contratado, lo que admite el plan)`**, en las dos
+puertas que reparten asiento: `invitar` (por correo) y `darAsiento` (al meter a
+alguien en un proyecto). Antes las dos leían `organizacion.subscription?.seats ??
+1` y ninguna miraba `quotas.asientos`.
+
+Cuatro cosas que salieron al escribirlo:
+
+1. **Un `Math.min` no vale.** `Math.min(5, null)` es **0**, porque `null` se
+   convierte en cero: Empresa —el único plan sin tope de asientos— pasaría a ser
+   el único donde no cabe nadie, y sin dar ningún error. Es el mismo fallo que
+   `cabe()` evita un operador más allá, así que la salida es la misma: `menorTope`
+   en el catálogo y ninguna comparación suelta.
+2. **Sin suscripción vigente el tope es el del plan gratuito, no el `seats` de la
+   fila.** Ese número es el recuerdo de lo que se pagó —el webhook lo conserva al
+   cancelar— y leerlo *es* el agujero. Con eso, la organización que pagaba quince
+   pasa a tres al cancelar, que es lo que promete el gratuito.
+3. **El «no quedan asientos» tenía un solo mensaje para dos salidas distintas.**
+   Si el corte lo ponen los asientos comprados, se compran más; si lo pone el
+   plan, comprar más no sirve de nada. `mensajeSinAsientos` los separa — la misma
+   lección de `PROJECT_SUSPENDED` frente a un `FORBIDDEN` corriente (D4 la pedía
+   para el congelado, y resulta que hacía falta un paso antes).
+4. **La pantalla enseñaba el otro número.** `OrganizationView` solo llevaba
+   `seats`, así que Equipo decía «3 de 15 asientos ocupados» con el guard cortando
+   en 3. Se añade `seatsCap` **al lado** de `seats`, no en su lugar: la pantalla de
+   facturación necesita justamente enseñar los dos juntos (`a80b965`).
+
+La lógica vive en `services/billing/src/organizations/asientos.ts`, fuera del
+servicio, para poder probarla sin Prisma: ocho casos, y el primero es el agujero.
+
+Verde: `pnpm test` (16 tareas), `next build` de `web` y `tsc --noEmit` de
+billing, gateway y web.
+
+**Lo que A1 NO hace: congelar.** Quien ya está dentro sigue dentro y sigue
+escribiendo. Eso es A2–A7 y sigue esperando a las cuatro preguntas que quedan.
