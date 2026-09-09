@@ -867,6 +867,42 @@ periodo anterior, la línea de objetivo, el acumulado, el sparkline dentro de la
 cifras del resumen y la dispersión suelta en el constructor—. Ninguna está
 empezada, ninguna bloquea nada y todas siguen siendo catálogo, no cimientos.
 
+### Reverificación del 2026-09-09 — la sexta, y el trabajo se fue a otro sitio
+
+El prompt de traspaso volvió a pedir sus dos bloques: R9 en `main` y
+`ENCARGO-ENTERPRISE.md` en `feature/enterprise`. **Los dos siguen fusionados en
+`main`** y no se re-ejecutaron. Comprobado en un minuto, y estos son los tres
+comandos por si vuelve a aparecer:
+
+```
+git merge-base --is-ancestor 99b2f6d main      # → sí (Enterprise, PR #33)
+grep -rl report_column_time apps/backend       # → 7 ficheros, R9.2 vivo
+ls apps/backend/services/billing/src           # → organizations/ subscriptions/
+```
+
+🔴 **Y `reports-front` ya no existe**: se borró entera en F1 de la fusión de
+zonas (`8e2475c`) y `/reports` responde 404. Lo que R9 dejó en el backend sigue
+intacto —`report_dynamics`, `report_column_time` y `report_matrix`, con sus rutas
+en el gateway— y es lo que PRAX usa para contestar. Lo que desapareció es la
+pantalla, por decisión de aquella etapa.
+
+**Lo que sí se hizo en esa sesión** fue A1 de
+[PLAN-ASIENTOS-CONGELADOS](../PLAN-ASIENTOS-CONGELADOS.md), que era el único
+trabajo abierto que no pedía navegador ni stack levantado: el tope de asientos
+del plan gratuito no lo aplicaba ningún guard, así que cancelar dejaba invitando
+con los asientos que se pagaban antes. Cuatro commits, registro entero en ese
+plan.
+
+⚠️ **Y queda esto dicho, que no es de aquí y no se tocó**: la rama
+`feature/fusion-zonas` tiene **18 commits que no están en `main`** —la accesibilidad
+de E1 al completo, los 57 avisos de Biome a 0, y el cierre de 29 de los 30
+hallazgos de `AUDITORIA-ORGANIZACION-CHAT-MOVIL.md`—. `main` ha seguido moviéndose
+por encima (la landing, los esqueletos, la barra lateral), así que fusionarlas va
+a tener conflictos y **es una decisión del dueño del producto**, no algo que se
+resuelva en frío. Mientras tanto, cualquiera que corra Biome sobre
+`apps/frontend` en `main` verá esos avisos otra vez: no han vuelto, es que nunca
+llegaron.
+
 ### El hueco, dicho en una línea
 
 **Se guarda mucho más de lo que se mide.** `TaskEvent` tiene ocho tipos y los
