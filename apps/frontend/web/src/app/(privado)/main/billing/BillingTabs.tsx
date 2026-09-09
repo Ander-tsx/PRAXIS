@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-type TabId = 'plan' | 'planes' | 'historial';
+type TabId = 'planes' | 'historial';
 
 interface Tab {
   id: TabId;
@@ -28,34 +28,30 @@ function Icono({ d }: { d: string }) {
  * Las pestañas de Facturación, con el mismo dibujo que las de Equipo
  * (`TeamTabs`): una fila con subrayado, la activa en blanco.
  *
- * ⚠️ **La pestaña «Tu plan» solo aparece cuando hay plan de pago.** En una
- * organización gratuita no hay nada que gestionar ahí —ni asientos contratados,
- * ni portal de Stripe, ni registro— así que se entra directamente a comparar.
+ * ## Ya no hay una pestaña «Tu plan» aparte
+ *
+ * Eran dos: «Tu plan» —el plan contratado y los asientos— y «Todos los planes»
+ * —la tabla comparativa—. La separación obligaba a saltar de una a otra para
+ * responder la única pregunta que se trae aquí: **qué tengo y qué me daría
+ * cambiar**. Peor: los asientos, que son lo que de verdad se administra, vivían
+ * en la pestaña que no se abre.
+ *
+ * Ahora es una sola, **«Planes»**, con lo tuyo arriba y la tabla debajo. Lo
+ * ordena la página (`planesSlot`), no este componente: aquí solo quedan las
+ * pestañas.
  */
 export function BillingTabs({
-  tuPlan,
   planes,
   historial,
 }: {
-  /** El bloque «Tu plan». `null` en organizaciones gratuitas. */
-  tuPlan: React.ReactNode | null;
   planes: React.ReactNode;
   /** El registro de facturación. `null` si no hay permiso o no hay plan. */
   historial: React.ReactNode | null;
 }) {
   const tabs: Tab[] = [];
-  if (tuPlan) {
-    tabs.push({
-      id: 'plan',
-      label: 'Tu plan',
-      icon: (
-        <Icono d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-      ),
-    });
-  }
   tabs.push({
     id: 'planes',
-    label: 'Todos los planes',
+    label: 'Planes',
     icon: <Icono d="M4 6h16M4 12h16M4 18h16" />,
   });
   if (historial) {
@@ -89,7 +85,6 @@ export function BillingTabs({
       </div>
 
       <div className="animate-in fade-in pt-2 duration-300">
-        {activeTab === 'plan' && tuPlan}
         {activeTab === 'planes' && planes}
         {activeTab === 'historial' && historial}
       </div>

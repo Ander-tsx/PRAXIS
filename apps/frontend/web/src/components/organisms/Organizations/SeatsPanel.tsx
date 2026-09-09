@@ -23,10 +23,24 @@ export function SeatsPanel({
   organizationId,
   contratados,
   ocupados,
+  tope,
+  nombreDelPlan,
 }: {
   organizationId: string;
   contratados: number;
   ocupados: number;
+  /**
+   * Cuántos asientos admite el plan como mucho. `null` si no tiene tope.
+   *
+   * ⚠️ **Acota el campo de verdad, no solo el texto.** Estaba a `max={500}`
+   * fijo, así que se podía escribir 40 en un plan que admite 15: el navegador lo
+   * aceptaba, la acción salía y el 402 llegaba del servidor. Pedir un número que
+   * no puede existir y enterarse al confirmar es el peor sitio para descubrir el
+   * tope de tu plan.
+   */
+  tope: number | null;
+  /** Para nombrarlo en el aviso: «Equipo admite hasta 15». */
+  nombreDelPlan: string;
 }) {
   const [state, formAction, pending] = useAccion(cambiarAsientosAction, ORGANIZACION_INITIAL_STATE);
   const [seats, setSeats] = useState(contratados);
@@ -36,6 +50,8 @@ export function SeatsPanel({
   const isUpgrading = seats > contratados;
   const isDowngrading = seats < contratados;
   const hasChanged = seats !== contratados;
+  /** Ya está al máximo del plan: subir más exige cambiar de plan, no de cifra. */
+  const enElTope = tope !== null && contratados >= tope;
 
   function reset() {
     setSeats(contratados);
@@ -51,9 +67,11 @@ export function SeatsPanel({
               <FloatingLabelInput
                 id={campoId}
                 type="number"
-                label="Asientos Contratados"
+                label="Asientos contratados"
                 min={Math.max(ocupados, 1)}
-                max={500}
+                /* El tope del plan, y 500 solo cuando no lo hay. Ver `tope`. */
+                max={tope ?? 500}
+                disabled={enElTope}
                 value={String(seats)}
                 onChange={(evento) => setSeats(Number(evento.target.value))}
               />
@@ -61,16 +79,32 @@ export function SeatsPanel({
             <button
               type="button"
               onClick={() => setConfirmando(true)}
-              disabled={!hasChanged}
+              disabled={!hasChanged || enElTope}
               className="rounded-lg bg-white/10 px-5 py-2.5 h-[58px] font-sans text-sm font-semibold text-white transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Cambiar
             </button>
           </div>
           <p className="font-sans text-xs text-white/50">
-            Tienes {ocupados} {ocupados === 1 ? 'asiento ocupado' : 'asientos ocupados'} (incluyendo
-            invitaciones).
+            Tienes {ocupados} {ocupados === 1 ? 'asiento ocupado' : 'asientos ocupados'} de{' '}
+            {contratados} {contratados === 1 ? 'contratado' : 'contratados'} (las invitaciones sin
+            aceptar también ocupan).
+            {tope !== null && (
+              <>
+                {' '}
+                {nombreDelPlan} admite hasta {tope}.
+              </>
+            )}
           </p>
+
+          {/* Estar en el tope no es un error, así que no se pinta como tal: es
+              la única situación en la que la salida no es escribir otro número
+              sino subir de plan, y hay que decirlo donde se intenta. */}
+          {enElTope && (
+            <p className="font-sans text-xs text-white/70">
+              Estás en el máximo de {nombreDelPlan}. Para más asientos hay que cambiar de plan.
+            </p>
+          )}
         </div>
       ) : (
         <form
@@ -91,9 +125,13 @@ export function SeatsPanel({
             </p>
             {isUpgrading && (
               <p className="font-sans text-xs text-primary bg-primary/10 p-2 rounded-lg mt-1 border border-primary/20">
-                <strong>Autorización de cobro:</strong> Stripe cargará a tu método de pago principal
-                la parte proporcional de lo que queda de mes por los {seats - contratados} asientos
-                adicionales. Al confirmar, aceptas este cargo inmediato.
+                <strong>Autorización de cobro:</strong> el precio del plan es{' '}
+                <strong>por asiento</strong>, así que Stripe cargará a tu método de pago principal
+                la parte proporcional de lo que queda de mes por{' '}
+                {seats - contratados === 1
+                  ? 'el asiento adicional'
+                  : `los ${seats - contratados} asientos adicionales`}
+                . Al confirmar, aceptas este cargo inmediato.
               </p>
             )}
             {isDowngrading && (
@@ -131,7 +169,7 @@ export function SeatsPanel({
       )}
       {state.done && !pending && (
         <p role="status" className="font-sans text-sm text-primary">
-          El plan ha sido actualizado a {state.done} asientos exitosamente.
+          Listo: la organización pasa a tener {state.done} asientos contratados.
         </p>
       )}
     </section>

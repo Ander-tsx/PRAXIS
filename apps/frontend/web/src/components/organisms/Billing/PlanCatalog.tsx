@@ -100,7 +100,11 @@ export function PlanCatalog({
 
           <tbody className="divide-y divide-white/[0.06]">
             {[
-              { label: 'Asientos', valor: (p: PlanSpec) => tope(p.quotas.asientos) },
+              /* ⚠️ **«Asientos (máximo)», no «Asientos».** Con la etiqueta a
+                 secas, la fila decía «Equipo: 15» y se leía como «Equipo trae
+                 15 asientos» — que es exactamente lo que no pasa: el precio es
+                 por asiento y el 15 es el techo. Ver el aviso de `SeatsPanel`. */
+              { label: 'Asientos (máximo)', valor: (p: PlanSpec) => tope(p.quotas.asientos) },
               { label: 'Proyectos', valor: (p: PlanSpec) => tope(p.quotas.proyectos) },
               {
                 label: 'Consultas a PRAX / mes',
@@ -167,9 +171,12 @@ export function PlanCatalog({
         </table>
       </div>
 
-      <p className="font-sans text-xs text-white/40">
-        Todos los planes de pago van por asiento y se asocian a tu organización. Empieza gratis y
-        cambia cuando lo necesites.
+      <p className="max-w-3xl font-sans text-xs text-white/40">
+        Todos los planes de pago se cobran <strong className="text-white/60">por asiento</strong> y
+        se asocian a tu organización. Contratar un plan no compra sus asientos: las cifras de la
+        tabla son el <strong className="text-white/60">máximo</strong> al que deja llegar cada plan,
+        y los asientos se añaden uno a uno desde «Tu plan», arriba. Empieza gratis y cambia cuando
+        lo necesites.
       </p>
     </div>
   );
