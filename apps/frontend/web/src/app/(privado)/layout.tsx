@@ -1,7 +1,7 @@
 import { setPresenceAction } from '@/app/(privado)/presence-actions';
 import { AppShell, PresenceFooter, avatarHref, displayName } from '@praxis/commons';
 import { loadPrivateChrome } from '@praxis/commons/auth';
-import { getSidebarPlegada } from '@praxis/commons/theme';
+import { getSidebarPlegada, getSidebarTab } from '@praxis/commons/theme';
 
 /**
  * El armazón del área privada. **Uno para las cinco secciones.**
@@ -43,6 +43,10 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
   /* La cookie del pliegue, leída en el servidor: sin esto la barra se serviría
      desplegada y se plegaría al hidratar, parpadeando en cada navegación. */
   const plegada = await getSidebarPlegada();
+  /* Igual que el pliegue: si el servidor no sabe qué pestaña va abierta, la
+     pinta mal y el cliente la corrige — que es el error de hidratación que se
+     arregló aquí. Ver `commons/theme/sidebar.ts`. */
+  const pestana = await getSidebarTab();
 
   return (
     <AppShell
@@ -57,6 +61,7 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
        */
       zonePath=""
       plegadaInicial={plegada}
+      pestanaInicial={pestana}
       /* El selector de organización de la barra: la lista y cuál se mira. Las
          dos las resuelve `loadPrivateChrome`, así que aquí no cuestan nada. */
       organizaciones={organizaciones}

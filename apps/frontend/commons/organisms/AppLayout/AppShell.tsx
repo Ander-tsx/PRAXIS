@@ -120,6 +120,19 @@ export interface AppShellProps {
    */
   plegadaInicial?: boolean;
   /**
+   * Con qué pestaña sale la barra —Inicio, Chat o Bandeja—, **resuelto en el
+   * servidor**, exactamente por lo mismo que `plegadaInicial`.
+   *
+   * Lo lee el `layout.tsx` con `getSidebarTab()`. 🔴 Antes salía de
+   * `localStorage` **dentro del inicializador de `useState`**, y eso rompía la
+   * hidratación en cada carga: el servidor no tiene `window`, así que pintaba
+   * «Inicio», y el cliente leía la preferencia y pintaba otra. React lo avisaba
+   * por consola y no lo parcheaba — los `aria-selected` se quedaban con los del
+   * servidor, anunciando una pestaña distinta de la que se veía. El porqué
+   * entero, en `commons/theme/sidebar.ts`.
+   */
+  pestanaInicial?: SidebarTab;
+  /**
    * Las organizaciones a las que perteneces, y cuál estás mirando.
    *
    * ⚠️ **Lo resuelve el `layout.tsx` de la zona**, igual que `plegadaInicial`:
@@ -224,6 +237,9 @@ export function useSidebarPlegada(): boolean {
  * índice de `theme/`. Si cambia allí, cambia aquí.
  */
 const SIDEBAR_COOKIE = 'praxis_sidebar';
+/* La de la pestaña, espejo de `SIDEBAR_TAB_COOKIE` en `commons/theme/sidebar.ts`
+   y repetida aquí por lo mismo que la de arriba: aquel es módulo de servidor. */
+const SIDEBAR_TAB_COOKIE = 'praxis_sidebar_tab';
 const UN_ANO = 60 * 60 * 24 * 365;
 
 /**
@@ -306,6 +322,7 @@ function ArmazonInterno({
   user,
   estadoSlot,
   plegadaInicial = false,
+  pestanaInicial = 'home',
   organizaciones,
   organizacionActivaId,
   mensajesSinLeer: mensajesIniciales = 0,
@@ -316,21 +333,32 @@ function ArmazonInterno({
   const browserPath = zonePath + (pathname === '/' ? '' : pathname);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<SidebarTab>(() => {
-    const isChat = zonePath === '/chat' || browserPath.startsWith('/chat');
-    if (isChat) return 'chat';
+  /**
+   * 🔴 **Determinista: la ruta y una prop, nada del navegador.**
+   *
+   * Aquí había un `typeof window !== 'undefined'` leyendo `localStorage`, que es
+   * el primer punto de la lista que imprime React cuando el árbol no cuadra al
+   * hidratar. El servidor devolvía siempre `'home'` y el cliente la preferencia
+   * guardada, así que el primer render ya discrepaba. React **no lo parchea**:
+   * el `aria-selected` de los `<button role="tab">` se quedaba con el del
+   * servidor, o sea que un lector de pantalla anunciaba seleccionada una
+   * pestaña distinta de la que estaba a la vista.
+   *
+   * La preferencia llega ahora en `pestanaInicial`, que el `layout.tsx` saca de
+   * una cookie **antes** de pintar — el mismo camino que `plegadaInicial` y por
+   * el mismo motivo. Ver `commons/theme/sidebar.ts`.
+   *
+   * ⚠️ **La ruta manda sobre la preferencia**, y por eso va primero: estando en
+   * `/chat` la barra tiene que enseñar Chat aunque la cookie diga Bandeja.
+   */
+  const [activeTab, setActiveTab] = useState<SidebarTab>(() =>
+    zonePath === '/chat' || browserPath.startsWith('/chat') ? 'chat' : pestanaInicial,
+  );
 
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('praxis:sidebarTab');
-      if (stored === 'chat' || stored === 'inbox') return stored;
-    }
-    return 'home';
-  });
-
+  /* Se escribe desde el cliente, igual que la del pliegue: es una preferencia,
+     no una credencial, y así el cambio vale ya para la siguiente navegación. */
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('praxis:sidebarTab', activeTab);
-    }
+    document.cookie = `${SIDEBAR_TAB_COOKIE}=${activeTab}; path=/; max-age=${UN_ANO}; samesite=lax`;
   }, [activeTab]);
 
   /**
