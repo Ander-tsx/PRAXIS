@@ -9,6 +9,7 @@ import {
   SIN_TOPE,
   cabe,
   mejorPlan,
+  menorTope,
   quedan,
   quotasDe,
 } from './plans';
@@ -53,6 +54,24 @@ describe('cuotas de un plan', () => {
 
     it('sin tope no hay cuenta atrás que enseñar', () => {
       expect(quedan(5, SIN_TOPE)).toBe(SIN_TOPE);
+    });
+  });
+
+  describe('menorTope', () => {
+    it('se queda con el más restrictivo de los dos', () => {
+      expect(menorTope(5, 3)).toBe(3);
+      expect(menorTope(3, 5)).toBe(3);
+    });
+
+    it('🔴 sin tope de un lado manda el otro, no el cero de `Math.min`', () => {
+      /* `Math.min(5, null)` es 0. Con eso, ENTERPRISE —el único plan sin tope
+         de asientos— sería el único donde no cabe nadie. */
+      expect(menorTope(5, SIN_TOPE)).toBe(5);
+      expect(menorTope(SIN_TOPE, 5)).toBe(5);
+    });
+
+    it('sin tope por los dos lados sigue sin haberlo', () => {
+      expect(menorTope(SIN_TOPE, SIN_TOPE)).toBe(SIN_TOPE);
     });
   });
 

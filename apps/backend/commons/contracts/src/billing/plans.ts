@@ -68,6 +68,25 @@ export function quedan(actual: number, tope: Tope): Tope {
 }
 
 /**
+ * El más restrictivo de dos topes.
+ *
+ * Existe porque los asientos tienen **dos** números que significan cosas
+ * distintas —`Subscription.seats`, lo contratado en Stripe, y `quotas.asientos`,
+ * hasta dónde llega el plan— y quien manda es el menor de los dos. D6 de
+ * `docs/PLAN-ASIENTOS-CONGELADOS.md`.
+ *
+ * ⚠️ **Un `Math.min` a pelo no vale.** `Math.min(5, null)` es **0**, porque
+ * `null` se convierte en cero: el plan sin tope pasaría a ser el único donde no
+ * cabe nadie, y sin dar ningún error. Es exactamente el mismo fallo que `cabe()`
+ * evita con el `<`, un operador más allá.
+ */
+export function menorTope(a: Tope, b: Tope): Tope {
+  if (a === SIN_TOPE) return b;
+  if (b === SIN_TOPE) return a;
+  return Math.min(a, b);
+}
+
+/**
  * Los planes que existen. El orden es el de la tabla de precios.
  *
  * ⚠️ **Una sola escalera, y es una decisión de 2026-08-26.** Antes eran cinco en
