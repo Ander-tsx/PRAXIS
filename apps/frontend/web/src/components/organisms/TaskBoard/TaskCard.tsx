@@ -14,6 +14,7 @@ import {
   personLabel,
 } from '@praxis/commons';
 import { useCallback, useRef } from 'react';
+import { AttachmentGlyph, NotesGlyph } from './task-marks';
 
 /**
  * Cuántos píxeles puede desplazarse el puntero entre pulsar y soltar sin que
@@ -74,8 +75,15 @@ export interface TaskCardProps {
  * Una tarea dentro de su columna.
  *
  * Enseña de un vistazo lo que decide si hay que abrirla: prioridad, fecha
- * límite si está cerca o pasada, avance del checklist y quién la lleva. Todo lo
- * demás —descripción, comentarios, adjuntos— vive en el diálogo.
+ * límite si está cerca o pasada, avance del checklist, **si tiene notas o
+ * archivos** y quién la lleva. El contenido de todo eso vive en el diálogo; la
+ * tarjeta solo dice que existe.
+ *
+ * ⚠️ **Las notas y los archivos se marcan porque si no, no se sabe que están.**
+ * Una tarea que lleva tres sprints arrastrándose tiene la explicación escrita
+ * dentro, y sin la marca hay que abrir las doce tarjetas de la columna para
+ * encontrar cuáles la tienen. Es la misma razón por la que el checklist enseña
+ * su `3/7` en vez de esconderlo.
  *
  * **Tu inicial va primera y en rojo.** Es el único color de la tarjeta que no
  * describe la tarea sino a quien la mira, y por eso puede permitirse ser el más
@@ -122,6 +130,15 @@ export function TaskCard({
   const { done, total } = checklistProgress(task);
   const due = dueState(task.dueDate);
   const priorityColor = PRIORITY_COLORS[task.priority];
+
+  /**
+   * Notas y archivos vienen **dentro de la tarea**, también en el listado del
+   * tablero (`tasks.service.ts` los incluye en el `findAll`), así que contarlos
+   * aquí no cuesta ninguna petición extra. Por eso son un `.length` y no un
+   * campo `notesCount` que el backend tendría que mantener al día.
+   */
+  const notas = task.comments.length;
+  const adjuntos = task.attachments.length;
 
   /** Dónde se pulsó, para saber al soltar si aquello fue un clic o un arrastre. */
   const origenDelPuntero = useRef<{ x: number; y: number } | null>(null);
@@ -277,6 +294,40 @@ export function TaskCard({
             {done}/{total}
           </Chip>
         )}
+
+        {/**
+         * Notas y archivos: **contorno, no relleno.**
+         *
+         * El resto de píldoras de la fila describen la tarea —cuándo vence, qué
+         * prioridad tiene, cuánto lleva hecho— y van teñidas de su color. Estas
+         * dos dicen otra cosa: **hay algo más dentro que no cabe en la
+         * tarjeta**. Con el mismo relleno se leerían como un atributo más y se
+         * perderían entre cuatro chips de colores; con un contorno y un glifo se
+         * separan del grupo sin gritar, y las dos juntas se leen como una
+         * familia.
+         *
+         * Solo aparecen cuando hay algo. Un «0 notas» ocuparía sitio en cada
+         * tarjeta del tablero para no decir nada.
+         */}
+        {notas > 0 && (
+          <Mark
+            color={colors.primary}
+            glyph={<NotesGlyph className="h-3 w-3" />}
+            title={notas === 1 ? '1 nota' : `${notas} notas`}
+          >
+            {notas}
+          </Mark>
+        )}
+
+        {adjuntos > 0 && (
+          <Mark
+            color={colors.accent}
+            glyph={<AttachmentGlyph className="h-3 w-3" />}
+            title={adjuntos === 1 ? '1 archivo adjunto' : `${adjuntos} archivos adjuntos`}
+          >
+            {adjuntos}
+          </Mark>
+        )}
       </div>
 
       {task.assignees.length > 0 && (
@@ -323,6 +374,40 @@ function mineFirst<T extends { userId: string }>(assignees: T[], currentUserId: 
   const index = sorted.findIndex((assignee) => assignee.userId === currentUserId);
   if (index <= 0) return sorted;
   return [sorted[index], ...sorted.slice(0, index), ...sorted.slice(index + 1)];
+}
+
+/**
+ * Una marca de contenido: glifo y cuenta, con contorno en vez de relleno.
+ *
+ * Se distingue de `Chip` a propósito — ver la nota de la fila de píldoras. El
+ * borde va al 35 % del tono y el fondo al 8 %: lo justo para que la píldora
+ * exista sobre el `#191919` de la tarjeta sin competir con las de estado.
+ *
+ * `title` lleva el texto largo («3 notas») porque el contenido visible es solo
+ * la cifra; sin él, un lector de pantalla anunciaría «3» a secas.
+ */
+function Mark({
+  color,
+  glyph,
+  title,
+  children,
+}: {
+  color: string;
+  glyph: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      title={title}
+      aria-label={title}
+      className="flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-sans text-[10px] font-semibold tabular-nums"
+      style={{ borderColor: alpha(color, 35), background: alpha(color, 8), color }}
+    >
+      {glyph}
+      {children}
+    </span>
+  );
 }
 
 function Chip({ color, children }: { color: string; children: React.ReactNode }) {

@@ -23,6 +23,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { GestorDeEtiquetas } from './GestorDeEtiquetas';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
+import { TaskNotes } from './TaskNotes';
 import { SECTION_PANEL } from './section-panel';
 
 export interface TaskDialogProps {
@@ -39,12 +40,13 @@ export interface TaskDialogProps {
   members: UserProfile[];
   /** Etiquetas del proyecto, que son las que se pueden poner. */
   labels: LabelType[];
-  /** Para poner cara a los autores de los comentarios. */
+  /** Para poner cara a los autores de las notas y de los archivos. */
   usersById: Map<string, UserProfile>;
   currentUserId: string;
   /** Marcar pasos del checklist: `canMoveTask`, no `canEditTask`. */
   canToggleChecklist: boolean;
-  /** Escribir en el hilo: `canComment`, no `canEditTask`. */
+  /** Escribir una nota: `canComment`, no `canEditTask`. Es texto visible lo que
+   * cambió de nombre; el permiso sigue llamándose comentar. */
   canComment: boolean;
   /**
    * Crear, renombrar y borrar las etiquetas del proyecto: `canManageLabels`.
@@ -402,6 +404,27 @@ export function TaskDialog({
         usersById={usersById}
         currentUserId={currentUserId}
         canUpload={canEdit}
+        canModerate={canDelete}
+      />
+      {/**
+       * Las notas, **al final y fuera del formulario**, por lo mismo que las
+       * dos secciones de arriba: cada una tiene su propia acción de servidor y
+       * un `<form>` dentro de otro no es HTML válido.
+       *
+       * ⚠️ **Estaba escrita y no se montaba.** `canComment` llegaba hasta aquí
+       * desde la página, atravesando `WorkspaceCanvas`, `BoardColumns` y
+       * `ColumnTasks`, y moría en este archivo sin que nadie lo consumiera: el
+       * componente existía, la acción existía y el endpoint existía. Un
+       * componente que no se monta no da ningún error, así que el hilo entero
+       * llevaba escondido lo que duró el pulido.
+       */}
+      <TaskNotes
+        projectId={projectId}
+        taskId={task.id}
+        comments={task.comments}
+        usersById={usersById}
+        currentUserId={currentUserId}
+        canComment={canComment}
         canModerate={canDelete}
       />
 

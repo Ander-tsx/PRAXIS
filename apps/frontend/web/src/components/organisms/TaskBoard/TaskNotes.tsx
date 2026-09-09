@@ -16,9 +16,10 @@ import {
 } from '@praxis/commons';
 import { useEffect, useRef, useState } from 'react';
 import { SECTION_PANEL } from './section-panel';
+import { NotesGlyph } from './task-marks';
 
 /**
- * «Editar» y «Eliminar» de un comentario: mismo tamaño y mismo relleno.
+ * «Editar» y «Eliminar» de una nota: mismo tamaño y mismo relleno.
  *
  * Compartir la clase es la mitad del arreglo de la alineación; la otra es que el
  * formulario de «Eliminar» no ocupe caja (ver `contents` más abajo).
@@ -26,7 +27,7 @@ import { SECTION_PANEL } from './section-panel';
 const ACTION_BUTTON =
   'cursor-pointer rounded px-1 py-0.5 font-sans text-[11px] leading-none text-white transition-colors hover:text-white';
 
-export interface TaskCommentsProps {
+export interface TaskNotesProps {
   projectId: string;
   taskId: string;
   comments: TaskComment[];
@@ -34,21 +35,44 @@ export interface TaskCommentsProps {
   currentUserId: string;
   /** `canComment`, que desde `d0c67f2` es un permiso propio y no `canEditTask`. */
   canComment: boolean;
-  /** Quien puede eliminar tareas puede retirar comentarios ajenos. */
+  /** Quien puede eliminar tareas puede retirar notas ajenas. */
   canModerate: boolean;
 }
 
 /**
- * Hilo de comentarios de una tarea.
+ * Las **notas** de una tarea.
  *
- * Cada comentario es su propio formulario, como los ítems del checklist y por
- * el mismo motivo: van fuera del formulario de la tarea y cada uno tiene su
- * propio estado de envío.
+ * ## Por qué se llaman notas y no comentarios
  *
- * Se lee de arriba abajo, del más antiguo al más nuevo, con el campo de
+ * Es el mismo hilo y el mismo endpoint —`/tasks/:id/comments`—, con otra
+ * orientación: en Scrum lo que se escribe aquí es **por qué esta tarea sigue
+ * viva**. Se arrastró de un sprint al otro, se pospuso, quedó bloqueada
+ * esperando a alguien. Un «comentario» invita a opinar; una «nota» invita a
+ * dejar constancia, que es lo que hace falta al revisar el tablero.
+ *
+ * ⚠️ **El cambio de nombre es SOLO texto visible.** `TaskComment`,
+ * `addCommentAction`, `canComment` y la ruta siguen llamándose comentario,
+ * porque así se llaman en el backend y renombrarlos aquí abriría dos
+ * vocabularios para la misma cosa. Es exactamente el caso que CLAUDE.md acota
+ * al hablar del `sed` global: una palabra del español corriente no se renombra
+ * de lado a lado.
+ *
+ * ## Estuvo escondida, no borrada
+ *
+ * El componente existía entero y `TaskDialog` recibía `canComment` y lo
+ * pasaba... a ninguna parte: la sección se dejó de pintar en algún momento y el
+ * resto de la fontanería se quedó puesta. Nada fallaba —un componente que no se
+ * monta no da error—, así que volvió con un `<TaskNotes …>` en el diálogo y sin
+ * tocar el servidor.
+ *
+ * Cada nota es su propio formulario, como los ítems del checklist y por el
+ * mismo motivo: van fuera del formulario de la tarea y cada uno tiene su propio
+ * estado de envío.
+ *
+ * Se lee de arriba abajo, de la más antigua a la más nueva, con el campo de
  * escritura al final: es donde acaba la vista después de leer el hilo.
  */
-export function TaskComments({
+export function TaskNotes({
   projectId,
   taskId,
   comments,
@@ -56,7 +80,7 @@ export function TaskComments({
   currentUserId,
   canComment,
   canModerate,
-}: TaskCommentsProps) {
+}: TaskNotesProps) {
   const [state, formAction, pending] = useAccion(addCommentAction, TASK_INITIAL_STATE);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -67,8 +91,9 @@ export function TaskComments({
 
   return (
     <section className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5">
-      <h4 className="font-sans text-sm font-medium text-white">
-        Comentarios{' '}
+      <h4 className="flex items-center gap-2 font-sans text-sm font-medium text-white">
+        <NotesGlyph className="h-4 w-4 text-primary" />
+        Notas{' '}
         {comments.length > 0 && (
           <span className="font-normal tabular-nums text-white">{comments.length}</span>
         )}
@@ -76,14 +101,16 @@ export function TaskComments({
 
       {comments.length === 0 && (
         <p className="font-sans text-xs text-white">
-          {canComment ? 'Todavía nadie ha comentado. Empieza tú.' : 'Todavía nadie ha comentado.'}
+          {canComment
+            ? 'Sin notas todavía. Deja aquí por qué la tarea se movió, se aplazó o está esperando.'
+            : 'Esta tarea no tiene notas.'}
         </p>
       )}
 
       {comments.length > 0 && (
         <ul className="flex flex-col gap-3">
           {comments.map((comment) => (
-            <CommentRow
+            <NoteRow
               key={comment.id}
               comment={comment}
               author={usersById.get(comment.authorId)}
@@ -104,8 +131,8 @@ export function TaskComments({
             name="body"
             rows={2}
             maxLength={4000}
-            placeholder="Escribe un comentario…"
-            aria-label="Nuevo comentario"
+            placeholder="Escribe una nota…"
+            aria-label="Nueva nota"
             className="w-full resize-y rounded-lg border border-white/10 bg-[#191919] px-3 py-2 font-sans text-xs text-white placeholder:text-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
           <span className="flex justify-end">
@@ -115,13 +142,13 @@ export function TaskComments({
               className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               style={{ background: alpha(colors.primary, 20) }}
             >
-              {pending ? 'Enviando…' : 'Comentar'}
+              {pending ? 'Guardando…' : 'Añadir nota'}
             </button>
           </span>
         </form>
       ) : (
         <p className="font-sans text-xs text-white">
-          Puedes leer el hilo, pero no tienes permiso para comentar.
+          Puedes leer las notas, pero no tienes permiso para escribir.
         </p>
       )}
 
@@ -134,7 +161,7 @@ export function TaskComments({
   );
 }
 
-function CommentRow({
+function NoteRow({
   comment,
   author,
   projectId,
@@ -213,7 +240,7 @@ function CommentRow({
             rows={2}
             maxLength={4000}
             defaultValue={comment.body}
-            aria-label="Editar comentario"
+            aria-label="Editar nota"
             className="w-full resize-y rounded-lg border border-white/10 bg-[#191919] px-3 py-2 font-sans text-xs text-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
           <span className="flex gap-2">
