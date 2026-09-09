@@ -13,7 +13,13 @@ import { TeamTabs } from './TeamTabs';
 
 export const metadata: Metadata = { title: 'Equipo' };
 
-export default async function TeamPage() {
+export default async function TeamPage({
+  searchParams,
+}: {
+  /** `?tab=roles` abre la pestaña de papeles. La usa `/main/roles`. */
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab } = await searchParams;
   const { organizacionActivaId } = await loadPrivateChrome();
   if (!organizacionActivaId) {
     redirect('/main/organizations/new');
@@ -62,6 +68,7 @@ export default async function TeamPage() {
 
         <div>
           <TeamTabs
+            inicial={tab === 'roles' ? 'roles' : 'members'}
             members={
               <Seccion
                 titulo="Directorio de miembros"

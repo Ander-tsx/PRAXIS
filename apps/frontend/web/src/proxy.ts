@@ -97,6 +97,17 @@ const REDIRECCIONES_EXACTAS: Record<string, string> = {
   /* Cortesía: la pantalla pasó de `perfil` a `profile` y los marcadores viejos
      no se pueden corregir desde aquí. */
   '/main/perfil': '/main/profile',
+  /**
+   * «Roles y permisos» de la barra lateral no es una pantalla: los papeles son
+   * de una organización y viven en la pestaña de Equipo.
+   *
+   * 🔴 Era un `page.tsx` con `redirect()`, y encima **a una ruta que no
+   * existe** (`/main/organizations/:id/roles`): pagaba los 44 KB y las dos
+   * llamadas al gateway de la nota de arriba para terminar en un 404. Podía
+   * estar ahí porque necesitaba la organización activa para componer el
+   * destino; ya no la necesita, así que baja aquí.
+   */
+  '/main/roles': '/main/team?tab=roles',
 };
 
 /**

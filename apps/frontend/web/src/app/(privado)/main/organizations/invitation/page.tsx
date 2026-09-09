@@ -21,14 +21,24 @@ export default async function InvitacionPage({
   const { token } = await searchParams;
 
   return (
-    <AppHeader title="Invitación a una organización">
+    <AppHeader title="Invitación">
+      {/* La cabecera dice solo «Invitación»: el panel de dentro ya dice de qué
+          organización y qué pasa al aceptar, y repetirlo arriba dejaba el mismo
+          texto dos veces en la misma pantalla. */}
       {token ? (
         <AcceptInvitation token={token} />
       ) : (
-        <p className="font-sans text-sm text-white">
-          Este enlace no trae el código de la invitación. Pide que te lo vuelvan a enviar: el
-          anterior sigue valiendo mientras no caduque.
-        </p>
+        <div className="mx-auto w-full max-w-2xl">
+          <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-surface p-6">
+            <h2 className="font-display text-xl leading-tight text-text-primary">
+              Este enlace está incompleto
+            </h2>
+            <p className="font-sans text-sm text-white">
+              No trae el código de la invitación, así que no hay nada que aceptar. Pide que te lo
+              vuelvan a enviar: el anterior sigue valiendo mientras no caduque.
+            </p>
+          </div>
+        </div>
       )}
     </AppHeader>
   );
