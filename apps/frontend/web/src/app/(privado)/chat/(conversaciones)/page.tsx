@@ -4,15 +4,15 @@ import {
   Avatar,
   type ChatContact,
   type DirectConversation,
-  ProjectMonogram,
   type ProjectChatSummary,
+  ProjectMonogram,
   avatarHref,
   personName,
   resolveProfiles,
 } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
-import Link from 'next/link';
 import { cookies } from 'next/headers';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 /**
