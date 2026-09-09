@@ -1,6 +1,7 @@
 'use client';
 
 import { RollCta } from '@/components/molecules/RollCta';
+import { l } from '@/lib/landingColors';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -16,8 +17,18 @@ const NAV_LINKS = [
   { href: '#how-it-works', label: 'Cómo funciona' },
 ];
 
-const DARK = { fg: '#e8e8e3', fgMuted: '#938f8a', primary: '#e8e8e3', primaryFg: '#080807' };
-const LIGHT = { fg: '#080807', fgMuted: '#6b645c', primary: '#080807', primaryFg: '#e8e8e3' };
+/**
+ * Los dos juegos de color de la barra, a pelo y no por `var(--l-*)`: la barra
+ * es `fixed` y flota sobre las dos zonas a la vez, así que no puede heredar de
+ * la que tiene debajo — lo decide midiendo, en `useOverLightSection`.
+ *
+ * ⚠️ **Ya no llevan `primary`/`primaryFg`.** El botón cae en el acento de
+ * marca, que es el mismo en las dos zonas, así que invertirlo aquí era
+ * exactamente lo que hacía que el CTA principal cambiara de aspecto tres veces
+ * bajando por la página.
+ */
+const DARK = { fg: '#e8e8e3', fgMuted: '#938f8a' };
+const LIGHT = { fg: '#080807', fgMuted: '#6b645c' };
 
 /**
  * Sin fondo propio: la barra flota sobre la landing, y la landing alterna
@@ -82,9 +93,22 @@ export function PublicNavbar({ isAuthenticated = false }: PublicNavbarProps) {
         aria-label="Navegación principal"
       >
         <Link href="/" className="select-none">
+          {/**
+           * ⚠️ **El wordmark va en el acento y NO cambia con la zona.**
+           *
+           * Es lo único de esta barra que se queda quieto al cruzar de sección
+           * —el resto invierte con `c`—, y es a propósito: dentro de la
+           * aplicación este mismo «Praxis» es morado sobre la barra lateral
+           * (`AppShell`, `Wordmark()`), con la misma familia y el mismo peso.
+           * Con `c.fg` la marca era beige aquí y morada allí, o sea dos marcas.
+           *
+           * El morado tiene contraste suficiente contra las dos zonas —es el
+           * par `#6c63ff`/`#5b52e0` que ya resuelve `--l-accent` por sección—,
+           * así que quedarse fijo no cuesta legibilidad.
+           */}
           <span
-            className="text-xl tracking-tight transition-colors duration-300"
-            style={{ fontFamily: 'var(--font-grotesk)', fontWeight: 700, color: c.fg }}
+            className="text-xl tracking-tight"
+            style={{ fontFamily: 'var(--font-grotesk)', fontWeight: 700, color: l.accent }}
           >
             Praxis
           </span>
@@ -111,12 +135,10 @@ export function PublicNavbar({ isAuthenticated = false }: PublicNavbarProps) {
 
         <div className="flex items-center gap-5">
           {isAuthenticated ? (
-            <RollCta
-              href="/projects"
-              label="Ir al panel"
-              bgColor={c.primary}
-              fgColor={c.primaryFg}
-            />
+            /* Sin `bgColor`: cae en el acento, igual que el del hero y el del
+               cierre. Ver la nota del wordmark — el botón principal tampoco
+               invierte al cruzar de zona, y por eso ya no necesita `c`. */
+            <RollCta href="/projects" label="Ir al panel" />
           ) : (
             <>
               <a
@@ -126,12 +148,7 @@ export function PublicNavbar({ isAuthenticated = false }: PublicNavbarProps) {
               >
                 Iniciar sesión
               </a>
-              <RollCta
-                href="/auth/signup"
-                label="Comenzar"
-                bgColor={c.primary}
-                fgColor={c.primaryFg}
-              />
+              <RollCta href="/auth/signup" label="Comenzar" />
             </>
           )}
         </div>

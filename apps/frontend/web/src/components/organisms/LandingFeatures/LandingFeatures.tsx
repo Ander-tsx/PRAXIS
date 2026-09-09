@@ -1,5 +1,6 @@
 'use client';
 
+import { SectionEyebrow } from '@/components/molecules/SectionEyebrow';
 /**
  * Características — un índice editorial, no una rejilla de tarjetas.
  *
@@ -75,9 +76,17 @@ function FeatureRow({ feature, index }: { feature: (typeof FEATURES)[number]; in
         onFocus={() => setActive(true)}
         onBlur={() => setActive(false)}
       >
+        {/**
+         * El número se enciende **en el acento**, no en el color de texto.
+         *
+         * Es «activo = tono, no caja», la misma regla con la que el sidebar de
+         * la aplicación marca la entrada en la que estás
+         * (`kyloo-design/SKILL.md` §13). Antes iba de gris apagado a gris
+         * normal: un salto tan corto que la fila no parecía responder.
+         */}
         <span
           className="font-mono text-xs transition-colors duration-300 md:text-sm"
-          style={{ color: active ? 'var(--l-fg)' : 'var(--l-fg-muted)' }}
+          style={{ color: active ? 'var(--l-accent)' : 'var(--l-fg-muted)' }}
         >
           {feature.n}
         </span>
@@ -115,9 +124,7 @@ export function LandingFeatures() {
     >
       <div className="mx-auto max-w-5xl">
         <div className="mb-16 md:mb-24">
-          <Reveal innerClassName="font-mono text-xs font-medium uppercase tracking-widest">
-            <span style={{ color: 'var(--l-fg-muted)' }}>Características · 01–08</span>
-          </Reveal>
+          <SectionEyebrow>Características · 01–08</SectionEyebrow>
           <Reveal
             delay={0.05}
             className="mt-4"

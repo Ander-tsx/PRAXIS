@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowUpRightAltIcon, ArrowUpRightIcon } from '@/components/icons';
+import { ArrowUpRightIcon } from '@/components/icons';
 import { l, lRadius } from '@/lib/landingColors';
 import { alpha } from '@praxis/commons';
 import { useState } from 'react';
@@ -43,9 +43,26 @@ export interface RollCtaProps {
  * plano o en las filas del footer. Repetirlo en cada CTA lo habría convertido
  * en ruido en vez de en una llamada a la acción.
  *
- * Monocromo: blanco sobre negro en zona oscura, negro sobre blanco en zona
- * clara — invierte solo (`l.primary` ya resuelve al contrario del fondo de su
- * zona), nunca lleva color de marca.
+ * ## El acento va aquí, y solo en la variante `primary`
+ *
+ * Era monocromo puro: blanco sobre negro en zona oscura, negro sobre blanco en
+ * zona clara. Se leía bien, pero significaba que **el botón principal del
+ * producto no se parecía a sí mismo dos veces seguidas** —cambiaba de color al
+ * cruzar de sección— y no se parecía en nada al de dentro de la aplicación.
+ *
+ * Ahora `primary` lleva el morado de marca (`l.accent`), que es el mismo
+ * `--color-primary` del producto. Es el único elemento de la landing que **no**
+ * se invierte al cambiar de zona: eso es justo lo que lo convierte en un ancla
+ * bajando por la página.
+ *
+ * ⚠️ **`ghost` sigue monocromo, y tiene que seguir estándolo.** Es el
+ * secundario, y dos botones de color uno al lado del otro dejan de decir cuál
+ * es el camino corto — que es el problema que `variante` vino a resolver en el
+ * portal de facturación.
+ *
+ * ⚠️ **`bgColor` sigue mandando sobre el acento.** La barra fija flota sobre
+ * las dos zonas y decide su color por JS; si el acento lo pisara, esa decisión
+ * dejaría de tener efecto sin que nada lo dijera.
  */
 export function RollCta({
   href,
@@ -60,8 +77,8 @@ export function RollCta({
   const isLg = size === 'lg';
   const isGhost = variant === 'ghost';
   const rollTransition = `transform ${ROLL_MS}ms ${ROLL_EASE}`;
-  const bg = bgColor ?? l.primary;
-  const fg = fgColor ?? l.primaryForeground;
+  const bg = bgColor ?? l.accent;
+  const fg = fgColor ?? l.accentForeground;
   const border = bgColor ? bgColor : l.border;
 
   return (
@@ -103,6 +120,26 @@ export function RollCta({
           {label}
         </span>
       </span>
+      {/**
+       * 🔴 **Se veían las dos flechas a la vez, y era un porcentaje mal
+       * referido.**
+       *
+       * Un `translate(100%, …)` en CSS es el 100 % **del elemento que se
+       * mueve**, no de su contenedor. La flecha mide `0.9em` dentro de una caja
+       * de `2.1em`, así que centrada le sobran `0.6em` por lado: para salir del
+       * todo necesita recorrer `0.6 + 0.9 = 1.5em`, o sea un **167 %** de sí
+       * misma. Con el 100 % se quedaba a medio camino y asomaba por la esquina
+       * — las dos a la vez, una entrando y otra sin haber terminado de irse.
+       *
+       * No se arregla subiendo el número a ojo: los dos tamaños tienen
+       * proporciones distintas (`sm` necesita 150 %, `lg` 167 %) y cualquier
+       * ajuste futuro del icono o de la caja lo vuelve a romper **en silencio**,
+       * porque el resultado sigue siendo una animación válida.
+       *
+       * Lo que se mueve ahora es una **capa del tamaño de la caja**, con la
+       * flecha centrada dentro. Ahí el 100 % ya es el 100 % del recorrido que
+       * hay que hacer, sea cual sea el tamaño, y las dos capas nunca se solapan.
+       */}
       <span
         className={`relative flex flex-none items-center justify-center overflow-hidden ${isLg ? 'h-[2.1em] w-[2.1em]' : 'h-[1.7em] w-[1.7em]'}`}
         style={{
@@ -110,21 +147,28 @@ export function RollCta({
           borderRadius: `calc(${lRadius} - 1px)`,
         }}
       >
-        <ArrowUpRightIcon
-          className={`absolute inset-0 m-auto ${isLg ? 'h-[0.9em] w-[0.9em]' : 'h-[0.85em] w-[0.85em]'}`}
+        <span
+          className="absolute inset-0 flex items-center justify-center"
           style={{
             transform: hovered ? 'translate(100%, -100%)' : 'translate(0, 0)',
             transition: rollTransition,
           }}
-        />
-        <ArrowUpRightAltIcon
+        >
+          <ArrowUpRightIcon className={isLg ? 'h-[0.9em] w-[0.9em]' : 'h-[0.85em] w-[0.85em]'} />
+        </span>
+
+        {/* La gemela que entra por abajo-izquierda. `aria-hidden` porque es la
+            misma flecha repetida: anunciarla dos veces no aporta nada. */}
+        <span
           aria-hidden="true"
-          className={`absolute inset-0 m-auto ${isLg ? 'h-[0.9em] w-[0.9em]' : 'h-[0.85em] w-[0.85em]'}`}
+          className="absolute inset-0 flex items-center justify-center"
           style={{
             transform: hovered ? 'translate(0, 0)' : 'translate(-100%, 100%)',
             transition: rollTransition,
           }}
-        />
+        >
+          <ArrowUpRightIcon className={isLg ? 'h-[0.9em] w-[0.9em]' : 'h-[0.85em] w-[0.85em]'} />
+        </span>
       </span>
     </a>
   );

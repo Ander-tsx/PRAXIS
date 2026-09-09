@@ -32,6 +32,50 @@
   --l-primary: #e8e8e3;
   --l-primary-foreground: #080807;
 
+  /**
+   * El único color de la landing, y existe para atar dos superficies.
+   *
+   * Es `--color-primary` de la aplicación (`theme.css`), literal. Hasta ahora
+   * la landing no compartía **ni un color** con el producto: quien salía del
+   * registro pasaba de un mundo beige y negro a uno con un morado de marca que
+   * no había visto en ninguna parte. El acento es lo que hace que las dos
+   * lecturas se reconozcan.
+   *
+   * ⚠️ **Con cuentagotas, y está contado.** Va en cinco sitios —el wordmark de
+   * la barra, el botón principal, el punto que abre cada eyebrow, el número de
+   * una fila al recorrerla y las dos cursivas del titular— y en ninguno más.
+   * Generalizarlo lo convierte en decoración y se lleva por delante el criterio
+   * monocromo de `kyloo-design/SKILL.md` §1, que es el que sostiene el resto de
+   * la página.
+   *
+   * El titular es el caso que el propio §1 ya contemplaba: «una sola excepción
+   * de color, y es la marca — es identidad, no decoración». Ahí describía un
+   * gris apagado; ahora esa excepción se cobra en índigo, que es lo que la ata
+   * al producto.
+   *
+   * ⚠️ **Y NO se cuela en los tokens `--color-*` de abajo.** Esos son el
+   * puente por el que los átomos genéricos caen en monocromo dentro de una
+   * zona; meter el morado ahí teñiría cualquier `Button` que pase por aquí
+   * —incluido el panel de acceso— sin que su código lo pidiera.
+   */
+  --l-accent: #6c63ff;
+  --l-accent-foreground: #ffffff;
+
+  /**
+   * Los dos extremos del degradado del titular. Ver `DEGRADADO_DE_MARCA` en
+   * `LandingHero`.
+   *
+   * ⚠️ **Los dos pasan el contraste sobre el fondo, y por eso son estos.**
+   * Un «desvanecido» tira a apagar el final del degradado, y sobre `#080807`
+   * eso se sale de norma enseguida: un `#4a43b8` —que parecía el remate
+   * natural— se queda en **2,4:1**, por debajo del 3:1 que pide un titular
+   * grande. Estos dan 7,8:1 el claro y 3,5:1 el oscuro. Si alguien los
+   * retoca, que vuelva a medirlos: el degradado seguirá viéndose bonito
+   * mientras deja de leerse.
+   */
+  --l-accent-bright: #9d97ff;
+  --l-accent-deep: #5b52e0;
+
   --color-background: var(--l-bg);
   --color-surface: var(--l-card);
   --color-surface-elevated: #221f1c;
@@ -130,6 +174,20 @@
   --l-border: #bfbfb1;
   --l-primary: #080807;
   --l-primary-foreground: #e8e8e3;
+
+  /* ⚠️ **El morado de la zona clara es el del tema claro de la app**
+     (`#5b52e0`), no el de la oscura. El `#6c63ff` está calibrado contra un
+     fondo casi negro; sobre el beige `#e8e8e3` se queda en 3,6:1 y un texto
+     pequeño deja de leerse. Es el mismo par que ya mantiene `theme.css` entre
+     su claro y su oscuro, y por el mismo motivo. */
+  --l-accent: #5b52e0;
+  --l-accent-foreground: #ffffff;
+
+  /* Los mismos dos extremos, girados para fondo claro: aquí el que tiene que
+     pasar el contraste es el **claro** del par, así que el degradado va de un
+     índigo medio a uno profundo en vez de al revés. */
+  --l-accent-bright: #7d76ea;
+  --l-accent-deep: #3b33a3;
 
   --color-background: var(--l-bg);
   --color-surface: var(--l-card);
