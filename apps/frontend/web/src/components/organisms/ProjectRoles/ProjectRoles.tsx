@@ -33,11 +33,14 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
 
   return (
     <section className="flex flex-col gap-4" aria-label="Roles del proyecto">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-white/10 bg-[#191919] px-4 py-2">
+      {/* Encabezado de sección: misma barra que Equipo y Automatización —nombre,
+          separador, una frase, y la acción a la derecha—. Los tres usan los
+          mismos tokens; ver el comentario gemelo en `ProjectRules`. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <h3 className="font-sans text-sm font-semibold text-white shrink-0">Roles</h3>
-          <span className="text-white/30 font-light shrink-0">/</span>
-          <p className="truncate font-sans text-sm text-white/60">
+          <h3 className="shrink-0 font-sans text-sm font-semibold text-text-primary">Roles</h3>
+          <span className="shrink-0 font-light text-text-disabled">/</span>
+          <p className="truncate font-sans text-sm text-text-secondary">
             Cada persona entra con un rol, y el rol decide lo que puede hacer.
           </p>
         </div>
@@ -68,7 +71,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
       )}
 
       {roles.length === 0 ? (
-        <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-8 text-center font-sans text-sm text-white/60">
+        <p className="rounded-xl border border-border bg-surface px-6 py-8 text-center font-sans text-sm text-text-secondary">
           Este proyecto no tiene roles. Crea uno para poder añadir a alguien.
         </p>
       ) : (
@@ -108,12 +111,12 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
             return (
               <li
                 key={role.id}
-                className="flex flex-col gap-4 rounded-xl border border-white/10 bg-[#191919] p-5 transition-colors hover:bg-white/[0.02]"
+                className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 transition-colors hover:bg-white/[0.02]"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex flex-col gap-1.5">
                     <h4 className="font-sans text-base font-semibold text-white">{role.name}</h4>
-                    <span className="font-sans text-sm font-medium text-white/50">
+                    <span className="font-sans text-sm font-medium text-text-secondary">
                       {inUse === 0
                         ? 'Sin personas asignadas'
                         : `${inUse} ${inUse === 1 ? 'persona' : 'personas'}`}
@@ -146,7 +149,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
                     </Badge>
                   ))}
                   {selected.size === 0 && (
-                    <span className="font-sans text-sm italic text-white/50 py-1">
+                    <span className="py-1 font-sans text-sm italic text-text-secondary">
                       Sin permisos: quien tenga este rol no podrá hacer nada.
                     </span>
                   )}

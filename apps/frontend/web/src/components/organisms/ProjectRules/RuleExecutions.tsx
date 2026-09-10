@@ -47,7 +47,7 @@ const ENCABEZADO_EJECUCIONES = 'ejecuciones-de-reglas';
 
 function Dato({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <p className="font-sans text-sm text-white">
+    <p className="font-sans text-sm text-text-secondary">
       <span className="font-medium text-text-primary">{titulo}: </span>
       {children}
     </p>
@@ -85,15 +85,15 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <h3
             id={ENCABEZADO_EJECUCIONES}
-            className="shrink-0 font-sans font-medium text-text-primary"
+            className="shrink-0 font-sans text-sm font-semibold text-text-primary"
           >
             Ejecuciones
           </h3>
-          <span className="shrink-0 font-light text-white">/</span>
+          <span className="shrink-0 font-light text-text-disabled">/</span>
           {/* ⚠️ **«Las de barrido se lanzan desde aquí» no explicaba nada.**
               «Barrido» es como se llama por dentro; quien lee esto solo quiere
               saber qué pasa si pulsa el botón de al lado. */}
-          <p className="truncate font-sans text-sm text-white">
+          <p className="truncate font-sans text-sm text-text-secondary">
             Qué hizo cada regla, sobre qué tarea y cuándo.
           </p>
         </div>
@@ -142,7 +142,7 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
           No se ha podido consultar el historial de ejecuciones. Vuelve a cargar en un momento.
         </p>
       ) : executions.items.length === 0 ? (
-        <p className="rounded-xl border border-border bg-surface px-5 py-6 font-sans text-sm text-white">
+        <p className="rounded-xl border border-border bg-surface px-6 py-8 text-center font-sans text-sm text-text-secondary">
           Aún no se ha revisado nada. «Revisar ahora» evalúa las reglas activas contra las tareas
           del proyecto y deja aquí una fila por cada candidata que encontró.
         </p>
@@ -177,7 +177,7 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
                   <ChevronDown
                     aria-hidden
                     className={[
-                      'size-4 shrink-0 text-white transition-transform',
+                      'size-4 shrink-0 text-text-secondary transition-transform',
                       desplegada ? 'rotate-180' : '',
                     ].join(' ')}
                   />
@@ -185,7 +185,7 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
                     <span className="block truncate font-sans text-base font-semibold text-text-primary">
                       {execution.subjectTitle ?? execution.rule.name}
                     </span>
-                    <span className="block truncate font-sans text-xs text-white">
+                    <span className="block truncate font-sans text-xs text-text-secondary">
                       {execution.rule.name} ·{' '}
                       {new Date(execution.createdAt).toLocaleString('es-MX')}
                     </span>
@@ -243,7 +243,7 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
        * tope, la lista **es** el histórico y anunciarlo sería ruido.
        */}
       {executions !== null && executions.total > executions.items.length && (
-        <p className="font-sans text-xs text-white">
+        <p className="font-sans text-xs text-text-secondary">
           Se ven las últimas {executions.items.length} de {executions.total}.
         </p>
       )}

@@ -1,6 +1,5 @@
 'use client';
 import {
-  Badge,
   Button,
   PERSONA_ELIMINADA,
   type ProjectInvitation,
@@ -85,11 +84,14 @@ export function ProjectMembers({
 
   return (
     <section className="flex flex-col gap-4" aria-label="Equipo del proyecto">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5">
+      {/* Encabezado de sección: misma barra que Roles y Automatización —nombre,
+          separador, una frase, y la acción a la derecha—. Los tres usan los
+          mismos tokens; ver el comentario gemelo en `ProjectRules`. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <h3 className="font-sans text-sm font-semibold text-white shrink-0">Equipo</h3>
-          <span className="text-white font-light shrink-0">/</span>
-          <p className="truncate font-sans text-sm text-white">
+          <h3 className="shrink-0 font-sans text-sm font-semibold text-text-primary">Equipo</h3>
+          <span className="shrink-0 font-light text-text-disabled">/</span>
+          <p className="truncate font-sans text-sm text-text-secondary">
             Quien invites entra al aceptar la invitación, con el rol que le des.
           </p>
         </div>
@@ -97,17 +99,12 @@ export function ProjectMembers({
         <div className="flex shrink-0 items-center gap-2">
           {canLeave && <LeaveProjectButton projectId={projectId} projectName={projectName} />}
           {canManage && (
-            <button
-              type="button"
-              className={`rounded-lg px-3.5 py-1.5 font-sans text-xs font-medium transition-colors border ${
-                isInviting
-                  ? 'border-white/[0.10] text-white hover:bg-white/[0.05] hover:text-white'
-                  : 'border-white/[0.12] bg-white/[0.04] text-white hover:border-white/20 hover:bg-white/[0.08] hover:text-white'
-              }`}
+            <Button
+              variant={isInviting ? 'secondary' : 'primary'}
               onClick={() => setIsInviting(!isInviting)}
             >
               {isInviting ? 'Cancelar' : 'Invitar persona'}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -146,12 +143,12 @@ export function ProjectMembers({
       />
 
       {members.length === 0 ? (
-        <p className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-6 py-8 text-center font-sans text-sm text-white">
+        <p className="rounded-xl border border-border bg-surface px-6 py-8 text-center font-sans text-sm text-text-secondary">
           Todavía no hay nadie en este proyecto.
         </p>
       ) : (
-        <div className="rounded-2xl border border-white/[0.08] bg-transparent overflow-hidden">
-          <ul className="flex flex-col divide-y divide-white/[0.05]">
+        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+          <ul className="flex flex-col divide-y divide-border-subtle">
             {members.map((member) => {
               const user = usersById.get(member.userId);
               const label = user ? personLabel(user) : PERSONA_ELIMINADA;
@@ -207,7 +204,7 @@ export function ProjectMembers({
                           </a>
                         </div>
                       )}
-                      <span className="truncate font-sans text-xs text-white mt-0.5">
+                      <span className="mt-0.5 truncate font-sans text-xs text-text-secondary">
                         {/* Puede faltar si el directorio se cortó por paginación. */}
                         {user?.credential.email ?? 'Correo no disponible'}
                       </span>
@@ -237,7 +234,7 @@ export function ProjectMembers({
                         {member.projectRole.name}
                       </span>
                     )}
-                    <span className="hidden font-sans text-[11px] font-medium text-white sm:inline">
+                    <span className="hidden font-sans text-[11px] font-medium text-text-secondary sm:inline">
                       desde {dateFormatter.format(new Date(member.joinedAt))}
                     </span>
 

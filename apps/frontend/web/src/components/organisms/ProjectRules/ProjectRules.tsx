@@ -63,7 +63,7 @@ export function ProjectRules({
 
   if (!canManage) {
     return (
-      <p className="rounded-xl border border-border bg-surface p-5 font-sans text-sm text-white">
+      <p className="rounded-xl border border-border bg-surface p-5 font-sans text-sm text-text-secondary">
         {isSuspended
           ? 'La automatización de este proyecto no se puede ver ni administrar mientras esté suspendido.'
           : 'No tienes permiso para administrar automatizaciones en este proyecto.'}
@@ -88,11 +88,14 @@ export function ProjectRules({
             como si fuera de otra pantalla. */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-2">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <h3 id={ENCABEZADO_REGLAS} className="shrink-0 font-sans font-medium text-text-primary">
+            <h3
+              id={ENCABEZADO_REGLAS}
+              className="shrink-0 font-sans text-sm font-semibold text-text-primary"
+            >
               Reglas
             </h3>
-            <span className="shrink-0 font-light text-white">/</span>
-            <p className="truncate font-sans text-sm text-white">
+            <span className="shrink-0 font-light text-text-disabled">/</span>
+            <p className="truncate font-sans text-sm text-text-secondary">
               Cuando pasa algo, si se cumplen las condiciones, la regla actúa sola.
             </p>
           </div>
@@ -141,7 +144,7 @@ export function ProjectRules({
             )}
 
             {rules.length === 0 ? (
-              <p className="rounded-xl border border-border bg-surface px-5 py-6 font-sans text-sm text-white">
+              <p className="rounded-xl border border-border bg-surface px-6 py-8 text-center font-sans text-sm text-text-secondary">
                 Aún no hay reglas. Una regla dice qué tiene que pasar, sobre qué tareas, y qué hacer
                 cuando ocurra.
               </p>
