@@ -903,6 +903,31 @@ resuelva en frío. Mientras tanto, cualquiera que corra Biome sobre
 `apps/frontend` en `main` verá esos avisos otra vez: no han vuelto, es que nunca
 llegaron.
 
+### Reverificación del 2026-09-10 — la séptima, sin novedad
+
+El mismo prompt de traspaso, la misma respuesta. Comprobado en un minuto con los
+tres comandos de la sección anterior: `99b2f6d` sigue siendo ancestro de `main`
+(Enterprise, PR #33), `report_column_time` sigue vivo en cinco ficheros de
+`reports-service` + gateway (R9.2), y `billing-service` conserva `organizations/`
+y `subscriptions/`. **Los dos bloques siguen fusionados en `main` y no se
+re-ejecutaron.** `next build` de `web` en verde antes de tocar nada.
+
+Lo abierto sigue igual que el 2026-09-09 y nada de ello se resuelve en frío:
+A2–A7 de [PLAN-ASIENTOS-CONGELADOS](../PLAN-ASIENTOS-CONGELADOS.md) esperan a las
+cuatro preguntas de diseño sin contestar y tocan el backend; los 29 hallazgos de
+`AUDITORIA-ORGANIZACION-CHAT-MOVIL.md` viven en `feature/fusion-zonas` y
+fusionarlos es decisión del dueño; C6/C9/C10 piden navegador y stack, y esta
+máquina de 8 GB no levanta el stack con Playwright. Docker lleva cinco sesiones
+apagado.
+
+**Lo único que se hizo:** borrar dos organismos muertos —`ProjectGrid` y
+`ProjectSearch`, sin un solo import fuera de su propio `index.ts` desde la fusión
+de zonas (`307ce25`)—, que además arrastraban el mismo `/` a pelo que la fusión
+convirtió en enlace a la landing y que ya se arregló dos veces en código vivo
+(`6f90862`, `f18f690`). Tres comentarios de `projects/[id]/actions.ts` que los
+nombraban pasan a nombrar `ProyectosPageClient`, que es lo que pinta la lista hoy.
+`next build` en verde.
+
 ### El hueco, dicho en una línea
 
 **Se guarda mucho más de lo que se mide.** `TaskEvent` tiene ocho tipos y los
