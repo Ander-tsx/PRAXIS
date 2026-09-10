@@ -46,19 +46,22 @@ export function ProyectosPageClient({
   const [query, setQuery] = useState(search);
   const [, startTransition] = useTransition();
 
+  /* La ruta base es `/projects`. Al fusionar las zonas (F6) desapareció el
+     `basePath` que Next anteponía, así que un `/` o `/?…` a pelo ya no vuelve a
+     esta pantalla: lleva a la landing pública sin dar ningún error. */
   const hrefDePagina = (n: number) => {
     const otros = new URLSearchParams();
     if (search) otros.set('q', search);
     if (n > 1) otros.set('page', String(n));
     if (vistaActual !== 'lista') otros.set('vista', vistaActual);
     const cadena = otros.toString();
-    return cadena ? `/?${cadena}` : '/';
+    return cadena ? `/projects?${cadena}` : '/projects';
   };
 
   function buscar(q: string) {
     const trimmed = q.trim();
     startTransition(() => {
-      router.push(trimmed ? `/?q=${encodeURIComponent(trimmed)}` : '/');
+      router.push(trimmed ? `/projects?q=${encodeURIComponent(trimmed)}` : '/projects');
     });
   }
 
@@ -67,7 +70,7 @@ export function ProyectosPageClient({
     if (query.trim()) params.set('q', query.trim());
     if (v !== 'lista') params.set('vista', v);
     const qs = params.toString();
-    startTransition(() => router.push(qs ? `/?${qs}` : '/'));
+    startTransition(() => router.push(qs ? `/projects?${qs}` : '/projects'));
   }
 
   const hayProyectos = projects.length > 0;
