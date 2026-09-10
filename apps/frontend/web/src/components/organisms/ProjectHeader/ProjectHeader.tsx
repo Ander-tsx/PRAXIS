@@ -91,7 +91,7 @@ export function ProjectHeader({
     return (
       <header className="flex min-w-0 shrink-0 items-center gap-3">
         <Link
-          href="/"
+          href="/projects"
           aria-label="Volver a todos los proyectos"
           title="Todos los proyectos"
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -138,9 +138,11 @@ export function ProjectHeader({
       {/* Volver y configuración comparten fila: son lo que actúa sobre el
           proyecto entero, y ninguna pertenece al título. */}
       <div className="flex items-center justify-between gap-4">
-        {/* `/` es la lista: dentro de la zona se escribe sin el basePath. */}
+        {/* `/projects` es la lista. Era `/` porque el router de la zona
+            anteponía el basePath; tras la fusión (F6) un `/` a pelo saca a la
+            landing pública sin dar error. */}
         <Link
-          href="/"
+          href="/projects"
           className="w-fit font-sans text-sm text-white transition-colors hover:text-white"
         >
           ← Todos los proyectos
