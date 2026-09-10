@@ -84,7 +84,7 @@ async function requireApi() {
  * origina el botón que gira para siempre (`commons/hooks/useAccion`). Pagarlo
  * dos veces por escribir un comentario es coste puro.
  *
- * De la lista, `ProjectGrid` pinta exactamente esto: `name`, `description`,
+ * De la lista, `ProyectosPageClient` pinta exactamente esto: `name`, `description`,
  * `status`, `createdAt`, `_count.members` y `_count.workspaces`. Nada más. Un
  * comentario, una tarea, una columna o una etiqueta **no cambian ninguno de
  * esos campos**, así que revalidarla no producía una sola diferencia en
@@ -326,7 +326,7 @@ function describeAutomationToggleError(error: unknown): string {
 /**
  * El detalle **y** la lista.
  *
- * Solo para lo que mueve un contador de `ProjectGrid`: entrar o salir gente, y
+ * Solo para lo que mueve un contador de `ProyectosPageClient`: entrar o salir gente, y
  * crear o borrar espacios. Si mañana la tarjeta de la lista enseña algo más
  * —tareas abiertas, por ejemplo— hay que volver aquí y ampliar quién la llama;
  * olvidarlo sale como una tarjeta con el número viejo hasta navegar, no como un
@@ -503,7 +503,7 @@ export async function saveProjectSettingsAction(input: {
     if (saved.name !== name) return { error: 'El servidor no guardó el nombre nuevo.', ...empty };
 
     revalidateProject(input.projectId);
-    /* Y la lista, a diferencia del resto de acciones: `ProjectGrid` pinta el
+    /* Y la lista, a diferencia del resto de acciones: `ProyectosPageClient` pinta el
        nombre, la descripción y el monograma, y esto cambia los tres. */
     revalidatePath('/projects');
 
