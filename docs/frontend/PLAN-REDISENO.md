@@ -28,6 +28,17 @@
 > su webhook firmado, organizaciones, papeles, plantillas y el 402 con dos caras
 > están en el árbol. La etapa viva es **Organizaciones**, y lo que le queda —tres
 > casillas de 73— está en su propio plan, no aquí.
+>
+> **Reverificación del 2026-09-11 (octava vez).** Mismo resultado: los tres
+> comandos de comprobación siguen dando lo esperado, `next build` de `web`
+> verde. Lo nuevo de esta sesión no fue este plan sino que **Docker volvió**
+> tras cinco sesiones apagado (`docs/AUDITORIA-ORGANIZACION-CHAT-MOVIL.md` lo
+> tenía como motivo de bloqueo): con el stack arriba se pudo cerrar **B6** de esa
+> auditoría —prueba e2e de que la organización basta sin proyecto en
+> común, `527b1b5`—. **A1** de la misma auditoría sigue sin la suya: pasa por
+> Gemini de verdad y la clave sigue sin presupuesto, igual que R7 de este plan.
+> Los 2 fallos de `15-chat.spec.ts` en esa corrida son el limitador de login de
+> la propia suite (trampa 16 de `CLAUDE.md`), no una regresión.
 
 Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · `[!]` bloqueado o
 descartado (con motivo escrito al lado)
