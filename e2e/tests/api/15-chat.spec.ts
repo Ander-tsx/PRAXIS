@@ -610,6 +610,55 @@ test.describe('Chat — aislamiento', () => {
     expect(intento.status()).toBe(403);
   });
 
+  test('🔴 compañeros de organización sin proyecto en común SÍ tienen conversación privada', async ({
+    request,
+  }) => {
+    /* B6 de la auditoría (`docs/AUDITORIA-ORGANIZACION-CHAT-MOVIL.md`): la
+       puerta del privado pasó de «compartís proyecto» a «compartís
+       organización» (`DirectChatController.puedeHablarCon` →
+       `QuotaService.compartenOrganizacion`), pero hasta ahora nada lo probaba
+       con dos cuentas reales. La prueba de arriba no lo distingue: `dentro` y
+       `fuera` tampoco comparten organización, así que pasaría igual con la
+       regla vieja puesta. Esta mete a alguien en la organización personal del
+       dueño **sin darlo de alta en el proyecto**, y comprueba que puede
+       escribir igualmente. */
+    const compañera = await registrar(request);
+
+    const papeles = await data<{ id: string; isDefault: boolean }[]>(
+      await request.get(`/api/organizations/${organizacionId}/roles`, {
+        headers: comoBearer(duenno.accessToken),
+      }),
+    );
+    const miembro = papeles.find((papel) => papel.isDefault)!;
+
+    const invitacion = await data<{ enlace: string }>(
+      await request.post(`/api/organizations/${organizacionId}/members`, {
+        headers: comoBearer(duenno.accessToken),
+        data: { email: compañera.email, roleId: miembro.id },
+      }),
+    );
+    const token = new URL(invitacion.enlace).searchParams.get('token');
+    expect(token, 'La invitación devuelve el enlace con el token dentro').toBeTruthy();
+
+    const aceptada = await request.post('/api/me/organizations/invitations/accept', {
+      headers: comoBearer(compañera.accessToken),
+      data: { token },
+    });
+    expect(aceptada.status()).toBe(200);
+    /* Ocupa asiento desde este momento: el `afterEach` la libera igual que a
+       quien entra por un proyecto — la salida es la misma organización. */
+    prestados.push(compañera);
+
+    const mensaje = await request.post(conversacionDe(duenno, compañera, '/messages'), {
+      headers: comoBearer(duenno.accessToken),
+      data: { body: 'hola, equipo' },
+    });
+    expect(
+      mensaje.status(),
+      'La puerta del privado es la organización, no el proyecto compartido',
+    ).toBe(201);
+  });
+
   test('un mensaje ajeno no se toca desde otra conversación', async ({ request }) => {
     const unaPersona = await nuevoInterlocutor(request);
     const otraPersona = await nuevoInterlocutor(request);

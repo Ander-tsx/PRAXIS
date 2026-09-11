@@ -63,7 +63,7 @@ verificación:
 | B8 | La tarjeta emergente de un mensaje | Necesita el stack en marcha para separar «no llega el evento» de «llega y no se pinta». Arreglarlo a ciegas sería adivinar |
 | C6 | Repaso visual a 375 px | Se necesita un navegador. La auditoría estática ya descartó tablas y rejillas; lo que queda es mirarlo |
 | E1 | 139 diagnósticos de Biome | El **formato** está cerrado (0 archivos sin formatear). Quedan a11y y `useExhaustiveDependencies`, que son de revisar uno a uno, no de arreglar en masa |
-| A1/B6 | Sus pruebas e2e | Exigen el stack. Van con C9 del plan de la organización activa, que sigue sin correrse |
+| A1 | Su prueba e2e | Pasa por PRAX de verdad —crear con plantilla habla con Gemini— y la clave está sin presupuesto (mismo bloqueo que R7 de `PLAN-REDISENO.md`). B6 sí se cerró el 2026-09-11: no necesitaba modelo, solo el stack, que ese día se pudo levantar |
 
 ---
 
@@ -371,7 +371,10 @@ venía a quitar.
 `/chat` lo ofrece en el buscador → pulsarlo → «no encontrado».
 
 - [x] La comprobación se retira (la puerta es del gateway)
-- [ ] Prueba e2e: compañero de organización sin proyecto en común
+- [x] Prueba e2e: compañero de organización sin proyecto en común (`15-chat.spec.ts`,
+      «compañeros de organización sin proyecto en común SÍ tienen conversación
+      privada» — mete a alguien en la organización personal del dueño sin
+      proyecto de por medio y confirma el 201, no el 403 de la regla vieja)
 
 ## B7 🟠 ✅ El compositor se bloquea con la misma regla vieja
 
