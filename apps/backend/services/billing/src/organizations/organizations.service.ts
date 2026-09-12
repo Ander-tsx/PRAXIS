@@ -645,6 +645,14 @@ export class OrganizationsService {
       orderBy: [{ role: { name: 'asc' } }, { invitedAt: 'asc' }],
     });
 
+    /* ⚠️ **El orden de esta lista no es el de la cola, y no se cambia.** Aquí
+       se ordena por papel para que el portal se lea; la cola de antigüedad la
+       calcula `congeladosDe` aparte, y por eso el congelado viaja marcado en
+       cada fila en vez de deducirse de la posición. Mezclarlos habría hecho que
+       reordenar el portal cambiara a quién se congela. */
+    const corte = await this.congeladosDe(organizationId);
+    const congelado = new Map(corte.congelados.map((uno) => [uno.id, uno.puesto]));
+
     return filas.map((fila) => ({
       userId: fila.userId,
       email: fila.email,
@@ -657,6 +665,8 @@ export class OrganizationsService {
       status: fila.status as MembershipStatus,
       invitedAt: fila.invitedAt.toISOString(),
       joinedAt: fila.joinedAt?.toISOString() ?? null,
+      frozen: congelado.has(fila.id),
+      queuePosition: congelado.get(fila.id) ?? null,
     }));
   }
 

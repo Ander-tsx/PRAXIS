@@ -234,6 +234,18 @@ export interface OrganizationMemberView {
   status: MembershipStatus;
   invitedAt: string;
   joinedAt: string | null;
+  /**
+   * Dentro, y **en solo lectura** por haber bajado el techo del plan.
+   *
+   * ⚠️ **No es una tercera opción de `status`, y la diferencia se ve en la
+   * pantalla.** Congelado se deriva del orden de antigüedad contra el tope de
+   * asientos, así que volver a pagar lo apaga solo. Pintarlo como un estado más
+   * al lado de «invitado» diría que a esa persona le pasa algo; lo que pasa es
+   * que el plan encogió. Ver `docs/PLAN-ASIENTOS-CONGELADOS.md`.
+   */
+  frozen: boolean;
+  /** Su turno para volver: **1 es el primero**. `null` si no está congelado. */
+  queuePosition: number | null;
 }
 
 /** Una línea del registro de facturación de una organización. */

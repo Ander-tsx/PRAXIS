@@ -275,6 +275,32 @@ export class OrganizationsController {
    * Es lo que va a preguntar el gateway antes de meter a alguien en un proyecto
    * de esta organización, cuando exista `Project.organizationId` (O3).
    */
+  /**
+   * Quién está congelado en una organización, y en qué puesto de la cola.
+   *
+   * ⚠️ **No exige permiso, igual que `billing_org_members`.** Lo pregunta el
+   * gateway en cada escritura para saber si quien escribe puede; pedir un
+   * permiso aquí obligaría al guard a tener uno para poder comprobar si tiene
+   * alguno, que es la pescadilla de siempre. El filtro de quién ve la lista
+   * entera lo pone el gateway, en `GET /me/billing/resumen`.
+   */
+  @MessagePattern({ cmd: 'billing_frozen_members' })
+  congelados(@Payload() dto: { organizationId: string }) {
+    return this.organizaciones.congeladosDe(dto.organizationId);
+  }
+
+  /**
+   * ¿Está **esta** persona congelada **aquí**?
+   *
+   * El atajo del camino caliente: `exigirAsientoVivo` solo necesita un booleano
+   * y el puesto, y devolver la lista entera por cada escritura sería mandar por
+   * TCP los correos de todo el equipo para contestar que sí o que no.
+   */
+  @MessagePattern({ cmd: 'billing_seat_frozen' })
+  congelado(@Payload() dto: { organizationId: string; userId: string }) {
+    return this.organizaciones.estaCongelado(dto.organizationId, dto.userId);
+  }
+
   @MessagePattern({ cmd: 'billing_org_is_member' })
   esMiembro(@Payload() dto: { organizationId: string; userId: string }) {
     return this.organizaciones.esMiembroDe(dto.organizationId, dto.userId);

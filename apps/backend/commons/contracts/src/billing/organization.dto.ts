@@ -232,6 +232,34 @@ export function normalizarPermisosOrg(bruto: unknown): OrganizationPermissions {
 export const NOT_IN_ORG_CODE = 'NOT_IN_ORG';
 
 /**
+ * El código de un 403 por estar **congelado**: dentro, pero en solo lectura.
+ *
+ * ⚠️ **Es el cuarto 403 con nombre propio, y ninguno de los otros tres sirve.**
+ * No es `FORBIDDEN` —el permiso está, lo que falta es el asiento vivo—, no es
+ * `NOT_IN_ORG` —la persona sí está dentro, y decirle que no lo está es
+ * exactamente el «me han echado» que el encargo prohíbe— y no es
+ * `QUOTA_EXCEEDED`, porque quien lo recibe **no es quien puede resolverlo**: no
+ * hay nada que borrar ni nada que pueda pagar él.
+ *
+ * La salida es que alguien con `canManageBilling` amplíe el plan o libere un
+ * asiento, y por eso el detalle lleva el puesto en la cola: «eres el primero de
+ * dos» es una frase que se puede esperar; «acceso denegado» no.
+ *
+ * Con `PROJECT_SUSPENDED_CODE`, `NOT_IN_ORG_CODE` y `QUOTA_EXCEEDED_CODE`, son
+ * cuatro puertas y cuatro salidas distintas en la interfaz.
+ */
+export const SEAT_FROZEN_CODE = 'SEAT_FROZEN';
+
+/** Lo que viaja dentro de un 403 `SEAT_FROZEN`, para poder explicarlo. */
+export interface SeatFrozenDetails {
+  organizationId: string;
+  /** Su turno para volver: **1 es el primero** al liberarse un asiento. */
+  puesto: number | null;
+  /** Cuánta gente cabe en el plan de hoy. `null` = sin tope. */
+  tope: number | null;
+}
+
+/**
  * ¿Caben estos permisos dentro de los que tiene quien los reparte?
  *
  * 🔴 **Es lo que impide escalar privilegios, y sin esto el modelo se rompe
@@ -362,6 +390,25 @@ export interface OrganizationMemberView {
   status: MembershipStatus;
   invitedAt: string;
   joinedAt: string | null;
+  /**
+   * Si está **dentro y en solo lectura** por haber bajado el techo del plan.
+   *
+   * ⚠️ **No es un estado guardado ni una tercera opción de `status`.** Se
+   * deriva en cada lectura del orden de antigüedad contra el tope de asientos
+   * (D1 de `docs/PLAN-ASIENTOS-CONGELADOS.md`), así que volver a pagar lo pone
+   * a `false` solo, sin que nadie tenga que tocar ninguna fila. Meterlo en
+   * `MembershipStatus` habría hecho falsa esa frase.
+   */
+  frozen: boolean;
+  /**
+   * Su turno para volver: **1 es quien se descongela primero** al liberarse un
+   * asiento. `null` si no está congelado.
+   *
+   * Está aquí para que la pantalla pueda decir algo que se puede esperar. «Eres
+   * el primero de dos» y «no puedes escribir» son la misma situación y no la
+   * misma frase.
+   */
+  queuePosition: number | null;
 }
 
 export class CreateOrganizationBodyDto {
