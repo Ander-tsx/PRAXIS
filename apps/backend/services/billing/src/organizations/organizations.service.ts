@@ -12,6 +12,7 @@ import {
   PlanTier,
   ProjectPermission,
   SubscriptionStatus,
+  type Tope,
   cabe,
   cabenEn,
   estaVigente,
@@ -24,6 +25,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { mensajeSinAsientos, topeDeAsientos } from './asientos';
+import { type Corte, type MiembroParaCongelar, calcularCorte } from './congelados';
 
 /**
  * El error que este servicio devuelve cuando algo no se puede hacer.
@@ -1049,6 +1051,100 @@ export class OrganizationsService {
       select: { id: true },
     });
     return membresia !== null;
+  }
+
+  /* ─── Congelados ───────────────────────────────────────────────────────── */
+
+  /**
+   * Quién se ha quedado **en solo lectura** por haber bajado el techo del plan.
+   *
+   * ## Se calcula, no se guarda
+   *
+   * D1 de `docs/PLAN-ASIENTOS-CONGELADOS.md`: no hay columna `frozen`. Un flag
+   * habría que mantenerlo al día en cinco sitios —cancelar, pagar, invitar,
+   * sacar a alguien, cambiar de plan— y el día que uno se olvide habrá gente
+   * congelada en una organización que ya paga, sin que nada falle. Derivado,
+   * **volver a pagar descongela solo y en el mismo instante**, que es el
+   * invariante 3 y lo que pedía el encargo.
+   *
+   * ## Por qué esto NO se cachea
+   *
+   * 🔴 **Porque el instante importa y la caché de este servicio no la invalida
+   * un cambio de plan.** `SubscriptionsService` no tiene `RedisService` —no lo
+   * necesitaba— así que un `billing_apply_plan` no borra nada de
+   * `billing:org:*`. Con treinta segundos de TTL, la frase que oiría quien
+   * acaba de pagar es «he pagado y sigo sin poder escribir», que es la queja
+   * más cara de este terreno y la que el invariante 3 existe para evitar.
+   *
+   * El precio es una consulta ordenada por escritura sobre una tabla de decenas
+   * de filas, con índice por `organizationId`. Se paga.
+   *
+   * ⚠️ **Y `ocupados` cuenta igual que la puerta de invitar**: todas las filas,
+   * con las invitaciones pendientes dentro (D9). Contar aquí de otra manera
+   * dejaría el corte y el tope hablando de números distintos, y el síntoma sería
+   * alguien congelado con un asiento aparentemente libre.
+   */
+  async congeladosDe(organizationId: string): Promise<Corte & { organizationId: string }> {
+    const [organizacion, filas] = await Promise.all([
+      this.prisma.organization.findUnique({
+        where: { id: organizationId },
+        include: { subscription: true },
+      }),
+      this.prisma.organizationMember.findMany({
+        where: { organizationId },
+        include: { role: true },
+      }),
+    ]);
+
+    if (!organizacion) {
+      return { organizationId, congelados: [], tope: null, ocupados: 0 };
+    }
+
+    const { tope } = topeDeAsientos(organizacion.subscription);
+
+    const miembros: MiembroParaCongelar[] = filas.map((fila) => ({
+      id: fila.id,
+      userId: fila.userId,
+      email: fila.email,
+      status: fila.status,
+      invitedAt: fila.invitedAt,
+      joinedAt: fila.joinedAt,
+      /* ⚠️ **Solo en una membresía activa** (D8). Un papel con
+         `canManageBilling` en una invitación sin aceptar no salva de nada: esa
+         persona no ha entrado, así que no puede pagar. */
+      puedePagar:
+        fila.status === MembershipStatus.ACTIVE &&
+        normalizarPermisosOrg(fila.role.permissions)[OrganizationPermission.CAN_MANAGE_BILLING] ===
+          true,
+    }));
+
+    return {
+      organizationId,
+      ...calcularCorte({ miembros, ownerUserId: organizacion.ownerUserId, tope }),
+    };
+  }
+
+  /**
+   * ¿Está esta persona en solo lectura **en esta organización**?
+   *
+   * Es lo que pregunta el gateway en cada escritura. Se apoya en el cálculo
+   * entero porque el corte solo tiene sentido con la cola delante: no hay forma
+   * de saber si alguien está en la cola de atrás sin ordenar a los demás.
+   *
+   * ⚠️ **La organización que llega aquí es siempre la del recurso** (D10).
+   * Quien está congelado en la organización de su empresa escribe con
+   * normalidad en la suya personal el mismo segundo, y eso no es una promesa de
+   * este método: es consecuencia de quién le pasa el identificador. Ver
+   * `QuotaService.exigirAsientoVivo`.
+   */
+  async estaCongelado(
+    organizationId: string,
+    userId: string,
+  ): Promise<{ congelado: boolean; puesto: number | null; tope: Tope }> {
+    const corte = await this.congeladosDe(organizationId);
+    const suyo = corte.congelados.find((uno) => uno.userId === userId);
+
+    return { congelado: suyo !== undefined, puesto: suyo?.puesto ?? null, tope: corte.tope };
   }
 
   /**
