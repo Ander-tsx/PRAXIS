@@ -7,9 +7,9 @@
 > 📍 Vive en `docs/` y no en `docs/frontend/`: **es una regla de negocio y toca
 > el backend**. No se puede aproximar desde el frontend sin mentir en la pantalla.
 >
-> ⚠️ El diseño de abajo **no está cerrado**. Las siete decisiones tienen una
-> recomendación y un porqué; las cinco preguntas abiertas del final hay que
-> contestarlas antes de escribir código.
+> ✅ **El diseño quedó cerrado el 2026-09-12.** Las siete decisiones de abajo
+> siguen como estaban; las cinco preguntas que faltaban están contestadas y
+> convertidas en **D8–D12**, que es lo que se implementa en A2–A7.
 
 ---
 
@@ -196,31 +196,103 @@ demás. Si esta etapa se aplaza, A1 no debería aplazarse con ella.
 
 ---
 
-## Las cinco preguntas que faltan por contestar
+## Las cinco preguntas, contestadas
 
-1. **¿Quién más se salva además del dueño?** Alguien con `canManageBilling` es
-   quien puede volver a pagar; congelarlo tiene el mismo problema que congelar al
-   dueño, en menor grado. ¿Se salvan todos los que puedan pagar, o solo el dueño?
-2. **¿Qué pasa con las invitaciones pendientes?** Ocupan asiento (así se cuenta
-   hoy, a propósito). Al bajar de plan, ¿se congelan, se cancelan, o se dejan
-   caducar solas?
-3. **¿Congelado afecta a los proyectos de otras organizaciones?** El plan vale
-   dentro de su organización (CLAUDE.md trampa 20). Alguien congelado en la tuya
-   debería seguir escribiendo con normalidad en la suya — hay que comprobar que
-   `exigirAsientoVivo` recibe siempre la organización del **recurso**, nunca la
-   cookie.
-4. **¿Y sus tareas asignadas?** Siguen asignadas a quien no puede tocarlas.
-   ¿Se avisa en el tablero, se deja como está, o se ofrece reasignar?
-5. ~~**¿Qué se hace con las organizaciones que hoy ya están por encima?**~~
-   **Contestada al entregar A1, y la premisa era falsa.** A1 no congela a nadie:
-   solo cierra la puerta de *entrar*. Una organización que hoy tenga cinco dentro
-   y baje a tres se queda con los cinco escribiendo con normalidad y sin poder
-   meter a un sexto — que es exactamente lo que ya hace el tope de proyectos al
-   bajar de plan (trampa 24 de CLAUDE.md). No hace falta periodo de gracia para
-   A1. La pregunta **sigue viva para A4**, que es la que sí deja a alguien en
-   solo lectura, y ahí el periodo de gracia hay que decidirlo.
+> Las cuatro que quedaban vivas se contestan aquí el **2026-09-12**, antes de
+> escribir A2. Cada una pasa a ser una decisión con número, porque lo que se
+> contesta aquí lo aplica un `sort` y un `slice` que nadie va a volver a leer.
 
----
+### D8 — También se salva quien puede pagar, pero **no gratis**
+
+Se salva quien tenga `canManageBilling`, no solo el dueño. El argumento de D3 es
+el mismo un grado más abajo: congelar a la única persona que puede meter la
+tarjeta deja la organización sin llave por dentro, y el dueño puede estar de
+vacaciones.
+
+**Pero se salva de otra manera que el dueño, y la diferencia importa.** El dueño
+sale de la lista y **descuenta un asiento** (D3). Quien puede pagar **ocupa su
+asiento y se ordena el primero**: sigue contando, sigue gastando sitio, y lo
+único que se le concede es no estar nunca en la cola de atrás.
+
+⚠️ **Sin esa distinción, el papel sería la puerta de escape.** Si salvarse
+sacara de la cuenta, bastaría con dar `canManageBilling` a los cinco para que no
+se congelara nadie —y el tope de asientos volvería a ser decorativo, que es
+exactamente el agujero que A1 acaba de tapar—. Ordenando en vez de excluyendo,
+una organización de cinco que baja a tres congela a dos **aunque los cinco
+puedan pagar**: se congelan los dos últimos de entre ellos.
+
+⚠️ Y `puedePagar` solo puede ser cierto en una membresía **activa**. `permisosDe`
+exige `status: ACTIVE`, así que una invitación pendiente con un papel que lleva
+`canManageBilling` no se salva de nada — no ha entrado, no puede pagar.
+
+### D9 — Las invitaciones pendientes ocupan asiento, se congelan primero, y **no se cancelan**
+
+Tres partes, y las tres se decidieron juntas:
+
+1. **Siguen ocupando asiento.** Es como se cuenta hoy y a propósito (ver
+   `MembershipStatus`): si no ocuparan, se podrían mandar mil sobre tres y el
+   tope se rompería al aceptarlas.
+2. **Se ordenan las últimas**, después de toda la gente activa. Es la parte que
+   no era obvia: con un `COALESCE(joinedAt, invitedAt)` a secas, una invitación
+   de hace tres meses que nadie aceptó **congela a alguien que lleva un mes
+   trabajando**. Antigüedad significa haber estado dentro, no haber recibido un
+   correo.
+3. **No se cancelan.** Cancelar es borrar, y el invariante 1 dice que aquí no se
+   borra nada. Además ya caducan solas por `inviteExpiresAt`, que es un
+   mecanismo que existe y no necesita ayuda.
+
+⚠️ **Una invitación congelada se puede aceptar igual**, y quien la acepta entra
+congelado. Suena raro y es lo correcto: entrar no es escribir, y negarlo sería
+indistinguible de una invitación rota — que es justo lo que el encargo prohíbe.
+
+### D10 — Congelado en una organización, normal en las demás
+
+No hay contagio, y no es una promesa: es una consecuencia de dónde sale el
+identificador. `exigirAsientoVivo(userId, organizationId)` recibe **siempre** la
+organización del recurso —`project.organizationId`, resuelto por el guard que ya
+tenía el proyecto delante—, nunca la cookie `praxis_org` (trampa 20 de
+`CLAUDE.md`). Alguien congelado en la organización de su empresa escribe con
+normalidad en la suya personal el mismo segundo.
+
+⚠️ **Y hay una prueba para eso**, porque es el tipo de invariante que se rompe
+sin dar ningún error: bastaría con que una ruta nueva resolviera la organización
+por otro camino para congelar a alguien en un sitio donde nadie le ha bajado el
+plan.
+
+### D11 — Sus tareas se quedan donde están, y se dice
+
+No se reasigna nada automáticamente. Reasignar es una escritura que nadie ha
+pedido, le llega un aviso a quien la recibe, y desde fuera es indistinguible de
+que a la persona congelada la hayan echado del proyecto — exactamente lo que el
+encargo prohíbe.
+
+Lo que sí se hace es **decirlo**: la lista de Equipo marca quién está congelado
+y en qué puesto de la cola, y quien está congelado ve una cinta en toda la
+aplicación explicando por qué no puede escribir y a quién pedírselo.
+
+<!-- TODO(A6+): la insignia en el tablero, junto al encargado de cada tarjeta.
+     Queda fuera a propósito: el tablero no pide la lista de congelados y
+     añadírsela es una llamada más en la pantalla más caliente de la aplicación.
+     Se hará cuando el tablero ya traiga los miembros resueltos. -->
+
+### D12 — No hay periodo de gracia, y esa es la respuesta a la quinta
+
+La quinta pregunta —qué se hace con las organizaciones que hoy ya están por
+encima— se contestó a medias al entregar A1 y quedaba viva para A4, que es la
+que sí deja a alguien en solo lectura. La respuesta es **ninguno**.
+
+Un periodo de gracia existe para dar tiempo antes de un daño irreversible, y
+aquí no hay ninguno: congelar no borra nada, se deriva en cada lectura (D1) y se
+deshace **en el mismo instante** en que se paga (invariante 3). Añadir un plazo
+significaría guardar el instante en que empezó — o sea, estado — que es
+exactamente lo que D1 se niega a guardar, y por el mismo motivo: el día que a
+alguien se le olvide actualizarlo habrá gente congelada en una organización que
+ya paga.
+
+⚠️ Lo que sí hace falta, y es lo que sustituye al plazo, es **el aviso a quien
+puede resolverlo** (D7): el resumen de facturación dice quién se ha quedado en
+solo lectura, y lo ve quien tiene `canManageBilling`.
+
 
 ## Registro
 
