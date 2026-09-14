@@ -79,6 +79,19 @@ export class ProjectsController {
       organizationId: body.organizationId,
     });
 
+    /* 🔴 **Y el asiento vivo antes que la cuota**, porque no son la misma
+       negativa. `ProjectPermissionGuard` no llega aquí: no hay proyecto todavía
+       que le dé el contexto, así que esta es la **única** puerta de escritura de
+       la aplicación que el congelado tiene que cerrar por su cuenta. Sin esto,
+       quien está en solo lectura no puede tocar una tarea y sí puede crear un
+       tablero entero — que es justo lo contrario de lo que dice D4 («ni crear,
+       ni editar, ni mover»), y no daría ningún error.
+
+       Va **antes** de contar: quien está congelado no necesita enterarse de si
+       cabía o no, y un 402 le ofrecería borrar algo o pagar, que son las dos
+       cosas que no puede hacer. */
+    await this.quota.exigirAsientoVivo(req.user!.userId, organizationId);
+
     await this.quota.exigirProyecto(req.user!.userId, organizationId);
 
     return firstValueFrom(
