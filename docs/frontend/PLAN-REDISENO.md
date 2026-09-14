@@ -29,6 +29,9 @@
 > están en el árbol. La etapa viva es **Organizaciones**, y lo que le queda —tres
 > casillas de 73— está en su propio plan, no aquí.
 >
+> **Reverificación del 2026-09-14 (novena vez).** Mismo resultado, y esa sesión
+> cerró entera la etapa de asientos congelados (A4–A7). Ver la sección de abajo.
+>
 > **Reverificación del 2026-09-11 (octava vez).** Mismo resultado: los tres
 > comandos de comprobación siguen dando lo esperado, `next build` de `web`
 > verde. Lo nuevo de esta sesión no fue este plan sino que **Docker volvió**
@@ -938,6 +941,58 @@ convirtió en enlace a la landing y que ya se arregló dos veces en código vivo
 (`6f90862`, `f18f690`). Tres comentarios de `projects/[id]/actions.ts` que los
 nombraban pasan a nombrar `ProyectosPageClient`, que es lo que pinta la lista hoy.
 `next build` en verde.
+
+### Reverificación del 2026-09-14 — la novena, y la etapa de asientos cerrada
+
+El mismo prompt de traspaso, la misma respuesta. Los tres comandos de la sección
+anterior siguen dando lo mismo: `99b2f6d` es ancestro de `main` (Enterprise, PR
+#33), `report_column_time` sigue vivo en `reports-service` y en el gateway
+(R9.2), y `billing-service` conserva `organizations/` y `subscriptions/`. **Los
+dos bloques siguen fusionados en `main` y no se re-ejecutaron.**
+
+⚠️ **El árbol de trabajo traía A4 a medias y sin commitear** —el código de
+producción compilaba; el spec del guard tenía seis llamadas con un argumento de
+menos—. Es la tercera vez que pasa lo de encontrar cambios sin commitear, y esta
+vez no eran del usuario: eran de la sesión anterior. `git status` antes de nada.
+
+**Lo que se hizo: cerrar entera la etapa de asientos congelados**, que era el
+plan vivo. A4–A7 en seis commits sobre `main` (`bfdb9bc`…`5689a09`). El registro
+completo está en [PLAN-ASIENTOS-CONGELADOS](../PLAN-ASIENTOS-CONGELADOS.md); lo
+que importa desde fuera son los tres agujeros que aparecieron al enchufarlo, y
+ninguno daba error:
+
+1. 🔴 **`excedidasDe` medía los asientos contra el tope equivocado.** Comparaba
+   con `quotas.asientos` mientras el guard congela contra
+   `min(seats, quotas.asientos)`: una organización con plan Equipo, 5 asientos
+   contratados y 7 personas veía «7 de 25, todo bien» **con dos ya en solo
+   lectura**. El aviso fallaba justo donde más caro sale — quien podía ampliar el
+   plan no tenía forma de enterarse.
+2. 🔴 **`POST /projects` no pasa por `ProjectPermissionGuard`.** No hay proyecto
+   todavía que le dé contexto, así que era la única escritura por la que alguien
+   en solo lectura podía crear un tablero entero. Se cierra a mano en su
+   controlador.
+3. 🔴 **`organizacionesDe` de billing-service cachea 30 s en Redis.** Ahí no puede
+   entrar nada derivado: el congelado se calcula al leer *justo* para que pagar lo
+   apague en el mismo instante. Por eso la cinta pide `GET
+   /me/billing/mi-asiento`, sin caché, en vez de colgarse de
+   `loadPrivateChrome()`, que es donde habría sido gratis.
+
+Verde: `pnpm test` (16 tareas, 70 pruebas en el gateway), `next build` de `web`,
+`tsc --noEmit` de gateway y contracts, y **A7 contra el stack real** —
+`19-asientos-congelados`, 1 passed, con `pnpm dev:backend` levantado y Docker
+arriba.
+
+⚠️ Dos cosas que costaron tiempo y no estaban escritas: el frontend tiene su
+**propia copia** de `BillingSummary` (`commons/billing/planes.ts`), así que tocar
+el contrato del backend **no rompe** el build de `web` y hay que espejar a mano;
+y `GET /projects/:id/roles` **no existe** —solo POST—, los papeles del proyecto
+vienen dentro del detalle de `GET /projects/:id`.
+
+Lo abierto sigue siendo lo mismo y nada de ello se resuelve en frío: los 29
+hallazgos de `AUDITORIA-ORGANIZACION-CHAT-MOVIL.md` viven en
+`feature/fusion-zonas` y fusionarlos es decisión del dueño del producto; C6 y
+C9/C10 piden navegador y un humano que triage; A1 de la auditoría necesita Gemini
+con presupuesto. **Ya no queda nada de asientos congelados.**
 
 ### El hueco, dicho en una línea
 
