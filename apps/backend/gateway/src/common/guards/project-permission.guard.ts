@@ -14,6 +14,7 @@ import {
   READ_ONLY_PROJECT_PERMISSIONS,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
+import { QuotaService } from '../../billing/quota.service';
 import { PROJECT_ANY_PERMISSIONS_KEY } from '../decorators/require-any-project-permission.decorator';
 import { PROJECT_PERMISSION_KEY } from '../decorators/require-project-permission.decorator';
 
@@ -78,6 +79,9 @@ export class ProjectPermissionGuard implements CanActivate {
     private readonly reflector: Reflector,
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     @Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy,
+    /* Solo para `exigirAsientoVivo`. Viene de `BillingModule`, que ya importan
+       los seis módulos que montan este guard — ver la nota de la clase. */
+    private readonly quota: QuotaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -217,6 +221,9 @@ export class ProjectPermissionGuard implements CanActivate {
       ownerId?: string;
       status?: string;
       suspendedReason?: string | null;
+      /* Para el asiento congelado. Ya venía en la respuesta: comprobarlo aquí
+         no cuesta ni un salto de red más, igual que la suspensión. */
+      organizationId?: string | null;
     } | null = null;
 
     try {
@@ -231,9 +238,31 @@ export class ProjectPermissionGuard implements CanActivate {
       this.exigirEstadoQueDejePasar(project.status, project.suspendedReason, requiredPermissions);
     }
 
+    /**
+     * 2. El asiento vivo, y también **antes** del atajo del dueño.
+     *
+     * 🔴 **Y por un motivo distinto que la suspensión.** Ahí el orden protegía
+     * al dueño *del proyecto* de saltarse su propia suspensión; aquí lo que
+     * pasa es que **el dueño de un proyecto puede estar congelado**: quien no
+     * se congela nunca es el dueño de la *organización* (D3), que no tiene por
+     * qué ser el mismo. Poner esto después del atajo dejaría a cada persona
+     * congelada escribiendo con normalidad en los tableros que creó ella, que
+     * son justo los que más toca.
+     *
+     * ⚠️ **Solo en las escrituras**, con el mismo criterio que la suspensión:
+     * congelado es solo lectura, así que las rutas de lectura ni preguntan. Es
+     * además lo que evita pagar un viaje TCP por cada carga de un tablero.
+     *
+     * ⚠️ **La organización sale del proyecto**, que es lo que hace cierta D10:
+     * estar congelado en la de tu empresa no te congela en la tuya personal.
+     */
+    if (project?.organizationId && !this.esLectura(requiredPermissions)) {
+      await this.quota.exigirAsientoVivo(userId, project.organizationId);
+    }
+
     if (project?.ownerId === userId) return true;
 
-    // 2. Consultar projects-service por el permiso granular
+    // 3. Consultar projects-service por el permiso granular
     try {
       const permissions = await Promise.all(
         requiredPermissions.map(async (permission) => {
@@ -274,6 +303,21 @@ export class ProjectPermissionGuard implements CanActivate {
    * decir: por esta puerta no hay nada. El administrador lo ve por la suya
    * (`/admin/projects`), que no pasa por este guard.
    */
+  /**
+   * ¿Lo que se pide es solo mirar?
+   *
+   * ⚠️ **Lo comparten la suspensión y el asiento congelado, y por eso está
+   * extraído.** Las dos cosas significan «solo lectura» y las dos tienen que
+   * dejar pasar exactamente lo mismo: escrito dos veces, el día que se añada un
+   * permiso de lectura nuevo una de las dos se quedaría atrás y bloquearía una
+   * pantalla que la otra deja ver, sin que nada falle.
+   */
+  private esLectura(requiredPermissions: readonly ProjectPermission[]): boolean {
+    return requiredPermissions.some((permission) =>
+      READ_ONLY_PROJECT_PERMISSIONS.includes(permission),
+    );
+  }
+
   private exigirEstadoQueDejePasar(
     status: string,
     reason: string | null | undefined,
@@ -284,11 +328,7 @@ export class ProjectPermissionGuard implements CanActivate {
     }
 
     if (status === 'SUSPENDED') {
-      if (
-        requiredPermissions.some((permission) => READ_ONLY_PROJECT_PERMISSIONS.includes(permission))
-      ) {
-        return;
-      }
+      if (this.esLectura(requiredPermissions)) return;
 
       throw new ForbiddenException({
         code: PROJECT_SUSPENDED_CODE,

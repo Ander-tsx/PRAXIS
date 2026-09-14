@@ -17,6 +17,8 @@ import {
   QUOTA_EXCEEDED_CODE,
   type QuotaExceededDetails,
   QuotaKind,
+  SEAT_FROZEN_CODE,
+  type SeatFrozenDetails,
   type SubscriptionStatus,
   type Tope,
   cabe,
@@ -858,6 +860,86 @@ export class QuotaService {
       limite: plan.quotas.iaMensualPorPersona,
       organizationId: plan.organizationId,
     };
+  }
+
+  /* ─── Asiento congelado ────────────────────────────────────────────────── */
+
+  /**
+   * Que quien escribe tenga su asiento **vivo** en esa organización.
+   *
+   * ## Qué es esto y por qué no es una cuota más
+   *
+   * Es el corazón de `docs/PLAN-ASIENTOS-CONGELADOS.md`. Cuando el techo del
+   * plan baja por debajo de la gente que ya está dentro —al cancelar, o al bajar
+   * de plan— **no se echa a nadie**: la cola de antigüedad se corta por el tope
+   * y quien sobra se queda dentro en solo lectura. Ve sus proyectos, lee sus
+   * tareas, lee el chat, y no puede escribir nada.
+   *
+   * ⚠️ **No es un 402 y no pasa por `exigir`.** Las cuotas se arreglan borrando
+   * algo o pagando, y las dos cosas las puede hacer quien recibe el error. Esto
+   * no: quien está congelado no tiene nada que borrar —no ha creado nada de más—
+   * y no es quien paga. Un 402 le ofrecería una salida que no existe. Es un 403
+   * con código propio, `SEAT_FROZEN`, y el detalle lleva el puesto en la cola
+   * para que la pantalla pueda decir «eres el primero de dos» en vez de «acceso
+   * denegado».
+   *
+   * ## 🔴 De dónde sale `organizationId`
+   *
+   * **Siempre del recurso**, nunca de la cookie `praxis_org` (trampa 20 de
+   * `CLAUDE.md`). Es lo que hace cierta la decisión D10: estar congelado en la
+   * organización de tu empresa no te congela en la tuya personal, y eso no es
+   * una comprobación que se haga en ningún sitio — es la consecuencia de que el
+   * identificador salga del proyecto que se está tocando. Una ruta nueva que lo
+   * resolviera por otro camino congelaría a alguien donde nadie le ha bajado el
+   * plan, y no daría ningún error.
+   *
+   * ## Y falla hacia el lado permisivo
+   *
+   * ⚠️ Si billing-service no contesta, **se deja escribir** y se registra. Es la
+   * misma asimetría que `exigirAsientoEnProyecto` y la contraria a
+   * `compartenOrganizacion`, y la línea entre las dos es quién puede resolver el
+   * falso positivo: a quien se le niega escribir por una caída de billing no
+   * tiene absolutamente nada que hacer al respecto, y el daño de dejar pasar una
+   * escritura de alguien que debía estar congelado es una fila de más en un
+   * tablero que ya era suyo.
+   */
+  async exigirAsientoVivo(userId: string, organizationId: string | null): Promise<void> {
+    if (!organizationId) return;
+
+    const estado = await firstValueFrom(
+      this.billingClient.send<{ congelado: boolean; puesto: number | null; tope: Tope }>(
+        { cmd: 'billing_seat_frozen' },
+        { organizationId, userId },
+      ),
+    ).catch(() => null);
+
+    if (estado === null) {
+      this.log.error(
+        `billing-service no dijo si ${userId} está congelado en ${organizationId}: se deja escribir.`,
+      );
+      return;
+    }
+    if (!estado.congelado) return;
+
+    const detalles: SeatFrozenDetails = {
+      organizationId,
+      puesto: estado.puesto,
+      tope: estado.tope,
+    };
+
+    /* Al primero de la cola se le dice que lo es: es la diferencia entre «espera»
+       y «espera, y eres el siguiente». El resto no lleva número en el mensaje
+       —lo lleva `details.puesto`— porque la pantalla sabe redactarlo mejor. */
+    const elSiguiente =
+      estado.puesto === 1
+        ? 'Eres la primera persona que vuelve en cuanto se libere un asiento. '
+        : '';
+
+    throw new ForbiddenException({
+      code: SEAT_FROZEN_CODE,
+      message: `Tu organización tiene más gente que asientos, así que tu cuenta está en solo lectura: puedes verlo todo y no puedes escribir. ${elSiguiente}Se arregla desde facturación, ampliando el plan o liberando un asiento.`,
+      details: detalles,
+    });
   }
 
   /* ─── El motor ─────────────────────────────────────────────────────────── */
