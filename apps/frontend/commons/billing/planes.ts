@@ -153,6 +153,22 @@ export interface QuotaExcedida {
   actual: number;
 }
 
+/**
+ * Alguien en solo lectura por no caber en el plan. Espejo de `CongeladoView`.
+ *
+ * Se **deriva** en el servidor en cada lectura: no hay columna `frozen`, así que
+ * volver a pagar vacía esta lista sola y nadie tiene que descongelar a nadie.
+ */
+export interface CongeladoView {
+  /** El id de la membresía, no el de la persona. */
+  id: string;
+  /** `null` mientras la invitación siga sin aceptar. */
+  userId: string | null;
+  email: string;
+  /** Su turno para volver: **1 es el primero** al liberarse un asiento. */
+  puesto: number;
+}
+
 /** Lo que devuelve `GET /me/billing/resumen`. */
 export interface BillingSummary {
   organizationId: string | null;
@@ -169,6 +185,15 @@ export interface BillingSummary {
   };
   /** Los topes ya rebasados. Vacío casi siempre. Ver `QuotaExcedida`. */
   excedidas: QuotaExcedida[];
+  /**
+   * Quién se ha quedado en solo lectura por no caber en el plan.
+   *
+   * 🔴 **`null` no es «nadie»: es «no te toca saberlo».** Lo manda el servidor
+   * solo a quien tenga `canManageBilling` —y al dueño—, porque quien puede
+   * ampliar el plan no suele ser quien se quedó fuera. Pintar «no hay nadie
+   * congelado» a partir de un `null` es decir una cosa que no se sabe.
+   */
+  congelados: CongeladoView[] | null;
   iaReiniciaEn: string;
   pruebaTerminaEn: string | null;
   cancelaEn: string | null;

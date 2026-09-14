@@ -12,8 +12,13 @@ import { excedidasDe } from './billing.controller';
 describe('excedidasDe', () => {
   const sinNada = { proyectos: 0, iaMensual: 0, asientos: 0, almacenamientoMb: 0 };
 
+  /* El caso normal: no se ha bajado de plan, así que el tope que aplica es el
+     del plan. Los dos números coinciden salvo después de cancelar o bajar. */
+  const TOPE_TEAM = PLANS[PlanTier.TEAM].quotas.asientos;
+  const TOPE_FREE = PLANS[PlanTier.FREE].quotas.asientos;
+
   it('no marca nada cuando todo cabe', () => {
-    expect(excedidasDe(PLANS[PlanTier.TEAM].quotas, sinNada)).toEqual([]);
+    expect(excedidasDe(PLANS[PlanTier.TEAM].quotas, sinNada, TOPE_TEAM)).toEqual([]);
   });
 
   /**
@@ -21,7 +26,11 @@ describe('excedidasDe', () => {
    * cabían en Negocio no caben en Equipo.
    */
   it('marca los proyectos cuando el plan baja por debajo de lo que ya hay', () => {
-    const excedidas = excedidasDe(PLANS[PlanTier.TEAM].quotas, { ...sinNada, proyectos: 40 });
+    const excedidas = excedidasDe(
+      PLANS[PlanTier.TEAM].quotas,
+      { ...sinNada, proyectos: 40 },
+      TOPE_TEAM,
+    );
 
     expect(excedidas).toEqual([{ kind: QuotaKind.PROYECTOS, tope: 25, actual: 40 }]);
   });
@@ -31,7 +40,9 @@ describe('excedidasDe', () => {
    * pasado» a quien está justo donde compró es una acusación falsa.
    */
   it('no marca a quien está exactamente en el tope', () => {
-    expect(excedidasDe(PLANS[PlanTier.TEAM].quotas, { ...sinNada, proyectos: 25 })).toEqual([]);
+    expect(
+      excedidasDe(PLANS[PlanTier.TEAM].quotas, { ...sinNada, proyectos: 25 }, TOPE_TEAM),
+    ).toEqual([]);
   });
 
   /**
@@ -39,22 +50,22 @@ describe('excedidasDe', () => {
    * cero, y el plan sin límite saldría como el único rebasado de los cuatro.
    */
   it('nunca marca un tope que no existe', () => {
-    const excedidas = excedidasDe(PLANS[PlanTier.ENTERPRISE].quotas, {
-      proyectos: 9_000,
-      iaMensual: 0,
-      asientos: 9_000,
-      almacenamientoMb: 9_000_000,
-    });
+    const excedidas = excedidasDe(
+      PLANS[PlanTier.ENTERPRISE].quotas,
+      { proyectos: 9_000, iaMensual: 0, asientos: 9_000, almacenamientoMb: 9_000_000 },
+      PLANS[PlanTier.ENTERPRISE].quotas.asientos,
+    );
 
     expect(excedidas).toEqual([]);
   });
 
   /** `null` es «no se pudo medir», no «cero»: inventarse el aviso es peor. */
   it('no marca el almacenamiento cuando no se pudo medir', () => {
-    const excedidas = excedidasDe(PLANS[PlanTier.FREE].quotas, {
-      ...sinNada,
-      almacenamientoMb: null,
-    });
+    const excedidas = excedidasDe(
+      PLANS[PlanTier.FREE].quotas,
+      { ...sinNada, almacenamientoMb: null },
+      TOPE_FREE,
+    );
 
     expect(excedidas).toEqual([]);
   });
@@ -64,8 +75,45 @@ describe('excedidasDe', () => {
    * alguien por encima el resto del mes, sin haber escrito nada más.
    */
   it('marca la IA del mes en curso tras una bajada de plan', () => {
-    const excedidas = excedidasDe(PLANS[PlanTier.FREE].quotas, { ...sinNada, iaMensual: 200 });
+    const excedidas = excedidasDe(
+      PLANS[PlanTier.FREE].quotas,
+      { ...sinNada, iaMensual: 200 },
+      TOPE_FREE,
+    );
 
     expect(excedidas).toEqual([{ kind: QuotaKind.IA_MENSUAL, tope: 13, actual: 200 }]);
+  });
+  /**
+   * 🔴 **El tope de asientos no sale del plan, y por eso es un parámetro.**
+   *
+   * Es el caso que esta función contestaba mal: una organización con el plan
+   * Equipo —25 asientos— que solo contrató 5 y tiene 7 personas dentro. Contra
+   * `quotas.asientos` salen «7 de 25, todo bien», mientras
+   * `QuotaService.exigirAsientoVivo` congela a dos con el tope efectivo
+   * `min(5, 25)`. La pantalla decía que no pasaba nada sobre gente que ya estaba
+   * en solo lectura, que es el peor sitio donde puede fallar un aviso: quien
+   * podía ampliar el plan no tenía forma de enterarse.
+   */
+  it('marca los asientos contra lo contratado, no contra lo que admite el plan', () => {
+    const excedidas = excedidasDe(
+      PLANS[PlanTier.TEAM].quotas,
+      { ...sinNada, asientos: 7 },
+      /* `min(seats=5, quotas.asientos=25)`, que es lo que trae `seatsCap`. */
+      5,
+    );
+
+    expect(excedidas).toEqual([{ kind: QuotaKind.ASIENTOS, tope: 5, actual: 7 }]);
+  });
+
+  /** Y con el tope del plan a secas no se marcaría nada: la prueba de arriba
+      pasaría igual sin el parámetro si no se comprobara también esto. */
+  it('no marcaba nada mirando solo el plan, que es lo que se estaba haciendo', () => {
+    const excedidas = excedidasDe(
+      PLANS[PlanTier.TEAM].quotas,
+      { ...sinNada, asientos: 7 },
+      TOPE_TEAM,
+    );
+
+    expect(excedidas).toEqual([]);
   });
 });

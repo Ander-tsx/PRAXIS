@@ -16,6 +16,8 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import {
   type BillingSummary,
   CheckoutBodyDto,
+  type CongeladoView,
+  OrganizationPermission,
   type OrganizationView,
   PLANS,
   PLAN_LIST,
@@ -120,8 +122,26 @@ export class BillingController {
       organizationId ? this.quota.almacenamientoDe(organizationId) : Promise.resolve(null),
     ]);
 
-    const asientos = organizaciones.find((una) => una.id === organizationId)?.seatsUsed ?? 0;
+    const laSuya = organizaciones.find((una) => una.id === organizationId) ?? null;
+    const asientos = laSuya?.seatsUsed ?? 0;
     const almacenamientoMb = bytes === null ? null : Math.ceil(bytes / (1024 * 1024));
+
+    /* El tope que aplica el guard, no el del plan a secas. Si `billing_orgs_of`
+       no contestó, se cae al del plan: es el peor de los dos números que se
+       pueden enseñar, y equivocarse hacia «tienes menos sitio del que crees» no
+       manda a nadie a invitar a quien no va a caber. */
+    const topeAsientos = laSuya ? laSuya.seatsCap : plan.quotas.asientos;
+
+    /* 🔴 **La lista solo para quien puede resolverlo** (D7). No cuesta un viaje
+       TCP de permisos: `billing_orgs_of` ya trae `myPermissions` resueltos y el
+       dueño los tiene todos. Quien no puede verla recibe `null` —«no te toca
+       saberlo»— y no `[]`, que le diría que no hay nadie congelado. */
+    const puedeVerlos =
+      laSuya !== null &&
+      (laSuya.soyDueno || laSuya.myPermissions[OrganizationPermission.CAN_MANAGE_BILLING] === true);
+
+    const congelados =
+      puedeVerlos && organizationId ? await this.congeladosDe(organizationId) : null;
 
     return {
       organizationId: plan.organizationId,
@@ -129,12 +149,12 @@ export class BillingController {
       status: plan.status,
       quotas: plan.quotas,
       uso: { proyectos, iaMensual: ia.usados, asientos, almacenamientoMb },
-      excedidas: excedidasDe(plan.quotas, {
-        proyectos,
-        iaMensual: ia.usados,
-        asientos,
-        almacenamientoMb,
-      }),
+      excedidas: excedidasDe(
+        plan.quotas,
+        { proyectos, iaMensual: ia.usados, asientos, almacenamientoMb },
+        topeAsientos,
+      ),
+      congelados,
       iaReiniciaEn: ia.reinicia,
       pruebaTerminaEn: plan.trialEndsAt,
       cancelaEn: plan.cancelAt,
@@ -344,6 +364,29 @@ export class BillingController {
     ).catch(() => ({ stripeCustomerId: null }));
   }
 
+  /**
+   * Quién está en solo lectura en esta organización.
+   *
+   * ⚠️ **Se cae a lista vacía si billing-service no contesta**, igual que
+   * `organizaciones()`. Es un aviso, no una puerta: quien niega la escritura es
+   * el guard (A4), con su propia llamada y su propio criterio. Tumbar la
+   * pantalla de facturación entera porque no se pudo pintar una tarjeta
+   * informativa sería cambiar un aviso que falta por una avería.
+   *
+   * ⚠️ Y **no filtra por permiso**: eso ya lo decidió quien llama. El comando
+   * TCP tampoco lo hace, por el mismo motivo que `billing_org_members`.
+   */
+  private congeladosDe(organizationId: string): Promise<CongeladoView[]> {
+    return firstValueFrom(
+      this.billingClient.send<{ congelados: CongeladoView[] }>(
+        { cmd: 'billing_frozen_members' },
+        { organizationId },
+      ),
+    )
+      .then((corte) => corte?.congelados ?? [])
+      .catch(() => []);
+  }
+
   private organizaciones(userId: string): Promise<OrganizationView[]> {
     return firstValueFrom(
       this.billingClient.send<OrganizationView[]>({ cmd: 'billing_orgs_of' }, { userId }),
@@ -453,6 +496,21 @@ export function excedidasDe(
     asientos: number;
     almacenamientoMb: number | null;
   },
+  /**
+   * El tope de asientos que **aplica de verdad**: `min(seats, quotas.asientos)`.
+   *
+   * 🔴 **Obligatorio y aparte de `quotas` a propósito.** Es el único tope de los
+   * cuatro que no sale del plan, y usar `quotas.asientos` aquí era una mentira
+   * medible: una organización con el plan Equipo (25) que solo contrató 5
+   * asientos y tiene 7 personas ve «7 de 25, todo bien» mientras el guard
+   * congela a 2 (A4). El resumen decía que no pasaba nada sobre gente que ya
+   * estaba en solo lectura.
+   *
+   * Un parámetro obligatorio y no un valor por defecto: con un `?? quotas.asientos`
+   * al final, quien añadiera la quinta llamada a esta función se llevaría el
+   * número equivocado sin escribir una línea de más y sin un error.
+   */
+  topeAsientos: Tope,
 ): QuotaExcedida[] {
   const excedidas: QuotaExcedida[] = [];
 
@@ -469,7 +527,10 @@ export function excedidasDe(
   };
 
   mirar(QuotaKind.PROYECTOS, quotas.proyectos, uso.proyectos);
-  mirar(QuotaKind.ASIENTOS, quotas.asientos, uso.asientos);
+  /* `topeAsientos` y no `quotas.asientos`: ver el parámetro. Es el mismo número
+     contra el que congela `QuotaService.exigirAsientoVivo`, y tienen que ser el
+     mismo o la pantalla y el guard cuentan distinto. */
+  mirar(QuotaKind.ASIENTOS, topeAsientos, uso.asientos);
   mirar(QuotaKind.ALMACENAMIENTO, quotas.almacenamientoOrgMb, uso.almacenamientoMb);
   /**
    * ⚠️ **La IA también, y es la menos evidente.** Alguien que gastó 200 mensajes

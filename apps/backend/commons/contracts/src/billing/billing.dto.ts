@@ -83,6 +83,22 @@ export interface QuotaExcedida {
   actual: number;
 }
 
+/**
+ * Alguien en solo lectura dentro de una organización, para la pantalla.
+ *
+ * Se **deriva** en cada lectura (D1): no hay columna `frozen`, así que volver a
+ * pagar vacía esta lista sola, sin que nadie tenga que descongelar a nadie.
+ */
+export interface CongeladoView {
+  /** El id de la membresía, no el de la persona. */
+  id: string;
+  /** `null` mientras la invitación siga sin aceptar. */
+  userId: string | null;
+  email: string;
+  /** Su turno para volver: **1 es el primero** al liberarse un asiento. */
+  puesto: number;
+}
+
 export interface BillingSummary {
   /**
    * De qué organización sale el plan que vale.
@@ -118,6 +134,21 @@ export interface BillingSummary {
    * Ver `QuotaExcedida`: se llega aquí bajando de plan, no creando de más.
    */
   excedidas: QuotaExcedida[];
+  /**
+   * Quién se ha quedado en solo lectura por no caber en el plan, y en qué
+   * puesto de la cola para volver.
+   *
+   * 🔴 **`null` no es «nadie»: es «no te toca saberlo».** Lo ve quien tenga
+   * `canManageBilling` —y el dueño, que lo puede todo—, que es la asimetría de
+   * D7 de `docs/PLAN-ASIENTOS-CONGELADOS.md`: en un equipo de cinco, quien puede
+   * ampliar el plan no suele ser quien se quedó fuera. Una lista vacía para
+   * quien no puede verla le diría que no hay nadie congelado, que es peor que
+   * no decirle nada.
+   *
+   * ⚠️ **Es la única salida del congelado, porque no hay periodo de gracia**
+   * (D12): no hay plazo que avise, hay un aviso a quien puede resolverlo.
+   */
+  congelados: CongeladoView[] | null;
   /** Cuándo vuelve a cero el contador de IA, en ISO. */
   iaReiniciaEn: string;
   /**
