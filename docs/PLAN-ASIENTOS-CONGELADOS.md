@@ -299,6 +299,8 @@ solo lectura, y lo ve quien tiene `canManageBilling`.
 | Fecha | Paso | Qué se hizo |
 |---|---|---|
 | 2026-09-09 | **A1** | El agujero, tapado. Tres commits en `main` |
+| 2026-09-12 | **A2**, **A3** | La cola de antigüedad y el corte; `SEAT_FROZEN` y los dos comandos TCP |
+| 2026-09-14 | **A4**–**A7** | Se aplica, se dice y se prueba. La etapa queda **cerrada** |
 
 ### A1 — `b88147d`, `48fe695`, `831effe`
 
@@ -336,3 +338,81 @@ billing, gateway y web.
 
 **Lo que A1 NO hace: congelar.** Quien ya está dentro sigue dentro y sigue
 escribiendo. Eso es A2–A7 y sigue esperando a las cuatro preguntas que quedan.
+
+### A4–A7 — `bfdb9bc`, `fd8fe79`, `158fe80`, y lo que cierra la etapa
+
+Con A2 y A3 el corte estaba calculado y nombrado, y **no lo invocaba nadie**.
+Eso es exactamente la forma que tienen de fallar las cuotas en este repositorio
+—una cifra escrita en `plans.ts` que no comprueba ningún guard, tres veces ya
+(trampas 20 y 23 de `CLAUDE.md`)— así que lo que hacen estos cuatro pasos es
+enchufarlo, decirlo y demostrarlo.
+
+**A4, el guard.** `exigirAsientoVivo` en `ProjectPermissionGuard`, y el orden es
+la mitad del diseño: **va antes del atajo del dueño**. No por la razón de la
+suspensión —que impide al dueño saltarse su propio castigo— sino porque **el
+dueño de un proyecto puede estar congelado**; quien no se congela nunca es el
+dueño de la *organización* (D3), que no tiene por qué ser el mismo. Puesto
+después del atajo, cada persona congelada seguiría escribiendo con normalidad en
+los tableros que creó ella, que son los que más toca, y el congelado sería una
+cáscara. Hay prueba, y cae si se mueve el orden.
+
+Solo en las escrituras: el criterio de «esto es solo mirar» sale a `esLectura()`
+porque lo comparten la suspensión y el asiento, y escrito dos veces el día que se
+añada un permiso de lectura nuevo una de las dos se queda atrás.
+
+🔴 **Y apareció una puerta que el guard no cubre: `POST /projects`.** No hay
+proyecto todavía que le dé contexto, así que se cierra a mano en su controlador.
+Sin esa línea, quien no puede tocar una tarea podía crear un tablero entero —lo
+contrario de D4, y sin ningún error—. Es la única escritura del repositorio que
+tiene que acordarse de esto por su cuenta.
+
+**A5, el aviso — y un fallo medible de propina.** `excedidasDe` comparaba los
+asientos contra `quotas.asientos`, y el guard congela contra
+`min(seats, quotas.asientos)`. Una organización con el plan Equipo que solo
+contrató 5 asientos y tiene 7 personas veía «7 de 25, todo bien» **mientras dos
+estaban en solo lectura**. El tope pasa a ser parámetro **obligatorio**: con un
+valor por defecto, la próxima llamada se lleva el número equivocado sin escribir
+una línea de más.
+
+`resumen` gana `congelados`, y `null` no es «nadie» sino «no te toca saberlo» —lo
+ve quien tiene `canManageBilling` y el dueño (D7)—. Es lo que sustituye al
+periodo de gracia que D12 decidió no tener.
+
+**A6, las tres pantallas**, una por cada persona distinta: la cinta para quien lo
+sufre, la marca en Equipo junto al nombre —no en la columna de estado, porque
+conserva su papel entero— y la tarjeta en Facturación para quien puede
+resolverlo, arriba del todo y fuera de «Tu plan», que es `null` en el gratuito
+—que es justo donde más gente se congela—.
+
+🔴 **La cinta pide su propio endpoint por la caché, y esto vale para lo que
+venga.** El sitio natural era `loadPrivateChrome()`, donde habría sido gratis,
+pero esa lista **se guarda 30 s en Redis**. Congelado es derivado *justo* para
+que pagar lo apague en el mismo instante (invariante 3): metido en esa caché
+duraría medio minuto más que el pago, con la cinta puesta en una organización que
+ya paga y sin que nada fallara. Es D1 un piso más arriba. `GET
+/me/billing/mi-asiento`, tres campos, sin caché.
+
+**A7, la prueba.** `e2e/tests/api/19-asientos-congelados.spec.ts`: cinco
+personas, se cancela, las dos últimas **leen y no escriben** —con
+`error.code === 'SEAT_FROZEN'`, no un 403 cualquiera— y **al volver a pagar
+escriben**, sin reinvitar a nadie ni tocar una fila. Ese último tramo es el
+invariante 3, y es la razón entera de que congelado se derive.
+
+⚠️ Necesita una fixture nueva, `e2e/fixtures/suscripcion.ts`, que escribe el plan
+en la base. Es el **segundo y último** sitio de la suite que no pasa por el
+gateway, y por la misma razón que `verificacion.ts`: quien concede un plan es el
+webhook de Stripe con la firma comprobada, y ese endpoint no se toca. Escribe
+exactamente las tres columnas que escribe el webhook —`tier`, `status`,
+`seats`— y **conserva `seats` al cancelar**, que es medio caso de prueba: bajarlo
+borraría justo la condición que A1 arregló.
+
+### Lo que queda
+
+**Nada de esta etapa.** Las siete decisiones y los cinco invariantes están
+aplicados y probados.
+
+Fuera de ella queda el `TODO(A6+)` de D11: la insignia de congelado en el
+tablero, junto al encargado de cada tarjeta. Sigue fuera a propósito —el tablero
+no pide la lista de congelados y añadírsela es una llamada más en la pantalla más
+caliente de la aplicación— y se hará cuando el tablero ya traiga los miembros
+resueltos.
