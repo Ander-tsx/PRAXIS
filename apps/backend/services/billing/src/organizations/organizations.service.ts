@@ -362,6 +362,13 @@ export class OrganizationsService {
        selector de la barra lateral. Sin caché, eso es una consulta con tres
        `include` por navegación para una lista que cambia cuando alguien crea o
        acepta algo. */
+    /* 🔴 **Y por eso mismo aquí no entra nada derivado.** En concreto, no entra
+       si quien pregunta está congelado: eso se calcula al leer (D1 de
+       `docs/PLAN-ASIENTOS-CONGELADOS.md`) justo para que volver a pagar lo
+       apague **en el mismo instante** (invariante 3). Guardado aquí duraría
+       treinta segundos más que el pago, con la cinta de «solo lectura» puesta en
+       una organización que ya paga, y sin que nada fallara. Quien lo necesite
+       que pregunte por `billing_seat_frozen`, que no cachea. */
     const clave = `billing:user:${userId}:orgs`;
     const cacheado = await this.redis.get<unknown[]>(clave);
     if (cacheado) return cacheado;

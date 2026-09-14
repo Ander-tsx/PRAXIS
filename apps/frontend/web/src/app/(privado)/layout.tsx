@@ -1,4 +1,5 @@
 import { setPresenceAction } from '@/app/(privado)/presence-actions';
+import { AvisoAsientoCongelado } from '@/components/organisms/Billing/AvisoAsientoCongelado';
 import { AppShell, PresenceFooter, avatarHref, displayName } from '@praxis/commons';
 import { loadPrivateChrome } from '@praxis/commons/auth';
 import { getSidebarPlegada, getSidebarTab } from '@praxis/commons/theme';
@@ -81,6 +82,15 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
        **es** el botón. Ver `PresenceFooter`. */
       estadoSlot={<PresenceFooter presencia={profile.presence} onCambiar={setPresenceAction} />}
     >
+      {/* La cinta de «estás en solo lectura», encima de todo lo demás y en las
+          cinco secciones. Va aquí y no en `AppShell` porque no es parte del
+          armazón: es un aviso que casi nunca se pinta —no devuelve nada si no
+          estás congelado— y el armazón no tiene por qué saber de facturación.
+
+          ⚠️ Se le pasa la organización **resuelta**, no la cookie: con la cruda
+          se preguntaría por una de la que quizá ya te fueron. Ver
+          `resolverOrganizacionActiva`. */}
+      <AvisoAsientoCongelado organizationId={organizacionActivaId} />
       {children}
     </AppShell>
   );

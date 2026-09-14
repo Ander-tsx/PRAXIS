@@ -225,6 +225,62 @@ export default async function BillingPage({
   );
 
   /**
+   * Quién se ha quedado en solo lectura, para quien puede resolverlo.
+   *
+   * 🔴 **Es lo que sustituye al periodo de gracia** (D12 de
+   * `docs/PLAN-ASIENTOS-CONGELADOS.md`). No hay plazo que avise antes de
+   * congelar a nadie, porque congelar no borra nada y se deshace en cuanto se
+   * paga; lo que sí hace falta es que quien puede ampliar el plan **se entere**,
+   * y en un equipo de cinco ese casi nunca es quien se quedó fuera.
+   *
+   * ⚠️ **`null` es «no te toca saberlo», no «no hay nadie».** El servidor solo
+   * manda la lista a quien tiene `canManageBilling` —y al dueño—, así que
+   * distinguirlo del array vacío es lo que evita decirle «no hay nadie
+   * congelado» a alguien que simplemente no puede verlo.
+   *
+   * Va **arriba del todo y fuera de `tuPlanSlot`**, que es `null` en el plan
+   * gratuito: gratis es justo donde más gente se congela.
+   */
+  const congelados = resumen?.congelados ?? null;
+
+  const congeladosSlot =
+    congelados && congelados.length > 0 ? (
+      <div className="flex flex-col gap-4 rounded-2xl border border-warning/30 bg-warning-muted p-6">
+        <div className="flex flex-col gap-1">
+          <h2 className="font-sans text-lg font-semibold tracking-tight text-text-primary">
+            {congelados.length === 1
+              ? 'Una persona está en solo lectura'
+              : `${congelados.length} personas están en solo lectura`}
+          </h2>
+          <p className="max-w-2xl font-sans text-sm text-text-secondary">
+            Tu organización tiene más gente que asientos, así que quienes llegaron más tarde pueden
+            verlo todo y no pueden escribir.{' '}
+            <strong className="font-semibold text-text-primary">No se ha ido nadie</strong>: siguen
+            dentro, con su papel y sus tareas, y recuperan el asiento solos —por orden— en cuanto
+            amplíes el plan o se libere uno.
+          </p>
+        </div>
+
+        <ul className="flex flex-col gap-1.5">
+          {congelados.map((quien) => (
+            <li
+              key={quien.id}
+              className="flex flex-wrap items-baseline gap-x-2 font-sans text-sm text-text-primary"
+            >
+              <span className="font-medium">{quien.email}</span>
+              <span className="text-text-secondary">
+                {quien.puesto === 1 ? '· el 1.º en volver' : `· el ${quien.puesto}.º en volver`}
+              </span>
+              {quien.userId === null && (
+                <span className="text-text-secondary">· invitación sin aceptar</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null;
+
+  /**
    * Una sola pestaña: lo tuyo arriba, la comparativa debajo.
    *
    * Antes eran dos —«Tu plan» y «Todos los planes»— y los asientos vivían en la
@@ -232,6 +288,7 @@ export default async function BillingPage({
    */
   const planesSlot = (
     <div className="flex flex-col gap-8">
+      {congeladosSlot}
       {tuPlanSlot}
 
       <div className="flex flex-col gap-6">

@@ -183,11 +183,11 @@ de cinco no suele ser quien se quedó fuera. Es la misma asimetría que ya resue
 | # | Paso | Dónde |
 |---|---|---|
 | ✅ A1 | Tapar el agujero: aplicar `min(seats, quotas.asientos)` al invitar | billing-service |
-| A2 | `orderMiembrosPorAntiguedad` + cálculo del corte, con el dueño fuera | billing-service |
-| A3 | `billing_frozen_members` por TCP, y `SEAT_FROZEN` en `fallos.ts` | billing-service + gateway |
-| A4 | `QuotaService.exigirAsientoVivo` y su uso en los guards de escritura | gateway |
-| A5 | `excedidas[]` incluye congelados; `resumen` dice quiénes | gateway |
-| A6 | La cinta de «estás en solo lectura» y el listado en Equipo | frontend |
+| ✅ A2 | `orderMiembrosPorAntiguedad` + cálculo del corte, con el dueño fuera | billing-service |
+| ✅ A3 | `billing_frozen_members` por TCP, y `SEAT_FROZEN` en `fallos.ts` | billing-service + gateway |
+| ✅ A4 | `QuotaService.exigirAsientoVivo` y su uso en los guards de escritura | gateway |
+| ✅ A5 | `excedidas[]` incluye congelados; `resumen` dice quiénes | gateway |
+| ✅ A6 | La cinta de «estás en solo lectura» y el listado en Equipo | frontend |
 | A7 | Pruebas: cancelar con 5, comprobar que las 2 últimas leen y no escriben, volver a pagar y comprobar que escriben | e2e |
 
 ⚠️ **A1 es independiente y se puede entregar solo.** Es el arreglo de un agujero

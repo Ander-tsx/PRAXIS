@@ -171,6 +171,57 @@ export class BillingController {
   }
 
   /**
+   * ¿Estoy yo en solo lectura en esta organización?
+   *
+   * Lo pide la cinta que se pinta en toda la aplicación (D11 de
+   * `docs/PLAN-ASIENTOS-CONGELADOS.md`). Es el otro lado de `resumen.congelados`:
+   * aquella lista es para quien puede **resolverlo**, y esto es para quien lo
+   * **sufre**. Sin ella, la primera noticia que tiene alguien congelado es un
+   * botón que no responde, y eso se lee como una avería.
+   *
+   * 🔴 **Existe suelto, y no como un campo de `/me/organizations`, por la
+   * caché.** Esa lista se guarda 30 s en Redis (`ORGS_TTL`) porque la pide el
+   * armazón en cada carga de cada pantalla. Meter ahí un dato **derivado** como
+   * este rompería el invariante 3 —volver a pagar descongela *en el mismo
+   * instante*—: habría gente con la cinta puesta en una organización que ya
+   * paga, hasta medio minuto, sin que nada fallara. Es la misma razón por la que
+   * D1 se niega a guardar una columna `frozen`, un piso más arriba.
+   *
+   * ⚠️ **Y es barato a propósito.** Un booleano, un puesto y un tope: lo pide
+   * una pantalla en cada carga, así que no se le cuelga el resumen entero —que
+   * son cinco llamadas a microservicios— para pintar una cinta que casi siempre
+   * no se pinta.
+   */
+  @Get('mi-asiento')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Si tu asiento está congelado en una organización, y tu puesto' })
+  @ApiResponse({ status: 200, description: '{ congelado, puesto, tope }' })
+  async miAsiento(
+    @Request() req: Express.Request,
+    @Query('organizationId') organizationIdPedida?: string,
+  ): Promise<{ congelado: boolean; puesto: number | null; tope: Tope }> {
+    const userId = req.user!.userId;
+
+    /* La misma validación que `resumen`: llega de una cookie que escribe el
+       navegador, así que se comprueba la pertenencia antes de contestar. Aquí
+       filtrar de más no basta —contestar «no estás congelado» sobre una
+       organización ajena es poco— pero contestar «sí» diría que existe. */
+    const organizationId = await this.quota.organizacionElegida(userId, organizationIdPedida);
+    if (!organizationId) return { congelado: false, puesto: null, tope: null };
+
+    return firstValueFrom(
+      this.billingClient.send<{ congelado: boolean; puesto: number | null; tope: Tope }>(
+        { cmd: 'billing_seat_frozen' },
+        { organizationId, userId },
+      ),
+      /* Sin respuesta, no se pinta la cinta. Es la misma asimetría que
+         `exigirAsientoVivo`, que deja escribir si billing no contesta: las dos
+         fallan hacia «puedes», y así no se le dice a nadie que está en solo
+         lectura por una caída de un servicio. */
+    ).catch(() => ({ congelado: false, puesto: null, tope: null }));
+  }
+
+  /**
    * Qué puede ofrecer la pantalla de Configuración.
    *
    * Existe desde antes que `resumen` y se queda: la tarjeta de Configuración y

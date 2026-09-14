@@ -260,7 +260,12 @@ function Fila({
             size="sm"
           />
           <div className="flex flex-col min-w-0">
-            <span className="truncate font-medium text-white">{miembro.name ?? miembro.email}</span>
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-medium text-white">
+                {miembro.name ?? miembro.email}
+              </span>
+              {miembro.frozen && <MarcaDeCongelado puesto={miembro.queuePosition} />}
+            </div>
             {miembro.name && (
               <span className="truncate text-xs text-white/50">{miembro.email}</span>
             )}
@@ -317,6 +322,34 @@ function Fila({
         )}
       </td>
     </tr>
+  );
+}
+
+/**
+ * «En solo lectura», junto al nombre y no en la columna de estado.
+ *
+ * ⚠️ **Al lado y no en lugar del papel, porque no lo sustituye.** Quien está
+ * congelado conserva su papel entero y lo recupera intacto en cuanto se libere
+ * un asiento; pintarlo donde va «Invitación pendiente» diría que es un estado
+ * más de la membresía, y no lo es (D1: se deriva, no se guarda). Lo que le pasa
+ * a esta persona no es que le falte algo suyo, es que el plan encogió.
+ *
+ * El puesto se dice cuando se sabe: «el 1.º en volver» es una espera con reloj,
+ * y «estás congelado» a secas es una puerta cerrada.
+ */
+function MarcaDeCongelado({ puesto }: { puesto: number | null }) {
+  return (
+    <span
+      title={
+        puesto === null
+          ? 'En solo lectura: no cabe en los asientos del plan.'
+          : `En solo lectura: es el ${puesto}.º en recuperar el asiento cuando se libere uno.`
+      }
+      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-warning/30 bg-warning-muted px-2 py-0.5 text-xs font-medium text-warning"
+    >
+      Solo lectura
+      {puesto !== null && <span className="text-text-secondary">· {puesto}.º</span>}
+    </span>
   );
 }
 
