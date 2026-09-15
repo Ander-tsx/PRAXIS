@@ -1,6 +1,6 @@
 # Plan de asientos congelados — bajar de plan no puede echar a nadie
 
-> Etapa **abierta**, con **A1 entregada** el 2026-09-09. Nace de una pregunta del dueño del producto el
+> Etapa **cerrada** el 2026-09-14: A1–A7 entregadas (ver «Registro»). Nace de una pregunta del dueño del producto el
 > 2026-09-09: *«tengo 5 personas y el mes gratis del plan Equipo; ¿qué pasa
 > cuando se acabe? ¿se expulsa gente? ¿pierdo proyectos?»*.
 >
@@ -188,7 +188,7 @@ de cinco no suele ser quien se quedó fuera. Es la misma asimetría que ya resue
 | ✅ A4 | `QuotaService.exigirAsientoVivo` y su uso en los guards de escritura | gateway |
 | ✅ A5 | `excedidas[]` incluye congelados; `resumen` dice quiénes | gateway |
 | ✅ A6 | La cinta de «estás en solo lectura» y el listado en Equipo | frontend |
-| A7 | Pruebas: cancelar con 5, comprobar que las 2 últimas leen y no escriben, volver a pagar y comprobar que escriben | e2e |
+| ✅ A7 | Pruebas: cancelar con 5, comprobar que las 2 últimas leen y no escriben, volver a pagar y comprobar que escriben | e2e |
 
 ⚠️ **A1 es independiente y se puede entregar solo.** Es el arreglo de un agujero
 real que hoy regala asientos en el plan gratuito, y no depende de nada de lo

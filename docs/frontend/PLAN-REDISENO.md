@@ -29,6 +29,10 @@
 > están en el árbol. La etapa viva es **Organizaciones**, y lo que le queda —tres
 > casillas de 73— está en su propio plan, no aquí.
 >
+> **Reverificación del 2026-09-15 (décima vez).** Mismo resultado. No se
+> re-ejecutó nada; se corrigieron tres textos que seguían diciendo que la etapa
+> de asientos estaba abierta. Ver la sección de abajo.
+>
 > **Reverificación del 2026-09-14 (novena vez).** Mismo resultado, y esa sesión
 > cerró entera la etapa de asientos congelados (A4–A7). Ver la sección de abajo.
 >
@@ -993,6 +997,28 @@ hallazgos de `AUDITORIA-ORGANIZACION-CHAT-MOVIL.md` viven en
 `feature/fusion-zonas` y fusionarlos es decisión del dueño del producto; C6 y
 C9/C10 piden navegador y un humano que triage; A1 de la auditoría necesita Gemini
 con presupuesto. **Ya no queda nada de asientos congelados.**
+
+### Reverificación del 2026-09-15 — la décima, y los tres textos que no se enteraron
+
+El mismo prompt de traspaso. Los tres comandos dan lo mismo: `99b2f6d` es
+ancestro de `main`, `report_column_time` sigue en los dos controladores y
+`billing-service` conserva `organizations/` y `subscriptions/`. **R9 y Enterprise
+siguen fusionados en `main`; no se re-ejecutaron.** Árbol limpio al empezar.
+
+Lo único que se tocó: la etapa de asientos se cerró ayer y **tres sitios seguían
+diciendo lo contrario** —la fila de `CLAUDE.md` («Etapa abierta; A1 entregada…
+Falta A2–A7… cuatro preguntas sin contestar»), la cabecera de
+`PLAN-ASIENTOS-CONGELADOS.md` y la casilla de A7 en su tabla de orden, sin ✅—.
+La fila de `CLAUDE.md` es la que lee toda sesión fría: con ella así, la siguiente
+habría intentado reabrir A2–A7 sobre código que ya los tiene.
+
+Verde: `next build` de `web`. Docker **apagado** en esta sesión, así que nada
+contra el stack.
+
+Lo abierto no cambia y nada de ello se hace en frío: los 18 commits de
+`feature/fusion-zonas` que no están en `main` (y 38 de `main` que no están allí;
+fusionar es decisión del dueño del producto), C6 y C9/C10 con navegador y un
+humano, A1 de la auditoría con Gemini, y el `TODO(A6+)` de D11.
 
 ### El hueco, dicho en una línea
 
