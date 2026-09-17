@@ -1,5 +1,6 @@
 'use client';
 
+import { InstallAppButton } from '@/components/molecules/InstallAppButton';
 import { RollCta } from '@/components/molecules/RollCta';
 import { l } from '@/lib/landingColors';
 import type { CSSProperties, ElementType, ReactNode } from 'react';
@@ -275,6 +276,13 @@ export function LandingHero({ isAuthenticated = false }: LandingHeroProps) {
                 Iniciar sesión
               </a>
             )}
+            {/* Independiente de la sesión: instalar la app no es una
+                alternativa a entrar, es otra forma de abrir la misma cuenta.
+                Se enseña o no según lo que decida el navegador — ver
+                `useInstallPrompt`. `size="lg"` iguala al CTA principal a
+                propósito: son dos invitaciones del mismo peso, no una
+                principal y otra de relleno. */}
+            <InstallAppButton size="lg" />
           </HeroReveal>
         </div>
       </div>

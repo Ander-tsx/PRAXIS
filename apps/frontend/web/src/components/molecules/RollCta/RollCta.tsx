@@ -3,6 +3,7 @@
 import { ArrowUpRightIcon } from '@/components/icons';
 import { l, lRadius } from '@/lib/landingColors';
 import { alpha } from '@praxis/commons';
+import type { ComponentType, SVGProps } from 'react';
 import { useState } from 'react';
 
 /** Misma cadencia en todo el sitio: la etiqueta rueda hacia arriba y su gemela
@@ -19,8 +20,7 @@ import { useState } from 'react';
 const ROLL_MS = 350;
 const ROLL_EASE = 'cubic-bezier(0.16, 1, 0.35, 1)';
 
-export interface RollCtaProps {
-  href: string;
+interface RollCtaBaseProps {
   label: string;
   size?: 'sm' | 'lg';
   variant?: 'primary' | 'ghost';
@@ -33,7 +33,22 @@ export interface RollCtaProps {
    */
   bgColor?: string;
   fgColor?: string;
+  /** El icono de la cápsula final. Por defecto, la flecha de "ir". */
+  icon?: ComponentType<SVGProps<SVGSVGElement>>;
 }
+
+/**
+ * `href` o `onClick`, nunca los dos ni ninguno.
+ *
+ * No es la misma acción disfrazada de dos formas: una navega (`<a>`) y la
+ * otra dispara algo en la propia página (`<button>`), y el navegador trata
+ * los dos elementos de forma distinta —clic central, "abrir en pestaña
+ * nueva", el rol que anuncia un lector de pantalla—. El tipo de unión hace
+ * que pasar los dos, o ninguno, sea un error de compilación en vez de un
+ * botón que hace lo que no debía.
+ */
+export type RollCtaProps = RollCtaBaseProps &
+  ({ href: string; onClick?: undefined } | { href?: undefined; onClick: () => void });
 
 /**
  * El único botón con flecha y esquina cuadrada de la landing.
@@ -66,12 +81,14 @@ export interface RollCtaProps {
  */
 export function RollCta({
   href,
+  onClick,
   label,
   size = 'sm',
   variant = 'primary',
   className = '',
   bgColor,
   fgColor,
+  icon: Icon = ArrowUpRightIcon,
 }: RollCtaProps) {
   const [hovered, setHovered] = useState(false);
   const isLg = size === 'lg';
@@ -81,24 +98,28 @@ export function RollCta({
   const fg = fgColor ?? l.accentForeground;
   const border = bgColor ? bgColor : l.border;
 
-  return (
-    <a
-      href={href}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className={`flex w-fit items-center overflow-hidden font-medium no-underline transition-transform duration-300 ease-[var(--ease-transition)] ${
-        isLg
-          ? 'gap-2 py-[0.3em] pr-[0.3em] pl-6 text-lg'
-          : 'gap-1.5 py-[0.3em] pr-[0.3em] pl-4 text-sm'
-      } ${className}`}
-      style={{
-        background: isGhost ? 'transparent' : bg,
-        color: isGhost ? (fgColor ?? l.fg) : fg,
-        border: isGhost ? `1px solid ${border}` : 'none',
-        borderRadius: lRadius,
-        transform: hovered ? 'translateY(-1px)' : 'none',
-      }}
-    >
+  const sharedProps = {
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+    className: `flex w-fit items-center overflow-hidden font-medium no-underline transition-transform duration-300 ease-[var(--ease-transition)] ${
+      isLg
+        ? 'gap-2 py-[0.3em] pr-[0.3em] pl-6 text-lg'
+        : 'gap-1.5 py-[0.3em] pr-[0.3em] pl-4 text-sm'
+    } ${className}`,
+    style: {
+      background: isGhost ? 'transparent' : bg,
+      color: isGhost ? (fgColor ?? l.fg) : fg,
+      border: isGhost ? `1px solid ${border}` : 'none',
+      borderRadius: lRadius,
+      transform: hovered ? 'translateY(-1px)' : 'none',
+    },
+  };
+
+  /* La cápsula de dentro es idéntica en los dos casos — lo único que cambia
+     es la etiqueta HTML que la envuelve, `<a>` o `<button>` — así que se arma
+     una vez y se reutiliza en las dos ramas de abajo. */
+  const contenido = (
+    <>
       <span className="relative flex overflow-hidden">
         <span
           className="relative block"
@@ -154,11 +175,11 @@ export function RollCta({
             transition: rollTransition,
           }}
         >
-          <ArrowUpRightIcon className={isLg ? 'h-[0.9em] w-[0.9em]' : 'h-[0.85em] w-[0.85em]'} />
+          <Icon className={isLg ? 'h-[0.9em] w-[0.9em]' : 'h-[0.85em] w-[0.85em]'} />
         </span>
 
         {/* La gemela que entra por abajo-izquierda. `aria-hidden` porque es la
-            misma flecha repetida: anunciarla dos veces no aporta nada. */}
+            misma repetida: anunciarla dos veces no aporta nada. */}
         <span
           aria-hidden="true"
           className="absolute inset-0 flex items-center justify-center"
@@ -167,9 +188,23 @@ export function RollCta({
             transition: rollTransition,
           }}
         >
-          <ArrowUpRightIcon className={isLg ? 'h-[0.9em] w-[0.9em]' : 'h-[0.85em] w-[0.85em]'} />
+          <Icon className={isLg ? 'h-[0.9em] w-[0.9em]' : 'h-[0.85em] w-[0.85em]'} />
         </span>
       </span>
-    </a>
+    </>
+  );
+
+  if (href) {
+    return (
+      <a href={href} {...sharedProps}>
+        {contenido}
+      </a>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onClick} {...sharedProps}>
+      {contenido}
+    </button>
   );
 }

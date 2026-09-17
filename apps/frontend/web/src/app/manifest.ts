@@ -18,14 +18,30 @@ import type { MetadataRoute } from 'next';
  * convención de Next para la pestaña del navegador y el icono de iOS al
  * añadir a inicio: Next los sirve como ruta y los declara solo. El manifiesto
  * necesita además un 512×512 —Chrome lo exige para considerar la app
- * «instalable»— así que los tres viven como ficheros estáticos en
- * `public/icons/`, generados del mismo SVG (`public/icons/praxis-mark.svg`,
- * la fuente de la que salen todos).
+ * «instalable»— y un 1024×1024 para el Dock de macOS en pantallas Retina, así
+ * que viven como ficheros estáticos en `public/icons/`, generados del mismo
+ * SVG (`public/icons/praxis-mark.svg`, que se conserva como fuente pero no
+ * se declara aquí — ver el aviso de abajo).
  *
- * ⚠️ **El SVG va primero y con `sizes: 'any'`.** Es vectorial: un launcher que
- * lo entienda nunca pixela el icono, sea cual sea la resolución de la
- * pantalla. Los PNG son el respaldo para quien no lo soporte (Safari, sobre
- * todo) — nunca al revés, o el vectorial se ignora aunque esté disponible.
+ * 🔴 **El SVG estuvo aquí, primero y con `sizes: 'any'`, y se quitó.** En
+ * teoría es lo correcto —vectorial, nunca pixela— y así lo tenía la primera
+ * versión de este archivo. En la práctica, el icono instalado en el Dock de
+ * macOS salía **diminuto y sin fondo**: un test con Chrome en modo headless
+ * mostró que abre el SVG como página y lo pinta a su tamaño intrínseco
+ * (`width="44" height="44"` en el archivo), sin escalarlo al tamaño de icono
+ * pedido —el mismo fallo que reprodujo `qlmanage` de macOS con el archivo
+ * sin tocar—. El `viewBox` es correcto y el archivo es válido; el fallo está
+ * en cómo Chrome lo usa para generar el icono nativo de la app instalada, no
+ * en el SVG. Con solo PNG en la lista, esa ruta nunca se toma: cada tamaño ya
+ * viene rasterizado al pixel exacto que hace falta, sin ambigüedad que
+ * resolver.
+ *
+ * Los tres PNG llevan además las esquinas redondeadas **horneadas en el
+ * propio archivo** (transparencia real, no un `border-radius` que dependa de
+ * que alguien lo aplique): el icono de instalar tiene que verse ya como un
+ * icono de escritorio antes de que ningún sistema operativo le imponga su
+ * propia máscara, look que sí llevaba diseñado el SVG original pero que se
+ * perdía en cualquier renderizador que no respetara su `clip-path`.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -44,11 +60,6 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#080807',
     icons: [
       {
-        src: '/icons/praxis-mark.svg',
-        sizes: 'any',
-        type: 'image/svg+xml',
-      },
-      {
         src: '/icons/icon-192.png',
         sizes: '192x192',
         type: 'image/png',
@@ -56,6 +67,11 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         src: '/icons/icon-512.png',
         sizes: '512x512',
+        type: 'image/png',
+      },
+      {
+        src: '/icons/icon-1024.png',
+        sizes: '1024x1024',
         type: 'image/png',
       },
     ],
