@@ -1887,7 +1887,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
            * — o vuelven a desalinearse.
            */}
           {canWrite ? (
-            <div className="relative shrink-0 p-3 pt-4 bg-[#191919] rounded-b-2xl">
+            <div className="relative shrink-0 p-3 pt-4 bg-[#131312] rounded-b-2xl">
               {/* Degradado suave flotante por encima del composer para fusionarse con el chat */}
               <div className="absolute left-0 right-0 top-0 h-16 -translate-y-full bg-gradient-to-t from-[#131312] to-transparent pointer-events-none z-10" />
               <Composer

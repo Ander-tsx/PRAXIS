@@ -610,71 +610,90 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           />
         )}
 
+        {/*
+         * ⚠️ **`data-tone="dark"` aquí, igual que en `/admin`.**
+         *
+         * `ProjectMembers`, `ProjectRoles` y `ProjectRules` pintan sus paneles
+         * con `bg-surface`/`bg-surface-elevated`, y sin este contenedor esos
+         * tokens resuelven al `#161b27` azulado de la paleta general en vez de
+         * al monocromo `#191919` que ya usa el resto de la pantalla —el mismo
+         * desajuste que documenta `projects/[id]/loading.tsx` para el tablero,
+         * y que `RoleForm`, `DeleteRoleForm` e `InviteMemberDialog` sorteaban
+         * cada uno con su propio `bg-[#191919]` a pelo. Con el contenedor, esos
+         * tres dejan de hacer falta y las filas dejan de desentonar del resto
+         * del proyecto.
+         */}
         {activeTab === 'equipo' && (
-          <ProjectMembers
-            projectId={project.id}
-            members={members}
-            roles={project.roles}
-            usersById={usersById}
-            ownerId={project.ownerId}
-            canManage={can.canManageMembers}
-            invitations={invitations}
-            projectName={project.name}
-            currentUserId={userId}
-            /* A quién se puede invitar sale de aquí: quien entra en un proyecto
-               necesita asiento en su organización. Ver `InviteMemberDialog`. */
-            organizationId={project.organizationId}
-          />
+          <div data-tone="dark">
+            <ProjectMembers
+              projectId={project.id}
+              members={members}
+              roles={project.roles}
+              usersById={usersById}
+              ownerId={project.ownerId}
+              canManage={can.canManageMembers}
+              invitations={invitations}
+              projectName={project.name}
+              currentUserId={userId}
+              /* A quién se puede invitar sale de aquí: quien entra en un proyecto
+                 necesita asiento en su organización. Ver `InviteMemberDialog`. */
+              organizationId={project.organizationId}
+            />
+          </div>
         )}
 
         {activeTab === 'roles' && (
-          <ProjectRoles
-            projectId={project.id}
-            roles={project.roles}
-            members={members}
-            canManage={can.canManageRoles}
-          />
+          <div data-tone="dark">
+            <ProjectRoles
+              projectId={project.id}
+              roles={project.roles}
+              members={members}
+              canManage={can.canManageRoles}
+            />
+          </div>
         )}
 
         {activeTab === 'automation' && (
-          <ProjectRules
-            projectId={project.id}
-            rules={automationRules}
-            executions={automationExecutions}
-            catalog={automationCatalog}
-            /**
-             * Las listas de las que salen los valores de una condición o de una
-             * acción.
-             *
-             * ⚠️ **Ninguna consulta nueva.** Las columnas vienen embebidas en
-             * `GET /projects/:id`, y las etiquetas y la gente ya se piden para
-             * otras secciones. El catálogo dice *de qué lista* sale cada campo;
-             * los valores los pone quien ya los tiene en pantalla.
-             */
-            proyecto={{
-              columns: project.workspaces.flatMap((workspace) =>
-                workspace.boards.flatMap((board) =>
-                  board.columns.map((column) => ({
-                    value: column.id,
-                    /* Con el tablero delante: dos tableros pueden tener cada uno
-                       su «Por hacer», y un desplegable con dos entradas iguales
-                       no se puede usar. */
-                    label: `${board.name} · ${column.name}`,
-                  })),
+          <div data-tone="dark">
+            <ProjectRules
+              projectId={project.id}
+              rules={automationRules}
+              executions={automationExecutions}
+              catalog={automationCatalog}
+              /**
+               * Las listas de las que salen los valores de una condición o de una
+               * acción.
+               *
+               * ⚠️ **Ninguna consulta nueva.** Las columnas vienen embebidas en
+               * `GET /projects/:id`, y las etiquetas y la gente ya se piden para
+               * otras secciones. El catálogo dice *de qué lista* sale cada campo;
+               * los valores los pone quien ya los tiene en pantalla.
+               */
+              proyecto={{
+                columns: project.workspaces.flatMap((workspace) =>
+                  workspace.boards.flatMap((board) =>
+                    board.columns.map((column) => ({
+                      value: column.id,
+                      /* Con el tablero delante: dos tableros pueden tener cada uno
+                         su «Por hacer», y un desplegable con dos entradas iguales
+                         no se puede usar. */
+                      label: `${board.name} · ${column.name}`,
+                    })),
+                  ),
                 ),
-              ),
-              labels: labels.map((label) => ({ value: label.id, label: label.name })),
-              members: members.map((member) => {
-                const user = usersById.get(member.userId);
-                return {
-                  value: member.userId,
-                  label: user ? personLabel(user) : PERSONA_ELIMINADA,
-                };
-              }),
-            }}
-            canManage={can.canManageAutomations}
-            isSuspended={suspendido}
-          />
+                labels: labels.map((label) => ({ value: label.id, label: label.name })),
+                members: members.map((member) => {
+                  const user = usersById.get(member.userId);
+                  return {
+                    value: member.userId,
+                    label: user ? personLabel(user) : PERSONA_ELIMINADA,
+                  };
+                }),
+              }}
+              canManage={can.canManageAutomations}
+              isSuspended={suspendido}
+            />
+          </div>
         )}
       </div>
     </AppHeader>
