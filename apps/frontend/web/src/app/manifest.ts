@@ -42,6 +42,20 @@ import type { MetadataRoute } from 'next';
  * icono de escritorio antes de que ningún sistema operativo le imponga su
  * propia máscara, look que sí llevaba diseñado el SVG original pero que se
  * perdía en cualquier renderizador que no respetara su `clip-path`.
+ *
+ * ⚠️ **Y llevan margen alrededor — a propósito, y solo estos tres.** La
+ * primera versión rellenaba el lienzo entero (el cuadrado blanco a sangre, sin
+ * aire), y junto a los demás iconos del Dock de macOS se veía **más grande**
+ * que el resto: no es una ilusión óptica, es que macOS espera que el dibujo
+ * visible del icono ocupe **~80 %** del lienzo (824 sobre 1024, la plantilla
+ * de Apple para Big Sur en adelante), centrado, con el resto transparente — al
+ * revés que iOS, que va a sangre porque el sistema pone su propia máscara. Sin
+ * ese margen, el nuestro competía en tamaño contra iconos que ya lo llevaban
+ * incorporado y perdía por exceso. El radio de la esquina se reescala con el
+ * mismo factor (824/1024) para que sigan siendo la misma forma, solo más
+ * pequeña. `apple-icon.png` e `icon.png` (arriba) **no** llevan este margen:
+ * ahí sí toca ir a sangre, uno porque iOS lo exige y el otro porque es la
+ * pestaña del navegador, no el Dock.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
