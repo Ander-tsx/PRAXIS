@@ -1,5 +1,5 @@
 import { getTheme } from '@praxis/commons/theme';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Archivo, Fraunces, Inter, Lora } from 'next/font/google';
 import localFont from 'next/font/local';
 import './globals.css';
@@ -84,6 +84,18 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'es_MX',
   },
+};
+
+/**
+ * Exporte aparte y no un campo de `metadata`: desde Next 14, `themeColor`
+ * dejó de leerse ahí y solo cuenta si viene de `viewport`/`generateViewport`
+ * (`generate-viewport.md`). Sin esto, `manifest.ts` sigue declarando su
+ * `theme_color` para la app instalada, pero la pestaña normal del navegador
+ * no coloreaba la barra — dos sitios que tenían que decir el mismo negro y
+ * solo uno lo decía.
+ */
+export const viewport: Viewport = {
+  themeColor: '#080807',
 };
 
 /**

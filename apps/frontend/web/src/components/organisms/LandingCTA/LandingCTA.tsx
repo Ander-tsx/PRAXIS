@@ -1,5 +1,6 @@
 'use client';
 
+import { InstallAppButton } from '@/components/molecules/InstallAppButton';
 import { RollCta } from '@/components/molecules/RollCta';
 import { Reveal } from '@praxis/commons';
 
@@ -55,6 +56,10 @@ export function LandingCTA({ isAuthenticated = false }: LandingCTAProps) {
               Iniciar sesión
             </a>
           )}
+          {/* Independiente de la sesión: instalar la app no es una alternativa
+              a entrar, es otra forma de abrir la misma cuenta. Se enseña o no
+              según lo que decida el navegador — ver `useInstallPrompt`. */}
+          <InstallAppButton />
         </Reveal>
 
         <Reveal
