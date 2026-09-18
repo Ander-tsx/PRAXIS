@@ -29,6 +29,28 @@
 > están en el árbol. La etapa viva es **Organizaciones**, y lo que le queda —tres
 > casillas de 73— está en su propio plan, no aquí.
 >
+> **Reverificación del 2026-09-18 (duodécima vez).** Mismo resultado, mismos
+> tres comandos (`99b2f6d` sigue siendo ancestro de `main`,
+> `report_column_time` en los dos controladores, `billing/src` con
+> `organizations/` y `subscriptions/`). El prompt de arranque volvió a pedir R9
+> en `main` y Enterprise en `feature/enterprise`; no se re-ejecutó nada. Lo
+> único que encontró esta sesión al llegar fue la entrada de la undécima
+> verificación (2026-09-17) escrita en el árbol de trabajo y sin commitear —
+> se commitea aquí junto con esta. Nada abierto cambió: C6, C9/C10, A1 y
+> `TODO(A6+)` siguen pidiendo navegador, clave de Gemini con presupuesto o
+> decisión del dueño.
+>
+> **Reverificación del 2026-09-17 (undécima vez).** Mismo resultado, mismos tres
+> comandos. El prompt de arranque volvió a pedir R9 en `main` y Enterprise en
+> `feature/enterprise` — los dos siguen fusionados y cerrados
+> ([memoria del asistente](../../../../.claude/projects/-Users-andertsx-Software-PRAXIS/memory/handoff-r9-enterprise-ya-hechos.md),
+> `handoff-r9-enterprise-ya-hechos`). No se re-ejecutó nada. Docker seguía
+> apagado para este repo (solo un `mongo` de otro proyecto en marcha); lo único
+> abierto de verdad —C6 de la auditoría, C9/C10 de
+> `PLAN-ORGANIZACION-ACTIVA.md`, A1 de la auditoría, `TODO(A6+)` de D11— sigue
+> pidiendo navegador, clave de Gemini con presupuesto o decisión del dueño, así
+> que sigue sin poder cerrarse en frío.
+
 > **Reverificación del 2026-09-15 (décima vez).** Mismo resultado. No se
 > re-ejecutó nada; se corrigieron tres textos que seguían diciendo que la etapa
 > de asientos estaba abierta. Ver la sección de abajo.
