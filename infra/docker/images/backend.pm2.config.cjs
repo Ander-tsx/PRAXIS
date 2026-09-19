@@ -134,7 +134,19 @@ const rutas = {
   BILLING_SERVICE_PORT: 3009,
 };
 
-/** Valores por defecto de pm2 comunes a los 9 procesos. */
+/** Valores por defecto de pm2 comunes a los 9 procesos.
+ *
+ * ⚠️ **`--max-old-space-size` pone techo al heap de V8**, no un límite
+ * artificial: sin él, cada proceso puede crecer sin que el GC actúe hasta
+ * que Node lo decida, y los 9 arrancando a la vez (deploy) inflan la memoria
+ * del contenedor de golpe — eso es lo que se ve como pico de 3-6 GB en las
+ * métricas de Railway, y ahí se cobra por GB-minuto igual que en reposo.
+ * 256 MB es holgado para un microservicio de este tamaño (el proceso más
+ * pesado, credentials, ronda 150 MB en caliente).
+ *
+ * `max_memory_restart` es la red de seguridad: si algo tiene una fuga de
+ * verdad, pm2 lo reinicia solo antes de que se coma el resto del contenedor,
+ * en vez de dejarlo crecer indefinidamente. */
 function proceso(name, cwd, env) {
   return {
     name,
@@ -143,6 +155,8 @@ function proceso(name, cwd, env) {
     exec_mode: 'fork',
     instances: 1,
     autorestart: true,
+    node_args: '--max-old-space-size=256',
+    max_memory_restart: '350M',
     /* Un servicio que no levanta suele ser una variable que falta. Reintentar
        cada 4 s en vez de en bucle cerrado deja el error legible en el log en
        lugar de ahogarlo en miles de líneas. */

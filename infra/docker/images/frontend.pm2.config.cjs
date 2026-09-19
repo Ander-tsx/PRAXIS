@@ -39,6 +39,13 @@ module.exports = {
       script: 'node_modules/next/dist/bin/next',
       args: 'start --port 4100',
       interpreter: 'node',
+      /* Mismo motivo que en el backend (ver backend.pm2.config.cjs): sin techo
+         al heap de V8, el arranque en frío de un deploy puede inflar la
+         memoria del contenedor antes de que el GC actúe — eso es lo que se ve
+         como pico de varios GB en las métricas de Railway. 512 MB es holgado
+         para un solo proceso de Next en modo `start`. */
+      interpreter_args: '--max-old-space-size=512',
+      max_memory_restart: '700M',
       exec_mode: 'fork',
       instances: 1,
       autorestart: true,
