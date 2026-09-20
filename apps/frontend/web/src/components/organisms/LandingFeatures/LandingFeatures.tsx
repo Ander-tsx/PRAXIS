@@ -125,7 +125,10 @@ export function LandingFeatures() {
       <div className="mx-auto max-w-5xl">
         <div className="mb-16 md:mb-24">
           <SectionEyebrow>Características · 01–08</SectionEyebrow>
+          {/* h2 real con las mismas clases: el aspecto lo ponen las utilidades,
+              no la etiqueta (preflight ya resetea h1-h6). */}
           <Reveal
+            as="h2"
             delay={0.05}
             className="mt-4"
             innerClassName="text-4xl md:text-6xl"

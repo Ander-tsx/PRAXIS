@@ -69,7 +69,15 @@ const khteka = localFont({
   fallback: ['Arial', 'sans-serif'],
 });
 
+/**
+ * Dominio canónico del sitio. Una sola constante lógica: `robots.ts` y
+ * `sitemap.ts` usan el mismo valor a pelo porque son rutas, no páginas, y no
+ * pueden importar metadata de aquí.
+ */
+const SITIO_CANONICO = 'https://usepraxis.space';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITIO_CANONICO),
   title: {
     default: 'Praxis — Gestión de proyectos inteligente',
     template: '%s | Praxis',
@@ -81,8 +89,24 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Praxis — Gestión de proyectos inteligente',
     description: 'Tableros Kanban, permisos dinámicos y reportes para tu equipo.',
+    url: '/',
+    siteName: 'Praxis',
+    images: [
+      {
+        url: '/icons/icon-512.png',
+        width: 512,
+        height: 512,
+        alt: 'Praxis — Gestión de proyectos',
+      },
+    ],
     type: 'website',
     locale: 'es_MX',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Praxis — Gestión de proyectos inteligente',
+    description: 'Tableros Kanban, permisos dinámicos y reportes para tu equipo.',
+    images: ['/icons/icon-512.png'],
   },
 };
 

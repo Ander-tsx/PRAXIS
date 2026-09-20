@@ -76,7 +76,8 @@ export function LandingAutomation() {
       <div className="mx-auto max-w-5xl">
         <div className="mb-16 flex flex-col gap-5 md:mb-24 md:max-w-2xl">
           <SectionEyebrow>Automatización</SectionEyebrow>
-          <Reveal delay={0.05} innerClassName="text-4xl md:text-6xl" duration={0.9}>
+          {/* h2 real con las mismas clases: el aspecto lo ponen las utilidades. */}
+          <Reveal as="h2" delay={0.05} innerClassName="text-4xl md:text-6xl" duration={0.9}>
             <span style={{ fontFamily: 'var(--font-fraunces)', fontWeight: 500 }}>
               Reglas que reaccionan solas.
             </span>

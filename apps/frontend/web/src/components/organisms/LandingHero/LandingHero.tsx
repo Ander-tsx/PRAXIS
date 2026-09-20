@@ -532,7 +532,10 @@ function BloomVisual() {
         loop
         muted
         playsInline
-        preload="auto"
+        /* `metadata` y no `auto`: el póster cubre el primer frame y el
+           `autoPlay` ya pide los datos al montar; precargar el archivo entero
+           por adelantado solo adelanta la competencia con fuentes y CSS. */
+        preload="metadata"
       />
     </div>
   );

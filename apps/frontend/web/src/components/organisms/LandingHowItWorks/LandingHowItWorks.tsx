@@ -127,7 +127,8 @@ export function LandingHowItWorks() {
       <div className="relative z-10 mx-auto max-w-5xl">
         <div className="mb-16 flex flex-col gap-5 md:mb-4 md:max-w-2xl">
           <SectionEyebrow>Cómo funciona</SectionEyebrow>
-          <Reveal delay={0.05} innerClassName="text-4xl italic md:text-6xl" duration={0.9}>
+          {/* h2 real con las mismas clases: los h3 de cada rol ya cuelgan de él. */}
+          <Reveal as="h2" delay={0.05} innerClassName="text-4xl italic md:text-6xl" duration={0.9}>
             <span style={{ fontFamily: 'var(--font-fraunces)', fontWeight: 500 }}>
               Cómo usan Praxis los equipos.
             </span>

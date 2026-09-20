@@ -23,7 +23,8 @@ export function LandingCTA({ isAuthenticated = false }: LandingCTAProps) {
       style={{ background: 'var(--l-bg)', color: 'var(--l-fg)' }}
     >
       <div className="mx-auto max-w-4xl text-center">
-        <Reveal innerClassName="text-6xl italic md:text-8xl" duration={0.9}>
+        {/* h2 real con las mismas clases: el aspecto lo ponen las utilidades. */}
+        <Reveal as="h2" innerClassName="text-6xl italic md:text-8xl" duration={0.9}>
           <span style={{ fontFamily: 'var(--font-fraunces)', fontWeight: 500 }}>
             {isAuthenticated ? 'Continúa donde lo dejaste.' : 'Empieza hoy mismo.'}
           </span>

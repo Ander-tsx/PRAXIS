@@ -3,6 +3,19 @@ import { AvisoAsientoCongelado } from '@/components/organisms/Billing/AvisoAsien
 import { AppShell, PresenceFooter, avatarHref, displayName } from '@praxis/commons';
 import { loadPrivateChrome } from '@praxis/commons/auth';
 import { getSidebarPlegada, getSidebarTab } from '@praxis/commons/theme';
+import type { Metadata } from 'next';
+
+/**
+ * El área privada nunca se indexa: exige sesión (el guard redirige al login)
+ * y esta directiva es la red declarativa por si alguna ruta quedara expuesta.
+ * Los `title` de cada página siguen valiendo para la pestaña del navegador.
+ */
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 /**
  * El armazón del área privada. **Uno para las cinco secciones.**

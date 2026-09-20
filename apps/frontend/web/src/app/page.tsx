@@ -9,24 +9,91 @@ import { LandingHowItWorks } from '@/components/organisms/LandingHowItWorks';
 import { PublicFooter } from '@/components/organisms/PublicFooter';
 import { PublicNavbar } from '@/components/organisms/PublicNavbar';
 import { LandingTemplate } from '@/components/templates/LandingTemplate';
-import { getSession } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Praxis — Gestión de proyectos para equipos',
   description:
     'Organiza tus proyectos en espacios y tableros, define qué puede hacer cada rol, deja que un asistente proponga y que reglas automáticas actúen solas.',
+  alternates: { canonical: '/' },
+  openGraph: {
+    title: 'Praxis — Gestión de proyectos para equipos',
+    description:
+      'Organiza tus proyectos en espacios y tableros, define qué puede hacer cada rol, deja que un asistente proponga y que reglas automáticas actúen solas.',
+    url: '/',
+    siteName: 'Praxis',
+    images: [
+      {
+        url: '/icons/icon-512.png',
+        width: 512,
+        height: 512,
+        alt: 'Praxis — Gestión de proyectos',
+      },
+    ],
+    type: 'website',
+    locale: 'es_MX',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Praxis — Gestión de proyectos para equipos',
+    description:
+      'Organiza tus proyectos en espacios y tableros, define qué puede hacer cada rol, deja que un asistente proponga y que reglas automáticas actúen solas.',
+    images: ['/icons/icon-512.png'],
+  },
+};
+
+/**
+ * Datos estructurados de la landing. Solo lo que la página ya dice de sí
+ * misma: el nombre, la URL, el logo servido en `public/icons/` y la
+ * descripción visible. Sin ratings, precios ni perfiles que no existan.
+ */
+const DATOS_ESTRUCTURADOS = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': 'https://usepraxis.space/#organizacion',
+      name: 'Praxis',
+      url: 'https://usepraxis.space/',
+      logo: 'https://usepraxis.space/icons/icon-512.png',
+      description:
+        'Plataforma de gestión de proyectos con tableros Kanban, permisos dinámicos, automatizaciones y un asistente que propone.',
+    },
+    {
+      '@type': 'WebSite',
+      '@id': 'https://usepraxis.space/#sitio',
+      url: 'https://usepraxis.space/',
+      name: 'Praxis',
+      inLanguage: 'es-MX',
+      publisher: { '@id': 'https://usepraxis.space/#organizacion' },
+    },
+    {
+      '@type': 'WebPage',
+      '@id': 'https://usepraxis.space/#pagina-inicio',
+      url: 'https://usepraxis.space/',
+      name: 'Praxis — Gestión de proyectos para equipos',
+      isPartOf: { '@id': 'https://usepraxis.space/#sitio' },
+      about: { '@id': 'https://usepraxis.space/#organizacion' },
+      inLanguage: 'es-MX',
+    },
+  ],
 };
 
 /**
  * LandingPage — página de inicio pública.
  *
- * Instancia el template con los organismos reales. Lee la sesión en el
- * servidor para que las llamadas a la acción apunten al panel en vez de al
- * registro cuando ya hay alguien identificado.
+ * Instancia el template con los organismos reales. Es un Server Component
+ * estático: no lee la sesión ni ninguna otra cookie, así que Next puede
+ * prerenderizarla y servir el HTML con el contenido SEO sin depender de
+ * autenticación.
  *
- * Leer la cookie hace que la página se renderice bajo demanda en lugar de
- * prerenderizarse: es el precio de que el navbar refleje la sesión.
+ * ⚠️ **Por qué ya no se lee `getSession()` aquí.** La llamada a la acción
+ * variaba según la sesión («Ir al panel» vs «Comenzar gratis»), y leer la
+ * cookie forzaba renderizado dinámico en la única URL indexable. Pero el guard
+ * (`SOLO_INVITADOS` en `src/proxy.ts`) redirige `/` con sesión válida a
+ * `/projects` antes de llegar aquí, así que la rama autenticada nunca se
+ * servía en producción: estático con `isAuthenticated={false}` es el mismo
+ * HTML que ya veían el crawler y los visitantes anónimos.
  *
  * El vídeo de demostración (`LandingDemo`) vive en `public/media/`: WebM
  * (VP9) primero, más ligero, y MP4 (H.264) como `<source>` de respaldo para
@@ -39,16 +106,17 @@ export const metadata: Metadata = {
  * claro/oscuro de la cuenta. Ese selector sigue viviendo en Configuración,
  * dentro de la aplicación.
  */
-export default async function LandingPage() {
-  const session = await getSession();
-  const isAuthenticated = session !== null;
-
+export default function LandingPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(DATOS_ESTRUCTURADOS) }}
+      />
       <SmoothScroll />
       <LandingTemplate
-        navbar={<PublicNavbar isAuthenticated={isAuthenticated} />}
-        hero={<LandingHero isAuthenticated={isAuthenticated} />}
+        navbar={<PublicNavbar isAuthenticated={false} />}
+        hero={<LandingHero isAuthenticated={false} />}
         demo={
           <LandingDemo
             webmSrc="/media/praxis-demo.webm"
@@ -60,7 +128,7 @@ export default async function LandingPage() {
         automation={<LandingAutomation />}
         assistant={<LandingAssistant />}
         howItWorks={<LandingHowItWorks />}
-        cta={<LandingCTA isAuthenticated={isAuthenticated} />}
+        cta={<LandingCTA isAuthenticated={false} />}
         footer={<PublicFooter />}
       />
     </>
