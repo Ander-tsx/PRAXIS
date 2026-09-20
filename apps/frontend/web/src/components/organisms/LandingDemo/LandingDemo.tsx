@@ -1,9 +1,14 @@
 'use client';
 
 import { l, lRadius } from '@/lib/landingColors';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export interface LandingDemoProps {
+  /**
+   * La fuente WebM (VP9), relativa a `public/`. Va primero: mismo contenido,
+   * bastante menos peso, y el navegador que no lo entiende cae solo al `src`.
+   */
+  webmSrc?: string;
   /**
    * La fuente del vídeo, relativa a `public/`. Mientras no exista el archivo
    * se deja sin pasar y la sección se dibuja igual, con el marco vacío.
@@ -56,10 +61,23 @@ export interface LandingDemoProps {
  * hero: gasta batería y ancho de banda en algo que nadie está viendo, y en un
  * móvil eso se nota en el primer scroll. El `IntersectionObserver` lo arranca
  * al asomar y lo pausa al salir.
+ *
+ * ## El único control es reproducir/pausar
+ *
+ * Nada de barra de progreso, volumen ni pantalla completa: por eso no lleva
+ * el atributo `controls` nativo, que trae los cuatro. El botón propio guarda
+ * si la pausa fue manual (`pausadoAMano`) para que el `IntersectionObserver`
+ * no reanude un vídeo que la persona paró a propósito al volver a hacer
+ * scroll sobre él.
  */
-export function LandingDemo({ src, poster }: LandingDemoProps) {
+export function LandingDemo({ webmSrc, src, poster }: LandingDemoProps) {
   const marco = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
+  /* Si quien mira lo pausó a mano, el observador deja de reactivarlo al
+     hacer scroll: sin esto, salir y volver a entrar en pantalla reanudaba
+     un vídeo que la persona había parado a propósito. */
+  const pausadoAMano = useRef(false);
+  const [enReproduccion, setEnReproduccion] = useState(false);
 
   useEffect(() => {
     const nodo = marco.current;
@@ -70,6 +88,7 @@ export function LandingDemo({ src, poster }: LandingDemoProps) {
         const v = video.current;
         if (!v) return;
         if (entrada.isIntersecting) {
+          if (pausadoAMano.current) return;
           /* La promesa se rechaza si el navegador decide que no toca —pestaña
              en segundo plano, ahorro de datos—. No es un error que haya que
              propagar: el póster se queda puesto y la página funciona igual. */
@@ -92,6 +111,18 @@ export function LandingDemo({ src, poster }: LandingDemoProps) {
     observador.observe(nodo);
     return () => observador.disconnect();
   }, []);
+
+  const alternar = () => {
+    const v = video.current;
+    if (!v) return;
+    if (v.paused) {
+      pausadoAMano.current = false;
+      void v.play().catch(() => undefined);
+    } else {
+      pausadoAMano.current = true;
+      v.pause();
+    }
+  };
 
   return (
     <section
@@ -117,16 +148,48 @@ export function LandingDemo({ src, poster }: LandingDemoProps) {
           }}
         >
           {src ? (
-            <video
-              ref={video}
-              className="h-full w-full object-cover"
-              src={src}
-              poster={poster}
-              loop
-              muted
-              playsInline
-              preload="metadata"
-            />
+            <>
+              <video
+                ref={video}
+                className="h-full w-full object-cover"
+                poster={poster}
+                loop
+                muted
+                playsInline
+                preload="metadata"
+                onPlay={() => setEnReproduccion(true)}
+                onPause={() => setEnReproduccion(false)}
+              >
+                {webmSrc ? <source src={webmSrc} type="video/webm" /> : null}
+                <source src={src} type="video/mp4" />
+              </video>
+              {/* El único control que lleva: reproducir/pausar. Nada de
+                  barra de progreso, volumen ni pantalla completa — el marco
+                  es una demostración ambiental, no un reproductor. */}
+              <button
+                type="button"
+                onClick={alternar}
+                aria-label={enReproduccion ? 'Pausar el vídeo' : 'Reproducir el vídeo'}
+                className="absolute bottom-4 left-4 flex h-9 w-9 items-center justify-center transition-opacity hover:opacity-100 md:opacity-70"
+                style={{
+                  borderRadius: '9999px',
+                  background: 'rgba(0,0,0,0.55)',
+                  border: `1px solid ${l.border}`,
+                  color: l.fg,
+                }}
+              >
+                {enReproduccion ? (
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                    <rect x="3" y="2" width="3.5" height="12" fill="currentColor" />
+                    <rect x="9.5" y="2" width="3.5" height="12" fill="currentColor" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                    <path d="M4 2L14 8L4 14Z" fill="currentColor" />
+                  </svg>
+                )}
+              </button>
+            </>
           ) : (
             /* El hueco reservado. No es un error ni un cargador: es el marco
                definitivo esperando su contenido, y lo dice. */

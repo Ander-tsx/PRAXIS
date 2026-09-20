@@ -28,10 +28,12 @@ export const metadata: Metadata = {
  * Leer la cookie hace que la página se renderice bajo demanda en lugar de
  * prerenderizarse: es el precio de que el navbar refleje la sesión.
  *
- * El vídeo de demostración (`LandingDemo`) va **sin `src`**: el marco se pinta
- * con su proporción definitiva y un aviso dentro. Cuando exista el archivo se
- * copia a `public/media/` y se pasa aquí; nada más se mueve, que es justamente
- * para lo que el hueco ya está reservado.
+ * El vídeo de demostración (`LandingDemo`) vive en `public/media/`: WebM
+ * (VP9) primero, más ligero, y MP4 (H.264) como `<source>` de respaldo para
+ * el navegador que no entienda el primero. Los dos se generaron a partir de
+ * la grabación original recortando al 16:9 exacto del marco antes de escalar
+ * a 1080p — así no se gastan bits en los píxeles que `object-cover` iba a
+ * recortar de todos modos — y sin pista de audio, que un vídeo `muted` no usa.
  *
  * No lee `getTheme()`: la landing es monocroma y fija, no responde al
  * claro/oscuro de la cuenta. Ese selector sigue viviendo en Configuración,
@@ -47,7 +49,13 @@ export default async function LandingPage() {
       <LandingTemplate
         navbar={<PublicNavbar isAuthenticated={isAuthenticated} />}
         hero={<LandingHero isAuthenticated={isAuthenticated} />}
-        demo={<LandingDemo />}
+        demo={
+          <LandingDemo
+            webmSrc="/media/praxis-demo.webm"
+            src="/media/praxis-demo.mp4"
+            poster="/media/praxis-demo-poster.jpg"
+          />
+        }
         features={<LandingFeatures />}
         automation={<LandingAutomation />}
         assistant={<LandingAssistant />}
