@@ -3,6 +3,12 @@ import type { ReactNode } from 'react';
 export interface LandingTemplateProps {
   navbar: ReactNode;
   hero: ReactNode;
+  /**
+   * El vídeo de demostración. Va pegado al hero y **sube sobre él** con un
+   * margen negativo propio, así que el orden importa: entre `hero` y
+   * `features` y en ningún otro sitio.
+   */
+  demo: ReactNode;
   features: ReactNode;
   automation: ReactNode;
   assistant: ReactNode;
@@ -19,6 +25,7 @@ export interface LandingTemplateProps {
 export function LandingTemplate({
   navbar,
   hero,
+  demo,
   features,
   automation,
   assistant,
@@ -34,6 +41,7 @@ export function LandingTemplate({
       {navbar}
       <main className="flex-1">
         {hero}
+        {demo}
         {features}
         {automation}
         {assistant}

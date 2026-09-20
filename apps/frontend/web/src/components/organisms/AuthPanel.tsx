@@ -21,8 +21,20 @@
  * Ver kyloo-design/SKILL.md §12.
  */
 
-import { KylooWordmark, ShaderCanvas } from '@praxis/commons';
+import { KylooWordmark } from '@praxis/commons';
 import { useEffect } from 'react';
+
+/**
+ * El desvanecido de los bordes de la pieza, copiado literal de `LandingHero`.
+ *
+ * ⚠️ **Se copia y NO se importa.** `LandingHero` es un organismo de la landing
+ * y esto es el panel de acceso: importar desde ahí ataría una pantalla a la
+ * otra por una cadena de CSS. Si esto se usa en un tercer sitio, entonces sí
+ * sube a `commons` — la regla de siempre, dos usos es coincidencia y tres es
+ * un patrón.
+ */
+const MASCARA_DE_BORDE =
+  'radial-gradient(ellipse 50% 50% at 50% 46%, #000 0%, #000 34%, rgba(0,0,0,0.82) 52%, rgba(0,0,0,0.42) 66%, rgba(0,0,0,0.12) 80%, transparent 94%)';
 
 export interface AuthPanelProps {
   children: React.ReactNode;
@@ -50,19 +62,59 @@ export function AuthPanel({ children }: AuthPanelProps) {
         className="landing relative hidden flex-1 flex-col justify-end overflow-hidden p-10 md:flex"
         style={{ background: 'var(--l-bg)' }}
       >
-        <ShaderCanvas
-          className="absolute inset-0 h-full w-full"
-          amplitude={0.9}
-          timeSpeed={0.004}
-          pixelSize={4}
-          gooeyness={0.4}
-          contrast={1.3}
-          bias={-0.05}
-          invert={false}
-          bg="#080807"
-          fg="#e8e8e3"
-          autoReveal
-          interactive
+        {/**
+         * La misma pieza que la primera pantalla de la landing
+         * (`LandingHero`, `BloomVisual`) — y por las mismas razones, así que
+         * las trampas están contadas allí, no aquí:
+         *
+         * - `mixBlendMode: 'lighten'` y **no** `screen`, porque el negro que
+         *   devuelve el decodificador de vídeo no es exactamente el de la
+         *   página y `screen` los suma.
+         * - Ningún ancestro con `transform`, `filter` ni `opacity` < 1: abren
+         *   contexto de apilado y el blend deja de ver el fondo.
+         * - El radio de la máscara no pasa del 50 %, o el desvanecido muere
+         *   fuera del elemento y reaparece el canto.
+         *
+         * 🚫 **Aquí había un `ShaderCanvas`** — el motivo halftone del cierre
+         * de la landing, blanco sobre negro. Se retira: era el único sitio
+         * donde la puerta de entrada enseñaba algo que no vuelve a aparecer
+         * dentro del producto, y además su blanco impedía que esta pieza
+         * conviviera con él (con `lighten`, el shader gana en cuanto pasa de
+         * gris medio y la flor desaparece). El componente sigue existiendo y
+         * lo usa `PublicFooter`.
+         *
+         * ⚠️ **El cuadrado se dimensiona con `min()` de las dos medidas del
+         * panel, no con un porcentaje.** La columna es `flex-1` de alto
+         * completo: su proporción va de casi cuadrada a muy apaisada según la
+         * ventana, y un `w-[70%]` se sale por arriba en cuanto la ventana es
+         * baja.
+         */}
+        <video
+          className="pointer-events-none absolute top-1/2 left-1/2 aspect-square max-w-none -translate-x-1/2 -translate-y-1/2 object-cover"
+          style={{
+            width: 'min(96%, 82vh)',
+            mixBlendMode: 'lighten',
+            maskImage: MASCARA_DE_BORDE,
+            WebkitMaskImage: MASCARA_DE_BORDE,
+          }}
+          src="/media/hero-bloom.mp4"
+          poster="/media/hero-bloom.png"
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          /**
+           * ⚠️ **`aria-hidden` y `tabIndex={-1}` van juntos, siempre.** Un
+           * `<video>` es enfocable, así que esconderlo del árbol de
+           * accesibilidad sin sacarlo del orden de tabulación deja una parada
+           * de teclado que no anuncia nada: se tabula, el foco desaparece y no
+           * hay forma de saber dónde está. Biome lo marca
+           * (`noAriaHiddenOnFocusable`) y su arreglo automático es el
+           * contrario —quitar `aria-hidden`—, que sería anunciar un adorno.
+           */
+          tabIndex={-1}
+          aria-hidden="true"
         />
         <a href="/" className="relative z-10 flex flex-col items-start gap-1.5 no-underline">
           <span

@@ -42,25 +42,42 @@ const refreshSession = createSessionRefreshProxy();
 const LOGIN_PATH = '/auth/login';
 
 /**
- * Las pantallas de sesión, que son **solo para quien no la tiene**.
+ * Las pantallas que son **solo para quien no tiene sesión**.
  *
  * Era el `proxy.ts` entero de `auth-front`, y es la regla inversa a la de
  * `PREFIJOS_PRIVADOS`: aquí no se echa a quien no tiene sesión, se echa a quien
  * sí la tiene — enseñarle el formulario de entrada a alguien que ya entró es
  * una pantalla muerta.
  *
+ * ⚠️ **Y desde 2026-09-19 la landing está dentro.** Quien usa Praxis a diario
+ * escribe el dominio a pelo, y hasta ahora eso le servía la página de venta con
+ * un botón «Ir al panel» que tenía que pulsar cada vez. Con sesión válida, `/`
+ * es exactamente lo mismo que `/auth/login`: una pantalla que no le dice nada
+ * a quien ya está dentro.
+ *
+ * ⚠️ **Consecuencia: con sesión puesta no hay forma de ver la landing.** Es lo
+ * que se quiere, pero conviene saberlo antes de buscar por qué «la página de
+ * inicio no carga» — se ve entera en una ventana privada, o cerrando sesión.
+ *
  * ⚠️ **Rutas exactas, no un prefijo.** `/auth/verify-email` y
  * `/auth/reset-password` se abren desde un enlace del correo y tienen que
  * funcionar con sesión puesta: quien confirma su correo en el navegador donde
  * ya estaba dentro no puede acabar rebotado.
  */
-const SOLO_INVITADOS = new Set(['/auth/login', '/auth/signup']);
+const SOLO_INVITADOS = new Set(['/', '/auth/login', '/auth/signup']);
 
 /**
- * A dónde va quien ya tiene sesión y pide una pantalla de entrada.
+ * A dónde va quien ya tiene sesión y pide una de las pantallas de arriba.
  *
- * El área privada, no la landing: quien acaba de identificarse quiere su
- * trabajo. Es el mismo destino que usa el formulario al terminar.
+ * El área privada: quien acaba de identificarse —o quien vuelve a escribir el
+ * dominio— quiere su trabajo. Es el mismo destino que usa el formulario al
+ * terminar.
+ *
+ * ⚠️ **Ruta relativa, nunca el dominio entero.** `redirectToZone` compone el
+ * origen público desde `x-forwarded-host`, así que esto vale igual en
+ * `localhost:4100` y en producción. Escribir aquí el dominio de producción
+ * rompería el desarrollo y las pruebas de punta a punta sin dar ningún error:
+ * la redirección funciona, solo que a otra máquina.
  */
 const DESTINO_TRAS_ENTRAR = '/projects';
 
@@ -149,7 +166,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
   /**
-   * Las pantallas de entrada: quien ya tiene sesión no las ve.
+   * Las pantallas de quien no ha entrado —la landing incluida—: quien ya tiene
+   * sesión no las ve.
    *
    * ⚠️ Se **verifica la firma**, no basta con que la cookie exista: con un token
    * caducado hay que poder llegar al login para volver a entrar, y mirar solo la
