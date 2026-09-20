@@ -133,7 +133,7 @@ export function LandingDemo({ webmSrc, src, poster }: LandingDemoProps) {
       <div className="mx-auto w-full max-w-[96rem] px-6 sm:px-8 lg:px-10 xl:px-16">
         <div
           ref={marco}
-          className="relative aspect-video w-full overflow-hidden"
+          className="relative mx-auto aspect-video w-full max-w-[72rem] overflow-hidden"
           style={{
             /* El radio de la landing, al doble: es la pieza más grande de la
                página y el radio «casi cuadrado» de una fila se pierde a este
