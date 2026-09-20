@@ -127,17 +127,23 @@ html::-webkit-scrollbar {
 /* El brillo que cruza la tarjeta de arriba-izquierda a abajo-derecha, una
    sola vez, al terminar de guardarse. `background-position` en diagonal
    —no una animación de `transform`— porque así la banda de luz siempre mide
-   lo mismo que la tarjeta, sin importar su alto. */
+   lo mismo que la tarjeta, sin importar su alto.
+   Lento y con una meseta en medio (no solo un pico) para que se lea como un
+   brillo que se desliza, no como un parpadeo: ver el `animation` en
+   TaskCard.tsx, que va con una curva de salida suave, no lineal. */
 @keyframes task-card-shine {
   0% {
-    background-position: -150% -150%;
+    background-position: -160% -160%;
     opacity: 0;
   }
   15% {
     opacity: 1;
   }
+  65% {
+    opacity: 1;
+  }
   100% {
-    background-position: 150% 150%;
+    background-position: 160% 160%;
     opacity: 0;
   }
 }

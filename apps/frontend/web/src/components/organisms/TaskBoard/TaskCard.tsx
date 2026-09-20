@@ -268,10 +268,18 @@ export function TaskCard({
     >
       {/**
        * El brillo de guardado: una banda diagonal que cruza la tarjeta una
-       * sola vez. `overflow-hidden` en este envoltorio, no en el `<article>`
-       * entero — así la banda, más grande que la tarjeta para cubrirla en
-       * diagonal, se recorta a su tamaño sin tocar el resto del recorte de la
-       * tarjeta (avatares solapados, etc.).
+       * sola vez, despacio. `overflow-hidden` en este envoltorio, no en el
+       * `<article>` entero — así la banda, más grande que la tarjeta para
+       * cubrirla en diagonal, se recorta a su tamaño sin tocar el resto del
+       * recorte de la tarjeta (avatares solapados, etc.).
+       *
+       * ⚠️ **1900 ms y una curva de salida suave, a propósito.** La primera
+       * versión duraba 900 ms en `ease-out` y con un pico de opacidad muy
+       * corto: se leía como un parpadeo, no como un brillo. Una banda más
+       * ancha y traslúcida, una meseta de opacidad en el centro (ver el
+       * `15%`–`65%` del keyframe) y una curva tipo "expo-out" —rápida al
+       * principio, larga cola al final— es lo que da la sensación de
+       * deslizarse en vez de encenderse y apagarse.
        */}
       {brillando && (
         <span
@@ -281,9 +289,9 @@ export function TaskCard({
           <span
             className="absolute inset-[-60%]"
             style={{
-              backgroundImage: `linear-gradient(135deg, transparent 45%, ${alpha('#ffffff', 40)} 50%, transparent 55%)`,
+              backgroundImage: `linear-gradient(135deg, transparent 38%, ${alpha('#ffffff', 22)} 50%, transparent 62%)`,
               backgroundSize: '300% 300%',
-              animation: 'task-card-shine 900ms ease-out',
+              animation: 'task-card-shine 1900ms cubic-bezier(0.16, 1, 0.3, 1)',
             }}
             onAnimationEnd={() => setBrillando(false)}
           />

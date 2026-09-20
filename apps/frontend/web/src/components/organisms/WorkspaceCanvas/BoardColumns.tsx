@@ -569,7 +569,15 @@ export function BoardColumns({
             canEdit={canEditTask}
             canDelete={canDeleteTask}
             onOpenTask={setOpenTask}
-            openTaskId={openTaskId}
+            /**
+             * ⚠️ **`openTask?.id`, no el `openTaskId` de las props.** Ese es
+             * el de la URL al cargar la página —solo sirve para el estado
+             * inicial (arriba)— y no cambia cuando se abre otra tarea con un
+             * clic. Con él aquí, el reborde de «tarea abierta» se quedaba
+             * fijo en lo que hubiera en la URL, o no aparecía nunca si se
+             * entró sin `?task=`.
+             */
+            openTaskId={openTask?.id ?? null}
             ultimoGuardado={ultimoGuardado}
             onTaskCreated={setRecienCreada}
             arrastre={arrastre}

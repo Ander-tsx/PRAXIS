@@ -198,12 +198,22 @@ export function TaskDialog({
     if (state.error) savedSignature.current = null;
   }, [state.error]);
 
-  /** Terminó bien: el brillo va para la tarjeta que de verdad se guardó. */
+  /**
+   * Terminó bien: el brillo va para la tarjeta que de verdad se guardó.
+   *
+   * ⚠️ **La dependencia es `state` entero, no `state.done`.** `useAccion`
+   * devuelve un objeto nuevo en cada acción que termina, pero su campo
+   * `done` es la misma cadena `'updated'` de la vez anterior — y una
+   * dependencia por valor primitivo no dispara el efecto si el valor no
+   * cambió. Guardar dos tareas seguidas solo hacía brillar la primera: la
+   * segunda actualización de `state` no volvía a pasar por aquí porque
+   * `state.done` seguía siendo, letra por letra, `'updated'`.
+   */
   useEffect(() => {
     if (state.done !== 'updated' || !idEnVuelo.current) return;
     onSaved?.(idEnVuelo.current);
     idEnVuelo.current = null;
-  }, [state.done, onSaved]);
+  }, [state, onSaved]);
 
   /**
    * Anota lo que hay al abrir una tarea, y guarda lo que quede pendiente antes
