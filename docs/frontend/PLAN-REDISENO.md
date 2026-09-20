@@ -29,6 +29,29 @@
 > están en el árbol. La etapa viva es **Organizaciones**, y lo que le queda —tres
 > casillas de 73— está en su propio plan, no aquí.
 >
+> **Reverificación del 2026-09-20 (decimotercera vez).** Mismo resultado en los
+> tres comandos de siempre. El prompt de arranque volvió a pedir, literalmente,
+> «R9.1/R9.2/R9.3 en `main`» y Enterprise en rama nueva — como si nada de esto
+> existiera. Esta vez con un dato nuevo que vale la pena dejar escrito porque
+> cambia el motivo de no re-ejecutar: **el 2026-09-04, en F1 de
+> [PLAN-FUSION-ZONAS](../PLAN-FUSION-ZONAS.md), el dueño del producto archivó
+> `reports-front` a propósito** —«de las 15+ gráficas solo 1 o 2 eran útiles de
+> verdad»— y `/reports` da 404 desde entonces. No es solo que R9 ya esté hecho:
+> es que la pantalla donde vivían sus gráficas **ya no existe por decisión
+> explícita**, y el menú lo dice desde antes de archivarla. Añadir un
+> histograma o un mapa de calor más a esa zona sería reabrir código que el
+> dueño mandó apagar, no completar un pendiente. `reports-service` y sus once
+> rutas siguen intactos —los usa PRAX— así que si algún día vuelve a haber
+> pantalla, la base de R9 sigue ahí para montarla encima.
+>
+> Bloque 2 (Enterprise) se reconfirmó igual: `billing-service` con
+> `organizations/`, `subscriptions/` y `asientos.ts` en el árbol, y la etapa
+> viva sigue siendo Organizaciones, no Enterprise.
+>
+> Nada abierto cambió de lo que ya pedía navegador, la clave de Gemini o
+> decisión del dueño (C6, C9/C10, A1, `TODO(A6+)`), así que esta sesión no
+> ejecutó código nuevo — solo esta entrada.
+>
 > **Reverificación del 2026-09-18 (duodécima vez).** Mismo resultado, mismos
 > tres comandos (`99b2f6d` sigue siendo ancestro de `main`,
 > `report_column_time` en los dos controladores, `billing/src` con
