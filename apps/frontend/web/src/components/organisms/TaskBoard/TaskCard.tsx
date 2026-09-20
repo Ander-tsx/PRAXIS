@@ -13,7 +13,7 @@ import {
   dueState,
   personLabel,
 } from '@praxis/commons';
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AttachmentGlyph, NotesGlyph } from './task-marks';
 
 /**
@@ -41,6 +41,23 @@ export interface TaskCardProps {
   onOpen: () => void;
   /** Solo cambia cómo se nombra el botón: el diálogo decide qué deja tocar. */
   canEdit: boolean;
+  /**
+   * Esta es la tarea que tienes abierta ahora mismo.
+   *
+   * Pinta el mismo reborde morado que el hover, pero fijo y algo más
+   * transparente: quien tiene el panel de detalle abierto necesita encontrar
+   * de un vistazo su tarjeta entre las demás de la columna, sobre todo
+   * cuando hay muchas.
+   */
+  isOpen?: boolean;
+  /**
+   * Acaba de guardarse: dispara el brillo una vez.
+   *
+   * Un número y no un booleano — cada guardado trae uno distinto (ver
+   * `BoardColumns`), para que guardar la misma tarea dos veces seguidas
+   * reproduzca el brillo las dos veces y no solo la primera.
+   */
+  shineNonce?: number | null;
   /**
    * La tarea está en una columna de cierre (verde).
    *
@@ -121,6 +138,8 @@ export function TaskCard({
   currentUserId,
   onOpen,
   canEdit,
+  isOpen = false,
+  shineNonce = null,
   isDone,
   draggable,
   onArrastrar,
@@ -142,6 +161,24 @@ export function TaskCard({
 
   /** Dónde se pulsó, para saber al soltar si aquello fue un clic o un arrastre. */
   const origenDelPuntero = useRef<{ x: number; y: number } | null>(null);
+
+  /**
+   * El brillo de guardado: se enciende cuando llega un `shineNonce` nuevo y se
+   * apaga solo, al terminar la animación CSS.
+   *
+   * ⚠️ No basta con `shineNonce != null` para decidir si se pinta: ese valor
+   * sigue puesto en las siguientes renderizaciones —viene de un estado del
+   * tablero que no se limpia— así que sin este seguimiento el brillo se
+   * repintaría en cada re-render de la tarjeta, no solo al guardar.
+   */
+  const ultimoNonceVisto = useRef<number | null>(null);
+  const [brillando, setBrillando] = useState(false);
+  useEffect(() => {
+    if (shineNonce != null && shineNonce !== ultimoNonceVisto.current) {
+      ultimoNonceVisto.current = shineNonce;
+      setBrillando(true);
+    }
+  }, [shineNonce]);
 
   /**
    * Decide si este clic abre la tarea.
@@ -216,12 +253,43 @@ export function TaskCard({
         boxShadow: fantasma
           ? `0 24px 48px -12px ${alpha(colors.overlay, 70)}, 0 0 0 1px ${alpha(colors.primary, 45)}`
           : `0 1px 0 ${alpha(colors.border, 40)}`,
+        /**
+         * Fija el mismo morado del hover, pero al 55 % — «reborde, no aviso»—
+         * y por encima de las clases de Tailwind: un `style` inline gana
+         * siempre a un `className` para la misma propiedad, así que sigue
+         * viéndose aunque el puntero no esté encima.
+         */
+        outlineColor: !fantasma && isOpen ? alpha(colors.primary, 55) : undefined,
         /* El fantasma **no** se toca con el dedo ni con el ratón: los eventos
            siguen yendo al tablero de debajo, que es quien tiene que saber sobre
            qué columna estás. */
         touchAction: fantasma ? undefined : 'manipulation',
       }}
     >
+      {/**
+       * El brillo de guardado: una banda diagonal que cruza la tarjeta una
+       * sola vez. `overflow-hidden` en este envoltorio, no en el `<article>`
+       * entero — así la banda, más grande que la tarjeta para cubrirla en
+       * diagonal, se recorta a su tamaño sin tocar el resto del recorte de la
+       * tarjeta (avatares solapados, etc.).
+       */}
+      {brillando && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl"
+        >
+          <span
+            className="absolute inset-[-60%]"
+            style={{
+              backgroundImage: `linear-gradient(135deg, transparent 45%, ${alpha('#ffffff', 40)} 50%, transparent 55%)`,
+              backgroundSize: '300% 300%',
+              animation: 'task-card-shine 900ms ease-out',
+            }}
+            onAnimationEnd={() => setBrillando(false)}
+          />
+        </span>
+      )}
+
       {/* Aquí había un punto de color por prioridad, a la izquierda del título.
           Se fue porque **toda** tarea tiene prioridad: el punto no marcaba las
           urgentes, pintaba las cuatro familias a la vez y una columna llena se

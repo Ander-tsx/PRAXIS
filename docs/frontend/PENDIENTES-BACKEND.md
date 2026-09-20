@@ -1159,3 +1159,30 @@ suscripción, que ya lo tiene (`billing_subscription_of` lo devuelve).
 **Severidad 🟠 y no roja** porque no expone nada y hoy casi nadie tiene dos
 suscripciones. Sube a naranja el día que alguien pague dos equipos.
 
+---
+
+## 🟡 27. `Task` no tiene `completedAt`: la vista de calendario usa `updatedAt` como proxy
+
+**Leído en el código** · `apps/frontend/commons/api/domain.ts:697`
+
+Una tarea sin `dueDate` que cae en una columna de cierre debería ubicarse en el
+calendario el día en que se completó, no en el panel de «sin fecha» —si no,
+el trabajo hecho esa semana desaparece del calendario en cuanto no tiene
+vencimiento—. No hay ningún campo que diga cuándo entró en esa columna:
+`updatedAt` se actualiza con cualquier escritura sobre la tarea, no solo con
+el cambio de columna.
+
+**Qué hace el frontend mientras tanto.** `BoardCalendar.tsx` usa `updatedAt`
+como proxy para esas tareas. Acierta en el caso normal —se completa y no se
+vuelve a tocar— pero un comentario o una edición posterior después de
+completada la desplaza de día sin que nadie la haya "completado" de nuevo, y
+reabrirla y cerrarla el mismo día la deja en el sitio correcto por
+casualidad, no porque el dato lo diga.
+
+**Qué haría falta.** Un `completedAt` que solo se escriba al entrar en una
+columna de cierre (y se vacíe si sale), igual que ya distingue
+`Project.status` de un campo de auditoría genérico.
+
+**Severidad 🟡**: no rompe nada, solo puede mostrar una fecha de compleción
+aproximada en un calendario de solo lectura.
+

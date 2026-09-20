@@ -1272,6 +1272,41 @@ export async function moveTaskAction(_prev: TaskState, formData: FormData): Prom
   return { error: null, done: 'moved' };
 }
 
+/**
+ * Cambia solo la fecha de vencimiento: lo que arrastra la vista de Calendario
+ * al soltar una tarea sobre otro día.
+ *
+ * ⚠️ **A propósito no reusa `updateTaskAction`.** Ese lee `readTaskFields` y
+ * reenvía título, prioridad, encargados y etiquetas junto con la fecha — bien
+ * para el panel, que ya tiene los cinco a mano, pero forzaría al calendario a
+ * cargar la tarea entera solo para soltarla un día más allá. `PATCH /tasks/:id`
+ * admite un cuerpo parcial, así que aquí solo viaja lo que cambió.
+ */
+export async function moveTaskDueDateAction(
+  _prev: TaskState,
+  formData: FormData,
+): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  /** Vacío es «sin fecha»: se manda `null` explícito, no se omite el campo. */
+  const dueDate = String(formData.get('dueDate') ?? '').trim();
+
+  try {
+    const saved = await api.patch<Task>(`/tasks/${taskId}`, {
+      dueDate: dueDate ? toIsoDueDate(dueDate) : null,
+    });
+    if (!saved?.id) return { error: 'El servidor no guardó la fecha.', done: null };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo cambiar la fecha.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'moved' };
+}
+
 export async function deleteTaskAction(_prev: TaskState, formData: FormData): Promise<TaskState> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.', done: null };

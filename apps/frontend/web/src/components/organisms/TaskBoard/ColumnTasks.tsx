@@ -29,6 +29,15 @@ export interface ColumnTasksProps {
   canDelete: boolean;
   onOpenTask: (task: Task) => void;
   /**
+   * La tarea que está abierta ahora mismo (viene de la URL, ver `BoardColumns`).
+   *
+   * Solo se pasa desde la instancia en tira: la de pantalla completa convive
+   * con ella y las dos pintarían el mismo reborde, sin aportar nada.
+   */
+  openTaskId?: string | null;
+  /** Qué tarjeta acaba de guardarse, para el brillo. Ver `BoardColumns`. */
+  ultimoGuardado?: { taskId: string; nonce: number } | null;
+  /**
    * Acaba de crearse una tarea en esta columna.
    *
    * El alta rápida solo pide el título, así que quien la usa casi siempre
@@ -88,6 +97,8 @@ export function ColumnTasks({
   canEdit,
   canDelete,
   onOpenTask,
+  openTaskId = null,
+  ultimoGuardado = null,
   onTaskCreated,
   arrastre,
   destino,
@@ -141,6 +152,8 @@ export function ColumnTasks({
         currentUserId={currentUserId}
         onOpen={() => onOpenTask(task)}
         canEdit={canEdit}
+        isOpen={task.id === openTaskId}
+        shineNonce={ultimoGuardado?.taskId === task.id ? ultimoGuardado.nonce : null}
         isDone={isDoneColumn}
         draggable={canMove}
         onArrastrar={(evento) => alEmpezarArrastre(task.id, column.id, evento)}

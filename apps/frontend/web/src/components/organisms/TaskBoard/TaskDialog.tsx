@@ -57,6 +57,16 @@ export interface TaskDialogProps {
   canManageLabels: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  /**
+   * Un guardado terminó bien. Es lo que dispara el brillo de la tarjeta en el
+   * tablero (ver `TaskCard`), no algo que este panel enseñe.
+   *
+   * ⚠️ **Manda el id que iba en el formulario que se guardó, no `task.id`.**
+   * El guardado se dispara al cerrar o al cambiar de tarea, y para cuando el
+   * servidor responde el panel ya puede estar mostrando la tarea siguiente:
+   * usar `task.id` en ese momento haría brillar la tarjeta equivocada.
+   */
+  onSaved?: (taskId: string) => void;
 }
 
 /**
@@ -124,6 +134,7 @@ export function TaskDialog({
   canManageLabels,
   canEdit,
   canDelete,
+  onSaved,
 }: TaskDialogProps) {
   /* Sin el tercer elemento (`enMarcha`) a propósito: ver `handleClose`. */
   const [state, formAction] = useAccion(updateTaskAction, TASK_INITIAL_STATE);
@@ -163,16 +174,21 @@ export function TaskDialog({
    * desde que el motor de automatización reacciona a hechos, despierta a las
    * reglas de esa tarea.
    */
+  /** El id que iba en el último formulario mandado, para el aviso de `onSaved`. */
+  const idEnVuelo = useRef<string | null>(null);
+
   const saveIfChanged = useCallback(
     (form: HTMLFormElement) => {
       if (!canEdit) return;
       const signature = formSignature(form);
       if (signature === savedSignature.current) return;
       savedSignature.current = signature;
+      const datos = new FormData(form);
+      idEnVuelo.current = String(datos.get('taskId') ?? '') || null;
       /* El `FormData` va suelto y no por `requestSubmit()`: esto también se
          llama desde el desmontaje, y entonces el formulario ya no está en el
          DOM y `requestSubmit()` falla. */
-      formAction(new FormData(form));
+      formAction(datos);
     },
     [canEdit, formAction],
   );
@@ -181,6 +197,13 @@ export function TaskDialog({
   useEffect(() => {
     if (state.error) savedSignature.current = null;
   }, [state.error]);
+
+  /** Terminó bien: el brillo va para la tarjeta que de verdad se guardó. */
+  useEffect(() => {
+    if (state.done !== 'updated' || !idEnVuelo.current) return;
+    onSaved?.(idEnVuelo.current);
+    idEnVuelo.current = null;
+  }, [state.done, onSaved]);
 
   /**
    * Anota lo que hay al abrir una tarea, y guarda lo que quede pendiente antes

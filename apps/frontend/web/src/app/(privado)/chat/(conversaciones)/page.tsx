@@ -1,8 +1,6 @@
-import { ChatSearch } from '@/components/organisms/ChatSearch';
 import { ULTIMO_CHAT_COOKIE, conversacionRecordada } from '@/lib/ultimo-chat';
 import {
   Avatar,
-  type ChatContact,
   type DirectConversation,
   type ProjectChatSummary,
   ProjectMonogram,
@@ -65,9 +63,12 @@ interface PageProps {
  * determinista, no mira el `user-agent`, y las dos plataformas se comportan
  * igual: quien quiere la lista la pide, y quien no dice nada vuelve a lo último.
  *
- * Y el índice enseña **las conversaciones**, no solo el buscador. En un teléfono
- * es la pantalla de la lista de cualquier app de mensajería; en escritorio es
- * redundante con la barra lateral, que es una redundancia barata.
+ * Y el índice enseña **las conversaciones**, pero solo en móvil: en escritorio
+ * la barra lateral ya las lista, así que la pantalla vacía se reduce a un
+ * aviso de que hay que elegir un chat. El buscador de contactos vivía aquí y
+ * se quitó de los dos: en escritorio es redundante con el de la barra
+ * lateral, y en móvil esta pantalla es «tus conversaciones», no «con quién
+ * puedes hablar».
  */
 export default async function ChatVacioPage({ searchParams }: PageProps) {
   const { lista } = await searchParams;
@@ -80,10 +81,9 @@ export default async function ChatVacioPage({ searchParams }: PageProps) {
   /* Las dos listas hacen falta igualmente: para pintar el índice, y para
      comprobar que lo recordado sigue siendo accesible antes de redirigir a
      ello. Pedirlas antes del `redirect()` no cuesta nada en el camino largo. */
-  const [directas, deProyecto, contactos] = await Promise.all([
+  const [directas, deProyecto] = await Promise.all([
     api.get<DirectConversation[]>('/me/chats').catch(() => [] as DirectConversation[]),
     api.get<ProjectChatSummary[]>('/me/chats/projects').catch(() => [] as ProjectChatSummary[]),
-    api.get<ChatContact[]>('/me/chats/contacts').catch(() => [] as ChatContact[]),
   ]);
 
   /* `?lista=1` es «quiero el índice», y lo pide la salida de móvil de una
@@ -96,93 +96,103 @@ export default async function ChatVacioPage({ searchParams }: PageProps) {
     if (accesible) redirect(`${CHAT_PATH}/${recordada}`);
   }
 
-  /* Un solo viaje al directorio para todo lo que pinta un nombre: los
-     interlocutores de las conversaciones abiertas y los contactos del buscador.
-     Eran dos, y el limitador del gateway cuenta a toda la plataforma en el mismo
-     cubo (ver `commons/api/directory.ts`). */
-  const directorio = await resolveProfiles(api, [
-    ...directas.map((conversacion) => conversacion.peerId),
-    ...contactos.map((contacto) => contacto.userId),
-  ]);
+  /* Solo los interlocutores de conversaciones ya abiertas: sin buscador aquí,
+     no hace falta el directorio de contactos. */
+  const directorio = await resolveProfiles(
+    api,
+    directas.map((conversacion) => conversacion.peerId),
+  );
 
   const hayConversaciones = directas.length > 0 || deProyecto.some((chat) => chat.channelId);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 p-4 sm:p-8">
-      <header className="flex flex-col gap-1">
-        <h2 className="font-display text-2xl text-text-primary">Tus mensajes</h2>
+    <>
+      {/* Escritorio: la barra lateral ya lista los chats, así que aquí solo
+          hace falta decir qué hacer. Sin buscador, sin lista duplicada. */}
+      <div className="mx-auto hidden w-full max-w-md flex-1 flex-col items-center justify-center gap-1 p-8 text-center md:flex">
+        <p className="font-display text-xl text-text-primary">Selecciona un chat</p>
         <p className="font-sans text-sm text-text-secondary">
-          {hayConversaciones
-            ? 'Sigue donde lo dejaste, o busca a alguien para empezar una conversación nueva.'
-            : 'Todavía no tienes ninguna conversación. Busca a alguien de tu organización para empezar.'}
+          Elige una conversación de la barra lateral para empezar a escribir.
         </p>
-      </header>
+      </div>
 
-      {hayConversaciones && (
-        <section className="flex flex-col gap-1">
-          <h3 className="px-1 pb-1 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-            Conversaciones
-          </h3>
+      {/* Móvil: esta pantalla es la lista de conversaciones —no hay barra
+          lateral visible—, así que sí hace falta pintarlas. Sin buscador: eso
+          es «con quién puedes hablar», y aquí es «con quién ya hablas». */}
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 p-4 md:hidden">
+        <header className="flex flex-col gap-1">
+          <h2 className="font-display text-2xl text-text-primary">Tus mensajes</h2>
+          <p className="font-sans text-sm text-text-secondary">
+            {hayConversaciones
+              ? 'Sigue donde lo dejaste.'
+              : 'Todavía no tienes ninguna conversación.'}
+          </p>
+        </header>
 
-          {deProyecto
-            /* Sin canal es un proyecto en el que nadie ha escrito nunca: sale en
-               la barra lateral —desde donde se abre y se estrena— pero no en una
-               lista que dice «tus conversaciones». */
-            .filter((chat) => chat.channelId)
-            .map((chat) => (
+        {hayConversaciones && (
+          <section className="flex flex-col gap-1">
+            <h3 className="px-1 pb-1 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+              Conversaciones
+            </h3>
+
+            {deProyecto
+              /* Sin canal es un proyecto en el que nadie ha escrito nunca: sale en
+                 la barra lateral —desde donde se abre y se estrena— pero no en una
+                 lista que dice «tus conversaciones». */
+              .filter((chat) => chat.channelId)
+              .map((chat) => (
+                <Link
+                  key={chat.project.id}
+                  href={`${CHAT_PATH}/proyecto/${chat.project.id}`}
+                  className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-white/5"
+                >
+                  <ProjectMonogram
+                    id={chat.project.id}
+                    name={chat.project.name}
+                    iconKey={chat.project.iconKey}
+                    color={chat.project.color}
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate font-sans text-sm font-medium text-text-primary">
+                      {chat.project.name}
+                    </span>
+                    <span className="truncate font-sans text-xs text-text-secondary">
+                      {resumen(chat.ultimo)}
+                    </span>
+                  </span>
+                  <Insignia cuantos={chat.unread} />
+                </Link>
+              ))}
+
+            {directas.map((conversacion) => (
               <Link
-                key={chat.project.id}
-                href={`${CHAT_PATH}/proyecto/${chat.project.id}`}
+                key={conversacion.peerId}
+                href={`${CHAT_PATH}/${conversacion.peerId}`}
                 className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-white/5"
               >
-                <ProjectMonogram
-                  id={chat.project.id}
-                  name={chat.project.name}
-                  iconKey={chat.project.iconKey}
-                  color={chat.project.color}
+                <Avatar
+                  label={personName(directorio, conversacion.peerId)}
+                  size="sm"
+                  src={avatarHref(
+                    directorio.perfiles.get(conversacion.peerId)?.avatarUrl,
+                    GATEWAY_PATH,
+                  )}
                 />
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate font-sans text-sm font-medium text-text-primary">
-                    {chat.project.name}
+                    {personName(directorio, conversacion.peerId)}
                   </span>
                   <span className="truncate font-sans text-xs text-text-secondary">
-                    {resumen(chat.ultimo)}
+                    {resumen(conversacion.ultimo)}
                   </span>
                 </span>
-                <Insignia cuantos={chat.unread} />
+                <Insignia cuantos={conversacion.unread} />
               </Link>
             ))}
-
-          {directas.map((conversacion) => (
-            <Link
-              key={conversacion.peerId}
-              href={`${CHAT_PATH}/${conversacion.peerId}`}
-              className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-white/5"
-            >
-              <Avatar
-                label={personName(directorio, conversacion.peerId)}
-                size="sm"
-                src={avatarHref(
-                  directorio.perfiles.get(conversacion.peerId)?.avatarUrl,
-                  GATEWAY_PATH,
-                )}
-              />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-sans text-sm font-medium text-text-primary">
-                  {personName(directorio, conversacion.peerId)}
-                </span>
-                <span className="truncate font-sans text-xs text-text-secondary">
-                  {resumen(conversacion.ultimo)}
-                </span>
-              </span>
-              <Insignia cuantos={conversacion.unread} />
-            </Link>
-          ))}
-        </section>
-      )}
-
-      <ChatSearch contactos={contactos} directorio={directorio} gatewayPath={GATEWAY_PATH} />
-    </div>
+          </section>
+        )}
+      </div>
+    </>
   );
 }
 

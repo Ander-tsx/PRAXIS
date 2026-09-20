@@ -1,9 +1,8 @@
 'use client';
 
 import { aceptarInvitacionAction } from '@/app/(privado)/main/team/actions';
-import { NoticePanel } from '@/components/molecules/NoticePanel';
 import { ORGANIZACION_INITIAL_STATE } from '@/lib/main/action-state';
-import { Button, alpha, colors, useAccion } from '@praxis/commons';
+import { Button, useAccion } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -40,6 +39,16 @@ const DESTINO_TRAS_ACEPTAR = '/projects';
  * después de que le dijeran que ya está dentro. Se escribe igual que en
  * `OrgSwitcher` —y por el mismo motivo de que un Server Component no puede—:
  * la cookie es un **filtro sobre lo que ya puedes ver**, nunca una llave.
+ *
+ * ## Directamente en la página, no dentro de una tarjeta
+ *
+ * Vivía envuelta en un `NoticePanel` —el mismo borde con esquinas redondeadas
+ * que un aviso de tarea vencida—, y aquí no había nada que avisar: es una
+ * pantalla propia a la que solo se llega desde un enlace, no una fila entre
+ * otras del panel. Ahora sigue el mismo lenguaje que «Nueva organización»
+ * (`main/organizations/new`): una frase grande en serif, las filas numeradas
+ * con raya punteada de §4, y el formulario colgando de un `border-t`, no de
+ * una caja propia.
  */
 export function AcceptInvitation({ token }: { token: string }) {
   const router = useRouter();
@@ -55,98 +64,67 @@ export function AcceptInvitation({ token }: { token: string }) {
   }, [state.done, router]);
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
-      {/* El mismo `NoticePanel` que las invitaciones a un proyecto, y por el
-          mismo motivo: son la misma clase de cosa —algo que espera una
-          decisión—. Antes esto era un párrafo suelto y un botón sobre el fondo
-          desnudo, así que la invitación de más peso del producto se veía peor
-          que la de un proyecto. El tono es `accent`, el de «esto espera a que
-          decidas», igual que allí. */}
-      <NoticePanel
-        tone={colors.accent}
-        icon={<InvitationIcon />}
-        title="Te han invitado a una organización"
-        hint="Solo entras si aceptas. Nadie te ha metido todavía."
-      >
-        <form action={formAction} className="flex flex-col gap-4">
-          <input type="hidden" name="token" value={token} />
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-10">
+      <div className="flex flex-col gap-2">
+        <h2 className="font-display text-2xl leading-tight text-text-primary">
+          Te han invitado a una organización
+        </h2>
+        <p className="max-w-xl font-serif text-base italic text-white">
+          Solo entras si aceptas. Nadie te ha metido todavía.
+        </p>
+      </div>
 
-          <ul
-            className="flex flex-col gap-2.5 rounded-xl p-4"
-            style={{ background: alpha(colors.border, 30) }}
-          >
-            <Punto>
-              Su <strong className="font-medium text-text-primary">plan pasa a ser el tuyo</strong>{' '}
-              mientras estés dentro, y ocupas uno de sus asientos.
-            </Punto>
-            <Punto>
-              Tus proyectos{' '}
-              <strong className="font-medium text-text-primary">no cambian de sitio</strong>: siguen
-              en la organización donde estaban.
-            </Punto>
-            <Punto>
-              Podrás cambiar de organización cuando quieras desde el selector de la barra lateral.
-            </Punto>
-          </ul>
+      {/* El dispositivo de §4: número a la izquierda, texto al centro, raya
+          punteada entre filas. Ni una tarjeta. */}
+      <ol className="flex flex-col">
+        <Razon
+          n="01"
+          titulo="Su plan pasa a ser el tuyo"
+          texto="Mientras estés dentro, y ocupas uno de sus asientos."
+        />
+        <Razon
+          n="02"
+          titulo="Tus proyectos no cambian de sitio"
+          texto="Siguen en la organización donde estaban."
+        />
+        <Razon
+          n="03"
+          titulo="Puedes cambiar de organización cuando quieras"
+          texto="Desde el selector de la barra lateral."
+        />
+      </ol>
 
-          {state.error && (
-            <p
-              role="alert"
-              className="rounded-xl border px-4 py-3 font-sans text-sm"
-              style={{
-                borderColor: alpha(colors.error, 25),
-                background: alpha(colors.error, 8),
-                color: colors.error,
-              }}
-            >
-              {state.error}
-            </p>
-          )}
+      <form action={formAction} className="flex flex-col gap-5 border-t border-border pt-8">
+        <input type="hidden" name="token" value={token} />
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" isLoading={pending}>
-              Aceptar invitación
-            </Button>
-            <span className="font-sans text-xs text-text-secondary">
-              Te llevamos a tus proyectos al entrar.
-            </span>
-          </div>
-        </form>
-      </NoticePanel>
+        {state.error && (
+          <p role="alert" className="font-sans text-sm text-error">
+            {state.error}
+          </p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <Button type="submit" isLoading={pending}>
+            Aceptar invitación
+          </Button>
+          <span className="font-sans text-xs text-white">
+            Te llevamos a tus proyectos al entrar.
+          </span>
+        </div>
+      </form>
     </div>
   );
 }
 
-/** Una línea de «qué pasa si aceptas», con su punto delante. */
-function Punto({ children }: { children: React.ReactNode }) {
+/** Una fila de «qué pasa si aceptas», igual que en «Nueva organización». */
+function Razon({ n, titulo, texto }: { n: string; titulo: string; texto: string }) {
   return (
-    <li className="flex items-start gap-2.5 font-sans text-sm text-white">
-      <span
-        aria-hidden="true"
-        className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full"
-        style={{ background: colors.accent }}
-      />
-      <span className="min-w-0">{children}</span>
+    <li className="flex items-baseline gap-5 border-b border-dotted border-border py-5 last:border-b-0">
+      <span className="w-6 shrink-0 font-mono text-xs tabular-nums text-white">{n}</span>
+      <span className="flex min-w-0 flex-col gap-1">
+        <span className="font-display text-lg text-text-primary">{titulo}</span>
+        <span className="font-sans text-sm text-white">{texto}</span>
+      </span>
     </li>
-  );
-}
-
-/** Sobre: el mismo de `MyInvitations`, para que las dos invitaciones se reconozcan. */
-function InvitationIcon() {
-  return (
-    <svg
-      className="h-5 w-5"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3 8l7.9 5.3a2 2 0 002.2 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-      />
-    </svg>
   );
 }

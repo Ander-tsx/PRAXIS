@@ -156,6 +156,23 @@ export function BoardColumns({
   }, []);
 
   /**
+   * Qué tarjeta acaba de guardarse, para el brillo de `TaskCard`.
+   *
+   * `nonce` y no un booleano: guardar la misma tarea dos veces seguidas —abrir,
+   * tocar algo, cerrar; volver a abrir, tocar otra cosa, cerrar— tiene que
+   * reproducir el brillo las dos veces, y el mismo `taskId` no cambiaría de
+   * valor entre una y otra.
+   */
+  const [ultimoGuardado, setUltimoGuardado] = useState<{ taskId: string; nonce: number } | null>(
+    null,
+  );
+  const nonceGuardado = useRef(0);
+  const handleTaskSaved = useCallback((taskId: string) => {
+    nonceGuardado.current += 1;
+    setUltimoGuardado({ taskId, nonce: nonceGuardado.current });
+  }, []);
+
+  /**
    * La tarea que se acaba de crear y todavía no ha llegado en `tasks`.
    *
    * ⚠️ **No se puede abrir en el mismo gesto.** La acción confirma con el id,
@@ -552,6 +569,8 @@ export function BoardColumns({
             canEdit={canEditTask}
             canDelete={canDeleteTask}
             onOpenTask={setOpenTask}
+            openTaskId={openTaskId}
+            ultimoGuardado={ultimoGuardado}
             onTaskCreated={setRecienCreada}
             arrastre={arrastre}
             destino={destinoTarea}
@@ -772,6 +791,7 @@ export function BoardColumns({
               canEdit={canEditTask}
               canDelete={canDeleteTask}
               onOpenTask={setOpenTask}
+              ultimoGuardado={ultimoGuardado}
               onTaskCreated={setRecienCreada}
               arrastre={null}
               destino={null}
@@ -817,6 +837,7 @@ export function BoardColumns({
           canManageLabels={canManageLabels}
           canEdit={canEditTask}
           canDelete={canDeleteTask}
+          onSaved={handleTaskSaved}
         />
       )}
     </div>

@@ -28,16 +28,14 @@ export default async function InvitacionPage({
       {token ? (
         <AcceptInvitation token={token} />
       ) : (
-        <div className="mx-auto w-full max-w-2xl">
-          <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-surface p-6">
-            <h2 className="font-display text-xl leading-tight text-text-primary">
-              Este enlace está incompleto
-            </h2>
-            <p className="font-sans text-sm text-white">
-              No trae el código de la invitación, así que no hay nada que aceptar. Pide que te lo
-              vuelvan a enviar: el anterior sigue valiendo mientras no caduque.
-            </p>
-          </div>
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
+          <h2 className="font-display text-2xl leading-tight text-text-primary">
+            Este enlace está incompleto
+          </h2>
+          <p className="max-w-xl font-serif text-base italic text-white">
+            No trae el código de la invitación, así que no hay nada que aceptar. Pide que te lo
+            vuelvan a enviar: el anterior sigue valiendo mientras no caduque.
+          </p>
         </div>
       )}
     </AppHeader>

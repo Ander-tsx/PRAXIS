@@ -118,3 +118,26 @@ html::-webkit-scrollbar {
     background-position: 200% center;
   }
 }
+
+/* ============================================================
+   Kanban: confirmación de guardado
+   No es de la landing —vive aquí porque globals.css es lo único
+   compartido por toda la zona— pero es del tablero, ver TaskCard.tsx.
+   ============================================================ */
+/* El brillo que cruza la tarjeta de arriba-izquierda a abajo-derecha, una
+   sola vez, al terminar de guardarse. `background-position` en diagonal
+   —no una animación de `transform`— porque así la banda de luz siempre mide
+   lo mismo que la tarjeta, sin importar su alto. */
+@keyframes task-card-shine {
+  0% {
+    background-position: -150% -150%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    background-position: 150% 150%;
+    opacity: 0;
+  }
+}

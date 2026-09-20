@@ -1,16 +1,23 @@
 'use client';
 
+import { moveTaskDueDateAction } from '@/app/(privado)/projects/[id]/actions';
+import { TASK_INITIAL_STATE } from '@/lib/projects/action-state';
 import {
+  Avatar,
   type Board,
+  DONE_COLUMN_COLOR,
   type Label as LabelType,
   type Priority,
   type Task,
   type UserProfile,
   alpha,
+  avatarHref,
   colors,
   dueState,
+  personLabel,
+  useAccion,
 } from '@praxis/commons';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TaskDialog } from '../TaskBoard/TaskDialog';
 import { useTaskDialog } from '../TaskBoard/useTaskDialog';
 
@@ -67,8 +74,10 @@ function tonoDePrioridad(p: Priority): string {
  * propio panel al lado, para que no desaparezcan. Pulsar una abre el panel de
  * siempre.
  *
- * Solo lectura de las mismas tareas: no se arrastran entre días. Cambiar el
- * vencimiento se hace desde el panel de la tarea.
+ * Se arrastra una tarea a otro día para cambiar su vencimiento (o a «sin
+ * fecha» para quitárselo), con el mismo permiso que mueve tarjetas en Kanban
+ * (`canMoveTask`). Sin él, la tarea se sigue pudiendo abrir, solo que no
+ * arrastrar.
  */
 export function BoardCalendar({
   board,
@@ -92,18 +101,128 @@ export function BoardCalendar({
   const dialog = useTaskDialog(tasks, openTaskId);
   const [mostrarSinFecha, setMostrarSinFecha] = useState(false);
 
+  /**
+   * Arrastrar una tarea a otro día cambia su vencimiento, y se guarda solo.
+   *
+   * Es arrastre nativo (`draggable`), no el motor a medida del Kanban
+   * (`arrastre.ts`): aquí el destino es un día entero, no «entre qué dos
+   * tarjetas», que es justo la precisión que ese motor existe para dar. Sin
+   * esa necesidad, la API nativa del navegador basta y no hay que reconstruir
+   * la medición de rectángulos para esto.
+   */
+  const [moveState, moveAction] = useAccion(moveTaskDueDateAction, TASK_INITIAL_STATE);
+  const [diaSobrevolado, setDiaSobrevolado] = useState<string | null>(null);
+  /** Adelanta el resultado en pantalla mientras el servidor confirma. `null` es «sin fecha». */
+  const [overrides, setOverrides] = useState<Map<string, string | null>>(new Map());
+  const colaDeMovimientos = useRef<string[]>([]);
+  const ultimoResultado = useRef(moveState);
+
+  useEffect(() => {
+    if (moveState === ultimoResultado.current) return;
+    ultimoResultado.current = moveState;
+    const taskId = colaDeMovimientos.current.shift();
+    if (!taskId || !moveState.error) return;
+    /* Falló: se deshace el adelanto y la tarea vuelve a su día de verdad. */
+    setOverrides((prev) => {
+      const next = new Map(prev);
+      next.delete(taskId);
+      return next;
+    });
+  }, [moveState]);
+
+  /* Cuando el servidor confirma —la tarea revalidada ya trae el día nuevo—
+     el adelanto sobra: dejarlo puesto no cambiaría nada, pero mantenerlo
+     indefinidamente arrastraría estado viejo si la tarea vuelve a moverse
+     por otro medio (el panel, por ejemplo). */
+  useEffect(() => {
+    setOverrides((prev) => {
+      if (prev.size === 0) return prev;
+      let cambio = false;
+      const next = new Map(prev);
+      for (const [taskId, dueDate] of prev) {
+        const task = tasks.find((t) => t.id === taskId);
+        const diaReal = task?.dueDate ? claveDia(new Date(task.dueDate)) : null;
+        if (task && diaReal === dueDate) {
+          next.delete(taskId);
+          cambio = true;
+        }
+      }
+      return cambio ? next : prev;
+    });
+  }, [tasks]);
+
+  /** Columnas de cierre: lo que hay dentro está entregado. Ver `DONE_COLUMN_COLOR`. */
+  const columnasDeCierre = useMemo(
+    () => new Set(board.columns.filter((c) => c.color === DONE_COLUMN_COLOR).map((c) => c.id)),
+    [board.columns],
+  );
+  const estaCompletada = useCallback(
+    (t: Task) => columnasDeCierre.has(t.columnId),
+    [columnasDeCierre],
+  );
+
+  /**
+   * El día de una tarea, ya como clave `YYYY-MM-DD`.
+   *
+   * ⚠️ **El adelanto se guarda como clave de día, no como ISO, y aquí no se
+   * vuelve a pasar por `new Date(...)`.** `new Date('2026-09-19')` (sin hora)
+   * se interpreta en UTC; en un huso al oeste de Greenwich, `getFullYear`/
+   * `getDate` en horario **local** devuelven el día anterior. Solo se
+   * reconstruye la fecha para lo que sí trae hora de verdad (`dueDate`,
+   * `updatedAt`), que vienen en ISO completo del backend.
+   */
+  const diaDeTarea = useCallback(
+    (t: Task): string | null => {
+      if (overrides.has(t.id)) return overrides.get(t.id) ?? null;
+      if (t.dueDate) return claveDia(new Date(t.dueDate));
+      if (estaCompletada(t)) return claveDia(new Date(t.updatedAt));
+      return null;
+    },
+    [overrides, estaCompletada],
+  );
+
+  /** `dia` es una clave `YYYY-MM-DD`, o `null` para soltar en «sin fecha». */
+  function soltarEn(taskId: string, dia: string | null) {
+    setDiaSobrevolado(null);
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    if (diaDeTarea(task) === dia) return;
+
+    setOverrides((prev) => new Map(prev).set(taskId, dia));
+
+    const datos = new FormData();
+    datos.set('projectId', projectId);
+    datos.set('taskId', taskId);
+    datos.set('dueDate', dia ?? '');
+    colaDeMovimientos.current.push(taskId);
+    moveAction(datos);
+  }
+
   const hoy = useMemo(() => new Date(), []);
   const [cursor, setCursor] = useState(() => new Date(hoy.getFullYear(), hoy.getMonth(), 1));
 
+  /**
+   * Una tarea completada sin fecha de vencimiento no va a «sin fecha»: se
+   * ubica el día en que se completó, para que no desaparezca del trabajo
+   * hecho esa semana. Si sale de una columna de cierre sin tener vencimiento,
+   * vuelve a «sin fecha» — la regla de arriba deja de aplicar.
+   *
+   * ⚠️ **No hay `completedAt` en el backend.** Se usa `updatedAt` como el
+   * proxy disponible: es exacto en el caso normal (se completa y no se vuelve
+   * a tocar), pero un cambio posterior —un comentario, reabrir y volver a
+   * cerrar— movería la tarea de día sin que nadie la haya "completado" de
+   * nuevo. Pendiente real en `docs/frontend/PENDIENTES-BACKEND.md`.
+   */
   const { conFecha, sinFecha } = useMemo(() => {
     const map = new Map<string, Task[]>();
     const nada: Task[] = [];
     for (const t of tasks) {
-      if (!t.dueDate) {
+      const k = diaDeTarea(t);
+      if (!k) {
         nada.push(t);
         continue;
       }
-      const k = claveDia(new Date(t.dueDate));
       let list = map.get(k);
       if (!list) {
         list = [];
@@ -112,7 +231,7 @@ export function BoardCalendar({
       list.push(t);
     }
     return { conFecha: map, sinFecha: nada };
-  }, [tasks]);
+  }, [tasks, diaDeTarea]);
 
   /** Las 6 semanas (42 celdas) que cubren el mes, empezando en lunes. */
   const celdas = useMemo(() => {
@@ -222,9 +341,20 @@ export function BoardCalendar({
             return (
               <div
                 key={k}
-                className={`flex min-h-[6.5rem] flex-col gap-1 border-b border-r border-white/[0.06] p-1.5 ${
+                onDragOver={(e) => {
+                  if (!canMoveTask) return;
+                  e.preventDefault();
+                  if (diaSobrevolado !== k) setDiaSobrevolado(k);
+                }}
+                onDragLeave={() => setDiaSobrevolado((actual) => (actual === k ? null : actual))}
+                onDrop={(e) => {
+                  if (!canMoveTask) return;
+                  e.preventDefault();
+                  soltarEn(e.dataTransfer.getData('text/plain'), k);
+                }}
+                className={`flex min-h-[6.5rem] flex-col gap-1 border-b border-r border-white/[0.06] p-1.5 transition-colors ${
                   delMes ? '' : 'bg-black/30'
-                }`}
+                } ${diaSobrevolado === k ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}`}
               >
                 <span
                   className={`self-start rounded px-1 font-sans text-[11px] font-medium ${
@@ -239,7 +369,13 @@ export function BoardCalendar({
                 </span>
                 <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto scrollbar-none">
                   {delDia.map((t) => (
-                    <TareaChip key={t.id} task={t} onClick={() => dialog.open(t.id)} />
+                    <TareaChip
+                      key={t.id}
+                      task={t}
+                      usersById={usersById}
+                      arrastrable={canMoveTask}
+                      onClick={() => dialog.open(t.id)}
+                    />
                   ))}
                 </div>
               </div>
@@ -251,15 +387,29 @@ export function BoardCalendar({
       {/* ── Sin fecha ── */}
       {sinFecha.length > 0 && (
         <div
+          onDragOver={(e) => {
+            if (!canMoveTask) return;
+            e.preventDefault();
+            if (diaSobrevolado !== 'sin-fecha') setDiaSobrevolado('sin-fecha');
+          }}
+          onDragLeave={() =>
+            setDiaSobrevolado((actual) => (actual === 'sin-fecha' ? null : actual))
+          }
+          onDrop={(e) => {
+            if (!canMoveTask) return;
+            e.preventDefault();
+            soltarEn(e.dataTransfer.getData('text/plain'), null);
+          }}
           className={`flex shrink-0 flex-col overflow-hidden rounded-xl bg-[#202020] border-white/10 transition-all duration-300 ease-in-out ${
             mostrarSinFecha ? 'w-full lg:w-64 opacity-100 border' : 'w-0 opacity-0 border-0'
-          }`}
+          } ${diaSobrevolado === 'sin-fecha' ? 'bg-primary/10' : ''}`}
         >
           <div className="shrink-0 border-b border-white/10 px-3 py-2.5 flex items-center justify-between">
             <h4 className="font-sans text-sm font-semibold text-white whitespace-nowrap">
               Sin fecha <span className="font-normal text-white">{sinFecha.length}</span>
             </h4>
             <button
+              type="button"
               onClick={() => setMostrarSinFecha(false)}
               className="text-text-secondary hover:text-white/70"
             >
@@ -278,6 +428,8 @@ export function BoardCalendar({
               <TareaChip
                 key={t.id}
                 task={t}
+                usersById={usersById}
+                arrastrable={canMoveTask}
                 grande
                 columna={nombreDeColumna.get(t.columnId)}
                 onClick={() => dialog.open(t.id)}
@@ -313,25 +465,37 @@ export function BoardCalendar({
 
 function TareaChip({
   task,
+  usersById,
   onClick,
   grande = false,
   columna,
+  arrastrable = false,
 }: {
   task: Task;
+  usersById: Map<string, UserProfile>;
   onClick: () => void;
   grande?: boolean;
   columna?: string;
+  /** Permiso de mover: sin él la tarea se puede abrir, pero no arrastrar. */
+  arrastrable?: boolean;
 }) {
   const due = dueState(task.dueDate);
   const tono = due === 'overdue' ? colors.error : tonoDePrioridad(task.priority);
+  const primerEncargado = task.assignees[0];
+  const usuario = primerEncargado ? usersById.get(primerEncargado.userId) : undefined;
   return (
     <button
       type="button"
+      draggable={arrastrable}
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', task.id);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
       onClick={onClick}
       title={task.title}
       className={`flex w-full items-center gap-1.5 rounded px-1.5 text-left transition-opacity hover:opacity-80 ${
         grande ? 'py-1.5' : 'py-0.5'
-      }`}
+      } ${arrastrable ? 'cursor-grab active:cursor-grabbing' : ''}`}
       style={{ background: alpha(tono, grande ? 12 : 16) }}
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: tono }} />
@@ -345,6 +509,20 @@ function TareaChip({
           <span className="block truncate font-sans text-[10px] text-white/35">{columna}</span>
         )}
       </span>
+      {/* Quién la lleva, de un vistazo: antes solo se sabía abriendo la tarea. */}
+      {primerEncargado && (
+        <Avatar
+          size="sm"
+          label={usuario ? personLabel(usuario) : 'Alguien que ya no está en el proyecto'}
+          src={avatarHref(usuario?.avatarUrl, '/api/gateway')}
+          className="shrink-0"
+        />
+      )}
+      {task.assignees.length > 1 && (
+        <span className="shrink-0 font-sans text-[9px] text-white/40">
+          +{task.assignees.length - 1}
+        </span>
+      )}
     </button>
   );
 }
