@@ -29,6 +29,17 @@
 > están en el árbol. La etapa viva es **Organizaciones**, y lo que le queda —tres
 > casillas de 73— está en su propio plan, no aquí.
 >
+> **Reverificación del 2026-09-21 (decimocuarta vez).** Mismo prompt, mismos
+> tres comandos, misma respuesta: `99b2f6d` es ancestro de `main`,
+> `report_column_time` sigue en los dos controladores, `billing-service`
+> conserva `organizations/` y `subscriptions/`, y `apps/frontend/reports-front`
+> no existe. Árbol limpio al empezar. **No se re-ejecutó ni R9 ni Enterprise.**
+> Verde: `next build` de `web`, sin `next dev` vivo en el 4100. Lo abierto no
+> cambia (C6, C9/C10, A1, `TODO(A6+)`, y la fusión de `feature/fusion-zonas`,
+> decisión del dueño). ⚠️ **El que dicta el prompt de arranque debería
+> retirarlo o reescribirlo**: cada sesión que abre gasta su arranque en
+> demostrar que no hay nada que hacer.
+>
 > **Reverificación del 2026-09-20 (decimotercera vez).** Mismo resultado en los
 > tres comandos de siempre. El prompt de arranque volvió a pedir, literalmente,
 > «R9.1/R9.2/R9.3 en `main`» y Enterprise en rama nueva — como si nada de esto
