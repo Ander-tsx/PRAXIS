@@ -29,6 +29,14 @@
 > están en el árbol. La etapa viva es **Organizaciones**, y lo que le queda —tres
 > casillas de 73— está en su propio plan, no aquí.
 >
+> **Reverificación del 2026-09-22 (decimoquinta vez).** Mismos tres comandos,
+> misma respuesta. **No se re-ejecutó ni R9 ni Enterprise.** `next build` de
+> `web` verde (44 páginas). ⚠️ Trampa nueva: el primer `next build` falló con
+> `Module not found` en `lora_…module.css` —la descarga de `next/font/google`— y
+> el reintento se quedó colgado porque **dos `next build` se pisaban el
+> `.next/`** (uno huérfano del intento anterior). Matar los dos y lanzar uno
+> solo: verde. No es una regresión del código.
+>
 > **Reverificación del 2026-09-21 (decimocuarta vez).** Mismo prompt, mismos
 > tres comandos, misma respuesta: `99b2f6d` es ancestro de `main`,
 > `report_column_time` sigue en los dos controladores, `billing-service`
