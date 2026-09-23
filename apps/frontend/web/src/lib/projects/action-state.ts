@@ -174,3 +174,18 @@ export const CLOSE_SPRINT_INITIAL_STATE: CloseSprintState = {
   done: null,
   pending: null,
 };
+
+/* ─── Documentos (docs/PLAN-DOCUMENTOS.md) ──────────────────────────── */
+
+/**
+ * `done` es el id del documento al crearlo, `saved` al guardar y `deleted` al
+ * borrar. `conflicto` marca el 409 de D4: alguien guardó entre medias, y la
+ * pantalla tiene que conservar lo escrito en vez de tratarlo como un error más.
+ */
+export interface DocumentState {
+  error: string | null;
+  done: string | null;
+  conflicto: boolean;
+}
+
+export const DOCUMENT_INITIAL_STATE: DocumentState = { error: null, done: null, conflicto: false };

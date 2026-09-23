@@ -368,6 +368,7 @@ export const PROJECT_PERMISSIONS = [
   'canViewReports',
   'canDeleteProject',
   'canManageSprint',
+  'canEditDocuments',
 ] as const;
 
 export type ProjectPermission = (typeof PROJECT_PERMISSIONS)[number];
@@ -403,6 +404,7 @@ export const PERMISSION_LABELS: Record<ProjectPermission, string> = {
   canViewReports: 'Ver los reportes y usar el asistente',
   canDeleteProject: 'Eliminar el proyecto',
   canManageSprint: 'Planear, iniciar y cerrar sprints',
+  canEditDocuments: 'Crear y editar documentos',
 };
 
 /**
@@ -429,7 +431,7 @@ export const PERMISSION_IMPLIES: Partial<Record<ProjectPermission, ProjectPermis
   canDeleteColumn: ['canEditColumn', 'canCreateColumn'],
   canEditColumn: ['canCreateColumn'],
   canDeleteTask: ['canEditTask', 'canMoveTask', 'canComment', 'canCreateTask'],
-  canEditTask: ['canMoveTask', 'canComment', 'canCreateTask'],
+  canEditTask: ['canMoveTask', 'canComment', 'canCreateTask', 'canEditDocuments'],
   canDeleteProject: [
     'canDeleteBoard',
     'canEditBoard',
@@ -549,7 +551,37 @@ export interface Workspace {
   updatedAt: string;
   /** `GET /projects/:id` los trae embebidos, con sus columnas. */
   boards: Board[];
+  /**
+   * Los documentos del espacio, **sin contenido** (`docs/PLAN-DOCUMENTOS.md`).
+   * Opcional: un backend anterior a los documentos no lo manda.
+   */
+  documents?: WorkspaceDocumentRef[];
 }
+
+/** Lo que trae el árbol del proyecto de cada documento: lo justo para la pestaña. */
+export interface WorkspaceDocumentRef {
+  id: string;
+  title: string;
+  workspaceId: string;
+  updatedAt: string;
+}
+
+/**
+ * Un documento entero, en Markdown. Se llama `ProjectDocument` y no `Document`
+ * porque `Document` es un global del DOM y sombrearlo no da ningún error.
+ */
+export interface ProjectDocument extends WorkspaceDocumentRef {
+  content: string;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+}
+
+/** Tope del contenido de un documento. Espejo de `DOCUMENT_CONTENT_MAX` del backend. */
+export const DOCUMENT_CONTENT_MAX = 100_000;
+
+/** 409 al guardar sobre una versión que ya no es la última (D4 de PLAN-DOCUMENTOS). */
+export const DOCUMENT_CHANGED_CODE = 'DOCUMENT_CHANGED';
 
 export const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
 export type Priority = (typeof PRIORITIES)[number];

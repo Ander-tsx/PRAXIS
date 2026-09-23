@@ -19,6 +19,7 @@ import {
   PERSONA_ELIMINADA,
   type Paginated,
   type ProjectDetail,
+  type ProjectDocument,
   type ProjectInvitation,
   type ProjectMember,
   type Sprint,
@@ -43,6 +44,8 @@ interface PageProps {
     task?: string;
     mias?: string;
     vista?: string;
+    /** Documento abierto (`docs/PLAN-DOCUMENTOS.md`), como `board`. */
+    doc?: string;
   }>;
 }
 
@@ -110,7 +113,7 @@ type TabId = (typeof TABS)[number]['id'];
  */
 export default async function ProjectDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { tab, ws, board, task, mias, vista } = await searchParams;
+  const { tab, ws, board, task, mias, vista, doc } = await searchParams;
   const { userId } = await loadCurrentUser();
   const api = createServerApiClient();
 
@@ -395,7 +398,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   /* Los sprints solo de los tableros con Scrum encendido, y en paralelo con las
      tareas: como ellas, se filtran al pintar —el Kanban de un tablero Scrum
      enseña solo el sprint activo (D12 de docs/PLAN-SCRUM-KANBAN.md)—. */
-  const [boardTasks, boardSprints] = await Promise.all([
+  const [boardTasks, boardSprints, documentos] = await Promise.all([
     Promise.all(
       visibleBoards.map((board) =>
         api
@@ -414,6 +417,13 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             .catch(() => [board.id, [] as Sprint[]] as const),
         ),
     ),
+    /* Los documentos del espacio abierto, con su contenido: como las tareas,
+       cambiar de uno a otro no pasa por el servidor. */
+    activeTab === 'espacios' && activeWorkspace
+      ? api
+          .get<ProjectDocument[]>(`/workspaces/${activeWorkspace.id}/documents`)
+          .catch(() => [] as ProjectDocument[])
+      : Promise.resolve([] as ProjectDocument[]),
   ]);
   const sprintsByBoard = new Map(boardSprints);
   /**
@@ -628,6 +638,9 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             /* Planear, iniciar y cerrar sprints. Encender Scrum en el tablero
                sigue siendo `canEditBoard` (D1 y D7). */
             canManageSprint={can.canManageSprint ?? false}
+            documentos={documentos}
+            documentoInicial={doc ?? null}
+            canEditDocuments={can.canEditDocuments ?? false}
           />
         )}
 

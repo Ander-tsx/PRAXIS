@@ -43,7 +43,9 @@ export type ApiErrorCode =
    * 409 al cerrar un sprint con tareas sin resolver. `details.pending` trae la
    * lista, para preguntar por cada una (`docs/PLAN-SCRUM-KANBAN.md`, D6).
    */
-  | 'SPRINT_HAS_PENDING_TASKS';
+  | 'SPRINT_HAS_PENDING_TASKS'
+  /** 409 al guardar un documento que alguien cambió entre medias (PLAN-DOCUMENTOS, D4). */
+  | 'DOCUMENT_CHANGED';
 
 export interface ApiEnvelopeError {
   success: false;
