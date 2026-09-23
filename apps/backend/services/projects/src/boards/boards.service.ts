@@ -18,6 +18,12 @@ export class BoardsService {
     if (!workspace) {
       throw new RpcException({ statusCode: 404, message: 'Workspace no encontrado' });
     }
+    if (workspace.kind === 'DOCUMENTS') {
+      throw new RpcException({
+        statusCode: 400,
+        message: 'Este espacio es de documentos: los tableros van en un espacio de tableros.',
+      });
+    }
 
     const board = await this.prisma.board.create({
       data: { name: dto.name, workspaceId: dto.workspaceId },

@@ -184,7 +184,12 @@ export function WorkspaceCanvas({
   const [documentoActivoId, setDocumentoActivoId] = useState<string | null>(
     () => documentoInicial ?? null,
   );
-  const documentoActivo = documentos.find((d) => d.id === documentoActivoId) ?? null;
+  /* Un espacio es de tableros o de documentos, nunca de las dos cosas
+     (PLAN-DOCUMENTOS, D7). En uno de documentos, sin elegir, se abre el primero. */
+  const deDocumentos = activeWorkspace?.kind === 'DOCUMENTS';
+  const documentoActivo = deDocumentos
+    ? (documentos.find((d) => d.id === documentoActivoId) ?? documentos[0] ?? null)
+    : null;
   const abrirDocumento = useCallback((id: string) => setDocumentoActivoId(id), []);
   const cerrarDocumento = useCallback(() => setDocumentoActivoId(null), []);
   function elegirTablero(id: string) {
@@ -272,7 +277,7 @@ export function WorkspaceCanvas({
         /
       </span>
 
-      {boardActivo && (
+      {!deDocumentos && boardActivo && (
         <BoardTabs
           boards={boards}
           /* Con un documento abierto no hay tablero activo que marcar. */
@@ -282,11 +287,11 @@ export function WorkspaceCanvas({
         />
       )}
 
-      {activeWorkspace && canManage && (
+      {activeWorkspace && !deDocumentos && canManage && (
         <CreateBoardButton compacto workspaceId={activeWorkspace.id} projectId={projectId} />
       )}
 
-      {activeWorkspace && (
+      {activeWorkspace && deDocumentos && (
         <DocumentTabs
           documentos={activeWorkspace.documents ?? []}
           activeId={documentoActivo?.id ?? null}
@@ -411,7 +416,26 @@ export function WorkspaceCanvas({
     );
   }
 
-  /* Un documento abierto ocupa el lienzo, haya tableros o no. */
+  if (deDocumentos && !documentoActivo) {
+    return (
+      <div className="flex h-full flex-col bg-[#191919]">
+        <div className="flex shrink-0 flex-wrap items-center gap-1 px-4 py-2">
+          {barraDelTablero}
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+          <h3 className="font-display text-2xl text-text-primary">Ningún documento todavía</h3>
+          <p className="max-w-md font-sans text-sm text-text-secondary">
+            Este espacio es para documentos: actas, especificaciones, lo que el equipo necesite
+            escrito.{' '}
+            {canEditDocuments
+              ? 'Crea el primero con el botón de arriba.'
+              : 'Quien pueda editar documentos puede crear el primero.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (documentoActivo) {
     return (
       <section

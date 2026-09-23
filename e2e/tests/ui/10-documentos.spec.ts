@@ -33,8 +33,22 @@ test.describe('Documentos de un espacio', () => {
     const mundo = await crearMundo(api);
     const cabeceras = comoBearer(mundo.duenno.accessToken);
 
+    // D7: los documentos viven en un espacio de documentos, no junto a los tableros.
+    const espacio = await api.post(`/api/projects/${mundo.proyecto.id}/workspaces`, {
+      headers: cabeceras,
+      data: { name: nombreUnico('Wiki'), kind: 'DOCUMENTS' },
+    });
+    expect(espacio.status(), 'Crear espacio de documentos').toBe(201);
+    const espacioDocs = await data<{ id: string }>(espacio);
+    const tablero = await api.post(`/api/workspaces/${espacioDocs.id}/boards`, {
+      headers: cabeceras,
+      data: { name: 'No cabe aquí' },
+    });
+    expect(tablero.status(), 'Un espacio de documentos no admite tableros').toBe(400);
+
     await entrarConCuenta(page, mundo.duenno.email);
-    await page.goto(`/projects/${mundo.proyecto.id}?board=${mundo.boardId}`);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=espacios&ws=${espacioDocs.id}`);
+    await expect(page.getByRole('heading', { name: 'Ningún documento todavía' })).toBeVisible();
 
     // El «+» de documentos crea «Sin título» y lo abre en modo escribir.
     await page.getByRole('button', { name: 'Nuevo documento' }).click();
@@ -58,7 +72,7 @@ test.describe('Documentos de un espacio', () => {
 
     // La pestaña existe y el servidor lo tiene.
     await expect(page.getByRole('tab', { name: nombre })).toBeVisible();
-    const lista = await api.get(`/api/workspaces/${mundo.workspaceId}/documents`, {
+    const lista = await api.get(`/api/workspaces/${espacioDocs.id}/documents`, {
       headers: cabeceras,
     });
     const docs = await data<{ id: string; title: string; updatedAt: string }[]>(lista);
@@ -66,7 +80,7 @@ test.describe('Documentos de un espacio', () => {
     expect(doc, 'El documento está en el servidor').toBeTruthy();
 
     // D4: otra persona guarda por la API; guardar aquí encima da conflicto.
-    const ajeno = await api.patch(`/api/workspaces/${mundo.workspaceId}/documents/${doc!.id}`, {
+    const ajeno = await api.patch(`/api/workspaces/${espacioDocs.id}/documents/${doc!.id}`, {
       headers: cabeceras,
       data: { content: 'Versión de otra persona', expectedUpdatedAt: doc!.updatedAt },
     });
@@ -82,7 +96,7 @@ test.describe('Documentos de un espacio', () => {
     });
     await expect(page.getByRole('button', { name: 'Copiar lo mío' })).toBeVisible();
 
-    const tras = await api.get(`/api/workspaces/${mundo.workspaceId}/documents/${doc!.id}`, {
+    const tras = await api.get(`/api/workspaces/${espacioDocs.id}/documents/${doc!.id}`, {
       headers: cabeceras,
     });
     expect((await data<{ content: string }>(tras)).content).toBe('Versión de otra persona');

@@ -162,9 +162,21 @@ enum ProjectStatus {
   @@schema("projects")
 }
 
+/// Qué contiene un espacio: o tableros o documentos, nunca las dos cosas
+/// (`docs/PLAN-DOCUMENTOS.md`, D7). En la interfaz: «Tableros» y «Documentos».
+enum WorkspaceKind {
+  BOARDS
+  DOCUMENTS
+
+  @@schema("projects")
+}
+
 model Workspace {
   id        String   @id @default(uuid())
   name      String
+  /// Todos los espacios anteriores son de tableros: el valor por defecto es
+  /// justo lo que ya eran.
+  kind      WorkspaceKind @default(BOARDS)
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   boards    Board[]

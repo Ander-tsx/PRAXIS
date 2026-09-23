@@ -743,7 +743,8 @@ export async function createWorkspaceAction(
 
   let created: Workspace;
   try {
-    created = await api.post<Workspace>(`/projects/${projectId}/workspaces`, { name });
+    const kind = formData.get('kind') === 'DOCUMENTS' ? 'DOCUMENTS' : 'BOARDS';
+    created = await api.post<Workspace>(`/projects/${projectId}/workspaces`, { name, kind });
     if (!created?.id || created.name !== name) {
       return { error: 'El servidor no guardó el espacio.', savedName: null, createdId: null };
     }

@@ -546,6 +546,8 @@ export const SPRINT_HAS_PENDING_TASKS_CODE = 'SPRINT_HAS_PENDING_TASKS';
 export interface Workspace {
   id: string;
   name: string;
+  /** Tableros o documentos, nunca las dos cosas (PLAN-DOCUMENTOS, D7). */
+  kind: 'BOARDS' | 'DOCUMENTS';
   projectId: string;
   createdAt: string;
   updatedAt: string;

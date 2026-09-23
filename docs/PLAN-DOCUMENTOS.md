@@ -23,7 +23,8 @@ distintas —tableros y documentos—, deja de ser ruido**: es lo que hacen Clic
 
 ## Las cuatro preguntas de la fase futura, contestadas a mi criterio
 
-1. **¿Se renombra «Espacio»?** No. El selector ya dice «Espacio de trabajo» y
+1. **¿Se renombra «Espacio»?** No — los dos tipos se llaman «Tableros» y
+   «Documentos» (D7), a elección del dueño del producto. El selector ya dice «Espacio de trabajo» y
    eso sigue siendo verdad: ahora hay más trabajo dentro. Renombrar es
    reversible y barato — se puede decidir después, con el uso delante.
 2. **¿Un documento puede vivir suelto, sin Espacio?** No, igual que un tablero.
@@ -67,12 +68,21 @@ abrió, responde **409 `DOCUMENT_CHANGED`** y no guarda. La pantalla lo dice y
 ofrece recargar — perder un párrafo en silencio es el peor fallo posible de un
 editor. No es edición en tiempo real; no pretende serlo.
 
-### D5 — En la misma tira que los tableros
+### D5 — ~~En la misma tira que los tableros~~ (sustituida por D7)
 
-Los documentos salen en las pestañas del espacio, junto a los tableros y con
+Los documentos salían en las pestañas del espacio, junto a los tableros y con
 su propio icono. El botón de crear del espacio ofrece tablero o documento. La
 URL lleva `?doc=` igual que lleva `?board=`, y como los tableros, cambiar entre
 ellos no navega.
+
+### D7 — Un espacio es de tableros o de documentos, nunca de las dos cosas
+
+Corrige D5, decidido por el dueño del producto al probarlo (2026-09-23).
+`Workspace.kind: BOARDS | DOCUMENTS`, elegido al crear el espacio —el selector
+ofrece «Tableros» y «Documentos»— y sin cambio después. Un espacio de
+documentos solo enseña documentos; uno de tableros, solo tableros. El backend
+lo hace cumplir: crear un tablero en uno de documentos, o al revés, es 400.
+Todos los espacios anteriores son de tableros por defecto.
 
 ### D6 — Se guarda al pulsar, al salir del campo y con Ctrl/⌘+S
 

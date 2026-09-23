@@ -40,6 +40,12 @@ export class DocumentsService {
     if (!workspace) {
       throw new RpcException({ statusCode: 404, message: 'Espacio no encontrado' });
     }
+    if (workspace.kind !== 'DOCUMENTS') {
+      throw new RpcException({
+        statusCode: 400,
+        message: 'Este espacio es de tableros: los documentos van en un espacio de documentos.',
+      });
+    }
     const documento = await this.prisma.document.create({
       data: {
         workspaceId: dto.workspaceId,
