@@ -29,9 +29,18 @@ import { ColumnMenu } from './ColumnMenu';
 import { MinimizarIcono } from './TableroExpandible';
 import { BOARD_SURFACE } from './superficie-tablero';
 
+/** Tipo MIME del arrastre que sale del panel del backlog (`BacklogDrawer`). */
+export const MIME_BACKLOG = 'application/x-praxis-backlog-task';
+
 export interface BoardColumnsProps {
   board: Board;
   projectId: string;
+  /**
+   * Soltar en una columna una tarea arrastrada desde el panel del backlog.
+   * Solo llega en un tablero Scrum con sprint en curso: la tarea entra en ese
+   * sprint y en esa columna (`docs/PLAN-SCRUM-KANBAN.md`, D14).
+   */
+  onSoltarDesdeBacklog?: (taskId: string, column: Column) => void;
   /**
    * Crear columnas. Es `canCreateColumn`, no `canCreateBoard` como estaba:
    * gatearlo con el de tableros ocultaba el botón a quien sí podía usarlo.
@@ -140,7 +149,10 @@ export function BoardColumns({
   canManageLabels,
   canEditTask,
   canDeleteTask,
+  onSoltarDesdeBacklog,
 }: BoardColumnsProps) {
+  /* La columna sobre la que se sostiene una tarea del backlog, para marcarla. */
+  const [receptora, setReceptora] = useState<string | null>(null);
   const [columns, setColumns] = useState<Column[]>(() =>
     [...board.columns].sort((a, b) => a.order - b.order),
   );
@@ -477,8 +489,33 @@ export function BoardColumns({
           registrarColumna(column.id, el);
           reposicion.registrar(`columna:${column.id}`, el);
         }}
-        className="flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-[#202020]"
-        style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
+        /* Arrastre HTML5 nativo, aparte del de puntero del tablero: el panel
+           del backlog vive fuera de este componente y así no se mezclan. */
+        onDragOver={(evento) => {
+          if (!onSoltarDesdeBacklog || !evento.dataTransfer.types.includes(MIME_BACKLOG)) return;
+          evento.preventDefault();
+          evento.dataTransfer.dropEffect = 'move';
+          if (receptora !== column.id) setReceptora(column.id);
+        }}
+        onDragLeave={(evento) => {
+          if (!evento.currentTarget.contains(evento.relatedTarget as Node | null)) {
+            setReceptora((actual) => (actual === column.id ? null : actual));
+          }
+        }}
+        onDrop={(evento) => {
+          const taskId = evento.dataTransfer.getData(MIME_BACKLOG);
+          setReceptora(null);
+          if (!onSoltarDesdeBacklog || !taskId) return;
+          evento.preventDefault();
+          onSoltarDesdeBacklog(taskId, column);
+        }}
+        className="flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-[#202020] transition-shadow"
+        style={{
+          boxShadow:
+            receptora === column.id
+              ? `0 0 0 2px ${colors.primary}`
+              : `0 1px 0 ${alpha(colors.border, 45)}`,
+        }}
       >
         {/**
          * La cabecera **es el asa**, y el resto de la columna no lo es.

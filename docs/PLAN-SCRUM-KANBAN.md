@@ -273,6 +273,39 @@ WIP busca es que alguien lo vea y hable de ello, no cerrar la puerta. Es como
 lo hacen Jira y Linear. Si algún día se quiere duro, es una comprobación más en
 `moveTask` — el dato ya está.
 
+### D14 — El backlog es un panel lateral, y solo lleva al sprint en curso
+
+Decidido por el dueño del producto al probarlo (2026-09-23), y sustituye a la
+vista «Backlog»: un botón «Backlog · N» en la franja del sprint abre un panel
+por la derecha, como el de la tarea. Desde él se **arrastra** una tarea a una
+columna y entra en el sprint en curso, en esa columna — un solo `PATCH` con
+`sprintId`, `columnId` y `status`. En el móvil, donde arrastrar pelea con el
+desplazamiento, cada tarea lleva un «→ columna».
+
+Solo al sprint en curso, a propósito: planear sprints futuros tarea a tarea
+era la parte que más complicaba la pantalla y la que menos se usa. El alta
+desde el panel pide lo básico de una tarea Scrum: título, descripción,
+prioridad, puntos y encargado.
+
+### D15 — Una franja encima del tablero dice qué sprint es
+
+Respuesta a «¿cómo se distingue cuándo acaba un sprint y empieza otro?». El
+Kanban de un tablero Scrum **es** el sprint en curso; la franja lo nombra, con
+sus fechas, los días que quedan y cuánto va hecho. Al cerrarlo desaparece y el
+tablero se queda vacío; al empezar el siguiente, la franja cambia de nombre.
+
+### D16 — Empezar un sprint es un paso, y cerrarlo puede abrir el siguiente
+
+La vista Sprint ya no separa «planear» e «iniciar»: un formulario con nombre,
+meta y fechas, y un botón. Al cerrar, si alguna pendiente pasa al siguiente,
+se le pone nombre y fechas en el mismo diálogo y arranca en cuanto este se
+cierra. El backend sigue teniendo `PLANNED`; la interfaz encadena las
+llamadas.
+
+La vista se reorganizó para leerse sola: dos barras que se comparan —tiempo
+gastado y trabajo hecho— con una frase («vais al ritmo»), el reparto por
+columna, el burndown explicado en una línea y el historial como barras.
+
 ### D11 — Se implementa tocando `apps/backend/` directo, en esta rama
 
 Sin pasar por `PENDIENTES-BACKEND.md`: el equipo de frontend lo trabaja con

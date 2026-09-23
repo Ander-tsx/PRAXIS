@@ -2,8 +2,7 @@
 
 import {
   closeSprintAction,
-  createSprintAction,
-  startSprintAction,
+  startNewSprintAction,
 } from '@/app/(privado)/projects/[id]/sprint-actions';
 import { CLOSE_SPRINT_INITIAL_STATE, SPRINT_INITIAL_STATE } from '@/lib/projects/action-state';
 import {
@@ -11,18 +10,18 @@ import {
   type PendingSprintTask,
   type Sprint,
   type Task,
+  colors,
   useAccion,
 } from '@praxis/commons';
 import { type ReactNode, useMemo, useState } from 'react';
 import { BurndownChart } from './BurndownChart';
-import { calcularBurndown, calcularVelocidad, conUnidad } from './burndown';
+import { calcularBurndown, calcularVelocidad, conUnidad, unidadDe } from './burndown';
 import {
   diasRestantes,
   fechasPorDefecto,
   rangoDeFechas,
   sprintActivo,
   sprintsCerrados,
-  sprintsPlaneados,
   textoDiasRestantes,
 } from './scrum';
 
@@ -32,16 +31,21 @@ export interface SprintPanelProps {
   /** Todas las tareas del tablero. */
   tasks: Task[];
   sprints: Sprint[];
-  /** Planear, iniciar y cerrar: `canManageSprint`. */
+  /** Empezar y cerrar: `canManageSprint`. */
   canManageSprint: boolean;
 }
 
 /**
- * La vista **Sprint** de un tablero Scrum: el que está en curso, los que
- * vienen y los que ya pasaron. Ver `docs/PLAN-SCRUM-KANBAN.md`.
+ * La vista **Sprint** (D16 de `docs/PLAN-SCRUM-KANBAN.md`).
  *
- * Filas con raya fina y tipografía como jerarquía (`kyloo-design` §4): el
- * sprint en curso es el titular, lo demás son listas.
+ * Tres preguntas, en este orden, y cada una con su respuesta a la vista:
+ *
+ * 1. **¿Hay sprint?** Si no, un solo formulario: empezarlo.
+ * 2. **¿Cómo vamos?** Dos barras que se comparan solas —tiempo gastado y
+ *    trabajo hecho— y una frase que lo dice. El burndown debajo, para quien
+ *    quiera el detalle.
+ * 3. **¿Cómo fueron los anteriores?** Lo terminado en cada uno, en barras: la
+ *    velocidad sin tener que saber qué es.
  */
 export function SprintPanel({
   board,
@@ -51,181 +55,252 @@ export function SprintPanel({
   canManageSprint,
 }: SprintPanelProps) {
   const activo = sprintActivo(sprints);
-  const planeados = useMemo(() => sprintsPlaneados(sprints), [sprints]);
   const cerrados = useMemo(() => sprintsCerrados(sprints), [sprints]);
   const velocidad = useMemo(() => calcularVelocidad(cerrados, tasks), [cerrados, tasks]);
 
-  const cuentaPorSprint = useMemo(() => {
-    const cuenta = new Map<string, { total: number; hechas: number }>();
-    for (const t of tasks) {
-      if (!t.sprintId) continue;
-      const c = cuenta.get(t.sprintId) ?? { total: 0, hechas: 0 };
-      c.total += 1;
-      if (t.completedAt) c.hechas += 1;
-      cuenta.set(t.sprintId, c);
-    }
-    return cuenta;
-  }, [tasks]);
-
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 pb-8">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-12 pb-10 pt-2">
         {activo ? (
           <SprintEnCurso
             board={board}
             projectId={projectId}
             sprint={activo}
             tasks={tasks}
-            planeados={planeados}
-            cuenta={cuentaPorSprint.get(activo.id) ?? { total: 0, hechas: 0 }}
             canManageSprint={canManageSprint}
             velocidadMedia={velocidad.media}
+            sugerido={`Sprint ${sprints.length + 1}`}
+          />
+        ) : canManageSprint ? (
+          <EmpezarSprint
+            board={board}
+            projectId={projectId}
+            sugerido={`Sprint ${sprints.length + 1}`}
+            enBacklog={tasks.filter((t) => t.sprintId === null).length}
           />
         ) : (
-          <section className="flex flex-col gap-2 border-b border-border pb-6">
-            <h2 className="font-display text-2xl text-text-primary">Ningún sprint en curso</h2>
+          <section className="flex flex-col gap-2">
+            <h2 className="font-display text-3xl text-text-primary">Ningún sprint en curso</h2>
             <p className="font-sans text-sm text-text-secondary">
-              {planeados.length > 0
-                ? 'Inicia uno de los planeados de abajo. Mientras tanto, el Kanban de este tablero se queda vacío: no hay nada comprometido.'
-                : canManageSprint
-                  ? 'Planea el primero aquí abajo, llénalo desde el Backlog e inícialo cuando el equipo esté listo.'
-                  : 'Quien gestione los sprints de este tablero puede planear el primero.'}
+              Quien gestione los sprints de este tablero puede empezar el siguiente.
             </p>
           </section>
         )}
 
-        <section aria-label="Sprints planeados" className="flex flex-col">
-          <h3 className="border-b border-border pb-2 font-sans text-sm font-semibold text-text-primary">
-            Planeados
-          </h3>
-          {planeados.length === 0 && (
-            <p className="py-3 font-sans text-xs text-text-secondary">Ninguno todavía.</p>
-          )}
-          <ul className="flex flex-col">
-            {planeados.map((sprint) => (
-              <SprintPlaneado
-                key={sprint.id}
-                board={board}
-                projectId={projectId}
-                sprint={sprint}
-                tareas={cuentaPorSprint.get(sprint.id)?.total ?? 0}
-                puedeIniciar={canManageSprint && !activo}
-              />
-            ))}
-          </ul>
-          {canManageSprint && (
-            <NuevoSprint
-              board={board}
-              projectId={projectId}
-              sugerido={`Sprint ${sprints.length + 1}`}
-            />
-          )}
-        </section>
-
-        {cerrados.length > 0 && (
-          <section aria-label="Sprints cerrados" className="flex flex-col">
-            <h3 className="flex items-baseline justify-between border-b border-border pb-2 font-sans text-sm font-semibold text-text-primary">
-              Cerrados
-              {velocidad.media !== null && (
-                <span className="font-normal text-xs text-text-secondary">
-                  velocidad media: {conUnidad(velocidad.media, velocidad.unidad)} por sprint
-                </span>
-              )}
-            </h3>
-            <ul className="flex flex-col">
-              {cerrados.map((sprint) => {
-                const hecho =
-                  velocidad.sprints.find((v) => v.sprint.id === sprint.id)?.hecho ??
-                  cuentaPorSprint.get(sprint.id)?.hechas ??
-                  0;
-                return (
-                  <li
-                    key={sprint.id}
-                    className="flex items-baseline gap-2 border-b border-border py-2 last:border-b-0"
-                  >
-                    <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary">
-                      {sprint.name}
-                    </span>
-                    <span className="shrink-0 font-sans text-xs text-text-secondary">
-                      {rangoDeFechas(sprint)} · terminado: {conUnidad(hecho, velocidad.unidad)}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
+        {velocidad.sprints.length > 0 && <Historial velocidad={velocidad} />}
       </div>
     </div>
   );
 }
+
+/* ─── Empezar ───────────────────────────────────────────────────────────── */
+
+function EmpezarSprint({
+  board,
+  projectId,
+  sugerido,
+  enBacklog,
+}: {
+  board: Board;
+  projectId: string;
+  sugerido: string;
+  enBacklog: number;
+}) {
+  const [estado, empezar, empezando] = useAccion(startNewSprintAction, SPRINT_INITIAL_STATE);
+  const porDefecto = useMemo(() => fechasPorDefecto(), []);
+
+  function enviar(evento: React.FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const datos = new FormData(evento.currentTarget);
+    datos.set('tzOffset', String(new Date().getTimezoneOffset()));
+    empezar(datos);
+  }
+
+  return (
+    <section className="flex flex-col gap-6" aria-label="Empezar un sprint">
+      <div className="flex flex-col gap-2">
+        <h2 className="font-display text-3xl text-text-primary">Empieza un sprint</h2>
+        <p className="max-w-xl font-sans text-sm leading-relaxed text-text-secondary">
+          Un sprint es un bloque de tiempo con una meta. Mientras dura, el tablero enseña solo lo
+          que el equipo se comprometió a terminar; lo demás espera en el backlog
+          {enBacklog > 0 && ` (ahora hay ${enBacklog} ${enBacklog === 1 ? 'tarea' : 'tareas'})`}.
+        </p>
+      </div>
+
+      <form onSubmit={enviar} className="flex flex-col gap-4">
+        <input type="hidden" name="projectId" value={projectId} />
+        <input type="hidden" name="boardId" value={board.id} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Campo etiqueta="Nombre">
+            <input
+              name="name"
+              required
+              minLength={2}
+              maxLength={100}
+              defaultValue={sugerido}
+              className={CAMPO}
+            />
+          </Campo>
+          <Campo etiqueta="Meta (opcional)">
+            <input
+              name="goal"
+              maxLength={500}
+              placeholder="Qué tiene que estar hecho al final"
+              className={CAMPO}
+            />
+          </Campo>
+          <Campo etiqueta="Empieza">
+            <input
+              type="date"
+              name="startDate"
+              required
+              defaultValue={porDefecto.inicio}
+              className={CAMPO}
+            />
+          </Campo>
+          <Campo etiqueta="Termina">
+            <input
+              type="date"
+              name="endDate"
+              required
+              defaultValue={porDefecto.fin}
+              className={CAMPO}
+            />
+          </Campo>
+        </div>
+        {estado.error && (
+          <p role="alert" className="font-sans text-xs text-error">
+            {estado.error}
+          </p>
+        )}
+        <div>
+          <button
+            type="submit"
+            disabled={empezando}
+            className="cursor-pointer rounded-lg bg-primary px-4 py-2 font-sans text-sm font-semibold text-primary-foreground disabled:cursor-wait disabled:opacity-60"
+          >
+            {empezando ? 'Empezando…' : 'Empezar sprint'}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+/* ─── En curso ──────────────────────────────────────────────────────────── */
 
 function SprintEnCurso({
   board,
   projectId,
   sprint,
   tasks,
-  planeados,
-  cuenta,
   canManageSprint,
   velocidadMedia,
+  sugerido,
 }: {
   board: Board;
   projectId: string;
   sprint: Sprint;
   tasks: Task[];
-  planeados: Sprint[];
-  cuenta: { total: number; hechas: number };
   canManageSprint: boolean;
   velocidadMedia: number | null;
+  sugerido: string;
 }) {
-  const burndown = useMemo(() => calcularBurndown(sprint, tasks), [sprint, tasks]);
   const [cerrando, setCerrando] = useState(false);
+  const burndown = useMemo(() => calcularBurndown(sprint, tasks), [sprint, tasks]);
+  const delSprint = useMemo(
+    () => tasks.filter((t) => t.sprintId === sprint.id),
+    [tasks, sprint.id],
+  );
+  const unidad = unidadDe(delSprint);
+  const valor = (t: Task) => (unidad === 'puntos' ? (t.estimatePoints ?? 0) : 1);
+  const total = delSprint.reduce((s, t) => s + valor(t), 0);
+  const hecho = delSprint.filter((t) => t.completedAt).reduce((s, t) => s + valor(t), 0);
+
+  const totalDias = burndown?.dias.length ?? 0;
   const dias = diasRestantes(sprint);
+  const transcurridos = dias === null ? 0 : Math.min(totalDias, Math.max(0, totalDias - dias + 1));
+  const pctTiempo = totalDias === 0 ? 0 : Math.round((transcurridos / totalDias) * 100);
+  const pctTrabajo = total === 0 ? 0 : Math.round((hecho / total) * 100);
   const vencido = dias !== null && dias < 1;
-  const porcentaje = cuenta.total === 0 ? 0 : Math.round((cuenta.hechas / cuenta.total) * 100);
+
+  const diferencia = pctTrabajo - pctTiempo;
+  const veredicto =
+    total === 0
+      ? 'El sprint está vacío: trae tareas desde el backlog.'
+      : pctTrabajo === 100
+        ? 'Todo hecho. Puedes cerrarlo.'
+        : vencido
+          ? 'Se acabó el tiempo. Ciérralo y decide qué pasa con lo pendiente.'
+          : diferencia >= 10
+            ? 'Vais por delante del ritmo.'
+            : diferencia <= -15
+              ? 'Vais por detrás del ritmo: queda más trabajo que tiempo.'
+              : 'Vais al ritmo.';
+
+  const porColumna = useMemo(
+    () =>
+      [...board.columns]
+        .sort((a, b) => a.order - b.order)
+        .map((c) => ({ columna: c, n: delSprint.filter((t) => t.columnId === c.id).length })),
+    [board.columns, delSprint],
+  );
 
   return (
-    <section
-      className="flex flex-col gap-4 border-b border-border pb-8"
-      aria-label="Sprint en curso"
-    >
-      <div className="flex flex-col gap-1">
-        <span className="font-sans text-xs uppercase tracking-wide text-text-secondary">
-          En curso
-        </span>
-        <h2 className="font-display text-3xl leading-tight text-text-primary">{sprint.name}</h2>
-        {sprint.goal && (
-          <p className="font-sans text-sm italic text-text-secondary">{sprint.goal}</p>
-        )}
-        <p className="font-sans text-xs text-text-secondary">
-          {rangoDeFechas(sprint)} ·{' '}
+    <section className="flex flex-col gap-8" aria-label="Sprint en curso">
+      <header className="flex flex-col gap-2">
+        <span className="font-sans text-xs text-text-secondary">
+          En curso · {rangoDeFechas(sprint)} ·{' '}
           <span className={vencido ? 'text-warning' : undefined}>{textoDiasRestantes(dias)}</span>
-        </p>
+        </span>
+        <h2 className="font-display text-4xl leading-tight text-text-primary">{sprint.name}</h2>
+        {sprint.goal && <p className="font-sans text-base text-text-secondary">{sprint.goal}</p>}
+      </header>
+
+      <div className="flex flex-col gap-4">
+        <Barra
+          etiqueta="Tiempo"
+          detalle={`día ${transcurridos} de ${totalDias}`}
+          porcentaje={pctTiempo}
+          color={vencido ? colors.warning : colors.textSecondary}
+        />
+        <Barra
+          etiqueta="Trabajo"
+          detalle={`${conUnidad(hecho, unidad)} de ${conUnidad(total, unidad)}`}
+          porcentaje={pctTrabajo}
+          color={colors.primary}
+        />
+        <p className="font-sans text-sm text-text-primary">{veredicto}</p>
+        {velocidadMedia !== null && total > 0 && (
+          <p className="font-sans text-xs text-text-secondary">
+            En los últimos sprints el equipo terminó de media {conUnidad(velocidadMedia, unidad)}
+            {total > velocidadMedia * 1.2 ? ': este va más cargado de lo habitual.' : '.'}
+          </p>
+        )}
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-baseline justify-between font-sans text-xs text-text-secondary">
-          <span>
-            <span className="text-text-primary tabular-nums">{cuenta.hechas}</span> de{' '}
-            <span className="tabular-nums">{cuenta.total}</span> tareas terminadas
-          </span>
-          <span className="tabular-nums">{porcentaje}%</span>
-        </div>
-        <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
-          <div
-            className="h-full rounded-full bg-primary transition-all"
-            style={{ width: `${porcentaje}%` }}
-          />
-        </div>
-      </div>
+      <ul className="flex flex-wrap gap-x-6 gap-y-2 border-y border-border py-3">
+        {porColumna.map(({ columna, n }) => (
+          <li key={columna.id} className="flex items-baseline gap-2 font-sans text-sm">
+            <span
+              className="h-2 w-2 self-center rounded-full"
+              style={{ background: colors[columna.color] ?? colors.primary }}
+              aria-hidden="true"
+            />
+            <span className="text-text-secondary">{columna.name}</span>
+            <span className="tabular-nums text-text-primary">{n}</span>
+          </li>
+        ))}
+      </ul>
 
-      {burndown && <BurndownChart datos={burndown} />}
-      {burndown && velocidadMedia !== null && (
-        <p className="font-sans text-xs text-text-secondary">
-          Comprometido: {conUnidad(burndown.alcanceOriginal + burndown.anadido, burndown.unidad)} ·
-          velocidad media de los últimos sprints: {conUnidad(velocidadMedia, burndown.unidad)}
-        </p>
+      {burndown && total > 0 && (
+        <div className="flex flex-col gap-2">
+          <BurndownChart datos={burndown} />
+          <p className="font-sans text-xs text-text-secondary">
+            La línea gris es el ritmo para terminar justo a tiempo. Si la tuya va por debajo, vais
+            bien; si sube, entró trabajo nuevo al sprint.
+          </p>
+        </div>
       )}
 
       {canManageSprint &&
@@ -235,7 +310,7 @@ function SprintEnCurso({
             projectId={projectId}
             sprint={sprint}
             tasks={tasks}
-            planeados={planeados}
+            sugerido={sugerido}
             onCancelar={() => setCerrando(false)}
           />
         ) : (
@@ -243,7 +318,7 @@ function SprintEnCurso({
             <button
               type="button"
               onClick={() => setCerrando(true)}
-              className="cursor-pointer rounded-lg border border-border px-3 py-1.5 font-sans text-xs font-medium text-text-primary transition-colors hover:border-border-strong"
+              className="cursor-pointer rounded-lg border border-border px-4 py-2 font-sans text-sm font-medium text-text-primary transition-colors hover:border-border-strong"
             >
               Cerrar sprint
             </button>
@@ -253,33 +328,64 @@ function SprintEnCurso({
   );
 }
 
+function Barra({
+  etiqueta,
+  detalle,
+  porcentaje,
+  color,
+}: {
+  etiqueta: string;
+  detalle: string;
+  porcentaje: number;
+  color: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-baseline justify-between font-sans text-xs">
+        <span className="font-medium text-text-primary">{etiqueta}</span>
+        <span className="tabular-nums text-text-secondary">
+          {detalle} · {porcentaje}%
+        </span>
+      </div>
+      <div
+        className="h-2 w-full overflow-hidden rounded-full bg-white/10"
+        aria-hidden="true"
+      >
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${porcentaje}%`, background: color }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Cerrar ────────────────────────────────────────────────────────────── */
+
 type Decision = 'backlog' | 'nextSprint';
 
 /**
- * Cerrar el sprint en curso (D6): cada tarea sin terminar necesita una
- * decisión — backlog o siguiente sprint—. No hay opción preseleccionada: los
- * dos atajos de arriba deciden todas de golpe, pero hay que pulsarlos.
- *
- * La lista de pendientes sale de las tareas que ya hay en pantalla; si el
- * servidor ve otra —alguien movió una tarjeta mientras tanto— responde 409 con
- * la suya, y esa pasa a mandar.
+ * Cerrar el sprint (D6): cada tarea sin terminar necesita decisión. Si alguna
+ * pasa al siguiente sprint, aquí mismo se le pone nombre y fechas, y arranca
+ * en cuanto este se cierra (D16).
  */
 function CierreDeSprint({
   board,
   projectId,
   sprint,
   tasks,
-  planeados,
+  sugerido,
   onCancelar,
 }: {
   board: Board;
   projectId: string;
   sprint: Sprint;
   tasks: Task[];
-  planeados: Sprint[];
+  sugerido: string;
   onCancelar: () => void;
 }) {
   const [estado, cerrar, enviando] = useAccion(closeSprintAction, CLOSE_SPRINT_INITIAL_STATE);
+  const porDefecto = useMemo(() => fechasPorDefecto(), []);
 
   const locales: PendingSprintTask[] = useMemo(
     () =>
@@ -297,21 +403,14 @@ function CierreDeSprint({
   const pendientes = estado.pending ?? locales;
 
   const [decisiones, setDecisiones] = useState<Map<string, Decision>>(() => new Map());
-  const [siguiente, setSiguiente] = useState(planeados[0]?.id ?? '');
+  const [siguiente, setSiguiente] = useState({
+    nombre: sugerido,
+    inicio: porDefecto.inicio,
+    fin: porDefecto.fin,
+  });
 
-  /* Si el elegido desaparece de la lista (se inició en otra pestaña), manda el
-     primero que quede. Derivado, no sincronizado con un efecto. */
-  const siguienteValido = planeados.some((p) => p.id === siguiente)
-    ? siguiente
-    : (planeados[0]?.id ?? '');
-
-  const hayPlaneado = planeados.length > 0;
   const faltan = pendientes.filter((t) => !decisiones.has(t.id)).length;
   const alSiguiente = pendientes.some((t) => decisiones.get(t.id) === 'nextSprint');
-
-  function decidirTodas(d: Decision) {
-    setDecisiones(new Map(pendientes.map((t) => [t.id, d])));
-  }
 
   function enviar() {
     const datos = new FormData();
@@ -319,40 +418,46 @@ function CierreDeSprint({
     datos.set('boardId', board.id);
     datos.set('sprintId', sprint.id);
     datos.set('resolutions', pendientes.map((t) => `${t.id}:${decisiones.get(t.id)}`).join(','));
-    if (alSiguiente) datos.set('nextSprintId', siguienteValido);
+    if (alSiguiente) {
+      datos.set('nextName', siguiente.nombre);
+      datos.set('nextstartDate', siguiente.inicio);
+      datos.set('nextendDate', siguiente.fin);
+      datos.set('tzOffset', String(new Date().getTimezoneOffset()));
+    }
     cerrar(datos);
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
-      <p className="font-sans text-sm text-text-primary">
+    <div className="flex flex-col gap-4 border-t border-border pt-6">
+      <h3 className="font-sans text-base font-semibold text-text-primary">
+        Cerrar «{sprint.name}»
+      </h3>
+      <p className="font-sans text-sm text-text-secondary">
         {pendientes.length === 0
-          ? `Todo lo de «${sprint.name}» está terminado. Al cerrarlo pasa al historial.`
+          ? 'Todo está terminado. Al cerrarlo pasa al historial.'
           : pendientes.length === 1
-            ? 'Queda una tarea sin terminar. ¿Qué hacemos con ella?'
-            : `Quedan ${pendientes.length} tareas sin terminar. ¿Qué hacemos con cada una?`}
+            ? 'Queda una tarea sin terminar. ¿Vuelve al backlog o pasa al siguiente sprint?'
+            : `Quedan ${pendientes.length} tareas sin terminar. Decide qué pasa con cada una.`}
       </p>
 
       {pendientes.length > 0 && (
         <>
-          <div className="flex flex-wrap items-center gap-2 font-sans text-xs">
+          <div className="flex flex-wrap items-center gap-3 font-sans text-xs">
             <span className="text-text-secondary">Todas:</span>
             <button
               type="button"
-              onClick={() => decidirTodas('backlog')}
+              onClick={() => setDecisiones(new Map(pendientes.map((t) => [t.id, 'backlog'])))}
               className="cursor-pointer text-text-primary underline decoration-dotted underline-offset-4"
             >
               al backlog
             </button>
-            {hayPlaneado && (
-              <button
-                type="button"
-                onClick={() => decidirTodas('nextSprint')}
-                className="cursor-pointer text-text-primary underline decoration-dotted underline-offset-4"
-              >
-                al siguiente sprint
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setDecisiones(new Map(pendientes.map((t) => [t.id, 'nextSprint'])))}
+              className="cursor-pointer text-text-primary underline decoration-dotted underline-offset-4"
+            >
+              al siguiente sprint
+            </button>
           </div>
 
           <ul className="flex flex-col">
@@ -376,10 +481,9 @@ function CierreDeSprint({
                     </Opcion>
                     <Opcion
                       activa={d === 'nextSprint'}
-                      deshabilitada={!hayPlaneado}
                       onClick={() => setDecisiones(new Map(decisiones).set(t.id, 'nextSprint'))}
                     >
-                      Siguiente
+                      Siguiente sprint
                     </Opcion>
                   </fieldset>
                 </li>
@@ -387,27 +491,36 @@ function CierreDeSprint({
             })}
           </ul>
 
-          {hayPlaneado ? (
-            alSiguiente && (
-              <label className="flex items-center gap-2 font-sans text-xs text-text-secondary">
-                Siguiente sprint:
-                <select
-                  value={siguienteValido}
-                  onChange={(e) => setSiguiente(e.target.value)}
-                  className="cursor-pointer rounded-lg border border-border bg-transparent px-2 py-1 text-text-primary focus:border-primary focus:outline-none"
-                >
-                  {planeados.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )
-          ) : (
-            <p className="font-sans text-xs text-text-secondary">
-              No hay ningún sprint planeado: planea uno abajo si quieres pasarle tareas.
-            </p>
+          {alSiguiente && (
+            <div className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-3">
+              <p className="font-sans text-xs text-text-secondary sm:col-span-3">
+                El siguiente sprint empieza en cuanto cierres este:
+              </p>
+              <Campo etiqueta="Nombre">
+                <input
+                  value={siguiente.nombre}
+                  onChange={(e) => setSiguiente({ ...siguiente, nombre: e.target.value })}
+                  maxLength={100}
+                  className={CAMPO}
+                />
+              </Campo>
+              <Campo etiqueta="Empieza">
+                <input
+                  type="date"
+                  value={siguiente.inicio}
+                  onChange={(e) => setSiguiente({ ...siguiente, inicio: e.target.value })}
+                  className={CAMPO}
+                />
+              </Campo>
+              <Campo etiqueta="Termina">
+                <input
+                  type="date"
+                  value={siguiente.fin}
+                  onChange={(e) => setSiguiente({ ...siguiente, fin: e.target.value })}
+                  className={CAMPO}
+                />
+              </Campo>
+            </div>
           )}
         </>
       )}
@@ -423,14 +536,20 @@ function CierreDeSprint({
           type="button"
           onClick={enviar}
           disabled={enviando || faltan > 0}
-          className="cursor-pointer rounded-lg bg-primary px-3 py-1.5 font-sans text-xs font-semibold text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+          className="cursor-pointer rounded-lg bg-primary px-4 py-2 font-sans text-sm font-semibold text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {enviando ? 'Cerrando…' : faltan > 0 ? `Faltan ${faltan} por decidir` : 'Cerrar sprint'}
+          {enviando
+            ? 'Cerrando…'
+            : faltan > 0
+              ? `Faltan ${faltan} por decidir`
+              : alSiguiente
+                ? 'Cerrar y empezar el siguiente'
+                : 'Cerrar sprint'}
         </button>
         <button
           type="button"
           onClick={onCancelar}
-          className="cursor-pointer px-2 py-1.5 font-sans text-xs text-text-secondary hover:text-text-primary"
+          className="cursor-pointer px-2 py-2 font-sans text-sm text-text-secondary hover:text-text-primary"
         >
           Cancelar
         </button>
@@ -441,22 +560,15 @@ function CierreDeSprint({
 
 function Opcion({
   activa,
-  deshabilitada = false,
   onClick,
   children,
-}: {
-  activa: boolean;
-  deshabilitada?: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
+}: { activa: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"
       aria-pressed={activa}
-      disabled={deshabilitada}
       onClick={onClick}
-      className={`cursor-pointer rounded-md px-2 py-1 font-sans text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
+      className={`cursor-pointer rounded-md px-2 py-1 font-sans text-xs transition-colors ${
         activa ? 'bg-primary/15 text-primary' : 'text-text-secondary hover:text-text-primary'
       }`}
     >
@@ -465,151 +577,55 @@ function Opcion({
   );
 }
 
-function SprintPlaneado({
-  board,
-  projectId,
-  sprint,
-  tareas,
-  puedeIniciar,
-}: {
-  board: Board;
-  projectId: string;
-  sprint: Sprint;
-  tareas: number;
-  puedeIniciar: boolean;
-}) {
-  const [abierto, setAbierto] = useState(false);
-  const [estado, iniciar, iniciando] = useAccion(startSprintAction, SPRINT_INITIAL_STATE);
-  const porDefecto = useMemo(() => fechasPorDefecto(), []);
+/* ─── Historial ─────────────────────────────────────────────────────────── */
 
-  /* El `tzOffset` va con el envío para que «del 1 al 14» sean días locales de
-     quien lo arranca, no del servidor. Ver `startSprintAction`. */
-  function enviar(evento: React.FormEvent<HTMLFormElement>) {
-    evento.preventDefault();
-    const datos = new FormData(evento.currentTarget);
-    datos.set('tzOffset', String(new Date().getTimezoneOffset()));
-    iniciar(datos);
-  }
-
+function Historial({ velocidad }: { velocidad: ReturnType<typeof calcularVelocidad> }) {
+  const maximo = Math.max(1, ...velocidad.sprints.map((s) => s.hecho));
   return (
-    <li className="flex flex-col gap-2 border-b border-border py-2 last:border-b-0">
-      <div className="flex items-baseline gap-2">
-        <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary">
-          {sprint.name}
-        </span>
-        <span className="shrink-0 font-sans text-xs text-text-secondary">
-          {tareas} {tareas === 1 ? 'tarea' : 'tareas'}
-        </span>
-        {puedeIniciar && !abierto && (
-          <button
-            type="button"
-            onClick={() => setAbierto(true)}
-            className="shrink-0 cursor-pointer font-sans text-xs font-medium text-primary hover:underline"
-          >
-            Iniciar
-          </button>
+    <section aria-label="Sprints anteriores" className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between gap-2 border-b border-border pb-2">
+        <h3 className="font-sans text-sm font-semibold text-text-primary">Sprints anteriores</h3>
+        {velocidad.media !== null && (
+          <span className="font-sans text-xs text-text-secondary">
+            media: {conUnidad(velocidad.media, velocidad.unidad)} terminados por sprint
+          </span>
         )}
       </div>
-      {sprint.goal && <p className="font-sans text-xs italic text-text-secondary">{sprint.goal}</p>}
-
-      {abierto && (
-        <form onSubmit={enviar} className="flex flex-wrap items-end gap-3 pb-1">
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="boardId" value={board.id} />
-          <input type="hidden" name="sprintId" value={sprint.id} />
-          <label className="flex flex-col gap-1 font-sans text-[11px] text-text-secondary">
-            Empieza
-            <input
-              type="date"
-              name="startDate"
-              defaultValue={porDefecto.inicio}
-              required
-              className="rounded-lg border border-border bg-transparent px-2 py-1 text-xs text-text-primary [color-scheme:dark] focus:border-primary focus:outline-none"
-            />
-          </label>
-          <label className="flex flex-col gap-1 font-sans text-[11px] text-text-secondary">
-            Termina
-            <input
-              type="date"
-              name="endDate"
-              defaultValue={porDefecto.fin}
-              required
-              className="rounded-lg border border-border bg-transparent px-2 py-1 text-xs text-text-primary [color-scheme:dark] focus:border-primary focus:outline-none"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={iniciando}
-            className="cursor-pointer rounded-lg bg-primary px-3 py-1.5 font-sans text-xs font-semibold text-primary-foreground disabled:cursor-wait disabled:opacity-60"
+      <ul className="flex flex-col gap-2">
+        {velocidad.sprints.map(({ sprint, hecho }) => (
+          <li
+            key={sprint.id}
+            className="grid grid-cols-[minmax(0,8rem)_1fr_auto] items-center gap-3 font-sans text-xs"
           >
-            {iniciando ? 'Iniciando…' : 'Iniciar sprint'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setAbierto(false)}
-            className="cursor-pointer px-1 py-1.5 font-sans text-xs text-text-secondary hover:text-text-primary"
-          >
-            Cancelar
-          </button>
-          {estado.error && (
-            <p role="alert" className="w-full font-sans text-xs text-error">
-              {estado.error}
-            </p>
-          )}
-        </form>
-      )}
-    </li>
+            <span className="truncate text-text-primary" title={rangoDeFechas(sprint) ?? undefined}>
+              {sprint.name}
+            </span>
+            <span className="h-2 overflow-hidden rounded-full bg-white/5" aria-hidden="true">
+              <span
+                className="block h-full rounded-full bg-primary/70"
+                style={{ width: `${(hecho / maximo) * 100}%` }}
+              />
+            </span>
+            <span className="tabular-nums text-text-secondary">
+              {conUnidad(hecho, velocidad.unidad)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
-function NuevoSprint({
-  board,
-  projectId,
-  sugerido,
-}: {
-  board: Board;
-  projectId: string;
-  sugerido: string;
-}) {
-  const [estado, crear, creando] = useAccion(createSprintAction, SPRINT_INITIAL_STATE);
+/* ─── Piezas ────────────────────────────────────────────────────────────── */
 
+const CAMPO =
+  'w-full rounded-lg border border-border bg-[#1c1c1b] px-2.5 py-1.5 font-sans text-sm text-text-primary outline-none focus:border-primary [color-scheme:dark]';
+
+function Campo({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
   return (
-    /* `action=` a propósito: es un formulario de alta, vaciarse al enviar es lo
-       que se quiere (ver CLAUDE.md, el reseteo de React 19). */
-    <form action={crear} className="flex flex-col gap-2 pt-3">
-      <input type="hidden" name="projectId" value={projectId} />
-      <input type="hidden" name="boardId" value={board.id} />
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          name="name"
-          required
-          minLength={2}
-          maxLength={100}
-          defaultValue={sugerido}
-          key={sugerido}
-          aria-label="Nombre del sprint"
-          className="min-w-0 flex-1 border-b border-border bg-transparent py-1 font-sans text-sm text-text-primary outline-none focus:border-primary"
-        />
-        <input
-          name="goal"
-          maxLength={500}
-          placeholder="Meta (opcional)"
-          aria-label="Meta del sprint"
-          className="min-w-0 flex-[2] border-b border-border bg-transparent py-1 font-sans text-sm text-text-primary outline-none placeholder:text-text-secondary focus:border-primary"
-        />
-        <button
-          type="submit"
-          disabled={creando}
-          className="shrink-0 cursor-pointer rounded-lg px-2.5 py-1 font-sans text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:cursor-wait disabled:opacity-60"
-        >
-          {creando ? 'Planeando…' : 'Planear sprint'}
-        </button>
-      </div>
-      {estado.error && (
-        <p role="alert" className="font-sans text-xs text-error">
-          {estado.error}
-        </p>
-      )}
-    </form>
+    <label className="flex flex-col gap-1 font-sans text-xs text-text-secondary">
+      {etiqueta}
+      {children}
+    </label>
   );
 }

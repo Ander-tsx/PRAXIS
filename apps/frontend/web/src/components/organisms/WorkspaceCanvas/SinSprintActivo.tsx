@@ -14,10 +14,12 @@ export function SinSprintActivo({
   planeados,
   enBacklog,
   onIr,
+  onBacklog,
 }: {
   planeados: number;
   enBacklog: number;
   onIr: (vista: VistaTablero) => void;
+  onBacklog: () => void;
 }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
@@ -33,10 +35,10 @@ export function SinSprintActivo({
       <div className="flex items-center gap-4 font-sans text-sm">
         <button
           type="button"
-          onClick={() => onIr('backlog')}
+          onClick={onBacklog}
           className="cursor-pointer text-text-primary underline decoration-dotted underline-offset-4"
         >
-          Ir al Backlog
+          Abrir el backlog
         </button>
         <button
           type="button"

@@ -76,7 +76,29 @@ export async function toggleScrumAction(
   return { error: null, done: enabled ? 'on' : 'off' };
 }
 
-export async function createSprintAction(
+/** `YYYY-MM-DD` local → ISO, al principio o al final del día (ver `startSprintAction`). */
+function fechasDelFormulario(
+  formData: FormData,
+  prefijo = '',
+): { startDate: string; endDate: string } | { error: string } {
+  const start = String(formData.get(`${prefijo}startDate`) ?? '');
+  const end = String(formData.get(`${prefijo}endDate`) ?? '');
+  const offset = Number(formData.get('tzOffset') ?? 0);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+    return { error: 'Elige la fecha de inicio y la de fin.' };
+  }
+  if (end < start) return { error: 'La fecha de fin no puede ser anterior a la de inicio.' };
+  const aIso = (dia: string, hora: string) =>
+    new Date(new Date(`${dia}T${hora}Z`).getTime() + offset * 60_000).toISOString();
+  return { startDate: aIso(start, '00:00:00.000'), endDate: aIso(end, '23:59:59.999') };
+}
+
+/**
+ * Crea y arranca un sprint en un solo paso: lo que ve la persona es «Empezar
+ * sprint», no «planear» y luego «iniciar» (D16 de `docs/PLAN-SCRUM-KANBAN.md`).
+ * El backend sigue teniendo los dos estados; aquí se encadenan.
+ */
+export async function startNewSprintAction(
   _prev: SprintState,
   formData: FormData,
 ): Promise<SprintState> {
@@ -87,67 +109,23 @@ export async function createSprintAction(
   const boardId = String(formData.get('boardId') ?? '');
   const name = String(formData.get('name') ?? '').trim();
   const goal = String(formData.get('goal') ?? '').trim();
-
   if (name.length < 2) return { error: 'El nombre necesita al menos 2 caracteres.', done: null };
-  if (name.length > 100)
-    return { error: 'El nombre no puede pasar de 100 caracteres.', done: null };
-  if (goal.length > 500) return { error: 'La meta no puede pasar de 500 caracteres.', done: null };
+  const fechas = fechasDelFormulario(formData);
+  if ('error' in fechas) return { error: fechas.error, done: null };
 
   try {
     const sprint = await api.post<Sprint>(`/boards/${boardId}/sprints`, {
-      name,
-      ...(goal && { goal }),
+      name: name.slice(0, 100),
+      ...(goal && { goal: goal.slice(0, 500) }),
     });
-    if (!sprint?.id) return { error: 'El servidor no creó el sprint.', done: null };
-  } catch (error) {
-    return { error: describe(error, 'No se pudo crear el sprint.'), done: null };
-  }
-
-  revalidateProject(projectId);
-  return { error: null, done: 'created' };
-}
-
-/**
- * Arranca un sprint planeado.
- *
- * Las fechas llegan como `YYYY-MM-DD` del `<input type="date">` y se mandan
- * como el **principio del día de inicio** y el **final del día de fin**, en
- * hora local de quien lo arranca: un sprint «del 1 al 14» incluye el 14 entero.
- */
-export async function startSprintAction(
-  _prev: SprintState,
-  formData: FormData,
-): Promise<SprintState> {
-  const api = await requireApi();
-  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
-
-  const projectId = String(formData.get('projectId') ?? '');
-  const boardId = String(formData.get('boardId') ?? '');
-  const sprintId = String(formData.get('sprintId') ?? '');
-  const start = String(formData.get('startDate') ?? '');
-  const end = String(formData.get('endDate') ?? '');
-  /* Minutos de diferencia con UTC del navegador, para que «del 1 al 14» no se
-     desplace un día según el huso del servidor. */
-  const offset = Number(formData.get('tzOffset') ?? 0);
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
-    return { error: 'Elige la fecha de inicio y la de fin.', done: null };
-  }
-  if (end < start)
-    return { error: 'La fecha de fin no puede ser anterior a la de inicio.', done: null };
-
-  const aIso = (dia: string, hora: string) =>
-    new Date(new Date(`${dia}T${hora}Z`).getTime() + offset * 60_000).toISOString();
-
-  try {
-    const sprint = await api.post<Sprint>(`/boards/${boardId}/sprints/${sprintId}/start`, {
-      startDate: aIso(start, '00:00:00.000'),
-      endDate: aIso(end, '23:59:59.999'),
-    });
-    if (sprint?.status !== 'ACTIVE')
+    const iniciado = await api.post<Sprint>(
+      `/boards/${boardId}/sprints/${sprint.id}/start`,
+      fechas,
+    );
+    if (iniciado?.status !== 'ACTIVE')
       return { error: 'El servidor no arrancó el sprint.', done: null };
   } catch (error) {
-    return { error: describe(error, 'No se pudo iniciar el sprint.'), done: null };
+    return { error: describe(error, 'No se pudo empezar el sprint.'), done: null };
   }
 
   revalidateProject(projectId);
@@ -181,21 +159,35 @@ export async function closeSprintAction(
     })
     .filter((r) => r.taskId && (r.action === 'backlog' || r.action === 'nextSprint'));
 
-  if (resolutions.some((r) => r.action === 'nextSprint') && !nextSprintId) {
-    return {
-      error: 'Elige a qué sprint pasan las tareas, o mándalas al backlog.',
-      done: null,
-      pending: null,
-    };
+  /* El siguiente sprint se crea aquí mismo, con su nombre y sus fechas, y se
+     arranca en cuanto el actual queda cerrado (D16). */
+  const nombreSiguiente = String(formData.get('nextName') ?? '').trim();
+  const alSiguiente = resolutions.some((r) => r.action === 'nextSprint');
+  const fechasSiguiente = alSiguiente ? fechasDelFormulario(formData, 'next') : null;
+  if (fechasSiguiente && 'error' in fechasSiguiente) {
+    return { error: fechasSiguiente.error, done: null, pending: null };
+  }
+  if (alSiguiente && !nextSprintId && nombreSiguiente.length < 2) {
+    return { error: 'Ponle nombre al siguiente sprint.', done: null, pending: null };
   }
 
   try {
+    let siguienteId = nextSprintId;
+    if (alSiguiente && !siguienteId) {
+      const nuevo = await api.post<Sprint>(`/boards/${boardId}/sprints`, {
+        name: nombreSiguiente.slice(0, 100),
+      });
+      siguienteId = nuevo.id;
+    }
     const sprint = await api.post<Sprint>(`/boards/${boardId}/sprints/${sprintId}/close`, {
       resolutions,
-      ...(nextSprintId && { nextSprintId }),
+      ...(alSiguiente && siguienteId && { nextSprintId: siguienteId }),
     });
     if (sprint?.status !== 'CLOSED') {
       return { error: 'El servidor no cerró el sprint.', done: null, pending: null };
+    }
+    if (alSiguiente && siguienteId && fechasSiguiente && !('error' in fechasSiguiente)) {
+      await api.post<Sprint>(`/boards/${boardId}/sprints/${siguienteId}/start`, fechasSiguiente);
     }
   } catch (error) {
     if (error instanceof ApiError && error.code === SPRINT_HAS_PENDING_TASKS_CODE) {
@@ -210,12 +202,11 @@ export async function closeSprintAction(
 }
 
 /**
- * Mueve una tarea al backlog (`sprintId` vacío) o a un sprint (D2).
- *
- * Es un `PATCH` de la tarea, con `canEditTask`: decidir en qué sprint cae una
- * tarea es planificación del trabajo, no gestión del sprint.
+ * Trae una tarea del backlog al sprint en curso, **a la columna donde se
+ * soltó** (D14 de `docs/PLAN-SCRUM-KANBAN.md`). Un solo `PATCH`: sprint,
+ * columna y `status` a la vez — el gateway resuelve si la columna es de cierre.
  */
-export async function moveToSprintAction(
+export async function pullToSprintAction(
   _prev: SprintState,
   formData: FormData,
 ): Promise<SprintState> {
@@ -224,19 +215,21 @@ export async function moveToSprintAction(
 
   const projectId = String(formData.get('projectId') ?? '');
   const taskId = String(formData.get('taskId') ?? '');
-  const sprintId = String(formData.get('sprintId') ?? '') || null;
+  const sprintId = String(formData.get('sprintId') ?? '');
+  const columnId = String(formData.get('columnId') ?? '');
+  const status = String(formData.get('status') ?? '');
 
   try {
-    const task = await api.patch<Task>(`/tasks/${taskId}`, { sprintId });
-    if ((task?.sprintId ?? null) !== sprintId) {
+    const task = await api.patch<Task>(`/tasks/${taskId}`, { sprintId, columnId, status });
+    if (task?.sprintId !== sprintId || task.columnId !== columnId) {
       return { error: 'El servidor no movió la tarea.', done: null };
     }
   } catch (error) {
-    return { error: describe(error, 'No se pudo mover la tarea.'), done: null };
+    return { error: describe(error, 'No se pudo meter la tarea en el sprint.'), done: null };
   }
 
   revalidateProject(projectId);
-  return { error: null, done: sprintId ? 'sprint' : 'backlog' };
+  return { error: null, done: taskId };
 }
 
 /**
@@ -257,6 +250,22 @@ export async function createBacklogTaskAction(
   const status = String(formData.get('status') ?? '');
   const title = String(formData.get('title') ?? '').trim();
   const order = Number(formData.get('order') ?? 0);
+  /* Los datos básicos de una tarea Scrum: lo que hace falta para poder
+     planearla sin abrirla otra vez. */
+  const description = String(formData.get('description') ?? '')
+    .replace(/\r\n?/g, '\n')
+    .trim();
+  const priority = String(formData.get('priority') ?? '');
+  const puntos = String(formData.get('estimatePoints') ?? '').trim();
+  const estimatePoints = puntos === '' ? undefined : Number(puntos);
+  const assigneeIds = formData.getAll('assigneeIds').map(String).filter(Boolean);
+
+  if (
+    estimatePoints !== undefined &&
+    (!Number.isInteger(estimatePoints) || estimatePoints < 0 || estimatePoints > 999)
+  ) {
+    return { error: 'Los puntos tienen que ser un número entero entre 0 y 999.', done: null };
+  }
 
   if (!title) return { error: 'Escribe un título.', done: null };
   if (title.length > 255)
@@ -270,6 +279,10 @@ export async function createBacklogTaskAction(
       title,
       order,
       sprintId: null,
+      ...(description && { description }),
+      ...(['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(priority) && { priority }),
+      ...(estimatePoints !== undefined && { estimatePoints }),
+      ...(assigneeIds.length > 0 && { assigneeIds }),
     });
     if (!task?.id || task.sprintId !== null) {
       return { error: 'El servidor no creó la tarea en el backlog.', done: null };
@@ -280,44 +293,4 @@ export async function createBacklogTaskAction(
 
   revalidateProject(projectId);
   return { error: null, done: 'created' };
-}
-
-/**
- * Sube o baja una tarea en el backlog.
- *
- * El orden del backlog es `Task.order`, el mismo que usa la columna (D5): se
- * renumeran solo las que cambian, por `POST /tasks/:id/move` con la **misma
- * columna** que ya tenían — el backend no reindexa por su cuenta.
- *
- * Llega como `id:columnId:orden` separados por comas.
- */
-export async function reorderBacklogAction(
-  _prev: SprintState,
-  formData: FormData,
-): Promise<SprintState> {
-  const api = await requireApi();
-  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
-
-  const projectId = String(formData.get('projectId') ?? '');
-  const cambios = String(formData.get('cambios') ?? '')
-    .split(',')
-    .filter(Boolean)
-    .slice(0, 60)
-    .map((trio) => {
-      const [id, columnId, orden] = trio.split(':');
-      return { id, columnId, order: Number(orden) };
-    })
-    .filter((c) => c.id && c.columnId && Number.isInteger(c.order) && c.order >= 0);
-
-  const resultados = await Promise.allSettled(
-    cambios.map((c) =>
-      api.post<Task>(`/tasks/${c.id}/move`, { columnId: c.columnId, order: c.order }),
-    ),
-  );
-
-  revalidateProject(projectId);
-  if (resultados.some((r) => r.status === 'rejected')) {
-    return { error: 'Parte del orden no se guardó. Recarga para ver el orden real.', done: null };
-  }
-  return { error: null, done: 'reordered' };
 }
