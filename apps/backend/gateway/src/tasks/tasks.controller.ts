@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -83,23 +84,65 @@ export class TasksController {
   @RequireProjectPermission(ProjectPermission.CAN_CREATE_TASK)
   @ApiOperation({ summary: 'Crea una tarea o subtarea en un board' })
   @ApiResponse({ status: 201, description: 'Tarea creada exitosamente' })
-  create(
+  async create(
     @Param('boardId') boardId: string,
     @Request() req: Express.Request,
     @Body() body: CreateTaskBodyDto,
   ) {
     const cmd = body.parentTaskId ? 'subtask_create' : 'task_create';
+    const sprintId = await this.sprintForNewTask(boardId, body);
     return firstValueFrom(
       this.tasksClient.send(
         { cmd },
         {
           ...body,
+          sprintId,
           boardId,
           projectId: req.projectId,
           requesterId: req.user!.userId,
         },
       ),
     );
+  }
+
+  /**
+   * A qué sprint entra una tarea nueva (D12 de `docs/PLAN-SCRUM-KANBAN.md`).
+   *
+   * - La clave **viene** en el cuerpo (un id o `null`): manda el cliente. Es
+   *   el caso del Backlog, que manda `null` para que no se ate a nada.
+   * - La clave **no viene**: si el tablero tiene Scrum y hay un sprint activo,
+   *   va a ese sprint. Es "Añadir tarea" desde una columna del Kanban, que en
+   *   un tablero Scrum solo enseña el sprint activo — una tarea creada ahí
+   *   que no entrara en él desaparecería de la vista en cuanto se guarda.
+   *
+   * ⚠️ **Se mira `scrumEnabled`, no basta con que haya un sprint activo.** Un
+   * tablero con Scrum apagado puede conservar un sprint `ACTIVE` de cuando
+   * estaba encendido (apagar no cierra nada, invariante 3), y sin esta
+   * comprobación las tareas de un tablero Kanban se seguirían atando a un
+   * sprint que ya nadie ve.
+   */
+  private async sprintForNewTask(
+    boardId: string,
+    body: CreateTaskBodyDto,
+  ): Promise<string | null> {
+    if (body.sprintId !== undefined) return body.sprintId;
+    if (body.parentTaskId) return null;
+
+    const board = await firstValueFrom(
+      this.projectsClient.send<{ scrumEnabled?: boolean }>(
+        { cmd: 'board_find_one' },
+        { id: boardId },
+      ),
+    );
+    if (!board?.scrumEnabled) return null;
+
+    const active = await firstValueFrom(
+      this.projectsClient.send<{ id: string } | null>(
+        { cmd: 'sprint_find_active' },
+        { boardId },
+      ),
+    );
+    return active?.id ?? null;
   }
 
   /** Lista tareas de un board (requiere canViewProject) */
@@ -110,16 +153,29 @@ export class TasksController {
   @ApiQuery({ name: 'columnId', required: false, description: 'Filtro por ID de columna' })
   @ApiQuery({ name: 'page', required: false, description: 'Número de página', type: Number })
   @ApiQuery({ name: 'limit', required: false, description: 'Límite por página', type: Number })
+  @ApiQuery({ name: 'sprintId', required: false, description: 'Solo las tareas de ese sprint' })
+  @ApiQuery({
+    name: 'backlog',
+    required: false,
+    description: '`true`: solo las que no tienen sprint (el backlog del tablero)',
+  })
   @ApiResponse({ status: 200, description: 'Lista de tareas recuperada' })
   findAll(
     @Param('boardId') boardId: string,
     @Query('columnId') columnId?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('sprintId') sprintId?: string,
+    @Query('backlog') backlog?: string,
   ) {
+    if (sprintId && backlog === 'true') {
+      throw new BadRequestException('`sprintId` y `backlog` no se combinan: uno pide un sprint, el otro ninguno');
+    }
     const findDto: FindTasksDto = {
       boardId,
       columnId,
+      ...(sprintId && { sprintId }),
+      ...(backlog === 'true' && { onlyBacklog: true }),
       query: {
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,

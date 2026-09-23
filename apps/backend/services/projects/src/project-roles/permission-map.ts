@@ -28,8 +28,10 @@ import { PROJECT_PERMISSIONS } from '@praxis/contracts';
  */
 export const PERMISSION_HIERARCHY: Record<string, string[]> = {
   // Boards
-  canDeleteBoard: ['canEditBoard', 'canCreateBoard', 'canEditProject'],
-  canEditBoard: ['canCreateBoard', 'canEditProject'],
+  canDeleteBoard: ['canEditBoard', 'canCreateBoard', 'canEditProject', 'canManageSprint'],
+  // Quien administra la estructura del tablero también gestiona sus sprints
+  // (D7 de `docs/PLAN-SCRUM-KANBAN.md`).
+  canEditBoard: ['canCreateBoard', 'canEditProject', 'canManageSprint'],
   // Quien administra el proyecto ve los reportes.
   canEditProject: ['canViewReports'],
   canManageMembers: ['canViewReports'],

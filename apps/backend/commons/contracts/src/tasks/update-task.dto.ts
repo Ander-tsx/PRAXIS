@@ -69,6 +69,16 @@ export class UpdateTaskBodyDto {
   @IsOptional()
   @IsEnum(Priority)
   priority?: Priority;
+
+  /**
+   * Mueve la tarea a un sprint (UUID) o al backlog (`null`). Omitirlo la deja
+   * donde está. Es lo que usan "añadir al sprint" desde el Backlog y "devolver
+   * al backlog" desde el tablero. Ver `docs/PLAN-SCRUM-KANBAN.md`, D2.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID('4')
+  sprintId?: string | null;
 }
 
 /** Payload al microservicio: el cuerpo + lo que inyecta el gateway. */

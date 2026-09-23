@@ -16,6 +16,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { RedisModule } from './redis/redis.module';
 import { ReportLayoutsModule } from './report-layouts/report-layouts.module';
+import { SprintsModule } from './sprints/sprints.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 
 @Module({
@@ -52,6 +53,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     WorkspacesModule,
     BoardsModule,
     ColumnsModule,
+    SprintsModule,
     InvitationsModule,
     MembersModule,
     NotificationsModule,

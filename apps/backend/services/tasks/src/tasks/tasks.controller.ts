@@ -114,6 +114,31 @@ export class TasksController {
     return this.tasksService.restatusTasks(dto);
   }
 
+  // ─── Sprints (D6 de `docs/PLAN-SCRUM-KANBAN.md`) ──────────────────────────
+
+  /** Las tareas de un sprint que todavía no están cerradas. */
+  @MessagePattern({ cmd: 'task_pending_in_sprint' })
+  pendingInSprint(@Payload() dto: { boardId: string; sprintId: string }) {
+    return this.tasksService.pendingInSprint(dto.boardId, dto.sprintId);
+  }
+
+  /**
+   * Mueve un lote de tareas de un sprint a otro, o al backlog (`toSprintId:
+   * null`). Solo lo llama el cierre de sprint del gateway, que ya validó.
+   */
+  @MessagePattern({ cmd: 'task_reassign_sprint' })
+  reassignSprint(
+    @Payload()
+    dto: {
+      boardId: string;
+      fromSprintId: string;
+      taskIds: string[];
+      toSprintId: string | null;
+    },
+  ) {
+    return this.tasksService.reassignSprint(dto);
+  }
+
   // ─── Etiquetas ────────────────────────────────────────────────────────────
 
   @MessagePattern({ cmd: 'label_find_all' })

@@ -19,6 +19,7 @@ import { ProjectChatController } from './project-chat.controller';
 import { ProjectPermissionsController } from './project-permissions.controller';
 import { ProjectRolesController } from './project-roles.controller';
 import { ProjectsController } from './projects.controller';
+import { SprintsController } from './sprints.controller';
 import { TaskPurgeService } from './task-purge.service';
 import { WorkspacesController, WorkspacesResourceController } from './workspaces.controller';
 
@@ -93,6 +94,7 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
     BoardsController,
     BoardsResourceController,
     ColumnsController,
+    SprintsController,
     MembersController,
     ProjectRolesController,
     ProjectPermissionsController,

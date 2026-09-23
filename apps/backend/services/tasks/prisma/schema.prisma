@@ -45,10 +45,31 @@ model Task {
   /// el color vive en projects-service. Ver `isClosingColumn` en `MoveTaskDto`.
   completedAt  DateTime?
 
+  /// A qué sprint pertenece. `null` = está en el backlog del tablero (Scrum,
+  /// `docs/PLAN-SCRUM-KANBAN.md` D2). En un tablero sin Scrum encendido,
+  /// siempre es `null` y no significa nada.
+  ///
+  /// Sin clave foránea: `Sprint` vive en projects-service, en otro esquema —
+  /// misma regla que `boardId`, `columnId` y `projectId` de esta misma tabla.
+  sprintId       String?
+
+  /// Cuándo se fijó el `sprintId` actual. Se pisa cada vez que cambia —entra a
+  /// un sprint, sale a backlog, entra a otro—, igual que `completedAt` se pisa
+  /// en cada cruce de columna de cierre.
+  ///
+  /// Es lo que separa, en el burndown, el alcance que había al arrancar el
+  /// sprint (`sprintAssignedAt <= sprint.startDate`) del que se añadió después
+  /// —scope creep— sin necesitar una foto congelada del alcance en ningún otro
+  /// sitio (D9).
+  sprintAssignedAt DateTime?
+
   /// Para «mis tareas»: se filtra por vencimiento dentro de los proyectos visibles.
   @@index([projectId, dueDate])
   /// Para el throughput: cuántas se cerraron en cada tramo de fechas.
   @@index([projectId, completedAt])
+  /// El tablero Kanban de un board Scrum filtra por sprint activo; el backlog
+  /// filtra por `sprintId: null`. Los dos casos comparten este índice.
+  @@index([boardId, sprintId])
   @@schema("tasks")
   @@map("tasks")
 }

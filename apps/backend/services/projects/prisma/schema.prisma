@@ -183,8 +183,75 @@ model Board {
   columns     BoardColumn[]
   createdAt   DateTime      @default(now())
 
+  /// Si este tablero, además de Kanban (que todo tablero ya es, por sus
+  /// columnas), trabaja también por sprints.
+  ///
+  /// ⚠️ **No existe `Board.method`.** Kanban no es un modo alterno a Scrum: es
+  /// la base que todo tablero ya tiene. Esto enciende o apaga una capa
+  /// encima — nunca cambia lo que las columnas hacen. Ver
+  /// `docs/PLAN-SCRUM-KANBAN.md`, D1.
+  ///
+  /// Editable en cualquier momento, no solo al crear el tablero: apagarlo no
+  /// borra ningún sprint ni ninguna tarea (D1, invariante 3), así que fijarlo
+  /// para siempre no daría ninguna seguridad real.
+  scrumEnabled Boolean      @default(false)
+  sprints      Sprint[]
+
   @@schema("projects")
   @@map("boards")
+}
+
+/// PLANNED: creado, todavía no arrancó. ACTIVE: en curso. CLOSED: terminado,
+/// de solo lectura. Como mucho un ACTIVE por tablero — lo aplica el servicio,
+/// no hay forma de expresar la restricción en el schema sin un índice parcial
+/// que Prisma no genera.
+enum SprintStatus {
+  PLANNED
+  ACTIVE
+  CLOSED
+
+  @@schema("projects")
+}
+
+/// Un bloque de tiempo dentro de un tablero Scrum.
+///
+/// ## Por qué vive en projects-service y no en tasks-service
+///
+/// Es una propiedad del **tablero** — como `BoardColumn` — y no de la tarea.
+/// `Task.sprintId` (en tasks-service) apunta aquí igual que `Task.boardId` ya
+/// apunta a `Board`: sin clave foránea entre microservicios, misma regla que
+/// todas las referencias cruzadas de este backend.
+///
+/// ## Por qué el alcance no se congela en una tabla aparte
+///
+/// El burndown separa "alcance original" de "añadido después" comparando
+/// `Task.sprintAssignedAt` contra `Sprint.startDate` (ver
+/// `docs/PLAN-SCRUM-KANBAN.md`, D9) — no hace falta guardar una foto del
+/// alcance al arrancar.
+model Sprint {
+  id      String       @id @default(uuid())
+  boardId String
+  board   Board        @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  name    String
+  /// Opcional a propósito: no todo sprint necesita una frase que lo resuma.
+  goal    String?
+  status  SprintStatus @default(PLANNED)
+
+  /// `null` mientras esté `PLANNED`. Se fija al iniciar (`sprint_start`), no al
+  /// crear: crear un sprint es planearlo, no arrancar el reloj.
+  startDate DateTime?
+  endDate   DateTime?
+
+  createdAt DateTime  @default(now())
+  closedAt  DateTime?
+
+  /// Como mucho un `ACTIVE` por tablero (D3). Este índice no impone la regla
+  /// —Postgres no tiene "único condicionado a un valor de enum" sin un índice
+  /// parcial escrito a mano en SQL—, pero sí hace barata la consulta que la
+  /// aplica: "¿hay ya un sprint activo en este tablero?" antes de crear otro.
+  @@index([boardId, status])
+  @@schema("projects")
+  @@map("sprints")
 }
 
 model BoardColumn {

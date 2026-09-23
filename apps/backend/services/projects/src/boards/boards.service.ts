@@ -70,7 +70,10 @@ export class BoardsService {
 
     const updated = await this.prisma.board.update({
       where: { id: dto.id },
-      data: { name: dto.name },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.scrumEnabled !== undefined && { scrumEnabled: dto.scrumEnabled }),
+      },
     });
 
     await this.redis.del(`board:${board.id}`);

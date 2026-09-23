@@ -77,6 +77,24 @@ export class CreateTaskBodyDto {
   @IsOptional()
   @IsUUID('4')
   parentTaskId?: string;
+
+  /**
+   * A qué sprint entra. Lo decide el cliente, y las dos respuestas válidas
+   * significan cosas distintas:
+   *
+   * - **Ausente** (la clave no viaja en el cuerpo): el gateway decide — si el
+   *   tablero tiene Scrum encendido y hay un sprint activo, la ata a ese
+   *   sprint; si no, queda en `null`. Es lo que manda "Añadir tarea" desde una
+   *   columna del Kanban.
+   * - **`null` explícito**: queda en el backlog del tablero, sin importar si
+   *   hay un sprint activo. Es lo que manda "Añadir tarea" desde el Backlog.
+   *
+   * Ver `docs/PLAN-SCRUM-KANBAN.md`, D12.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID('4')
+  sprintId?: string | null;
 }
 
 /** Payload al microservicio: el cuerpo + lo que inyecta el gateway. */

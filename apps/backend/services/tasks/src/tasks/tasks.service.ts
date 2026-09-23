@@ -375,6 +375,33 @@ export class TasksService {
   }
 
   /**
+   * Comprueba que un sprint exista y sea del tablero que dice el payload.
+   *
+   * Mismo motivo que `assertColumnInBoard`: `sprintId` lo elige el cliente
+   * (`CreateTaskBodyDto`, `UpdateTaskBodyDto`), y sin esto un sprint de otro
+   * tablero —o de otro proyecto— podría colarse en el burndown de uno ajeno.
+   */
+  private async assertSprintInBoard(boardId: string, sprintId: string): Promise<void> {
+    const sprints = await firstValueFrom(
+      this.projectsClient.send<Array<{ id: string; boardId: string }>>(
+        { cmd: 'sprint_find_by_ids' },
+        { ids: [sprintId] },
+      ),
+    );
+
+    const sprint = (sprints ?? [])[0];
+    if (!sprint) {
+      throw new RpcException({ statusCode: 404, message: 'El sprint no existe' });
+    }
+    if (sprint.boardId !== boardId) {
+      throw new RpcException({
+        statusCode: 400,
+        message: 'Ese sprint no es de este tablero',
+      });
+    }
+  }
+
+  /**
    * Comprueba que todas las etiquetas existan y sean del proyecto.
    *
    * Sin esto se puede colgar de una tarea la etiqueta de otro proyecto: la
@@ -505,6 +532,7 @@ export class TasksService {
     /* El tablero lo pone la ruta, pero la columna la elige el cuerpo: una tarea
        puede nacer ya fuera de sitio si no se comprueba que sean del mismo sitio. */
     await this.assertColumnInBoard(dto.boardId, dto.columnId);
+    if (dto.sprintId) await this.assertSprintInBoard(dto.boardId, dto.sprintId);
 
     const assignees = await this.resolveAssignees(dto.projectId, dto.assigneeIds ?? []);
     const labels = await this.resolveLabels(dto.projectId, dto.labelIds ?? []);
@@ -526,6 +554,8 @@ export class TasksService {
           dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
           priority: dto.priority,
           order: dto.order ?? 0,
+          sprintId: dto.sprintId ?? null,
+          sprintAssignedAt: dto.sprintId ? new Date() : null,
           assignees: {
             create: assignees.map((userId) => ({ userId, assignedBy: dto.requesterId })),
           },
@@ -559,7 +589,7 @@ export class TasksService {
       return created;
     });
 
-    await this.redis.del(`tasks:board:${dto.boardId}`);
+    await this.redis.delByPrefix(`tasks:board:${dto.boardId}`);
 
     await this.notifyAssigneeChanges({
       taskId: task.id,
@@ -574,7 +604,11 @@ export class TasksService {
   }
 
   async findAllTasks(dto: FindTasksDto) {
-    const cacheKey = `tasks:board:${dto.boardId}${dto.columnId ? `:col:${dto.columnId}` : ''}`;
+    const cacheKey =
+      `tasks:board:${dto.boardId}` +
+      (dto.columnId ? `:col:${dto.columnId}` : '') +
+      (dto.sprintId ? `:sprint:${dto.sprintId}` : '') +
+      (dto.onlyBacklog ? ':backlog' : '');
     const cached = await this.redis.get(cacheKey);
     if (cached) return cached;
 
@@ -584,6 +618,8 @@ export class TasksService {
 
     const where: any = { boardId: dto.boardId };
     if (dto.columnId) where.columnId = dto.columnId;
+    if (dto.sprintId) where.sprintId = dto.sprintId;
+    if (dto.onlyBacklog) where.sprintId = null;
 
     const [items, total] = await Promise.all([
       this.prisma.task.findMany({
@@ -599,6 +635,57 @@ export class TasksService {
     const result = { items, total };
     await this.redis.set(cacheKey, result, BOARD_TASKS_TTL);
     return result;
+  }
+
+  /**
+   * Tareas de un sprint sin `completedAt`: lo que hay que resolver antes de
+   * cerrarlo (D6 de `docs/PLAN-SCRUM-KANBAN.md`).
+   *
+   * "Pendiente" es "no está en una columna de cierre", que es exactamente lo
+   * que `completedAt` ya registra — no se inventa otro criterio.
+   *
+   * Sin caché: se pide una vez al abrir el diálogo de cierre y otra al
+   * confirmar, y la segunda tiene que ver lo que haya cambiado entre medias.
+   */
+  async pendingInSprint(boardId: string, sprintId: string) {
+    return this.prisma.task.findMany({
+      where: { boardId, sprintId, completedAt: null },
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+      select: { id: true, title: true, columnId: true, status: true, priority: true },
+    });
+  }
+
+  /**
+   * Mueve un lote de tareas de un sprint a otro, o al backlog.
+   *
+   * ⚠️ **El `where` exige que sigan en `fromSprintId` y en este tablero.** Un
+   * id de otro tablero, o una tarea que alguien ya sacó del sprint entre que se
+   * abrió el diálogo y se confirmó, simplemente no se toca: el recuento que se
+   * devuelve dice cuántas se movieron de verdad.
+   */
+  async reassignSprint(dto: {
+    boardId: string;
+    fromSprintId: string;
+    taskIds: string[];
+    toSprintId: string | null;
+  }) {
+    if (dto.taskIds.length === 0) return { count: 0 };
+    if (dto.toSprintId) await this.assertSprintInBoard(dto.boardId, dto.toSprintId);
+
+    const { count } = await this.prisma.task.updateMany({
+      where: { id: { in: dto.taskIds }, boardId: dto.boardId, sprintId: dto.fromSprintId },
+      data: {
+        sprintId: dto.toSprintId,
+        sprintAssignedAt: dto.toSprintId ? new Date() : null,
+      },
+    });
+
+    await Promise.all([
+      this.redis.delByPrefix(`tasks:board:${dto.boardId}`),
+      ...dto.taskIds.map((id) => this.redis.del(`task:${id}`)),
+    ]);
+
+    return { count };
   }
 
   /**
@@ -716,6 +803,9 @@ export class TasksService {
     if (dto.columnId !== undefined) {
       await this.assertColumnInBoard(task.boardId, dto.columnId);
     }
+    if (dto.sprintId !== undefined && dto.sprintId !== null) {
+      await this.assertSprintInBoard(task.boardId, dto.sprintId);
+    }
 
     // Se validan antes de abrir la transacción: si alguien no es del proyecto,
     // no se ha tocado nada todavía.
@@ -778,6 +868,14 @@ export class TasksService {
             dueDate: nextDueDate,
           }),
           ...(change.completedAt !== undefined && { completedAt: change.completedAt }),
+          // `sprintAssignedAt` se pisa junto con `sprintId`, tanto al entrar a
+          // un sprint como al volver al backlog (`null`) — D9 de
+          // `docs/PLAN-SCRUM-KANBAN.md` necesita saber el momento de los dos
+          // cruces, no solo el de entrada.
+          ...(dto.sprintId !== undefined && {
+            sprintId: dto.sprintId,
+            sprintAssignedAt: dto.sprintId ? new Date() : null,
+          }),
         },
         include: TASK_INCLUDE,
       });
@@ -849,7 +947,7 @@ export class TasksService {
 
     await Promise.all([
       this.redis.del(`task:${dto.id}`),
-      this.redis.del(`tasks:board:${task.boardId}`),
+      this.redis.delByPrefix(`tasks:board:${task.boardId}`),
     ]);
 
     if (assignees !== undefined) {
@@ -951,7 +1049,7 @@ export class TasksService {
 
     await Promise.all([
       this.redis.del(`task:${dto.id}`),
-      this.redis.del(`tasks:board:${task.boardId}`),
+      this.redis.delByPrefix(`tasks:board:${task.boardId}`),
     ]);
 
     return updated;
@@ -998,7 +1096,7 @@ export class TasksService {
 
     await Promise.all([
       this.redis.del(`task:${dto.id}`),
-      this.redis.del(`tasks:board:${task.boardId}`),
+      this.redis.delByPrefix(`tasks:board:${task.boardId}`),
     ]);
 
     return { success: true };
@@ -1054,7 +1152,7 @@ export class TasksService {
 
     await Promise.all([
       this.redis.del(`task:${dto.id}`),
-      this.redis.del(`tasks:board:${task.boardId}`),
+      this.redis.delByPrefix(`tasks:board:${task.boardId}`),
     ]);
 
     await this.notifyAssigneeChanges({
@@ -1161,7 +1259,7 @@ export class TasksService {
     const boardIds = [...new Set(affected.map((t) => t.boardId))];
     await Promise.all([
       ...affected.map((t) => this.redis.del(`task:${t.id}`)),
-      ...boardIds.map((id) => this.redis.del(`tasks:board:${id}`)),
+      ...boardIds.map((id) => this.redis.delByPrefix(`tasks:board:${id}`)),
     ]);
 
     return { deleted: count };
@@ -1209,7 +1307,7 @@ export class TasksService {
     const boardIds = [...new Set(affected.map((task) => task.boardId))];
     await Promise.all([
       ...affected.map((task) => this.redis.del(`task:${task.id}`)),
-      ...boardIds.map((id) => this.redis.del(`tasks:board:${id}`)),
+      ...boardIds.map((id) => this.redis.delByPrefix(`tasks:board:${id}`)),
     ]);
 
     return { updated: count };
@@ -1250,7 +1348,7 @@ export class TasksService {
 
     await Promise.all([
       this.redis.del(`task:${dto.taskId}`),
-      this.redis.del(`tasks:board:${task.boardId}`),
+      this.redis.delByPrefix(`tasks:board:${task.boardId}`),
     ]);
 
     return item;
@@ -1272,7 +1370,7 @@ export class TasksService {
     // y sin esto se queda con el recuento viejo hasta que caduque (trampa #3).
     await Promise.all([
       this.redis.del(`task:${item.taskId}`),
-      this.redis.del(`tasks:board:${item.task.boardId}`),
+      this.redis.delByPrefix(`tasks:board:${item.task.boardId}`),
     ]);
 
     return updated;
@@ -1287,7 +1385,7 @@ export class TasksService {
 
     await Promise.all([
       this.redis.del(`task:${item.taskId}`),
-      this.redis.del(`tasks:board:${item.task.boardId}`),
+      this.redis.delByPrefix(`tasks:board:${item.task.boardId}`),
     ]);
 
     return { success: true };
