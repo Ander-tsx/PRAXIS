@@ -503,6 +503,12 @@ con Scrum/Kanban arriesgaría los dos.
   Las que usan una subclase (`flow`, con `days`) sí funcionaban, por eso no se
   notó. Es la trampa 3 de `CLAUDE.md` con otra cara. Import de valor y listo.
 
+**La regresión completa, bajo presión de memoria:** 8 GB, emulador de Android
+abierto y 15 de 16 GB de swap. Fallaron `06-chat` (busca el título «Tus
+mensajes», que esa pantalla solo pinta en una de sus dos ramas desde
+`9b6343c`; sin cambios en esta rama) y `07-reglas` Bloque 5 (tiempo agotado).
+Ninguna toca Scrum; las dos de `09-scrum` pasan con la máquina descargada.
+
 **Pendiente de mirar, sin urgencia:** `desde`/`hasta` del bloque `scrum` se
 recortan de la fecha en UTC; en México un sprint que acaba a las 23:59 del 5
 sale como «hasta 6». Un día de desfase en una cifra que PRAX solo nombra.

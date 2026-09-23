@@ -23,6 +23,8 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | [docs/PLAN-ASIENTOS-CONGELADOS.md](docs/PLAN-ASIENTOS-CONGELADOS.md) | **Etapa cerrada** (2026-09-14) — bajar de plan no puede echar a nadie: los que sobran se **congelan dentro** en solo lectura, por antigüedad, y volver a pagar los descongela solo. El tope es `min(Subscription.seats, quotas.asientos)` y vive en `services/billing/src/organizations/asientos.ts`; lo aplica `QuotaService.exigirAsientoVivo` en el guard de proyecto **y a mano en `POST /projects`**, que el guard no cubre. Doce decisiones (D1–D12), cinco invariantes y el registro de A1–A7. Solo queda fuera, a propósito, el `TODO(A6+)` de D11 |
 | [docs/AUDITORIA-PLANES.md](docs/AUDITORIA-PLANES.md) | **Los planes de pago.** Qué promete el catálogo y qué aplica el servidor, cuota por cuota. Incluye el plan **Pro** (entre Gratis y Equipo: menos inventario, más IA) y la retirada del `PRO` viejo por persona. ⚠️ Contesta por escrito si la cuota de PRAX es personal o del equipo — **personal, una entera por miembro** |
 | [docs/deploy/STRIPE-MODO-REAL.md](docs/deploy/STRIPE-MODO-REAL.md) | Para pasar del sandbox a cobrar de verdad. Los cinco pasos, qué objetos hay que recrear (los de prueba **no se migran**) y las tres cosas que no se pueden equivocar. ⚠️ Activar la cuenta y las dos claves van a mano, siempre |
+| [docs/PLAN-SCRUM-KANBAN.md](docs/PLAN-SCRUM-KANBAN.md) | **Etapa en revisión** (rama `feature/scrum-kanban`, 2026-09-23) — Scrum como **capa encima** del Kanban: `Board.scrumEnabled`, sprints, backlog, estimación, burndown, WIP blando y capacidad para PRAX. Trece decisiones (D1–D13) y el registro de cada fase. **Se sigue estrictamente**: una sesión que retome esto empieza leyéndolo entero |
+| [docs/PLAN-DOCUMENTOS.md](docs/PLAN-DOCUMENTOS.md) | ⚠️ **Propuesta implementada sin discutir, para discutirla** — documentos en Markdown dentro de los Espacios, en commits `feat(documentos)` separados de Scrum para poder revertirlos solos |
 | [docs/PLAN-FUSION-ZONAS.md](docs/PLAN-FUSION-ZONAS.md) | **Etapa cerrada** (2026-09-04, rama `feature/fusion-zonas`) — Multi-Zones fusionado en una sola aplicación. Por qué nacieron las zonas (un requisito de una materia, no una decisión de arquitectura), por qué no se sostenían —las 8 apps corrían en **un solo contenedor**, todo el coste y ningún beneficio— y cómo se hizo: ocho decisiones, seis invariantes y doce pasos (F0–F11), **ninguna URL cambiada**. Se conserva por el registro: cada paso anota qué trampa apareció, y varias no dan error —`revalidatePath` sin prefijo, `projectPath()`, un `redirect()` bajo un layout que ya hace streaming— |
 | [kyloo-design/SKILL.md](kyloo-design/SKILL.md) | **Antes de tocar cualquier pantalla.** Cómo se componen: filas en vez de tarjetas, tipografía como jerarquía, activo por tono. ⚠️ **Su paleta, sus radios y sus fuentes están revertidos** (`3fa9b87`) y no se reaplican sin pedirlo — lee el aviso de su cabecera. §13 es la de dentro de la aplicación |
 | [STRUCTURE.md](STRUCTURE.md) | Dónde va cada archivo nuevo |
@@ -281,6 +283,18 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
     llega ahí **sin haber hecho nada** —baja el techo, no sube el número— así que
     sin la tarjeta que lo explica se lee como una avería. Y estar **justo** en el
     tope no es excederlo: 25 de 25 está lleno, no rebasado.
+
+25. 🔴 **Un DTO de `@Body()` o `@Query()` importado con `type` rompe la
+    validación entera de esa ruta.** Con `import { type XDto }` el decorador
+    no tiene clase en runtime: el parámetro queda tipado como `Function` y el
+    `ValidationPipe` (`forbidNonWhitelisted`) responde 400 «property … should
+    not exist» a **cualquier** campo. Pasó en cuatro rutas de Análisis
+    (`a384438`) y no se notó porque las demás usaban una subclase. Es la trampa
+    3 con otra cara: los DTO de controlador se importan como **valor**, siempre.
+26. ⚠️ **`tasks:board:<id>` se cachea con sufijos** (`:col:`, `:sprint:`,
+    `:backlog`) y se invalida con `redis.delByPrefix`, no con `del`. Un filtro
+    nuevo en `findAllTasks` va en la clave **y** queda cubierto por el prefijo;
+    un `del` exacto dejaría las variantes filtradas sirviendo datos viejos.
 
 **Los siete agregados de Análisis aceptan filtros, y tienen tres trampas.**
 `from`/`to`, `boardId`, `assigneeId`, `labelId` y `priority`, en las ocho rutas —
