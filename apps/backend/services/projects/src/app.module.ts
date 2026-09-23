@@ -6,6 +6,7 @@ import { ObservabilityModule } from '@praxis/observability';
 import { BoardsModule } from './boards/boards.module';
 import { ChatModule } from './chat/chat.module';
 import { ColumnsModule } from './columns/columns.module';
+import { DocumentsModule } from './documents/documents.module';
 import { DomainEventsModule } from './domain-events/domain-events.module';
 import { InvitationsModule } from './invitations/invitations.module';
 import { MembersModule } from './members/members.module';
@@ -54,6 +55,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     BoardsModule,
     ColumnsModule,
     SprintsModule,
+    DocumentsModule,
     InvitationsModule,
     MembersModule,
     NotificationsModule,

@@ -8,6 +8,7 @@ import { BoardsController, BoardsResourceController } from './boards.controller'
 import { ColumnStatusSyncService } from './column-status-sync.service';
 import { ColumnsController } from './columns.controller';
 import { DirectChatController } from './direct-chat.controller';
+import { DocumentsController } from './documents.controller';
 import {
   MyInvitationsController,
   ProjectInvitationsController,
@@ -95,6 +96,7 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
     BoardsResourceController,
     ColumnsController,
     SprintsController,
+    DocumentsController,
     MembersController,
     ProjectRolesController,
     ProjectPermissionsController,

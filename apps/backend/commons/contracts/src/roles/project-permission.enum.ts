@@ -133,6 +133,14 @@ export enum ProjectPermission {
    * `canEditBoard` directamente. Ver `docs/PLAN-SCRUM-KANBAN.md`, D1 y D7.
    */
   CAN_MANAGE_SPRINT = 'canManageSprint',
+
+  /**
+   * Crear, editar y borrar los documentos de los espacios del proyecto.
+   *
+   * Leerlos pide `canViewProject`. Lo implica `canEditTask` por jerarquía:
+   * quien escribe el trabajo escribe sus notas. Ver `docs/PLAN-DOCUMENTOS.md`, D3.
+   */
+  CAN_EDIT_DOCUMENTS = 'canEditDocuments',
 }
 
 /** Claves válidas de un mapa de permisos. Se usa para validar lo que llega. */

@@ -168,11 +168,38 @@ model Workspace {
   projectId String
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   boards    Board[]
+  /// Un espacio agrupa tableros **y documentos** (`docs/PLAN-DOCUMENTOS.md`).
+  documents Document[]
   createdAt DateTime @default(now())
 
   @@unique([projectId, name])
   @@schema("projects")
   @@map("workspaces")
+}
+
+/// Un documento en Markdown dentro de un espacio (`docs/PLAN-DOCUMENTOS.md`).
+///
+/// Con clave foránea y cascada, al revés que las tareas: vive en el mismo
+/// esquema que `Workspace`, así que borrar el espacio o el proyecto se lo lleva
+/// sin purga a mano.
+model Document {
+  id          String    @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title       String
+  /// Markdown, sin HTML. Hasta 100 000 caracteres (D2).
+  content     String    @default("")
+  /// Sin clave foránea: las personas viven en credentials-service.
+  createdBy   String
+  updatedBy   String
+  createdAt   DateTime  @default(now())
+  /// El `PATCH` lo compara con `expectedUpdatedAt`: si alguien guardó entre
+  /// medias, 409 y no se pisa nada (D4).
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId, createdAt])
+  @@schema("projects")
+  @@map("documents")
 }
 
 model Board {
