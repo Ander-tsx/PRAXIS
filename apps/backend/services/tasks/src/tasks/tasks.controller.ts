@@ -123,6 +123,15 @@ export class TasksController {
   }
 
   /**
+   * Cuánto hay y cuánto está hecho en cada sprint, en tareas y en puntos. Lo
+   * usa el briefing del asistente para hablar de capacidad (P3.3).
+   */
+  @MessagePattern({ cmd: 'task_sprint_summary' })
+  sprintSummary(@Payload() dto: { sprintIds: string[] }) {
+    return this.tasksService.sprintSummary(dto.sprintIds ?? []);
+  }
+
+  /**
    * Mueve un lote de tareas de un sprint a otro, o al backlog (`toSprintId:
    * null`). Solo lo llama el cierre de sprint del gateway, que ya validó.
    */

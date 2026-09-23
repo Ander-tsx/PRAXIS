@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -96,8 +97,8 @@ export class CreateColumnDto extends CreateColumnBodyDto {
 /**
  * Cuerpo de `PATCH /boards/:boardId/columns/:id`.
  *
- * Los dos campos son opcionales, pero **al menos uno tiene que venir**: un
- * cuerpo vacío no describe ningún cambio y el servicio lo rechaza con 400.
+ * Los campos son opcionales, pero **al menos uno tiene que venir**: un cuerpo
+ * vacío no describe ningún cambio y el servicio lo rechaza con 400.
  */
 export class UpdateColumnBodyDto {
   @ApiPropertyOptional()
@@ -111,6 +112,17 @@ export class UpdateColumnBodyDto {
   @IsOptional()
   @IsIn(COLUMN_COLORS as unknown as string[])
   color?: string;
+
+  /**
+   * Límite de trabajo en curso. `null` lo quita. Es blando: se avisa en el
+   * tablero, no se bloquea ningún movimiento (D13 de `docs/PLAN-SCRUM-KANBAN.md`).
+   */
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(999)
+  wipLimit?: number | null;
 }
 
 export class UpdateColumnDto extends UpdateColumnBodyDto {

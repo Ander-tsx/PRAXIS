@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -95,6 +96,18 @@ export class CreateTaskBodyDto {
   @IsOptional()
   @IsUUID('4')
   sprintId?: string | null;
+
+  /**
+   * Puntos de estimación, sin escala impuesta (D4 de
+   * `docs/PLAN-SCRUM-KANBAN.md`). `null` borra la estimación: sin estimar no
+   * es lo mismo que cero.
+   */
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(999)
+  estimatePoints?: number | null;
 }
 
 /** Payload al microservicio: el cuerpo + lo que inyecta el gateway. */

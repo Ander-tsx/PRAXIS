@@ -263,6 +263,13 @@ model BoardColumn {
   /// posición**, así que reordenar una columna le cambiaba el color; guardándolo
   /// aquí el color es de la columna y viaja con ella.
   color   String @default("primary")
+  /// Límite de trabajo en curso (WIP). `null` = sin límite.
+  ///
+  /// ⚠️ **Es blando: se avisa, no se bloquea** (D13 de
+  /// `docs/PLAN-SCRUM-KANBAN.md`). Rechazar un arrastre porque la columna está
+  /// llena castiga justo el momento en que el equipo tiene prisa, y el límite
+  /// existe para abrir una conversación, no para cerrar la puerta.
+  wipLimit Int?
   boardId String
   board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
 

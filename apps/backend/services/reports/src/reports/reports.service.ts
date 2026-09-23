@@ -16,6 +16,21 @@ const DIAS_POR_DEFECTO = 60;
  */
 const REPORT_TTL = 60;
 
+/** El bloque `scrum` de un tablero en el briefing del asistente. */
+export interface ScrumDelTablero {
+  unidad: 'puntos' | 'tareas';
+  sprintEnCurso: {
+    nombre: string;
+    meta?: string;
+    desde: string | null;
+    hasta: string | null;
+    comprometido: number;
+    hecho: number;
+  } | null;
+  /** Lo terminado de media en los últimos (hasta 3) sprints cerrados. */
+  velocidadMedia: number | null;
+}
+
 @Injectable()
 export class ReportsService {
   private readonly log = new Logger(ReportsService.name);
@@ -88,6 +103,97 @@ export class ReportsService {
    * donde se cruzan las dos mitades, que es literalmente para lo que existe este
    * servicio.
    */
+  /**
+   * Lo que PRAX necesita para hablar de capacidad en un tablero con Scrum
+   * (P3.3 y D10 de `docs/PLAN-SCRUM-KANBAN.md`): el sprint en curso con lo
+   * comprometido y lo hecho, y la velocidad media de los últimos cerrados.
+   *
+   * ⚠️ **Viaja en cada turno**, así que va lo justo: sin ids, sin tareas —el
+   * inventario ya las trae— y en una sola unidad. Puntos si alguna tarea de
+   * esos sprints está estimada; si no, tareas, igual que el burndown de la
+   * pantalla. Un fallo aquí deja el tablero sin bloque, no tumba el briefing.
+   */
+  private async scrumDeTableros(boardIds: string[]): Promise<Map<string, ScrumDelTablero>> {
+    const resultado = new Map<string, ScrumDelTablero>();
+    if (boardIds.length === 0) return resultado;
+
+    try {
+      const porTablero = await Promise.all(
+        boardIds.map(async (boardId) => {
+          const sprints = await this.ask<
+            {
+              id: string;
+              name: string;
+              goal: string | null;
+              status: string;
+              startDate: string | null;
+              endDate: string | null;
+              closedAt: string | null;
+            }[]
+          >(this.projectsClient, 'sprint_find_by_board', { boardId });
+          return [boardId, sprints ?? []] as const;
+        }),
+      );
+
+      const elegidos = porTablero.map(([boardId, sprints]) => ({
+        boardId,
+        activo: sprints.find((s) => s.status === 'ACTIVE') ?? null,
+        cerrados: sprints
+          .filter((s) => s.status === 'CLOSED')
+          .sort((a, b) => (b.closedAt ?? '').localeCompare(a.closedAt ?? ''))
+          .slice(0, 3),
+      }));
+      const ids = elegidos.flatMap((e) => [
+        ...(e.activo ? [e.activo.id] : []),
+        ...e.cerrados.map((s) => s.id),
+      ]);
+      const resumenes = await this.ask<
+        {
+          sprintId: string;
+          tareas: number;
+          hechas: number;
+          estimadas: number;
+          puntos: number;
+          puntosHechos: number;
+        }[]
+      >(this.tasksClient, 'task_sprint_summary', { sprintIds: ids });
+      const resumen = new Map((resumenes ?? []).map((r) => [r.sprintId, r]));
+
+      for (const e of elegidos) {
+        const suyos = [...(e.activo ? [e.activo.id] : []), ...e.cerrados.map((s) => s.id)];
+        const enPuntos = suyos.some((id) => (resumen.get(id)?.estimadas ?? 0) > 0);
+        const total = (id: string) =>
+          enPuntos ? (resumen.get(id)?.puntos ?? 0) : (resumen.get(id)?.tareas ?? 0);
+        const hecho = (id: string) =>
+          enPuntos ? (resumen.get(id)?.puntosHechos ?? 0) : (resumen.get(id)?.hechas ?? 0);
+
+        resultado.set(e.boardId, {
+          unidad: enPuntos ? 'puntos' : 'tareas',
+          sprintEnCurso: e.activo
+            ? {
+                nombre: e.activo.name,
+                ...(e.activo.goal && { meta: e.activo.goal }),
+                desde: e.activo.startDate?.slice(0, 10) ?? null,
+                hasta: e.activo.endDate?.slice(0, 10) ?? null,
+                comprometido: total(e.activo.id),
+                hecho: hecho(e.activo.id),
+              }
+            : null,
+          velocidadMedia:
+            e.cerrados.length === 0
+              ? null
+              : Math.round(
+                  (e.cerrados.reduce((suma, s) => suma + hecho(s.id), 0) / e.cerrados.length) * 10,
+                ) / 10,
+        });
+      }
+    } catch (error) {
+      this.log.warn(`No se pudo componer el bloque de Scrum: ${String(error)}`);
+    }
+
+    return resultado;
+  }
+
   private async columnas(projectId: string) {
     const project = await this.ask<{
       workspaces?: {
@@ -96,6 +202,7 @@ export class ReportsService {
         boards?: {
           id: string;
           name: string;
+          scrumEnabled?: boolean;
           columns?: { id: string; name: string; color: string; order: number }[];
         }[];
       }[];
@@ -121,6 +228,7 @@ export class ReportsService {
           ...columna,
           boardId: board.id,
           boardName: board.name,
+          boardScrum: board.scrumEnabled === true,
           workspaceId: ws.id,
           workspaceName: ws.name,
         })),
@@ -925,6 +1033,7 @@ export class ReportsService {
         nombre: string;
         espacio: string;
         columnas: { id: string; nombre: string; color: string; orden: number }[];
+        scrum?: ScrumDelTablero;
       }
     >();
     for (const c of ordenadas) {
@@ -938,6 +1047,13 @@ export class ReportsService {
       porTablero.set(c.boardId, tablero);
     }
     const tableros = [...porTablero.values()];
+    /* Solo los tableros con Scrum: los demás no pagan ni un carácter de prompt. */
+    const conScrum = [...new Set(ordenadas.filter((c) => c.boardScrum).map((c) => c.boardId))];
+    const scrum = await this.scrumDeTableros(conScrum);
+    for (const tablero of tableros) {
+      const bloque = scrum.get(tablero.id);
+      if (bloque) tablero.scrum = bloque;
+    }
     /* `boardId` → nombre, para etiquetar el inventario sin recorrerlo dos veces. */
     const nombreDeTablero = new Map(tableros.map((t) => [t.id, t.nombre]));
 

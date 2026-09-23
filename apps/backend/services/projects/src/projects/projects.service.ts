@@ -40,6 +40,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, boolean> = {
   canComment: true,
   canManageLabels: true,
   canDeleteProject: true,
+  canManageSprint: true,
 };
 
 /** P2002 de Prisma: violación de restricción única. */

@@ -556,6 +556,7 @@ export class TasksService {
           order: dto.order ?? 0,
           sprintId: dto.sprintId ?? null,
           sprintAssignedAt: dto.sprintId ? new Date() : null,
+          estimatePoints: dto.estimatePoints ?? null,
           assignees: {
             create: assignees.map((userId) => ({ userId, assignedBy: dto.requesterId })),
           },
@@ -652,6 +653,35 @@ export class TasksService {
       where: { boardId, sprintId, completedAt: null },
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
       select: { id: true, title: true, columnId: true, status: true, priority: true },
+    });
+  }
+
+  /**
+   * Tareas y puntos, totales y hechos, de cada sprint pedido.
+   *
+   * `estimadas` dice cuántas tienen puntos: con cero, los puntos no significan
+   * nada y quien lo lea tiene que hablar en tareas (mismo criterio que el
+   * burndown de la pantalla).
+   */
+  async sprintSummary(sprintIds: string[]) {
+    if (sprintIds.length === 0) return [];
+    const tareas = await this.prisma.task.findMany({
+      where: { sprintId: { in: sprintIds } },
+      select: { sprintId: true, completedAt: true, estimatePoints: true },
+    });
+    return sprintIds.map((sprintId) => {
+      const suyas = tareas.filter((t) => t.sprintId === sprintId);
+      const hechas = suyas.filter((t) => t.completedAt !== null);
+      const puntos = (lista: typeof suyas) =>
+        lista.reduce((suma, t) => suma + (t.estimatePoints ?? 0), 0);
+      return {
+        sprintId,
+        tareas: suyas.length,
+        hechas: hechas.length,
+        estimadas: suyas.filter((t) => t.estimatePoints !== null).length,
+        puntos: puntos(suyas),
+        puntosHechos: puntos(hechas),
+      };
     });
   }
 
@@ -876,6 +906,7 @@ export class TasksService {
             sprintId: dto.sprintId,
             sprintAssignedAt: dto.sprintId ? new Date() : null,
           }),
+          ...(dto.estimatePoints !== undefined && { estimatePoints: dto.estimatePoints }),
         },
         include: TASK_INCLUDE,
       });

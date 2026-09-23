@@ -46,10 +46,10 @@ export class ColumnsService {
    * solo se cambia la columna.
    */
   async updateColumn(dto: UpdateColumnDto) {
-    if (dto.name === undefined && dto.color === undefined) {
+    if (dto.name === undefined && dto.color === undefined && dto.wipLimit === undefined) {
       throw new RpcException({
         statusCode: 400,
-        message: 'No hay nada que cambiar: manda al menos un nombre o un color',
+        message: 'No hay nada que cambiar: manda al menos un nombre, un color o un límite',
       });
     }
 
@@ -66,6 +66,7 @@ export class ColumnsService {
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.color !== undefined && { color: dto.color }),
+        ...(dto.wipLimit !== undefined && { wipLimit: dto.wipLimit }),
       },
     });
 

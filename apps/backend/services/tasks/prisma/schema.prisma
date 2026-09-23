@@ -63,6 +63,12 @@ model Task {
   /// sitio (D9).
   sprintAssignedAt DateTime?
 
+  /// Estimación en puntos, sin escala impuesta (D4 de
+  /// `docs/PLAN-SCRUM-KANBAN.md`): cada equipo decide si usa Fibonacci, tallas
+  /// o horas. A Praxis solo le importa que se pueda sumar — burndown y
+  /// velocidad. `null` = sin estimar, que **no** es lo mismo que 0.
+  estimatePoints Int?
+
   /// Para «mis tareas»: se filtra por vencimiento dentro de los proyectos visibles.
   @@index([projectId, dueDate])
   /// Para el throughput: cuántas se cerraron en cada tramo de fechas.

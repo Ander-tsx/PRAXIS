@@ -102,7 +102,15 @@ export enum SprintCloseAction {
 }
 
 export class SprintTaskResolutionBodyDto {
-  @IsUUID('4')
+  /**
+   * `IsString` y no `IsUUID`: las tareas de las semillas tienen ids fijos que no
+   * son UUID (`task0001-…`) y el resto de rutas de tarea los aceptan. No abre
+   * nada: el gateway solo aplica resoluciones a ids que están en la lista de
+   * pendientes del sprint, y la reasignación filtra por tablero y sprint.
+   */
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
   taskId: string;
 
   @IsEnum(SprintCloseAction)
