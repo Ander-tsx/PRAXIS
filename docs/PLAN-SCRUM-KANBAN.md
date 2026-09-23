@@ -2,6 +2,10 @@
 
 > Etapa **abierta**, arrancada el 2026-09-22. Rama `feature/scrum-kanban`.
 >
+> ✅ **Fases 0 a 3 entregadas el 2026-09-23** (ver Registro). Falta que el dueño
+> del producto lo pruebe y decida si se fusiona; lo que queda abierto está al
+> final: la fase futura de Espacios y Documentos, que requiere discutirse.
+>
 > Nace de una necesidad propia del dueño del producto: tiene un proyecto real
 > donde su equipo trabaja con Scrum + Kanban a la vez, y Praxis hoy solo tiene
 > Kanban — con un tablero *llamado* "Sprint de Lanzamiento" que no es más que
@@ -56,7 +60,7 @@ tienen Scrum encendido.
   Doing, Review, Done) más las que se le añadan.
 - Los tableros ya tienen pestañas de vista: **Kanban / Calendario / Tabla**.
   Este plan añade **Backlog** y **Sprint** al mismo lugar, condicionadas a
-  `sprintsEnabled`.
+  `scrumEnabled`.
 - `Task` tiene: título, descripción, prioridad (Baja/Media/Alta/Urgente),
   fecha límite, etiquetas, encargados, checklist, notas, adjuntos PDF. **No**
   tiene estimación — eso sí falta y lo trae D4.
@@ -257,6 +261,18 @@ un sprint, nunca quita ni añade tareas por su cuenta.
 **Por qué.** Es la regla ya escrita para todo el asistente en `CLAUDE.md`: "el
 asistente propone, nunca ejecuta". Esta capacidad no es una excepción.
 
+### D13 — El límite de WIP es blando: se avisa, no se bloquea
+
+`BoardColumn.wipLimit: Int?`. Al pasarlo, el contador de la columna pasa a
+«6/5» en tono de aviso; ningún movimiento se rechaza.
+
+**Por qué.** Tomada sin preguntar en la sesión autónoma del 2026-09-23, y
+anotada para revisarla. Rechazar un arrastre porque la columna está llena
+castiga justo el momento en que el equipo tiene prisa, y lo que un límite de
+WIP busca es que alguien lo vea y hable de ello, no cerrar la puerta. Es como
+lo hacen Jira y Linear. Si algún día se quiere duro, es una comprobación más en
+`moveTask` — el dato ya está.
+
 ### D11 — Se implementa tocando `apps/backend/` directo, en esta rama
 
 Sin pasar por `PENDIENTES-BACKEND.md`: el equipo de frontend lo trabaja con
@@ -292,15 +308,15 @@ invitaciones y estado de proyecto. Toda la feature vive en
 | 0 | ✅ P0.1 | Corregir `PENDIENTES-BACKEND.md §6` (ya resuelto, doc desactualizado) | doc | No |
 | 0 | ✅ P0.2 | `completedAt` en el tipo `Task` del frontend + `BoardCalendar.tsx` usándolo (el campo y la escritura ya existían en tasks-service; el hueco era solo de frontend) | frontend | Sí — arregla el calendario ya (§27 cerrado) |
 | 0 | ~~P0.3~~ | ~~`Task.position` + reorden~~ — **ya existía por completo** (`Task.order`, `MoveTaskDto`, drag-and-drop en `BoardColumns.tsx`). Sin trabajo pendiente; se retira de esta lista | — | — |
-| 1 | P1.1 | `Board.scrumEnabled`, `Sprint` (id, boardId, name, goal, startDate, endDate, status), `Task.sprintId`, `Task.sprintAssignedAt` | projects-service, tasks-service |No hasta P1.3 |
-| 1 | P1.2 | `canManageSprint` en el enum; endpoints crear/iniciar/cerrar sprint, con la resolución de D6 en el cierre; el Kanban filtra por sprint activo y ata las tareas nuevas a él (D12) | gateway |No hasta P1.3 |
-| 1 | P1.3 | Interruptor "Scrum" en configuración del tablero; pestañas Backlog y Sprint condicionadas a `scrumEnabled`; drag-to-reorder del backlog; estado vacío del Kanban sin sprint activo (D12) | frontend | Sí |
-| 2 | P2.1 | `Task.estimatePoints`, editable en el panel de tarea | tasks-service, frontend | Sí — visible en cualquier tablero, con o sin Scrum |
-| 2 | P2.2 | Burndown en vivo con scope creep + velocidad de sprints cerrados (D9) | reports-service, frontend | Sí |
-| 2 | P2.3 | `sprintId` como filtro en los 7 agregados de Análisis, con clave de Redis actualizada | reports-service | Sí |
-| 3 | P3.1 | Límite de WIP por columna (independiente de sprints) | projects-service, frontend | Sí |
-| 3 | P3.2 | Duración por defecto de sprint (plantilla, ej. 2 semanas) al iniciar uno | frontend | Sí |
-| 3 | P3.3 | Sugerencia de capacidad de PRAX al armar un sprint (D10) | assistant-service | Sí |
+| 1 | ✅ P1.1 | `Board.scrumEnabled`, `Sprint` (id, boardId, name, goal, startDate, endDate, status), `Task.sprintId`, `Task.sprintAssignedAt` | projects-service, tasks-service |No hasta P1.3 |
+| 1 | ✅ P1.2 | `canManageSprint` en el enum; endpoints crear/iniciar/cerrar sprint, con la resolución de D6 en el cierre; el Kanban filtra por sprint activo y ata las tareas nuevas a él (D12) | gateway |No hasta P1.3 |
+| 1 | ✅ P1.3 | Interruptor "Scrum" en configuración del tablero; pestañas Backlog y Sprint condicionadas a `scrumEnabled`; drag-to-reorder del backlog; estado vacío del Kanban sin sprint activo (D12) | frontend | Sí |
+| 2 | ✅ P2.1 | `Task.estimatePoints`, editable en el panel de tarea | tasks-service, frontend | Sí — visible en cualquier tablero, con o sin Scrum |
+| 2 | ✅ P2.2 | Burndown en vivo con scope creep + velocidad de sprints cerrados (D9) | reports-service, frontend | Sí |
+| 2 | ✅ P2.3 | `sprintId` como filtro en los 7 agregados de Análisis, con clave de Redis actualizada | reports-service | Sí |
+| 3 | ✅ P3.1 | Límite de WIP por columna (independiente de sprints) | projects-service, frontend | Sí |
+| 3 | ✅ P3.2 | Duración por defecto de sprint (plantilla, ej. 2 semanas) al iniciar uno | frontend | Sí |
+| 3 | ✅ P3.3 | Sugerencia de capacidad de PRAX al armar un sprint (D10) | assistant-service | Sí |
 
 **Fase 0 completa.** Los tres puntos eran de bajo riesgo y ya están cerrados
 (ver Registro). Lo que sigue es todo Fase 1 en adelante — el trabajo real de
@@ -412,4 +428,86 @@ con Scrum/Kanban arriesgaría los dos.
   existe ya nada parecido a `Sprint`, `scrumEnabled` o `estimatePoints` antes
   de escribir la migración.
 
-*(sigue vacío de aquí en adelante — se llena a medida que avanza la Fase 1)*
+### 2026-09-23 — Fase 1 (sesión autónoma, el dueño del producto dormía)
+
+- ✅ **P1.1** — `Board.scrumEnabled`, `Sprint` y `SprintStatus` en
+  projects-service (`20260923055428_add_scrum_sprint`); `Task.sprintId` y
+  `Task.sprintAssignedAt` en tasks-service (`20260923055433_add_sprint_id`).
+  Nada existente cambia: todo nace en `false`/`null`.
+- ✅ **P1.2** — `canManageSprint` (implicado por `canEditBoard`, y en el rol
+  «Administrador» por defecto); `/boards/:boardId/sprints` en el gateway
+  (listar, planear, iniciar, pendientes, cerrar). El cierre orquesta los dos
+  servicios desde el gateway y marca el sprint cerrado **el último**.
+  Verificado con curl contra el stack construido: crear sin Scrum → 400;
+  segundo activo → 409; tarea creada en el Kanban se ata sola al activo y con
+  `sprintId: null` explícito no; cerrar sin resolver → 409 con la lista;
+  resolver a medias → 409 con la que falta; mandar a un sprint cerrado → 400 y
+  **ninguna tarea se mueve**; un sprint de otro tablero → 404.
+- ✅ **P1.3** — Interruptor «Trabajar por sprints (Scrum)» en el menú del
+  tablero (sin confirmación, ver `ScrumToggle`); vistas Backlog y Sprint en el
+  selector solo con Scrum; Kanban, Calendario y Tabla filtran al sprint en
+  curso y sin él enseñan `SinSprintActivo`. El backlog se reordena con
+  flechas (mejor en el móvil que arrastrar) reusando `POST /tasks/:id/move`
+  con la misma columna, como decía D5.
+- ✅ **P3.2 adelantado** — las fechas de un sprint nuevo salen por defecto a
+  dos semanas (`fechasPorDefecto` en `scrum.ts`). Era una línea.
+- ✅ e2e `e2e/tests/ui/09-scrum.spec.ts`: el recorrido entero en Chromium.
+
+**Trampas que aparecieron:**
+
+- 🔴 **La caché `tasks:board:<id>` solo se borraba por clave exacta**, y ya
+  había una variante con `:col:<id>` que nadie invalidaba. Con los filtros de
+  sprint y backlog habría sido lo mismo tres veces. `RedisService.delByPrefix`
+  (con `SCAN`, no `KEYS`) y los diez sitios de invalidación pasan a usarlo.
+- ⚠️ **Los ids de tarea de las semillas no son UUID** (`task0001-…`). El DTO de
+  resoluciones del cierre los rechazaba con `@IsUUID`; ahora es `IsString`,
+  sin abrir nada (solo cuentan ids que estén en la lista de pendientes).
+- ⚠️ **Matar un servicio arrancado con `pnpm start:backend` tumba los diez**
+  (turbo sale con 137). Para reiniciar uno suelto hay que levantarlos por
+  separado.
+- ⚠️ **Probar desde el móvil con `next dev`** exige `allowedDevOrigins`; se
+  añadió leyendo `DEV_ORIGINS` en `next.config.ts` para no fijar una IP.
+
+### 2026-09-23 — Fases 2 y 3 (misma sesión autónoma)
+
+- ✅ **P2.1** — `Task.estimatePoints` (`20260923063101_add_estimate_points`),
+  editable en el panel de tarea («Estimación (puntos)»; vacío = sin estimar),
+  insignia «5 pt» en la tarjeta y totales en el Backlog.
+- ✅ **P2.2** — Burndown con scope creep y velocidad. ⚠️ **Se calcula en el
+  cliente, no en reports-service** como decía la tabla: la pantalla ya tiene
+  todas las tareas del tablero con `completedAt`, `sprintAssignedAt` y
+  `estimatePoints`, y pedirlas otra vez al servidor era un viaje para nada. La
+  lógica es pura y está aislada en `WorkspaceCanvas/burndown.ts`. Unidad: puntos
+  si alguna tarea del sprint está estimada; si no, tareas. El gráfico lleva
+  leyenda, trazo distinto para «ideal», tooltip por día y tabla alternativa.
+- ✅ **P2.3** — `sprintId` como filtro de Análisis, en la clave de Redis
+  (`claveDeFiltros`) desde el mismo commit. Sin pantalla —Análisis está
+  archivada—: lo usan la API y, a través del briefing, PRAX.
+- ✅ **P3.1** — `BoardColumn.wipLimit` (`20260923063552_add_column_wip_limit`),
+  blando (D13). Menú de columna › «Límite de trabajo en curso»; el contador
+  pasa a «3/5» y a tono de aviso al pasarlo.
+- ✅ **P3.3** — Bloque `scrum` en el briefing (sprint en curso: comprometido y
+  hecho; velocidad media de hasta 3 cerrados), solo en tableros con Scrum, y
+  una regla al final de la lista (para no mover las que se citan por número).
+  `medir-prompt` contra el proyecto de las semillas: 34 312 caracteres por
+  turno; el bloque ocupa ~170 y la regla ~290.
+- ✅ e2e: segundo caso en `09-scrum.spec.ts` (estimación y WIP).
+
+**Un fallo previo que apareció por el camino, y se arregló:**
+
+- 🔴 **Los filtros de Análisis se rechazaban todos en cuatro rutas.** El
+  controlador importaba `type ReportFiltersQueryDto`; con `type`, el
+  `@Query()` queda tipado en runtime como `Function` y el `ValidationPipe`
+  (`forbidNonWhitelisted`) responde 400 «property boardId should not exist» a
+  cualquier filtro en `snapshot` y las otras tres rutas que usan la clase base.
+  Las que usan una subclase (`flow`, con `days`) sí funcionaban, por eso no se
+  notó. Es la trampa 3 de `CLAUDE.md` con otra cara. Import de valor y listo.
+
+**Pendiente de mirar, sin urgencia:** `desde`/`hasta` del bloque `scrum` se
+recortan de la fecha en UTC; en México un sprint que acaba a las 23:59 del 5
+sale como «hasta 6». Un día de desfase en una cifra que PRAX solo nombra.
+
+**Decisión tomada sin preguntar**, anotada para revisarla: mover una tarea
+entre backlog y sprint pide `canEditTask` (es un `PATCH` de la tarea), no
+`canManageSprint`. Planificar qué entra es trabajo del equipo; arrancar y
+cerrar el reloj es de quien lleva el proceso.
