@@ -354,6 +354,21 @@ export function TaskDialog({
                dentro. */
             align="right"
           />
+
+          {/* Puntos sin escala impuesta (D4 de `docs/PLAN-SCRUM-KANBAN.md`):
+              vacío es «sin estimar», que no es lo mismo que 0. */}
+          <FloatingLabelInput
+            id="task-estimate"
+            name="estimatePoints"
+            label="Estimación (puntos)"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={999}
+            step={1}
+            defaultValue={task.estimatePoints ?? ''}
+            disabled={readOnly}
+          />
         </div>
 
         {/**

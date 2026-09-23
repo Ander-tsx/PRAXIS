@@ -21,6 +21,7 @@ import {
   type ProjectDetail,
   type ProjectInvitation,
   type ProjectMember,
+  type Sprint,
   TabNav,
   type Task,
   personLabel,
@@ -391,14 +392,30 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
    * un tablero es mucho mejor que perder el proyecto entero.
    */
   const visibleBoards = activeTab === 'espacios' ? (activeWorkspace?.boards ?? []) : [];
-  const boardTasks = await Promise.all(
-    visibleBoards.map((board) =>
-      api
-        .get<Paginated<Task>>(`/boards/${board.id}/tasks?limit=100`)
-        .then((page) => [board.id, page.items] as const)
-        .catch(() => [board.id, [] as Task[]] as const),
+  /* Los sprints solo de los tableros con Scrum encendido, y en paralelo con las
+     tareas: como ellas, se filtran al pintar —el Kanban de un tablero Scrum
+     enseña solo el sprint activo (D12 de docs/PLAN-SCRUM-KANBAN.md)—. */
+  const [boardTasks, boardSprints] = await Promise.all([
+    Promise.all(
+      visibleBoards.map((board) =>
+        api
+          .get<Paginated<Task>>(`/boards/${board.id}/tasks?limit=100`)
+          .then((page) => [board.id, page.items] as const)
+          .catch(() => [board.id, [] as Task[]] as const),
+      ),
     ),
-  );
+    Promise.all(
+      visibleBoards
+        .filter((board) => board.scrumEnabled)
+        .map((board) =>
+          api
+            .get<Sprint[]>(`/boards/${board.id}/sprints`)
+            .then((sprints) => [board.id, sprints] as const)
+            .catch(() => [board.id, [] as Sprint[]] as const),
+        ),
+    ),
+  ]);
+  const sprintsByBoard = new Map(boardSprints);
   /**
    * «Solo mis tareas».
    *
@@ -607,6 +624,10 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
                ello el vocabulario del proyecto entero. */
             canManageLabels={can.canManageLabels}
             canDeleteTask={can.canDeleteTask}
+            sprintsByBoard={sprintsByBoard}
+            /* Planear, iniciar y cerrar sprints. Encender Scrum en el tablero
+               sigue siendo `canEditBoard` (D1 y D7). */
+            canManageSprint={can.canManageSprint ?? false}
           />
         )}
 

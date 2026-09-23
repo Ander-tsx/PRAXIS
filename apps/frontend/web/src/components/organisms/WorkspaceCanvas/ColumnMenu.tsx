@@ -23,6 +23,8 @@ export interface ColumnMenuProps {
   columnColor: ColumnColor;
   /** Cuántas tareas tiene dentro: decide si el borrado pide confirmación. */
   taskCount: number;
+  /** Límite de trabajo en curso, o `null` sin límite. */
+  wipLimit: number | null;
   /** Renombrar y recolorear: `canEditColumn`. */
   canEdit: boolean;
   /** Eliminar: `canDeleteColumn`. */
@@ -47,7 +49,7 @@ export interface ColumnMenuProps {
 }
 
 /** Vista actual del panel. Una sola cosa a la vez: es un menú, no un formulario. */
-type View = 'menu' | 'color' | 'rename' | 'delete';
+type View = 'menu' | 'color' | 'rename' | 'wip' | 'delete';
 
 /**
  * Menú de una columna: color, renombrar y eliminar.
@@ -71,6 +73,7 @@ export function ColumnMenu({
   columnName,
   columnColor,
   taskCount,
+  wipLimit,
   canEdit,
   canDelete,
   onOpenChange,
@@ -215,6 +218,18 @@ export function ColumnMenu({
                     <PencilIcon />
                     Renombrar
                   </MenuItem>
+                  <MenuItem onClick={() => show('wip')}>
+                    <span
+                      className="w-3.5 shrink-0 text-center font-sans text-[10px] font-semibold"
+                      aria-hidden="true"
+                    >
+                      #
+                    </span>
+                    Límite de trabajo en curso
+                    {wipLimit !== null && (
+                      <span className="ml-auto font-sans text-[10px] text-white">{wipLimit}</span>
+                    )}
+                  </MenuItem>
                 </>
               )}
               {canDelete && (
@@ -356,6 +371,54 @@ export function ColumnMenu({
                 <button
                   type="submit"
                   disabled={updating || !name.trim() || name.trim() === columnName}
+                  className="cursor-pointer rounded-lg px-2.5 py-1.5 font-sans text-xs font-semibold text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{ background: colors.primary }}
+                >
+                  {updating ? 'Guardando…' : 'Guardar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => show('menu')}
+                  className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white transition-colors hover:text-white"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          )}
+
+          {view === 'wip' && (
+            <form action={updateAction} className="flex flex-col gap-2 p-1.5">
+              <input type="hidden" name="boardId" value={boardId} />
+              <input type="hidden" name="columnId" value={columnId} />
+              <input type="hidden" name="projectId" value={projectId} />
+
+              <label
+                htmlFor={`wip-${columnId}`}
+                className="font-sans text-[11px] uppercase tracking-wide text-white"
+              >
+                Máximo de tareas a la vez
+              </label>
+              <input
+                id={`wip-${columnId}`}
+                name="wipLimit"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={999}
+                defaultValue={wipLimit ?? ''}
+                placeholder="Sin límite"
+                className="h-9 rounded-lg border border-white/10 bg-[#191919] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
+              />
+              <span className="font-sans text-[11px] leading-snug text-text-secondary">
+                Pasarlo no bloquea nada: el contador de la columna se pone en aviso. Vacío quita el
+                límite.
+              </span>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="submit"
+                  disabled={updating}
                   className="cursor-pointer rounded-lg px-2.5 py-1.5 font-sans text-xs font-semibold text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ background: colors.primary }}
                 >

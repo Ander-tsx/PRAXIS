@@ -6,6 +6,7 @@ import { BOARD_INITIAL_STATE } from '@/lib/projects/action-state';
 import { BOARD_NAME_MAX, validateBoard } from '@/lib/projects/validation';
 import { useAccion } from '@praxis/commons';
 import type { Board } from '@praxis/commons';
+import { ScrumToggle } from './ScrumToggle';
 
 export interface TableroMenuProps {
   projectId: string;
@@ -45,6 +46,8 @@ export function TableroMenu({ projectId, board, canEdit, canDelete }: TableroMen
       validarNombre={validateBoard}
       canEdit={canEdit}
       canDelete={canDelete}
+      /* Encender Scrum es editar el tablero: el `PATCH` pide `canEditBoard`. */
+      extras={canEdit ? <ScrumToggle projectId={projectId} board={board} /> : undefined}
       exigeEscribirNombre={columnas > 0}
       avisoDeBorrado={
         columnas === 0

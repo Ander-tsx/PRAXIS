@@ -38,7 +38,12 @@ export type ApiErrorCode =
    * `details` trae `QuotaExceededDetails` (`commons/billing/planes`): qué tope,
    * cuánto es y cuánto llevas. Sin eso no se puede ofrecer la salida correcta.
    */
-  | 'QUOTA_EXCEEDED';
+  | 'QUOTA_EXCEEDED'
+  /**
+   * 409 al cerrar un sprint con tareas sin resolver. `details.pending` trae la
+   * lista, para preguntar por cada una (`docs/PLAN-SCRUM-KANBAN.md`, D6).
+   */
+  | 'SPRINT_HAS_PENDING_TASKS';
 
 export interface ApiEnvelopeError {
   success: false;

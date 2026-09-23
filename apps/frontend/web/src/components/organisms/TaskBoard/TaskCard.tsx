@@ -365,6 +365,12 @@ export function TaskCard({
 
         <Chip color={priorityColor}>{PRIORITY_LABELS[task.priority]}</Chip>
 
+        {task.estimatePoints !== null && task.estimatePoints !== undefined && (
+          <Chip color={colors.textSecondary}>
+            <span title="Estimación en puntos">{task.estimatePoints} pt</span>
+          </Chip>
+        )}
+
         {total > 0 && (
           <Chip color={done === total ? colors.success : colors.textSecondary}>
             {done}/{total}

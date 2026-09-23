@@ -1,11 +1,22 @@
 'use client';
 
-export type VistaTablero = 'kanban' | 'calendario' | 'tabla';
+export type VistaTablero = 'kanban' | 'calendario' | 'tabla' | 'backlog' | 'sprint';
 
 export const VISTAS: VistaTablero[] = ['kanban', 'calendario', 'tabla'];
 
+/**
+ * Las dos que añade Scrum (D1 de `docs/PLAN-SCRUM-KANBAN.md`). Van **después**
+ * de las de siempre y solo en un tablero con Scrum: son capa encima del
+ * Kanban, no alternativas a él.
+ */
+export const VISTAS_SCRUM: VistaTablero[] = ['backlog', 'sprint'];
+
 export function esVista(v: string | undefined | null): v is VistaTablero {
-  return v === 'kanban' || v === 'calendario' || v === 'tabla';
+  return v === 'kanban' || v === 'calendario' || v === 'tabla' || v === 'backlog' || v === 'sprint';
+}
+
+export function esVistaScrum(v: VistaTablero): boolean {
+  return VISTAS_SCRUM.includes(v);
 }
 
 const CONFIG: Record<VistaTablero, { etiqueta: string; d: string }> = {
@@ -15,6 +26,8 @@ const CONFIG: Record<VistaTablero, { etiqueta: string; d: string }> = {
     d: 'M4 8h16M8 3v3M16 3v3M5 5h14a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z',
   },
   tabla: { etiqueta: 'Tabla', d: 'M4 6h16M4 12h16M4 18h16M9 6v12' },
+  backlog: { etiqueta: 'Backlog', d: 'M4 6h11M4 12h11M4 18h7M18 5v14m0 0l-3-3m3 3l3-3' },
+  sprint: { etiqueta: 'Sprint', d: 'M12 7v5l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
 };
 
 /**
@@ -27,17 +40,21 @@ const CONFIG: Record<VistaTablero, { etiqueta: string; d: string }> = {
 export function VistaSelector({
   value,
   onChange,
+  scrum = false,
 }: {
   value: VistaTablero;
   onChange: (v: VistaTablero) => void;
+  /** Tablero con Scrum encendido: añade Backlog y Sprint. */
+  scrum?: boolean;
 }) {
+  const vistas = scrum ? [...VISTAS, ...VISTAS_SCRUM] : VISTAS;
   return (
     <div
       role="tablist"
       aria-label="Vista del tablero"
       className="flex shrink-0 items-center gap-0.5 rounded-lg border border-white/10 bg-[#191919] p-0.5"
     >
-      {VISTAS.map((v) => {
+      {vistas.map((v) => {
         const activo = v === value;
         return (
           <button

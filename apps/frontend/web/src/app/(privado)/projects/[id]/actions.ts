@@ -973,12 +973,22 @@ export async function updateColumnAction(
      sería un nombre inválido en vez de «no lo cambies». */
   const rawName = formData.get('name');
   const rawColor = formData.get('color');
+  const rawWip = formData.get('wipLimit');
 
   const name = rawName === null ? null : String(rawName).trim();
   const color = rawColor === null ? null : String(rawColor);
+  /* `undefined` = no se toca; vacío = quitar el límite (`null`). */
+  const wipTexto = rawWip === null ? undefined : String(rawWip).trim();
+  const wipLimit = wipTexto === undefined ? undefined : wipTexto === '' ? null : Number(wipTexto);
 
-  if (name === null && color === null) {
+  if (name === null && color === null && wipLimit === undefined) {
     return { error: 'No hay nada que cambiar.', savedName: null };
+  }
+  if (
+    typeof wipLimit === 'number' &&
+    (!Number.isInteger(wipLimit) || wipLimit < 1 || wipLimit > 999)
+  ) {
+    return { error: 'El límite tiene que ser un número entero entre 1 y 999.', savedName: null };
   }
 
   if (name !== null) {
@@ -994,6 +1004,7 @@ export async function updateColumnAction(
     const saved = await api.patch<Column>(`/boards/${boardId}/columns/${columnId}`, {
       ...(name !== null && { name }),
       ...(color !== null && { color }),
+      ...(wipLimit !== undefined && { wipLimit }),
     });
 
     // Confirmación contra el `data`, no contra el status.
@@ -1087,8 +1098,23 @@ function readTaskFields(formData: FormData) {
   const priority = String(formData.get('priority') ?? '').trim();
   const assigneeIds = formData.getAll('assigneeIds').map(String).filter(Boolean);
   const labelIds = formData.getAll('labelIds').map(String).filter(Boolean);
+  const estimatePoints = readEstimate(formData);
 
-  return { title, description, dueDate, priority, assigneeIds, labelIds };
+  return { title, description, dueDate, priority, assigneeIds, labelIds, estimatePoints };
+}
+
+/**
+ * La estimación, en sus tres formas: sin el campo en el formulario no se toca
+ * (`undefined`), vacío la borra (`null`) y un entero la fija. Un número mal
+ * escrito también se trata como «no tocar»: mejor no guardar que guardar un 0
+ * que nadie escribió.
+ */
+function readEstimate(formData: FormData): number | null | undefined {
+  if (!formData.has('estimatePoints')) return undefined;
+  const raw = String(formData.get('estimatePoints') ?? '').trim();
+  if (raw === '') return null;
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 0 && value <= 999 ? value : undefined;
 }
 
 /**
@@ -1156,13 +1182,15 @@ export async function updateTaskAction(_prev: TaskState, formData: FormData): Pr
 
   const projectId = String(formData.get('projectId') ?? '');
   const taskId = String(formData.get('taskId') ?? '');
-  const { title, description, dueDate, priority, assigneeIds, labelIds } = readTaskFields(formData);
+  const { title, description, dueDate, priority, assigneeIds, labelIds, estimatePoints } =
+    readTaskFields(formData);
 
   const invalid = validateTask(title);
   if (invalid) return { error: invalid, done: null };
 
   try {
     const saved = await api.patch<Task>(`/tasks/${taskId}`, {
+      ...(estimatePoints !== undefined && { estimatePoints }),
       title,
       /* Cadena vacía, no ausencia: es como se borra una descripción. */
       description,

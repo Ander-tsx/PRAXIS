@@ -44,6 +44,12 @@ export interface EntityPanelProps {
   camposOcultos: ReactNode;
   renombrar: EntityAction;
   eliminar: EntityAction;
+  /**
+   * Opciones propias de la entidad, encima de renombrar y eliminar. El tablero
+   * pone aquí su interruptor de Scrum: es configuración del tablero, se usa
+   * poco, y aquí es donde ya se busca lo que se usa poco.
+   */
+  extras?: ReactNode;
   /** Cerrar del todo: lo resuelve quien nos monta, que sabe dónde vivimos. */
   alCerrar: () => void;
 }
@@ -92,6 +98,7 @@ export function EntityPanel({
   camposOcultos,
   renombrar,
   eliminar,
+  extras,
   alCerrar,
 }: EntityPanelProps) {
   const [vista, setVista] = useState<Vista>('menu');
@@ -146,6 +153,7 @@ export function EntityPanel({
     <div className="flex flex-col">
       {vista === 'menu' && (
         <>
+          {extras}
           {canEdit && (
             <ItemDeMenu onClick={() => setVista('renombrar')}>
               <IconoLapiz />

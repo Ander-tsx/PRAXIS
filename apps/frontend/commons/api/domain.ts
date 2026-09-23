@@ -367,6 +367,7 @@ export const PROJECT_PERMISSIONS = [
   'canEditProject',
   'canViewReports',
   'canDeleteProject',
+  'canManageSprint',
 ] as const;
 
 export type ProjectPermission = (typeof PROJECT_PERMISSIONS)[number];
@@ -401,6 +402,7 @@ export const PERMISSION_LABELS: Record<ProjectPermission, string> = {
   canEditProject: 'Renombrar el proyecto y cambiar su descripción',
   canViewReports: 'Ver los reportes y usar el asistente',
   canDeleteProject: 'Eliminar el proyecto',
+  canManageSprint: 'Planear, iniciar y cerrar sprints',
 };
 
 /**
@@ -419,8 +421,8 @@ export type PermissionMap = Partial<Record<ProjectPermission, boolean>>;
  * "editar" y "crear", y sin decirlo el usuario cree que concede menos.
  */
 export const PERMISSION_IMPLIES: Partial<Record<ProjectPermission, ProjectPermission[]>> = {
-  canDeleteBoard: ['canEditBoard', 'canCreateBoard', 'canEditProject'],
-  canEditBoard: ['canCreateBoard', 'canEditProject'],
+  canDeleteBoard: ['canEditBoard', 'canCreateBoard', 'canEditProject', 'canManageSprint'],
+  canEditBoard: ['canCreateBoard', 'canEditProject', 'canManageSprint'],
   canEditProject: ['canViewReports'],
   canManageMembers: ['canViewReports'],
   canManageRoles: ['canManageAutomations', 'canManageIntegrations'],
@@ -491,6 +493,8 @@ export interface Column {
   /** Token del design system, no un hex. Viaja con la columna al reordenar. */
   color: ColumnColor;
   boardId: string;
+  /** Límite de trabajo en curso, blando: se avisa, no se bloquea. `null` = sin límite. */
+  wipLimit: number | null;
 }
 
 export interface Board {
@@ -499,7 +503,43 @@ export interface Board {
   workspaceId: string;
   createdAt: string;
   columns: Column[];
+  /**
+   * Scrum encendido: además de sus columnas (que todo tablero tiene), trabaja
+   * por sprints. Ver `docs/PLAN-SCRUM-KANBAN.md`, D1.
+   */
+  scrumEnabled: boolean;
 }
+
+export type SprintStatus = 'PLANNED' | 'ACTIVE' | 'CLOSED';
+
+/** Un bloque de tiempo de un tablero Scrum. Como mucho uno `ACTIVE` por tablero. */
+export interface Sprint {
+  id: string;
+  boardId: string;
+  name: string;
+  goal: string | null;
+  status: SprintStatus;
+  /** `null` mientras esté `PLANNED`: las fechas se fijan al iniciarlo. */
+  startDate: string | null;
+  endDate: string | null;
+  createdAt: string;
+  closedAt: string | null;
+}
+
+/** Una tarea sin terminar de un sprint, tal como la devuelve `/pending`. */
+export interface PendingSprintTask {
+  id: string;
+  title: string;
+  columnId: string;
+  status: string;
+  priority: Priority;
+}
+
+/**
+ * El 409 de cerrar un sprint con tareas sin resolver. Trae la lista en
+ * `details.pending` (D6: cerrar con pendientes siempre pregunta).
+ */
+export const SPRINT_HAS_PENDING_TASKS_CODE = 'SPRINT_HAS_PENDING_TASKS';
 
 export interface Workspace {
   id: string;
@@ -711,6 +751,12 @@ export interface Task {
   updatedAt: string;
   /** Cuándo entró en una columna de cierre. `null` mientras siga abierta. */
   completedAt: string | null;
+  /** Sprint al que pertenece. `null` = backlog del tablero (o tablero sin Scrum). */
+  sprintId: string | null;
+  /** Cuándo se fijó el `sprintId` actual. Separa alcance original de scope creep. */
+  sprintAssignedAt: string | null;
+  /** Puntos de estimación. `null` = sin estimar, que no es lo mismo que 0. */
+  estimatePoints: number | null;
   assignees: TaskAssignee[];
   checklists: ChecklistItem[];
   labels: TaskLabel[];

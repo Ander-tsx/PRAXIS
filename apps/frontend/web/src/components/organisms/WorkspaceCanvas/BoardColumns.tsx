@@ -531,11 +531,29 @@ export function BoardColumns({
                 />
               </>
             )}
+            {/* Con límite WIP, «3/5»; pasado, en tono de aviso. Es blando (D13
+                de docs/PLAN-SCRUM-KANBAN.md): se dice, no se impide. */}
             <span
               className="rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-white"
-              style={{ background: alpha(colors.border, 60) }}
+              style={{
+                background:
+                  column.wipLimit && deLaColumna.length > column.wipLimit
+                    ? alpha(colors.warning, 25)
+                    : alpha(colors.border, 60),
+                color:
+                  column.wipLimit && deLaColumna.length > column.wipLimit
+                    ? colors.warning
+                    : undefined,
+              }}
+              title={
+                column.wipLimit
+                  ? deLaColumna.length > column.wipLimit
+                    ? `Pasa del límite de ${column.wipLimit} en curso`
+                    : `Límite de ${column.wipLimit} en curso`
+                  : undefined
+              }
             >
-              {deLaColumna.length}
+              {column.wipLimit ? `${deLaColumna.length}/${column.wipLimit}` : deLaColumna.length}
             </span>
             <ColumnMenu
               boardId={board.id}
@@ -544,6 +562,7 @@ export function BoardColumns({
               columnName={column.name}
               columnColor={column.color}
               taskCount={deLaColumna.length}
+              wipLimit={column.wipLimit ?? null}
               canEdit={canEditColumn}
               canDelete={canDeleteColumn}
               onOpenChange={(isOpen) => setMenuOpenColumnId(isOpen ? column.id : null)}

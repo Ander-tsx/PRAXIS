@@ -2,6 +2,7 @@
 
 import {
   type Label,
+  type Sprint,
   type Task,
   type UserProfile,
   type Workspace,
@@ -28,6 +29,8 @@ import { WorkspacePicker } from './WorkspacePicker';
  * servidor lo haya confirmado — justo el parpadeo que veníamos a quitar.
  */
 const SIN_TAREAS: Task[] = [];
+/** Misma razón que `SIN_TAREAS`: un `?? []` en el JSX sería un array nuevo por render. */
+const SIN_SPRINTS: Sprint[] = [];
 
 export interface WorkspaceCanvasProps {
   /**
@@ -92,6 +95,10 @@ export interface WorkspaceCanvasProps {
   canManageLabels: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
+  /** Sprints de los tableros con Scrum encendido del espacio abierto. */
+  sprintsByBoard: Map<string, Sprint[]>;
+  /** Planear, iniciar y cerrar sprints: `canManageSprint`. */
+  canManageSprint: boolean;
 }
 
 /**
@@ -150,6 +157,8 @@ export function WorkspaceCanvas({
   canManageLabels,
   canEditTask,
   canDeleteTask,
+  sprintsByBoard,
+  canManageSprint,
 }: WorkspaceCanvasProps) {
   const router = useRouter();
   const boards = activeWorkspace?.boards ?? [];
@@ -311,7 +320,11 @@ export function WorkspaceCanvas({
      tablero, y comparten sitio encima del lienzo. */
   const controlesDeVista = (
     <>
-      <VistaSelector value={vista} onChange={cambiarVista} />
+      <VistaSelector
+        value={vista}
+        onChange={cambiarVista}
+        scrum={boardActivo?.scrumEnabled ?? false}
+      />
       {filtroMisTareas}
     </>
   );
@@ -404,6 +417,9 @@ export function WorkspaceCanvas({
       canManageLabels={canManageLabels}
       canEditTask={canEditTask}
       canDeleteTask={canDeleteTask}
+      sprints={sprintsByBoard.get(boardActivo.id) ?? SIN_SPRINTS}
+      canManageSprint={canManageSprint}
+      onCambiarVista={cambiarVista}
     />
   );
 }
