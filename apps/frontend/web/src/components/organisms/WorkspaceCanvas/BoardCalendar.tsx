@@ -169,13 +169,17 @@ export function BoardCalendar({
    * se interpreta en UTC; en un huso al oeste de Greenwich, `getFullYear`/
    * `getDate` en horario **local** devuelven el día anterior. Solo se
    * reconstruye la fecha para lo que sí trae hora de verdad (`dueDate`,
-   * `updatedAt`), que vienen en ISO completo del backend.
+   * `completedAt`), que vienen en ISO completo del backend.
    */
   const diaDeTarea = useCallback(
     (t: Task): string | null => {
       if (overrides.has(t.id)) return overrides.get(t.id) ?? null;
       if (t.dueDate) return claveDia(new Date(t.dueDate));
-      if (estaCompletada(t)) return claveDia(new Date(t.updatedAt));
+      if (estaCompletada(t)) {
+        // Una tarea cerrada antes del 2026-07-30 no tiene `completedAt`
+        // (el campo no existía) — se cae a `updatedAt` solo en ese caso.
+        return claveDia(new Date(t.completedAt ?? t.updatedAt));
+      }
       return null;
     },
     [overrides, estaCompletada],
@@ -208,11 +212,10 @@ export function BoardCalendar({
    * hecho esa semana. Si sale de una columna de cierre sin tener vencimiento,
    * vuelve a «sin fecha» — la regla de arriba deja de aplicar.
    *
-   * ⚠️ **No hay `completedAt` en el backend.** Se usa `updatedAt` como el
-   * proxy disponible: es exacto en el caso normal (se completa y no se vuelve
-   * a tocar), pero un cambio posterior —un comentario, reabrir y volver a
-   * cerrar— movería la tarea de día sin que nadie la haya "completado" de
-   * nuevo. Pendiente real en `docs/frontend/PENDIENTES-BACKEND.md`.
+   * Usa `Task.completedAt`, que tasks-service escribe al entrar a una columna
+   * de cierre y limpia si sale de ahí (`docs/frontend/PENDIENTES-BACKEND.md
+   * §27`, resuelto 2026-09-22). Solo cae a `updatedAt` para tareas cerradas
+   * antes de que el campo existiera (2026-07-30).
    */
   const { conFecha, sinFecha } = useMemo(() => {
     const map = new Map<string, Task[]>();

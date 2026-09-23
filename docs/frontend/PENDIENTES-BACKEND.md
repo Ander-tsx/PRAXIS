@@ -12,8 +12,13 @@
 > frontend recibió autorización para tocar `apps/backend/` y los ha ido cerrando;
 > cada punto resuelto lleva el commit y cómo se verificó.
 >
-> Lo que queda no es de esta lista. Hoy es un solo hueco de producto: **no se
-> pueden reordenar tareas dentro de una columna**.
+> ✅ **2026-09-22: revisado contra el código y ya no queda ningún hueco de
+> producto de esta lista.** "No se pueden reordenar tareas dentro de una
+> columna" **ya no es cierto** — `Task.order` existe desde el `init`,
+> `MoveTaskDto` lo acepta y el frontend ya reordena con drag-and-drop
+> (`BoardColumns.tsx`, con renumeración de las tareas intermedias). No hay
+> commit único que lo resuelva porque nunca fue un hueco: la última revisión
+> de este documento (2026-07-29) estaba mal, no el código.
 >
 > **Las subtareas no son un pendiente.** `Task.parentTaskId` y `subtask_create`
 > existen porque venían del modelo original, y **decidimos no exponerlas**: el
@@ -249,13 +254,15 @@ así que la interfaz no los necesita.
 
 ---
 
-## 🟡 6. El nombre de proyecto es único a nivel global
+## ✅ 6. ~~El nombre de proyecto es único a nivel global~~
 
-> El 500 **está resuelto** en `477616f`: se captura el P2002 y sale un 409 con
-> mensaje. Lo mismo para los espacios de trabajo en `fb4a758`.
->
-> **Sigue abierto el problema de diseño que había debajo**, que es lo que ahora
-> da nombre a este punto.
+> **Resuelto.** El 500 lo arregló `477616f` (se captura el P2002 y sale un 409
+> con mensaje; lo mismo para espacios de trabajo en `fb4a758`). El problema de
+> diseño de debajo —que el `@@unique` era global y no por dueño— también está
+> resuelto: el schema declara `@@unique([ownerId, name])` desde la migración
+> `20260730020000_project_name_unique_per_owner`. Esta sección seguía marcada
+> como abierta; era el documento el que estaba desactualizado, no el código.
+> Corregido el 2026-09-22.
 
 **Leído en el código.** `Project.name` es `@unique` **sin más**: no por
 propietario, no por organización. Dos equipos que no se conocen no pueden tener
@@ -1161,28 +1168,19 @@ suscripciones. Sube a naranja el día que alguien pague dos equipos.
 
 ---
 
-## 🟡 27. `Task` no tiene `completedAt`: la vista de calendario usa `updatedAt` como proxy
+## ✅ 27. ~~`Task` no tiene `completedAt`: la vista de calendario usa `updatedAt` como proxy~~
 
-**Leído en el código** · `apps/frontend/commons/api/domain.ts:697`
-
-Una tarea sin `dueDate` que cae en una columna de cierre debería ubicarse en el
-calendario el día en que se completó, no en el panel de «sin fecha» —si no,
-el trabajo hecho esa semana desaparece del calendario en cuanto no tiene
-vencimiento—. No hay ningún campo que diga cuándo entró en esa columna:
-`updatedAt` se actualiza con cualquier escritura sobre la tarea, no solo con
-el cambio de columna.
-
-**Qué hace el frontend mientras tanto.** `BoardCalendar.tsx` usa `updatedAt`
-como proxy para esas tareas. Acierta en el caso normal —se completa y no se
-vuelve a tocar— pero un comentario o una edición posterior después de
-completada la desplaza de día sin que nadie la haya "completado" de nuevo, y
-reabrirla y cerrarla el mismo día la deja en el sitio correcto por
-casualidad, no porque el dato lo diga.
-
-**Qué haría falta.** Un `completedAt` que solo se escriba al entrar en una
-columna de cierre (y se vacíe si sale), igual que ya distingue
-`Project.status` de un campo de auditoría genérico.
-
-**Severidad 🟡**: no rompe nada, solo puede mostrar una fecha de compleción
-aproximada en un calendario de solo lectura.
+> **Resuelto, y ya lo estaba del lado del backend cuando se escribió este
+> punto.** `Task.completedAt` existe desde la migración
+> `20260730182029_historial_de_tareas` (30 de julio), se escribe solo al
+> entrar a una columna de cierre y se limpia si sale (`MoveTaskDto
+> .isClosingColumn`, resuelto por el gateway) — exactamente lo que pedía este
+> punto. Como el `include` de `tasks.service.ts` no usa `select`, el campo ya
+> viajaba en cada respuesta; lo único que faltaba era que el **frontend** lo
+> declarara en su tipo `Task` (`commons/api/domain.ts`) y lo usara.
+>
+> Corregido el 2026-09-22: se añadió `completedAt` al tipo y
+> `BoardCalendar.tsx` ya lo usa, con `updatedAt` como respaldo solo para
+> tareas cerradas antes del 30 de julio (esas nacieron sin el campo y no hay
+> forma de reconstruirlo con retroactividad).
 

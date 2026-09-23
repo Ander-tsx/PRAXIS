@@ -709,6 +709,8 @@ export interface Task {
   order: number;
   createdAt: string;
   updatedAt: string;
+  /** Cuándo entró en una columna de cierre. `null` mientras siga abierta. */
+  completedAt: string | null;
   assignees: TaskAssignee[];
   checklists: ChecklistItem[];
   labels: TaskLabel[];
