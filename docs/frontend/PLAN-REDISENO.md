@@ -71,6 +71,21 @@
 > decisión del dueño (C6, C9/C10, A1, `TODO(A6+)`), así que esta sesión no
 > ejecutó código nuevo — solo esta entrada.
 >
+> **Reverificación del 2026-09-24 (decimoséptima vez).** Mismos tres comandos,
+> misma respuesta: `99b2f6d` sigue siendo ancestro de `main`,
+> `report_column_time` sigue en los dos controladores
+> (`reports-service` y gateway), `billing/src` conserva `organizations/` y
+> `subscriptions/`, y `apps/frontend/reports-front` sigue sin existir. Árbol
+> limpio al empezar, en `feature/scrum-kanban` (no `main`). No se re-ejecutó
+> ni R9 ni Enterprise: la rama activa hoy es
+> [PLAN-SCRUM-KANBAN.md](../PLAN-SCRUM-KANBAN.md), con Documentos encima
+> ([PLAN-DOCUMENTOS.md](../PLAN-DOCUMENTOS.md)), y ninguna de las dos aparece
+> mencionada en el prompt de arranque que sigue llegando. **Esta es la
+> segunda vez que se pide explícitamente escribirlo**: el prompt de arranque
+> debe retirarse o apuntar a la etapa viva real, porque cada repetición gasta
+> la sesión entera en probar un negativo en vez de tocar lo que sí está
+> abierto.
+>
 > **Reverificación del 2026-09-18 (duodécima vez).** Mismo resultado, mismos
 > tres comandos (`99b2f6d` sigue siendo ancestro de `main`,
 > `report_column_time` en los dos controladores, `billing/src` con
