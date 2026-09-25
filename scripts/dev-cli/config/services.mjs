@@ -154,6 +154,18 @@ export const BACKEND_SERVICES = [
     color: 36,
     descripcion: 'Planes, organizaciones y cuotas',
   },
+  {
+    key: 'collab',
+    pkg: '@praxis/collab-service',
+    dir: 'apps/backend/services/collab',
+    port: 3010,
+    /* WebSocket y no TCP: el navegador conecta directo (docs/PLAN-DOCUMENTOS.md, E3). */
+    protocolo: 'WS',
+    prisma: false,
+    seedOrder: null,
+    color: 33,
+    descripcion: 'Tiempo real de los documentos',
+  },
 ];
 
 /**
