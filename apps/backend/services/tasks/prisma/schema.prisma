@@ -27,6 +27,7 @@ model Task {
   labels       TaskLabel[]
   comments     TaskComment[]
   attachments  TaskAttachment[]
+  documents    TaskDocument[]
   dueDate      DateTime?
   priority     Priority       @default(MEDIUM)
   order        Int            @default(0)
@@ -326,3 +327,21 @@ enum Priority {
   
   @@schema("tasks")
 }
+
+/// Un documento del proyecto vinculado a una tarea (E9 de
+/// `docs/PLAN-DOCUMENTOS.md`). Sin clave foránea al documento: vive en
+/// projects-service. Si se borra, el vínculo queda y el gateway lo omite al
+/// componer — mejor que una tarjeta que apunta a la nada.
+model TaskDocument {
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  documentId String
+  linkedBy   String
+  createdAt  DateTime @default(now())
+
+  @@id([taskId, documentId])
+  @@index([documentId])
+  @@schema("tasks")
+  @@map("task_documents")
+}
+

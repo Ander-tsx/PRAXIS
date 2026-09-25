@@ -155,6 +155,27 @@ export class TasksController {
     return this.tasksService.sprintMetricRows(dto.sprintIds ?? []);
   }
 
+  // ─── Documentos vinculados (E9 de `docs/PLAN-DOCUMENTOS.md`) ──────────────
+
+  @MessagePattern({ cmd: 'task_documents' })
+  taskDocuments(@Payload() dto: { taskId: string; projectId: string }) {
+    return this.tasksService.taskDocuments(dto.taskId, dto.projectId);
+  }
+
+  @MessagePattern({ cmd: 'task_document_link' })
+  linkDocument(
+    @Payload() dto: { taskId: string; projectId: string; documentId: string; requesterId: string },
+  ) {
+    return this.tasksService.linkDocument(dto);
+  }
+
+  @MessagePattern({ cmd: 'task_document_unlink' })
+  unlinkDocument(
+    @Payload() dto: { taskId: string; projectId: string; documentId: string; requesterId: string },
+  ) {
+    return this.tasksService.unlinkDocument(dto);
+  }
+
   // ─── Etiquetas ────────────────────────────────────────────────────────────
 
   @MessagePattern({ cmd: 'label_find_all' })

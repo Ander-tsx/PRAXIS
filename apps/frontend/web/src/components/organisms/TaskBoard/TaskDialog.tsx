@@ -23,6 +23,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { GestorDeEtiquetas } from './GestorDeEtiquetas';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
+import { TaskDocuments } from './TaskDocuments';
 import { TaskNotes } from './TaskNotes';
 import { SECTION_PANEL } from './section-panel';
 
@@ -502,15 +503,38 @@ export function TaskDialog({
         canEdit={canEdit}
         canToggle={canToggleChecklist}
       />
-      <TaskAttachments
-        projectId={projectId}
-        taskId={task.id}
-        attachments={task.attachments}
-        usersById={usersById}
-        currentUserId={currentUserId}
-        canUpload={canEdit}
-        canModerate={canDelete}
-      />
+      {/* Los documentos del proyecto son la forma principal de dar contexto a
+          una tarea (E9 de `docs/PLAN-DOCUMENTOS.md`); los PDF siguen, plegados
+          mientras no haya ninguno. */}
+      <TaskDocuments projectId={projectId} taskId={task.id} canEdit={canEdit} />
+      {task.attachments.length > 0 ? (
+        <TaskAttachments
+          projectId={projectId}
+          taskId={task.id}
+          attachments={task.attachments}
+          usersById={usersById}
+          currentUserId={currentUserId}
+          canUpload={canEdit}
+          canModerate={canDelete}
+        />
+      ) : (
+        canEdit && (
+          <details className="group mt-4">
+            <summary className="w-fit cursor-pointer list-none font-sans text-xs text-text-secondary hover:text-text-primary">
+              Adjuntar un PDF
+            </summary>
+            <TaskAttachments
+              projectId={projectId}
+              taskId={task.id}
+              attachments={task.attachments}
+              usersById={usersById}
+              currentUserId={currentUserId}
+              canUpload={canEdit}
+              canModerate={canDelete}
+            />
+          </details>
+        )
+      )}
       {/**
        * Las notas, **al final y fuera del formulario**, por lo mismo que las
        * dos secciones de arriba: cada una tiene su propia acción de servidor y

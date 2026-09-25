@@ -777,6 +777,52 @@ export class TasksService {
     });
   }
 
+  /* ─── Documentos vinculados (E9 de `docs/PLAN-DOCUMENTOS.md`) ────────── */
+
+  async taskDocuments(taskId: string, projectId: string) {
+    await this.loadTaskInProject(taskId, projectId);
+    return this.prisma.taskDocument.findMany({
+      where: { taskId },
+      orderBy: { createdAt: 'asc' },
+      select: { documentId: true, linkedBy: true, createdAt: true },
+    });
+  }
+
+  /**
+   * Vincula un documento. Que sea **del mismo proyecto** lo comprueba el
+   * gateway, que es quien habla con projects-service; aquí la tarea y el permiso.
+   */
+  async linkDocument(dto: {
+    taskId: string;
+    projectId: string;
+    documentId: string;
+    requesterId: string;
+  }) {
+    await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
+    await this.loadTaskInProject(dto.taskId, dto.projectId);
+    await this.prisma.taskDocument.upsert({
+      where: { taskId_documentId: { taskId: dto.taskId, documentId: dto.documentId } },
+      create: { taskId: dto.taskId, documentId: dto.documentId, linkedBy: dto.requesterId },
+      update: {},
+    });
+    await this.redis.del(`task:${dto.taskId}`);
+    return this.taskDocuments(dto.taskId, dto.projectId);
+  }
+
+  async unlinkDocument(dto: {
+    taskId: string;
+    projectId: string;
+    documentId: string;
+    requesterId: string;
+  }) {
+    await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
+    await this.loadTaskInProject(dto.taskId, dto.projectId);
+    await this.prisma.taskDocument.deleteMany({
+      where: { taskId: dto.taskId, documentId: dto.documentId },
+    });
+    return this.taskDocuments(dto.taskId, dto.projectId);
+  }
+
   /**
    * Tareas asignadas a una persona, dentro de los proyectos donde sigue estando.
    *

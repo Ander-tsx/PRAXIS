@@ -45,6 +45,11 @@ export class DocumentsController {
     return this.documents.meta(dto.id, dto.email);
   }
 
+  @MessagePattern({ cmd: 'document_meta_many' })
+  metaDeVarios(@Payload() dto: { ids: string[] }) {
+    return this.documents.metaDeVarios(dto.ids ?? []);
+  }
+
   @MessagePattern({ cmd: 'document_collab_load' })
   collabLoad(@Payload() dto: { id: string }) {
     return this.documents.collabLoad(dto.id);

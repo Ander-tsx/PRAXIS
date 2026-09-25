@@ -123,3 +123,9 @@ export class CreateTaskDto extends CreateTaskBodyDto {
   @IsUUID('4')
   projectId: string;
 }
+
+/** Cuerpo de `POST /tasks/:taskId/documents` (E9 de `docs/PLAN-DOCUMENTOS.md`). */
+export class LinkTaskDocumentBodyDto {
+  @IsUUID('4')
+  documentId: string;
+}

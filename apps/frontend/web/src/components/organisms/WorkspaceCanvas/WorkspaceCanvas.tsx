@@ -192,6 +192,14 @@ export function WorkspaceCanvas({
   const documentoActivo = deDocumentos
     ? (documentos.find((d) => d.id === documentoActivoId) ?? documentos[0] ?? null)
     : null;
+  /* La URL manda cuando cambia desde fuera: un enlace de la barra lateral o
+     «Crear y abrir» desde una tarea navegan a `?doc=` sin desmontar esto, y el
+     estado inicial ya no se vuelve a leer. */
+  const [docDeLaUrl, setDocDeLaUrl] = useState(documentoInicial ?? null);
+  if ((documentoInicial ?? null) !== docDeLaUrl) {
+    setDocDeLaUrl(documentoInicial ?? null);
+    if (documentoInicial) setDocumentoActivoId(documentoInicial);
+  }
   const abrirDocumento = useCallback((id: string) => setDocumentoActivoId(id), []);
   const cerrarDocumento = useCallback(() => setDocumentoActivoId(null), []);
   function elegirTablero(id: string) {

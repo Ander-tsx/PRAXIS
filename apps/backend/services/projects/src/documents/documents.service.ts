@@ -133,6 +133,22 @@ export class DocumentsService {
     };
   }
 
+  /** Título y sitio de unos documentos: el gateway compone los de una tarea (E9). */
+  async metaDeVarios(ids: string[]) {
+    if (ids.length === 0) return [];
+    const documentos = await this.prisma.document.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        title: true,
+        workspaceId: true,
+        updatedAt: true,
+        workspace: { select: { projectId: true } },
+      },
+    });
+    return documentos.map(({ workspace, ...d }) => ({ ...d, projectId: workspace.projectId }));
+  }
+
   /* ─── Tiempo real (lo llama collab-service) ────────────────────────────── */
 
   /** El estado para abrir el documento: Yjs si ya lo tiene, o su Markdown. */
