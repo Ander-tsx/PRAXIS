@@ -11,7 +11,9 @@ import {
   type Board,
   Button,
   Dialog,
+  FloatingLabelInput,
   type PendingSprintTask,
+  SelectorDeFecha,
   type Sprint,
   type SprintMetrics,
   type Task,
@@ -38,19 +40,6 @@ import {
  * Van en tono cálido (`tone="dark"`): son la paleta de la aplicación, no la
  * azulada de antes.
  */
-
-const CAMPO =
-  'w-full rounded-lg border border-border bg-background px-3 py-2 font-sans text-sm text-text-primary outline-none transition-colors focus:border-primary [color-scheme:dark]';
-
-function Campo({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
-  return (
-    // biome-ignore lint/a11y/noLabelWithoutControl: el control llega en `children`, dentro de la etiqueta
-    <label className="flex flex-col gap-1.5 font-sans text-xs font-medium text-text-secondary">
-      {etiqueta}
-      {children}
-    </label>
-  );
-}
 
 /** Cierra el diálogo en cuanto la acción confirma, una sola vez por confirmación. */
 function useAlConfirmar(done: string | null, onHecho: () => void) {
@@ -138,39 +127,30 @@ export function FormularioDeSprint({
               ` — el equipo suele terminar ${conUnidad(velocidadMedia, unidad)}.`}
           </p>
         )}
-        <Campo etiqueta="Nombre">
-          <input
-            name="name"
-            required
-            minLength={2}
-            maxLength={100}
-            defaultValue={sprint.name}
-            className={CAMPO}
-          />
-        </Campo>
-        <Campo etiqueta="Meta">
-          <input
-            name="goal"
-            maxLength={500}
-            defaultValue={sprint.goal ?? ''}
-            placeholder="Qué tiene que estar hecho al final"
-            className={CAMPO}
-          />
-        </Campo>
+        <FloatingLabelInput
+          id="sprint-empezar-nombre"
+          name="name"
+          label="Nombre"
+          defaultValue={sprint.name}
+          required
+          minLength={2}
+          maxLength={100}
+        />
+        <FloatingLabelInput
+          id="sprint-empezar-meta"
+          name="goal"
+          label="Meta"
+          defaultValue={sprint.goal ?? ''}
+          maxLength={500}
+        />
         <div className="grid grid-cols-2 gap-3">
-          <Campo etiqueta="Empieza">
-            <input
-              type="date"
-              name="startDate"
-              required
-              defaultValue={inicio}
-              disabled={enCurso}
-              className={`${CAMPO} disabled:opacity-50`}
-            />
-          </Campo>
-          <Campo etiqueta="Termina">
-            <input type="date" name="endDate" required defaultValue={fin} className={CAMPO} />
-          </Campo>
+          <SelectorDeFecha
+            name="startDate"
+            label="Empieza"
+            defaultValue={inicio}
+            disabled={enCurso}
+          />
+          <SelectorDeFecha name="endDate" label="Termina" defaultValue={fin} align="right" />
         </div>
         {estado.error && (
           <p role="alert" className="font-sans text-xs text-error">
@@ -324,14 +304,13 @@ export function CerrarSprintDialog({
                   en la que estaban.
                 </p>
               ) : (
-                <Campo etiqueta="Siguiente sprint">
-                  <input
-                    value={nombre}
-                    onChange={(e) => setNombre(e.target.value)}
-                    maxLength={100}
-                    className={CAMPO}
-                  />
-                </Campo>
+                <FloatingLabelInput
+                  id="sprint-siguiente"
+                  label="Siguiente sprint"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  maxLength={100}
+                />
               ))}
           </section>
         )}

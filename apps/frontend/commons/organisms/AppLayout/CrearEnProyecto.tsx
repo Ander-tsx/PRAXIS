@@ -6,6 +6,8 @@ import { type FormEvent, type ReactNode, useState } from 'react';
 import { createApiClient } from '../../api/client';
 import { ApiError } from '../../api/envelope';
 import { Button } from '../../atoms/Button';
+import { FloatingLabelInput } from '../../atoms/FloatingLabelInput';
+import { Select } from '../../atoms/Select';
 import { Dialog } from '../../molecules/Dialog';
 
 export type TipoDeEspacio = 'BOARDS' | 'DOCUMENTS';
@@ -132,7 +134,7 @@ export function CrearEnProyecto({
   return (
     <Dialog tone="dark" open={abierto} onClose={onCerrar} title={`Nuevo en ${proyecto.name}`}>
       <form onSubmit={alEnviar} className="flex flex-col gap-5">
-        <div role="radiogroup" aria-label="Qué crear" className="grid grid-cols-3 gap-2">
+        <div aria-label="Qué crear" className="grid grid-cols-3 gap-2">
           <Opcion
             activa={que === 'documento'}
             onClick={() => setQue('documento')}
@@ -156,17 +158,13 @@ export function CrearEnProyecto({
           </Opcion>
         </div>
 
-        <Campo etiqueta={que === 'documento' ? 'Título' : 'Nombre'}>
-          <input
-            key={que}
-            name="nombre"
-            maxLength={que === 'documento' ? 200 : 100}
-            placeholder={
-              que === 'documento' ? 'Sin título' : que === 'tablero' ? 'Producto' : 'Diseño'
-            }
-            className={CAMPO}
-          />
-        </Campo>
+        <FloatingLabelInput
+          key={que}
+          id="crear-nombre"
+          name="nombre"
+          label={que === 'documento' ? 'Título' : 'Nombre'}
+          maxLength={que === 'documento' ? 200 : 100}
+        />
 
         {que === 'espacio' && (
           <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
@@ -204,35 +202,34 @@ export function CrearEnProyecto({
         )}
 
         {que !== 'espacio' && (
-          <Campo etiqueta="Espacio">
+          <div className="flex flex-col gap-3">
             {candidatos.length > 0 && (
-              <select
+              <Select
+                label="Espacio"
                 value={espacioNuevo ? '__nuevo__' : (elegido?.id ?? '')}
-                onChange={(e) => {
-                  setEspacioNuevo(e.target.value === '__nuevo__');
-                  if (e.target.value !== '__nuevo__') setEspacioId(e.target.value);
+                onValueChange={(valor) => {
+                  setEspacioNuevo(valor === '__nuevo__');
+                  if (valor !== '__nuevo__') setEspacioId(valor);
                 }}
-                className={CAMPO}
-              >
-                {candidatos.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name}
-                  </option>
-                ))}
-                <option value="__nuevo__">
-                  Nuevo espacio de {que === 'documento' ? 'documentos' : 'tableros'}…
-                </option>
-              </select>
-            )}
-            {creaEspacio && (
-              <input
-                name="nombreEspacio"
-                maxLength={100}
-                placeholder={que === 'documento' ? 'Documentación' : 'Tableros'}
-                className={`${CAMPO} ${candidatos.length > 0 ? 'mt-2' : ''}`}
+                options={[
+                  ...candidatos.map((e) => ({ value: e.id, label: e.name })),
+                  {
+                    value: '__nuevo__',
+                    label: `Nuevo espacio de ${que === 'documento' ? 'documentos' : 'tableros'}…`,
+                  },
+                ]}
               />
             )}
-          </Campo>
+            {creaEspacio && (
+              <FloatingLabelInput
+                id="crear-espacio"
+                name="nombreEspacio"
+                label={candidatos.length > 0 ? 'Nombre del espacio nuevo' : 'Espacio'}
+                placeholder={que === 'documento' ? 'Documentación' : 'Tableros'}
+                maxLength={100}
+              />
+            )}
+          </div>
         )}
 
         {error && (
@@ -254,19 +251,6 @@ export function CrearEnProyecto({
   );
 }
 
-const CAMPO =
-  'w-full rounded-lg border border-border bg-background px-3 py-2 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary focus:border-primary [color-scheme:dark]';
-
-function Campo({ etiqueta, children }: { etiqueta: string; children: ReactNode }) {
-  return (
-    // biome-ignore lint/a11y/noLabelWithoutControl: el control llega en `children`, dentro de la etiqueta
-    <label className="flex flex-col gap-1.5 font-sans text-xs text-text-secondary">
-      {etiqueta}
-      {children}
-    </label>
-  );
-}
-
 function Opcion({
   activa,
   onClick,
@@ -279,11 +263,9 @@ function Opcion({
   children: ReactNode;
 }) {
   return (
-    // biome-ignore lint/a11y/useSemanticElements: un radio nativo no se deja pintar como tarjeta con icono sin perder el foco visible
     <button
       type="button"
-      role="radio"
-      aria-checked={activa}
+      aria-pressed={activa}
       onClick={onClick}
       className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border px-3 py-3 font-sans text-xs transition-colors [&_svg]:h-5 [&_svg]:w-5 ${
         activa

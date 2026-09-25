@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useRef, useSyncExternalStore } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { alpha, colors } from '../../tokens';
 
 export interface SlideOverProps {
@@ -74,6 +74,22 @@ const pila: { id: symbol; etiqueta?: string }[] = [];
 const oyentes = new Set<() => void>();
 let version = 0;
 
+/** Cuándo se cerró el último panel: si otro se abre en el mismo instante, es un relevo. */
+let ultimoCierre = 0;
+
+/**
+ * ¿Este cambio de un panel es un **relevo** —otro panel ocupa o deja el sitio a
+ * la vez— y no una apertura o un cierre de verdad?
+ *
+ * En un relevo no se anima nada: si uno se desliza hacia fuera mientras el otro
+ * entra, durante 300 ms se ven los dos a medias y, entre ellos, el fondo de la
+ * página —el «fondo negro raro»—. El relevo es instantáneo, como cambiar de
+ * pestaña; deslizar queda para abrir desde nada o cerrar del todo.
+ */
+function esRelevo(id: symbol): boolean {
+  return pila.some((p) => p.id !== id) || performance.now() - ultimoCierre < 120;
+}
+
 function avisarPila() {
   version += 1;
   for (const oyente of oyentes) oyente();
@@ -124,7 +140,7 @@ export function SlideOver({
   const visible = open && (posicion === -1 || esCima);
   const debajo = esCima && posicion > 0 ? pila[posicion - 1] : null;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const isDesktop = window.matchMedia('(min-width: 640px)').matches;
     const id = idDelHueco.current;
     if (open && isDesktop) {
@@ -155,9 +171,6 @@ export function SlideOver({
       onClose();
     };
 
-    pila.push({ id, etiqueta: etiquetaDeVuelta });
-    avisarPila();
-
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       if (!esLaDeEncima()) return;
@@ -174,11 +187,52 @@ export function SlideOver({
       clearTimeout(timeoutId);
       document.removeEventListener('click', handleGlobalClick);
       document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, onClose, closeOnOutsideClick]);
+
+  /**
+   * Entrar y salir de la pila, **solo cuando cambia `open`**. Estaba en el
+   * efecto de los oyentes, que depende de `onClose`: si esa función cambiaba de
+   * identidad, el panel salía y volvía a entrar —arriba del todo—, tapando al
+   * que de verdad estaba encima. Y en layout, para que el relevo (abajo) vea la
+   * pila ya actualizada antes de pintar.
+   */
+  const etiqueta = useRef(etiquetaDeVuelta);
+  etiqueta.current = etiquetaDeVuelta;
+  useLayoutEffect(() => {
+    if (!open) return;
+    const id = idDelHueco.current;
+    pila.push({ id, etiqueta: etiqueta.current });
+    avisarPila();
+    return () => {
       const indice = pila.findIndex((p) => p.id === id);
       if (indice !== -1) pila.splice(indice, 1);
+      ultimoCierre = performance.now();
       avisarPila();
     };
-  }, [open, onClose, closeOnOutsideClick, etiquetaDeVuelta]);
+  }, [open]);
+
+  /* Relevo: sin transición en el panel ni en el hueco del `body`. Se decide en
+     una microtarea —después de todos los efectos de layout del mismo commit,
+     antes de pintar— para ver la pila con los dos paneles ya colocados. */
+  const visiblePrevio = useRef(visible);
+  useLayoutEffect(() => {
+    if (visiblePrevio.current === visible) return;
+    visiblePrevio.current = visible;
+    const id = idDelHueco.current;
+    queueMicrotask(() => {
+      const el = panelRef.current;
+      if (!el || !esRelevo(id)) return;
+      el.style.transition = 'none';
+      document.body.style.transition = 'none';
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          el.style.transition = '';
+          document.body.style.transition = 'padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+        }),
+      );
+    });
+  }, [visible]);
 
   return (
     <>

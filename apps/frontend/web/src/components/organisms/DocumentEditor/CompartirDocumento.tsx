@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Dialog } from '@praxis/commons';
+import { Button, Dialog, FloatingLabelInput, Select } from '@praxis/commons';
 import { Check, Copy, Globe, Lock, Share2, X } from 'lucide-react';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { rutaDeDocumento } from './contexto';
@@ -143,23 +143,27 @@ export function CompartirDocumento({ documentId }: { documentId: string }) {
           <p className="font-sans text-sm text-text-secondary">{error ?? 'Cargando…'}</p>
         ) : (
           <div className="flex flex-col gap-6">
-            <form onSubmit={invitar} className="flex gap-2">
-              <input
-                name="email"
-                type="email"
-                required
-                placeholder="Correo de la persona"
-                className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 font-sans text-sm text-text-primary outline-none placeholder:text-text-secondary focus:border-primary"
-              />
-              <select
-                name="role"
-                defaultValue="READ"
-                className="h-9 rounded-lg border border-border bg-background px-2 font-sans text-sm text-text-primary outline-none [color-scheme:dark]"
-              >
-                <option value="READ">Lector</option>
-                <option value="EDIT">Editor</option>
-              </select>
-              <Button type="submit" size="sm" isLoading={ocupado}>
+            <form onSubmit={invitar} className="flex items-end gap-2">
+              <div className="min-w-0 flex-1">
+                <FloatingLabelInput
+                  id="compartir-correo"
+                  name="email"
+                  type="email"
+                  label="Correo de la persona"
+                  required
+                />
+              </div>
+              <div className="w-32">
+                <Select
+                  name="role"
+                  defaultValue="READ"
+                  options={[
+                    { value: 'READ', label: 'Lector' },
+                    { value: 'EDIT', label: 'Editor' },
+                  ]}
+                />
+              </div>
+              <Button type="submit" isLoading={ocupado}>
                 Invitar
               </Button>
             </form>

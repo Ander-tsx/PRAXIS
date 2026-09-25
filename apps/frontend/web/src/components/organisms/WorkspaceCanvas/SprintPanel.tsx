@@ -5,6 +5,9 @@ import { SPRINT_INITIAL_STATE } from '@/lib/projects/action-state';
 import {
   type Board,
   Button,
+  FloatingLabelInput,
+  FloatingLabelTextarea,
+  SelectorDeFecha,
   SlideOver,
   type Sprint,
   type SprintMetrics,
@@ -76,7 +79,9 @@ export function SprintPanel({
     <SlideOver
       open={abierto}
       onClose={onCerrar}
-      size="lg"
+      /* El ancho del panel de tarea: las fechas largas caben en una línea y
+         pasar de uno a otro no mueve el tablero. */
+      size="xl"
       tone="dark"
       ariaLabel="Sprint"
       etiquetaDeVuelta={sprint.name}
@@ -138,9 +143,6 @@ function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) 
   );
 }
 
-const CAMPO =
-  'w-full rounded-lg border border-border bg-background px-3 py-2 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary focus:border-primary [color-scheme:dark] disabled:opacity-50';
-
 /**
  * Nombre, meta y fechas. Formulario **de edición**: `onSubmit` con el
  * `FormData` a mano, nunca `action=`, o React lo resetea al guardar
@@ -190,45 +192,33 @@ function Datos({
   }
 
   return (
-    <form onSubmit={alEnviar} className="flex flex-col gap-3">
-      <label className="flex flex-col gap-1.5 font-sans text-xs text-text-secondary">
-        Nombre
-        <input
-          name="name"
-          required
-          minLength={2}
-          maxLength={100}
-          defaultValue={sprint.name}
-          className={CAMPO}
-        />
-      </label>
-      <label className="flex flex-col gap-1.5 font-sans text-xs text-text-secondary">
-        Meta
-        <textarea
-          name="goal"
-          rows={2}
-          maxLength={500}
-          defaultValue={sprint.goal ?? ''}
-          placeholder="Qué tiene que estar hecho al final"
-          className={`${CAMPO} resize-none`}
-        />
-      </label>
+    <form onSubmit={alEnviar} className="flex flex-col gap-4">
+      <FloatingLabelInput
+        id="sprint-nombre"
+        name="name"
+        label="Nombre"
+        defaultValue={sprint.name}
+        required
+        minLength={2}
+        maxLength={100}
+      />
+      <FloatingLabelTextarea
+        id="sprint-meta"
+        name="goal"
+        label="Meta"
+        defaultValue={sprint.goal ?? ''}
+        rows={2}
+        maxLength={500}
+      />
       {(inicio || fin) && (
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1.5 font-sans text-xs text-text-secondary">
-            Empieza
-            <input
-              type="date"
-              name="startDate"
-              defaultValue={inicio ?? ''}
-              disabled={enCurso}
-              className={CAMPO}
-            />
-          </label>
-          <label className="flex flex-col gap-1.5 font-sans text-xs text-text-secondary">
-            Termina
-            <input type="date" name="endDate" defaultValue={fin ?? ''} className={CAMPO} />
-          </label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SelectorDeFecha
+            name="startDate"
+            label="Empieza"
+            defaultValue={inicio ?? ''}
+            disabled={enCurso}
+          />
+          <SelectorDeFecha name="endDate" label="Termina" defaultValue={fin ?? ''} align="right" />
         </div>
       )}
       {estado.error && (
