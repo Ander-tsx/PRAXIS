@@ -78,7 +78,8 @@ export class SharedDocumentsController {
     config: ConfigService,
   ) {
     this.appUrl = config.get<string>('PUBLIC_APP_URL') || 'http://localhost:4100';
-    this.collabUrl = config.get<string>('COLLAB_PUBLIC_URL') || 'ws://localhost:3010';
+    /* Por el propio gateway (`collab-proxy.ts`), igual que en producción. */
+    this.collabUrl = config.get<string>('COLLAB_PUBLIC_URL') || 'ws://localhost:3000/api/collab';
   }
 
   @Get()
