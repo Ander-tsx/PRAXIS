@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { jsonAMarkdown, markdownAJson, reconocerProveedor } from './index';
+import { jsonAMarkdown, markdownAJson, reconocerProveedor } from './index.js';
 
 /**
  * El Markdown es la copia legible del documento (E2 de

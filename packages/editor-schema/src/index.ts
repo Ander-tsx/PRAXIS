@@ -4,11 +4,11 @@ import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { TableKit } from '@tiptap/extension-table';
 import { MarkdownManager } from '@tiptap/markdown';
 import StarterKit from '@tiptap/starter-kit';
-import { Callout, ImagenDeDocumento, LinkCard } from './nodos';
+import { Callout, ImagenDeDocumento, LinkCard } from './nodos.js';
 
-export { Callout, ImagenDeDocumento, LinkCard } from './nodos';
-export type { ModoDeEnlace, VarianteDeAviso } from './nodos';
-export { reconocerProveedor, type Proveedor } from './proveedores';
+export { Callout, ImagenDeDocumento, LinkCard } from './nodos.js';
+export type { ModoDeEnlace, VarianteDeAviso } from './nodos.js';
+export { reconocerProveedor, type Proveedor } from './proveedores.js';
 
 /**
  * El campo del documento Yjs donde vive el contenido. El editor

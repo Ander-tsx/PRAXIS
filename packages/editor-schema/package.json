@@ -22,5 +22,12 @@
   "devDependencies": {
     "typescript": "^7.0.2",
     "vitest": "^3.0.0"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   }
 }

@@ -44,7 +44,9 @@ export const Callout = Node.create({
     level: 'block',
     start: (src: string) => src.search(/^> \[!/m),
     tokenize(src, _tokens, lexer) {
-      const m = src.match(/^> \[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*\n((?:>[^\n]*(?:\n|$))*)/i);
+      const m = src.match(
+        /^> \[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*\n((?:>[^\n]*(?:\n|$))*)/i,
+      );
       if (!m) return undefined;
       const dentro = m[2]
         .split('\n')
@@ -126,7 +128,11 @@ export const LinkCard = Node.create({
     return [
       'div',
       { 'data-link-card': '', 'data-url': node.attrs.url, 'data-display': node.attrs.display },
-      ['a', { href: node.attrs.url, rel: 'noopener noreferrer' }, node.attrs.title ?? node.attrs.url],
+      [
+        'a',
+        { href: node.attrs.url, rel: 'noopener noreferrer' },
+        node.attrs.title ?? node.attrs.url,
+      ],
     ];
   },
 

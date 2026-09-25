@@ -66,12 +66,10 @@ export async function createDocumentAction(
 }
 
 /**
- * Guarda título y contenido **si nadie lo cambió desde que se abrió** (D4).
- *
- * El 409 no es un error más: vuelve con `conflicto: true` para que la pantalla
- * conserve lo escrito y ofrezca copiarlo antes de recargar.
+ * Renombra un documento. **Solo el título**: el contenido se escribe en vivo,
+ * por el tiempo real (E4 de `docs/PLAN-DOCUMENTOS.md`).
  */
-export async function saveDocumentAction(
+export async function renameDocumentAction(
   _prev: DocumentState,
   formData: FormData,
 ): Promise<DocumentState> {
@@ -81,13 +79,7 @@ export async function saveDocumentAction(
   const projectId = String(formData.get('projectId') ?? '');
   const workspaceId = String(formData.get('workspaceId') ?? '');
   const documentId = String(formData.get('documentId') ?? '');
-  const title = String(formData.get('title') ?? '').trim();
-  /* `multipart/form-data` normaliza los saltos de línea a CRLF por norma, y un
-     `\r` al final de `## Título` basta para que el Markdown no lo reconozca. */
-  const content = String(formData.get('content') ?? '').replace(/\r\n?/g, '\n');
-  const expectedUpdatedAt = String(formData.get('expectedUpdatedAt') ?? '');
-
-  if (!title) return { error: 'El documento necesita un título.', done: null, conflicto: false };
+  const title = String(formData.get('title') ?? '').trim() || 'Sin título';
   if (title.length > MAX_TITULO) {
     return {
       error: `El título no puede pasar de ${MAX_TITULO} caracteres.`,
@@ -99,28 +91,21 @@ export async function saveDocumentAction(
   try {
     const doc = await api.patch<ProjectDocument>(
       `/workspaces/${workspaceId}/documents/${documentId}`,
-      {
-        title,
-        content,
-        expectedUpdatedAt,
-      },
+      { title },
     );
-    if (doc?.content !== content) {
-      return { error: 'El servidor no guardó el documento.', done: null, conflicto: false };
+    if (doc?.title !== title) {
+      return { error: 'El servidor no guardó el título.', done: null, conflicto: false };
     }
   } catch (error) {
-    if (error instanceof ApiError && error.code === DOCUMENT_CHANGED_CODE) {
-      return { error: error.message, done: null, conflicto: true };
-    }
     return {
-      error: describe(error, 'No se pudo guardar el documento.'),
+      error: describe(error, 'No se pudo renombrar el documento.'),
       done: null,
       conflicto: false,
     };
   }
 
   revalidatePath(`/projects/${projectId}`);
-  return { error: null, done: 'saved', conflicto: false };
+  return { error: null, done: title, conflicto: false };
 }
 
 export async function deleteDocumentAction(
