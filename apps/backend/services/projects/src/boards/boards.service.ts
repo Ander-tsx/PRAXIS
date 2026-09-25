@@ -18,6 +18,12 @@ export class BoardsService {
     if (!workspace) {
       throw new RpcException({ statusCode: 404, message: 'Workspace no encontrado' });
     }
+    if (workspace.kind === 'DOCUMENTS') {
+      throw new RpcException({
+        statusCode: 400,
+        message: 'Este espacio es de documentos: los tableros van en un espacio de tableros.',
+      });
+    }
 
     const board = await this.prisma.board.create({
       data: { name: dto.name, workspaceId: dto.workspaceId },
@@ -68,9 +74,28 @@ export class BoardsService {
       throw new RpcException({ statusCode: 404, message: 'Board no encontrado' });
     }
 
+    /* Apagar Scrum con un sprint en marcha lo dejaba corriendo sin que nadie
+       lo viera, y al volver a encender la franja decía «terminó hace 30 días»
+       (auditoría S8). Primero se cierra. */
+    if (dto.scrumEnabled === false && board.scrumEnabled) {
+      const activo = await this.prisma.sprint.findFirst({
+        where: { boardId: dto.id, status: 'ACTIVE' },
+        select: { name: true },
+      });
+      if (activo) {
+        throw new RpcException({
+          statusCode: 409,
+          message: `Cierra «${activo.name}» antes de dejar de trabajar por sprints.`,
+        });
+      }
+    }
+
     const updated = await this.prisma.board.update({
       where: { id: dto.id },
-      data: { name: dto.name },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.scrumEnabled !== undefined && { scrumEnabled: dto.scrumEnabled }),
+      },
     });
 
     await this.redis.del(`board:${board.id}`);

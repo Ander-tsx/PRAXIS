@@ -83,6 +83,7 @@ export function WorkspacePicker({
   /** El espacio cuyo panel de gestión está abierto, si hay alguno. */
   const [gestionando, setGestionando] = useState<Workspace | null>(null);
   const [state, formAction, pending] = useAccion(createWorkspaceAction, WORKSPACE_INITIAL_STATE);
+  const [tipo, setTipo] = useState<'BOARDS' | 'DOCUMENTS'>('BOARDS');
   const [estadoRenombrar, renombrar, renombrando] = useAccion(
     updateWorkspaceAction,
     WORKSPACE_INITIAL_STATE,
@@ -268,8 +269,7 @@ export function WorkspacePicker({
                           <span
                             className={`shrink-0 font-sans text-xs ${isActive ? 'text-primary opacity-80' : 'text-white'}`}
                           >
-                            {workspace.boards.length}{' '}
-                            {workspace.boards.length === 1 ? 'tablero' : 'tableros'}
+                            {contenidoDe(workspace)}
                           </span>
                         </button>
 
@@ -309,6 +309,28 @@ export function WorkspacePicker({
                   className="flex flex-col gap-2 border-t border-white/10 p-2 bg-[#191919]"
                 >
                   <input type="hidden" name="projectId" value={projectId} />
+                  <input type="hidden" name="kind" value={tipo} />
+
+                  {/* Un espacio es de un solo tipo y no se cambia después:
+                      se elige al crearlo (PLAN-DOCUMENTOS, D7). */}
+                  <fieldset className="m-0 flex gap-1 border-0 p-0">
+                    <legend className="sr-only">Qué va a contener</legend>
+                    {(['BOARDS', 'DOCUMENTS'] as const).map((opcion) => (
+                      <button
+                        key={opcion}
+                        type="button"
+                        aria-pressed={tipo === opcion}
+                        onClick={() => setTipo(opcion)}
+                        className={`flex-1 cursor-pointer rounded-lg px-2 py-1 font-sans text-xs transition-colors ${
+                          tipo === opcion
+                            ? 'bg-primary/15 text-primary'
+                            : 'text-text-secondary hover:text-text-primary'
+                        }`}
+                      >
+                        {opcion === 'BOARDS' ? 'Tableros' : 'Documentos'}
+                      </button>
+                    ))}
+                  </fieldset>
 
                   <div className="flex items-center gap-2">
                     <input
@@ -317,7 +339,11 @@ export function WorkspacePicker({
                       value={name}
                       onChange={(event) => setName(event.target.value)}
                       maxLength={WORKSPACE_NAME_MAX}
-                      placeholder="Crear espacio nuevo..."
+                      placeholder={
+                        tipo === 'BOARDS'
+                          ? 'Nuevo espacio de tableros…'
+                          : 'Nuevo espacio de documentos…'
+                      }
                       autoComplete="off"
                       className="h-8 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 font-sans text-sm text-white outline-none transition-colors placeholder:text-white hover:bg-[#1c1c1b] focus:bg-[#1c1c1b] focus:border-white/10"
                     />
@@ -354,8 +380,24 @@ export function WorkspacePicker({
   );
 }
 
+/** «3 tableros» o «2 documentos», según el tipo del espacio. */
+function contenidoDe(workspace: Workspace): string {
+  if (workspace.kind === 'DOCUMENTS') {
+    const n = workspace.documents?.length ?? 0;
+    return `${n} ${n === 1 ? 'documento' : 'documentos'}`;
+  }
+  const n = workspace.boards.length;
+  return `${n} ${n === 1 ? 'tablero' : 'tableros'}`;
+}
+
 /** Qué se lleva por delante borrar un espacio, contado. */
 function avisoDeBorrado(workspace: Workspace): string {
+  if (workspace.kind === 'DOCUMENTS') {
+    const n = workspace.documents?.length ?? 0;
+    return n === 0
+      ? 'Está vacío. Aun así, no se puede deshacer.'
+      : `Se irán con él sus ${n === 1 ? 'único documento' : `${n} documentos`}. No se puede deshacer.`;
+  }
   const tableros = workspace.boards.length;
   if (tableros === 0) return 'Está vacío. Aun así, no se puede deshacer.';
 

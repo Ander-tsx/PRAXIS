@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
    */
   transpilePackages: ['@praxis/commons'],
 
+  /**
+   * Probar desde el móvil en la misma red: `next dev` bloquea por defecto las
+   * peticiones de otro host a sus recursos de desarrollo, y la página carga sin
+   * hidratar. `DEV_ORIGINS=192.168.1.20` (separados por comas) las deja pasar.
+   * Solo afecta a `next dev`.
+   */
+  allowedDevOrigins: process.env.DEV_ORIGINS?.split(',').filter(Boolean) ?? [],
+
   experimental: {
     serverActions: {
       /**

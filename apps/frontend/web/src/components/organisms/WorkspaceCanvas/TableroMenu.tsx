@@ -5,7 +5,9 @@ import { EntityMenu } from '@/components/molecules/EntityMenu';
 import { BOARD_INITIAL_STATE } from '@/lib/projects/action-state';
 import { BOARD_NAME_MAX, validateBoard } from '@/lib/projects/validation';
 import { useAccion } from '@praxis/commons';
-import type { Board } from '@praxis/commons';
+import type { Board, Sprint } from '@praxis/commons';
+import { HistorialDeSprints } from './HistorialDeSprints';
+import { ScrumToggle } from './ScrumToggle';
 
 export interface TableroMenuProps {
   projectId: string;
@@ -14,6 +16,12 @@ export interface TableroMenuProps {
   canEdit: boolean;
   /** `canDeleteBoard`. */
   canDelete: boolean;
+  /** Tareas abiertas en columnas: al encender Scrum se ofrece llevarlas al primer sprint. */
+  tareasAbiertas?: string[];
+  /** Con un sprint en marcha, Scrum no se apaga: primero se cierra (S8). */
+  haySprintEnCurso?: boolean;
+  /** Sprints cerrados de cuando el tablero tenía Scrum. */
+  historial?: Sprint[];
 }
 
 /**
@@ -28,7 +36,15 @@ export interface TableroMenuProps {
  * gateway purga después sus tareas, que viven en otro microservicio. Por eso,
  * con columnas dentro, hay que escribir el nombre.
  */
-export function TableroMenu({ projectId, board, canEdit, canDelete }: TableroMenuProps) {
+export function TableroMenu({
+  projectId,
+  board,
+  canEdit,
+  canDelete,
+  tareasAbiertas = [],
+  haySprintEnCurso = false,
+  historial,
+}: TableroMenuProps) {
   const [estadoRenombrar, renombrar, renombrando] = useAccion(
     updateBoardAction,
     BOARD_INITIAL_STATE,
@@ -45,6 +61,20 @@ export function TableroMenu({ projectId, board, canEdit, canDelete }: TableroMen
       validarNombre={validateBoard}
       canEdit={canEdit}
       canDelete={canDelete}
+      /* Encender Scrum es editar el tablero: el `PATCH` pide `canEditBoard`. */
+      extras={
+        canEdit ? (
+          <>
+            <ScrumToggle
+              projectId={projectId}
+              board={board}
+              tareasAbiertas={tareasAbiertas}
+              haySprintEnCurso={haySprintEnCurso}
+            />
+            {historial && historial.length > 0 && <HistorialDeSprints sprints={historial} />}
+          </>
+        ) : undefined
+      }
       exigeEscribirNombre={columnas > 0}
       avisoDeBorrado={
         columnas === 0

@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from '@praxis/observability';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { montarProxyDeCollab } from './collab-proxy';
 import { StandardExceptionFilter } from './common/filters/standard-exception.filter';
 import { StandardResponseInterceptor } from './common/interceptors/standard-response.interceptor';
 
@@ -88,6 +89,13 @@ async function bootstrap() {
    * «Healthcheck failure» con el gateway perfectamente arrancado por dentro.
    */
   await app.listen(port, '0.0.0.0');
+  /* El tiempo real de los documentos sale por este mismo puerto (ver
+     `collab-proxy.ts`): Railway solo publica uno por servicio. */
+  montarProxyDeCollab(
+    app.getHttpServer(),
+    process.env.COLLAB_SERVICE_HOST ?? '127.0.0.1',
+    Number(process.env.COLLAB_SERVICE_PORT ?? 3010),
+  );
   app.get(Logger).log(`Gateway running on http://0.0.0.0:${port}/api`);
 
   if (!esProduccion) {

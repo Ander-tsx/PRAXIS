@@ -42,6 +42,9 @@ const TASK_CONTROLLERS = new Set([
   'ChecklistsController',
   'CommentsController',
   'AttachmentsController',
+  /* Sin esta línea el guard no sabe sacar el proyecto de `:taskId` y responde
+     403 «Contexto de proyecto no encontrado» a todo (E9 de PLAN-DOCUMENTOS). */
+  'TaskDocumentsController',
 ]);
 
 /**

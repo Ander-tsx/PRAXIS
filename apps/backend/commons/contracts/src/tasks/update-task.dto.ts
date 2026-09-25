@@ -5,10 +5,13 @@ import {
   IsBoolean,
   IsEnum,
   IsISO8601,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 import { Priority } from './priority.enum';
@@ -69,6 +72,28 @@ export class UpdateTaskBodyDto {
   @IsOptional()
   @IsEnum(Priority)
   priority?: Priority;
+
+  /**
+   * Mueve la tarea a un sprint (UUID) o al backlog (`null`). Omitirlo la deja
+   * donde está. Es lo que usan "añadir al sprint" desde el Backlog y "devolver
+   * al backlog" desde el tablero. Ver `docs/PLAN-SCRUM-KANBAN.md`, D2.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID('4')
+  sprintId?: string | null;
+
+  /**
+   * Puntos de estimación, sin escala impuesta (D4 de
+   * `docs/PLAN-SCRUM-KANBAN.md`). `null` borra la estimación: sin estimar no
+   * es lo mismo que cero.
+   */
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(999)
+  estimatePoints?: number | null;
 }
 
 /** Payload al microservicio: el cuerpo + lo que inyecta el gateway. */

@@ -261,10 +261,13 @@ test.describe('El recuerdo de la última conversación', () => {
     await page.goto('/chat');
 
     /* Lo que se exige no es «no hay 404»: es que se llegue al **índice de
-       Mensajes** —«Tus mensajes» y el buscador de contactos—, que es la pantalla
-       desde la que se puede seguir. El directorio de conversaciones vive ahora
-       en la barra lateral, no en la zona. */
-    await expect(page.getByRole('heading', { name: 'Tus mensajes' })).toBeVisible();
+       Mensajes**, que es la pantalla desde la que se puede seguir. En
+       escritorio el directorio vive en la barra lateral y el índice solo dice
+       qué hacer (`9b6343c9`); «Tus mensajes» es la versión del móvil, que aquí
+       está oculta. */
+    await expect(
+      page.getByRole('main', { name: 'Mensajes directos' }).getByText('Selecciona un chat'),
+    ).toBeVisible();
     await expect(page).toHaveURL(/\/chat\/?$/);
   });
 });

@@ -14,6 +14,12 @@ import {
 } from './arrastre';
 
 /**
+ * Lo que hay que quedarse en el borde de la pista para que se desplace sola
+ * sin haber pasado antes por dentro. Ver `armarHorizontal`.
+ */
+const ESPERA_EN_EL_BORDE_MS = 450;
+
+/**
  * El gesto de arrastrar del tablero, entero.
  *
  * Mantiene tres cosas y ninguna más: **qué viaja**, **dónde caería ahora mismo**
@@ -267,8 +273,9 @@ export function useArrastreDeTablero({
       const tira = pista.current;
       if (tira) {
         const caja = tira.getBoundingClientRect();
-        if (x < caja.left + MARGEN_DE_AUTODESPLAZAMIENTO) return true;
-        if (x > caja.right - MARGEN_DE_AUTODESPLAZAMIENTO) return true;
+        const dentro = x >= caja.left && x <= caja.right;
+        if (dentro && x < caja.left + MARGEN_DE_AUTODESPLAZAMIENTO) return true;
+        if (dentro && x > caja.right - MARGEN_DE_AUTODESPLAZAMIENTO) return true;
       }
       const encima = columnaBajoElPuntero(x, y);
       const lista = encima ? listas.current.get(encima) : null;
@@ -281,6 +288,36 @@ export function useArrastreDeTablero({
     },
     [columnaBajoElPuntero],
   );
+
+  /**
+   * ¿Puede la pista desplazarse sola en este fotograma?
+   *
+   * Se **arma** cuando el puntero ha pasado por el interior de la pista —fuera
+   * de las dos franjas del borde— en este gesto, o cuando lleva
+   * `ESPERA_EN_EL_BORDE_MS` quieto en una franja. Un arrastre que empieza
+   * dentro del tablero queda armado al primer fotograma; uno que llega desde el
+   * backlog, no hasta que entra de verdad, o hasta que se detiene en el borde
+   * queriendo ir más allá.
+   */
+  const armadoHorizontal = useRef(false);
+  const enFranjaDesde = useRef<number | null>(null);
+  const armarHorizontal = useCallback((x: number, caja: DOMRect): boolean => {
+    if (armadoHorizontal.current) return true;
+    const margen = Math.min(MARGEN_DE_AUTODESPLAZAMIENTO, caja.width / 3);
+    const enFranja = x < caja.left + margen || x > caja.right - margen;
+    if (!enFranja) {
+      armadoHorizontal.current = true;
+      enFranjaDesde.current = null;
+      return true;
+    }
+    const ahora = performance.now();
+    enFranjaDesde.current ??= ahora;
+    if (ahora - enFranjaDesde.current >= ESPERA_EN_EL_BORDE_MS) {
+      armadoHorizontal.current = true;
+      return true;
+    }
+    return false;
+  }, []);
 
   /**
    * Un fotograma: desplaza si toca, mueve el fantasma y recalcula el hueco.
@@ -300,8 +337,20 @@ export function useArrastreDeTablero({
     /* Horizontal: la pista de columnas. Es lo que permite llevar una tarjeta a
        una columna que ni siquiera está en pantalla. */
     const tira = pista.current;
-    if (tira) {
-      const caja = tira.getBoundingClientRect();
+    const cajaDeTira = tira?.getBoundingClientRect();
+    /* Solo con el puntero **dentro** de la pista, y **armado**. Fuera de ella
+       —sobre el panel del backlog, que se abre a su derecha— el empuje salía al
+       máximo. Y al traer una tarea del backlog se entra a la pista por su borde
+       derecho, justo la franja de autodesplazamiento: el tablero se iba solo
+       antes de poder apuntar a ninguna columna. Ver `armadoHorizontal`. */
+    if (
+      tira &&
+      cajaDeTira &&
+      x >= cajaDeTira.left &&
+      x <= cajaDeTira.right &&
+      armarHorizontal(x, cajaDeTira)
+    ) {
+      const caja = cajaDeTira;
       const empuje = empujeDeAutodesplazamiento(x, caja.left, caja.right);
       if (empuje !== 0 && tira.scrollWidth > tira.clientWidth) {
         const antes = tira.scrollLeft;
@@ -342,7 +391,7 @@ export function useArrastreDeTablero({
     if (huboDesplazamiento || estaEnLaFranja(x, y)) {
       fotograma.current = requestAnimationFrame(pintar);
     }
-  }, [recalcular, columnaBajoElPuntero, estaEnLaFranja]);
+  }, [recalcular, columnaBajoElPuntero, estaEnLaFranja, armarHorizontal]);
 
   const pedirFotograma = useCallback(() => {
     if (fotograma.current === null) fotograma.current = requestAnimationFrame(pintar);
@@ -373,6 +422,8 @@ export function useArrastreDeTablero({
     if (p.temporizador) clearTimeout(p.temporizador);
     p.temporizador = null;
     enCurso.current = p;
+    armadoHorizontal.current = false;
+    enFranjaDesde.current = null;
     /* ⚠️ Infinito y no `NaN`: la comparación de más abajo es `Math.abs(x - antes) >= 1`,
        y **cualquier** comparación con `NaN` da `false`. Con `NaN` aquí, el primer
        fotograma decidía que el puntero no se había movido, no actualizaba la

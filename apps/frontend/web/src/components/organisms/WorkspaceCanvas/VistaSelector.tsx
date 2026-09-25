@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * Scrum no añade vistas (D18 de `docs/PLAN-SCRUM-KANBAN.md`): lo del sprint va
+ * en la franja encima del tablero y el backlog en un panel lateral. Una
+ * `?vista=sprint` que quedara en un enlace viejo cae al Kanban.
+ */
 export type VistaTablero = 'kanban' | 'calendario' | 'tabla';
 
 export const VISTAS: VistaTablero[] = ['kanban', 'calendario', 'tabla'];
@@ -31,13 +36,14 @@ export function VistaSelector({
   value: VistaTablero;
   onChange: (v: VistaTablero) => void;
 }) {
+  const vistas = VISTAS;
   return (
     <div
       role="tablist"
       aria-label="Vista del tablero"
       className="flex shrink-0 items-center gap-0.5 rounded-lg border border-white/10 bg-[#191919] p-0.5"
     >
-      {VISTAS.map((v) => {
+      {vistas.map((v) => {
         const activo = v === value;
         return (
           <button

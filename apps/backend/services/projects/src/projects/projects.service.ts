@@ -40,6 +40,8 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, boolean> = {
   canComment: true,
   canManageLabels: true,
   canDeleteProject: true,
+  canManageSprint: true,
+  canEditDocuments: true,
 };
 
 /** P2002 de Prisma: violación de restricción única. */
@@ -372,7 +374,15 @@ export class ProjectsService {
       omit: { suspendedBy: true },
       include: {
         workspaces: {
-          include: { boards: { include: { columns: { orderBy: { order: 'asc' } } } } },
+          include: {
+            boards: { include: { columns: { orderBy: { order: 'asc' } } } },
+            /* Sin `content`: el árbol viaja entero en cada carga y se cachea
+               cinco minutos; el texto se pide al abrir el espacio. */
+            documents: {
+              orderBy: { createdAt: 'asc' },
+              select: { id: true, title: true, workspaceId: true, updatedAt: true },
+            },
+          },
         },
         roles: true,
         _count: { select: { members: true } },

@@ -50,6 +50,21 @@ export class AuthController {
     return this.authService.enviarInvitacion(dto);
   }
 
+  /** Invitación a un documento (E8 de `docs/PLAN-DOCUMENTOS.md`). No falla hacia fuera. */
+  @MessagePattern({ cmd: 'mail_send_document_invite' })
+  sendDocumentInvite(
+    @Payload()
+    dto: {
+      email: string;
+      titulo: string;
+      invitaPor: string | null;
+      puedeEditar: boolean;
+      enlace: string;
+    },
+  ) {
+    return this.authService.enviarDocumentoCompartido(dto);
+  }
+
   @MessagePattern({ cmd: 'auth_verify_email' })
   verifyEmail(@Payload() dto: { token: string }) {
     return this.authService.verifyEmail(dto.token);

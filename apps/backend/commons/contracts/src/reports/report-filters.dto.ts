@@ -96,6 +96,19 @@ export class ReportFiltersQueryDto {
   @IsOptional()
   @IsEnum(Priority)
   priority?: Priority;
+
+  /**
+   * Solo las tareas que **hoy** están en ese sprint (P2.3 de
+   * `docs/PLAN-SCRUM-KANBAN.md`).
+   *
+   * «Hoy», como el responsable: `task_events` no guarda en qué sprint estaba
+   * una tarea cuando pasó cada cosa. Tras cerrar un sprint lo pendiente ya salió
+   * de él (D6), así que filtrar un sprint cerrado enseña lo que se terminó ahí.
+   */
+  @ApiPropertyOptional({ description: 'Acota a las tareas de ese sprint' })
+  @IsOptional()
+  @IsUUID('4')
+  sprintId?: string;
 }
 
 /**
@@ -114,6 +127,7 @@ export interface ReportFilters {
   assigneeId?: string;
   labelId?: string;
   priority?: Priority;
+  sprintId?: string;
 }
 
 /** Si no hay ningún filtro puesto, para poder saltarse trabajo. */
@@ -125,7 +139,8 @@ export function sinFiltros(filtros: ReportFilters | undefined): boolean {
     filtros.boardId === undefined &&
     filtros.assigneeId === undefined &&
     filtros.labelId === undefined &&
-    filtros.priority === undefined
+    filtros.priority === undefined &&
+    filtros.sprintId === undefined
   );
 }
 
@@ -156,6 +171,9 @@ export function claveDeFiltros(filtros: ReportFilters | undefined): string {
     filtros?.assigneeId ?? '',
     filtros?.labelId ?? '',
     filtros?.priority ?? '',
+    /* El último, para que las claves sin sprint no cambien de forma más allá
+       de un separador: la caché de antes se vuelve a llenar en un minuto. */
+    filtros?.sprintId ?? '',
   ];
   return `:f${partes.join('|')}`;
 }

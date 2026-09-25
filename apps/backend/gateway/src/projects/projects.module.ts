@@ -2,12 +2,20 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
+import { OptionalJwtGuard } from '../auth/optional-jwt.guard';
 import { BillingModule } from '../billing/billing.module';
 import { AutomationPurgeService } from './automation-purge.service';
 import { BoardsController, BoardsResourceController } from './boards.controller';
 import { ColumnStatusSyncService } from './column-status-sync.service';
 import { ColumnsController } from './columns.controller';
 import { DirectChatController } from './direct-chat.controller';
+import { DocumentAccessService } from './document-access.service';
+import { DocumentsController } from './documents.controller';
+import { LinkPreviewController } from './link-preview.controller';
+import {
+  MySharedDocumentsController,
+  SharedDocumentsController,
+} from './shared-documents.controller';
 import {
   MyInvitationsController,
   ProjectInvitationsController,
@@ -19,6 +27,7 @@ import { ProjectChatController } from './project-chat.controller';
 import { ProjectPermissionsController } from './project-permissions.controller';
 import { ProjectRolesController } from './project-roles.controller';
 import { ProjectsController } from './projects.controller';
+import { SprintsController } from './sprints.controller';
 import { TaskPurgeService } from './task-purge.service';
 import { WorkspacesController, WorkspacesResourceController } from './workspaces.controller';
 
@@ -93,6 +102,11 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
     BoardsController,
     BoardsResourceController,
     ColumnsController,
+    SprintsController,
+    DocumentsController,
+    SharedDocumentsController,
+    MySharedDocumentsController,
+    LinkPreviewController,
     MembersController,
     ProjectRolesController,
     ProjectPermissionsController,
@@ -107,6 +121,8 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
     TaskPurgeService,
     AutomationPurgeService,
     MentionablesService,
+    DocumentAccessService,
+    OptionalJwtGuard,
   ],
   /**
    * ⚠️ **Las dos purgas se exportan porque administración también borra.**

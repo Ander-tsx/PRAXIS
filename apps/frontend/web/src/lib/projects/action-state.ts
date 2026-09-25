@@ -16,7 +16,7 @@ import type { QuotaExceededDetails } from '@praxis/commons/billing/planes';
  * que los consume: `commons/organisms/CreateProjectForm/project-form.ts`.
  * Se reexportan para no tocar los imports existentes.
  */
-import type { AutomationReviewSummary } from '@praxis/commons';
+import type { AutomationReviewSummary, PendingSprintTask } from '@praxis/commons';
 
 export { CREATE_PROJECT_INITIAL_STATE, type CreateProjectState } from '@praxis/commons';
 
@@ -143,3 +143,49 @@ export const INVITATION_RESPONSE_INITIAL_STATE: InvitationResponseState = {
   error: null,
   done: null,
 };
+
+/* ─── Scrum (docs/PLAN-SCRUM-KANBAN.md) ─────────────────────────────── */
+
+/**
+ * Estado de las acciones de Scrum: encender el interruptor, planear, iniciar,
+ * mover una tarea entre backlog y sprint.
+ *
+ * `done` dice qué se confirmó contra el `data` de la respuesta —nunca contra
+ * el status—, para que el formulario sepa si cerrarse.
+ */
+export interface SprintState {
+  error: string | null;
+  done: string | null;
+}
+
+export const SPRINT_INITIAL_STATE: SprintState = { error: null, done: null };
+
+/**
+ * Cerrar un sprint puede volver con la lista de lo que falta por resolver:
+ * el 409 `SPRINT_HAS_PENDING_TASKS` trae las tareas en `details.pending`, y el
+ * diálogo las enseña una a una en vez de repetir el error (D6).
+ */
+export interface CloseSprintState extends SprintState {
+  pending: PendingSprintTask[] | null;
+}
+
+export const CLOSE_SPRINT_INITIAL_STATE: CloseSprintState = {
+  error: null,
+  done: null,
+  pending: null,
+};
+
+/* ─── Documentos (docs/PLAN-DOCUMENTOS.md) ──────────────────────────── */
+
+/**
+ * `done` es el id del documento al crearlo, `saved` al guardar y `deleted` al
+ * borrar. `conflicto` marca el 409 de D4: alguien guardó entre medias, y la
+ * pantalla tiene que conservar lo escrito en vez de tratarlo como un error más.
+ */
+export interface DocumentState {
+  error: string | null;
+  done: string | null;
+  conflicto: boolean;
+}
+
+export const DOCUMENT_INITIAL_STATE: DocumentState = { error: null, done: null, conflicto: false };

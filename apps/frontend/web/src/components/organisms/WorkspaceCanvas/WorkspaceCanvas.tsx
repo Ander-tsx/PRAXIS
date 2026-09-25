@@ -2,6 +2,8 @@
 
 import {
   type Label,
+  type ProjectDocument,
+  type Sprint,
   type Task,
   type UserProfile,
   type Workspace,
@@ -10,12 +12,16 @@ import {
   projectHref,
 } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { BoardStrip } from './BoardStrip';
 import { BoardTabs } from './BoardTabs';
 import { CreateBoardButton } from './CreateBoardButton';
+import { DocumentTabs } from './DocumentTabs';
+import { DocumentView } from './DocumentView';
 import { VistaSelector, type VistaTablero, esVista } from './VistaSelector';
 import { WorkspacePicker } from './WorkspacePicker';
+import type { ScrumDelTablero } from './scrum';
+import { BOARD_SURFACE } from './superficie-tablero';
 
 /**
  * El vacío compartido de un tablero sin tareas.
@@ -92,6 +98,18 @@ export interface WorkspaceCanvasProps {
   canManageLabels: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
+  /** Sprints, backlog y métricas de los tableros con Scrum del espacio abierto. */
+  scrumByBoard: Map<string, ScrumDelTablero>;
+  /** Sprints cerrados de los tableros que ya no tienen Scrum: su historial. */
+  historialByBoard: Map<string, Sprint[]>;
+  /** Empezar, editar y cerrar sprints: `canManageSprint`. */
+  canManageSprint: boolean;
+  /** Los documentos del espacio abierto, con contenido (`docs/PLAN-DOCUMENTOS.md`). */
+  documentos: ProjectDocument[];
+  /** Documento con el que arrancar si la URL lo pide (`?doc=`). */
+  documentoInicial?: string | null;
+  /** Crear, editar y borrar documentos: `canEditDocuments`. */
+  canEditDocuments: boolean;
 }
 
 /**
@@ -150,9 +168,44 @@ export function WorkspaceCanvas({
   canManageLabels,
   canEditTask,
   canDeleteTask,
+  scrumByBoard,
+  historialByBoard,
+  canManageSprint,
+  documentos,
+  documentoInicial,
+  canEditDocuments,
 }: WorkspaceCanvasProps) {
   const router = useRouter();
   const boards = activeWorkspace?.boards ?? [];
+
+  /**
+   * El documento abierto, si hay uno. Mientras lo hay, ocupa el sitio del
+   * tablero; elegir un tablero lo cierra. Estado de cliente, como el tablero:
+   * el contenido de todos ya está en memoria (`docs/PLAN-DOCUMENTOS.md`, D5).
+   */
+  const [documentoActivoId, setDocumentoActivoId] = useState<string | null>(
+    () => documentoInicial ?? null,
+  );
+  /* Un espacio es de tableros o de documentos, nunca de las dos cosas
+     (PLAN-DOCUMENTOS, D7). En uno de documentos, sin elegir, se abre el primero. */
+  const deDocumentos = activeWorkspace?.kind === 'DOCUMENTS';
+  const documentoActivo = deDocumentos
+    ? (documentos.find((d) => d.id === documentoActivoId) ?? documentos[0] ?? null)
+    : null;
+  /* La URL manda cuando cambia desde fuera: un enlace de la barra lateral o
+     «Crear y abrir» desde una tarea navegan a `?doc=` sin desmontar esto, y el
+     estado inicial ya no se vuelve a leer. */
+  const [docDeLaUrl, setDocDeLaUrl] = useState(documentoInicial ?? null);
+  if ((documentoInicial ?? null) !== docDeLaUrl) {
+    setDocDeLaUrl(documentoInicial ?? null);
+    if (documentoInicial) setDocumentoActivoId(documentoInicial);
+  }
+  const abrirDocumento = useCallback((id: string) => setDocumentoActivoId(id), []);
+  const cerrarDocumento = useCallback(() => setDocumentoActivoId(null), []);
+  function elegirTablero(id: string) {
+    setDocumentoActivoId(null);
+    setBoardActivoId(id);
+  }
 
   const [boardActivoId, setBoardActivoId] = useState<string | null>(
     () => boardIdInicial ?? boards[0]?.id ?? null,
@@ -201,12 +254,13 @@ export function WorkspaceCanvas({
    * se recarga, que es para lo que sirve tener el tablero en la URL.
    */
   useEffect(() => {
-    if (!boardActivo) return;
     const url = new URL(window.location.href);
-    if (url.searchParams.get('board') === boardActivo.id) return;
-    url.searchParams.set('board', boardActivo.id);
-    window.history.replaceState(null, '', url);
-  }, [boardActivo]);
+    const antes = url.toString();
+    if (boardActivo) url.searchParams.set('board', boardActivo.id);
+    if (documentoActivo) url.searchParams.set('doc', documentoActivo.id);
+    else url.searchParams.delete('doc');
+    if (url.toString() !== antes) window.history.replaceState(null, '', url);
+  }, [boardActivo, documentoActivo]);
 
   const tareasPorTablero = new Map(
     boards.map((board) => [board.id, tasksByBoard.get(board.id)?.length ?? 0]),
@@ -233,17 +287,29 @@ export function WorkspaceCanvas({
         /
       </span>
 
-      {boardActivo && (
+      {!deDocumentos && boardActivo && (
         <BoardTabs
           boards={boards}
-          activeId={boardActivo.id}
-          onCambiar={setBoardActivoId}
+          /* Con un documento abierto no hay tablero activo que marcar. */
+          activeId={documentoActivo ? '' : boardActivo.id}
+          onCambiar={elegirTablero}
           tareasPorTablero={tareasPorTablero}
         />
       )}
 
-      {activeWorkspace && canManage && (
+      {activeWorkspace && !deDocumentos && canManage && (
         <CreateBoardButton compacto workspaceId={activeWorkspace.id} projectId={projectId} />
+      )}
+
+      {activeWorkspace && deDocumentos && (
+        <DocumentTabs
+          documentos={activeWorkspace.documents ?? []}
+          activeId={documentoActivo?.id ?? null}
+          onAbrir={abrirDocumento}
+          projectId={projectId}
+          workspaceId={activeWorkspace.id}
+          canEdit={canEditDocuments}
+        />
       )}
     </div>
   );
@@ -356,6 +422,46 @@ export function WorkspaceCanvas({
     );
   }
 
+  if (deDocumentos && !documentoActivo) {
+    return (
+      <div className="flex h-full flex-col bg-[#191919]">
+        <div className="flex shrink-0 flex-wrap items-center gap-1 px-4 py-2">
+          {barraDelTablero}
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+          <h3 className="font-display text-2xl text-text-primary">Ningún documento todavía</h3>
+          <p className="max-w-md font-sans text-sm text-text-secondary">
+            Este espacio es para documentos: actas, especificaciones, lo que el equipo necesite
+            escrito.{' '}
+            {canEditDocuments
+              ? 'Crea el primero con el botón de arriba.'
+              : 'Quien pueda editar documentos puede crear el primero.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (documentoActivo) {
+    return (
+      <section
+        aria-label={`Documento ${documentoActivo.title}`}
+        className="flex min-h-0 flex-1 flex-col gap-3 rounded-2xl p-4"
+        style={BOARD_SURFACE}
+      >
+        <div className="flex shrink-0 flex-wrap items-center gap-1">{barraDelTablero}</div>
+        <DocumentView
+          key={documentoActivo.id}
+          documento={documentoActivo}
+          projectId={projectId}
+          canEdit={canEditDocuments}
+          usersById={usersById}
+          onBorrado={cerrarDocumento}
+        />
+      </section>
+    );
+  }
+
   if (!boardActivo) {
     return (
       <div className="flex flex-col h-full bg-[#191919]">
@@ -404,6 +510,10 @@ export function WorkspaceCanvas({
       canManageLabels={canManageLabels}
       canEditTask={canEditTask}
       canDeleteTask={canDeleteTask}
+      scrum={boardActivo.scrumEnabled ? scrumByBoard.get(boardActivo.id) : undefined}
+      historial={historialByBoard.get(boardActivo.id)}
+      canManageSprint={canManageSprint}
+      onCambiarVista={cambiarVista}
     />
   );
 }

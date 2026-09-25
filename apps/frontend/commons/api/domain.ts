@@ -367,6 +367,8 @@ export const PROJECT_PERMISSIONS = [
   'canEditProject',
   'canViewReports',
   'canDeleteProject',
+  'canManageSprint',
+  'canEditDocuments',
 ] as const;
 
 export type ProjectPermission = (typeof PROJECT_PERMISSIONS)[number];
@@ -401,6 +403,8 @@ export const PERMISSION_LABELS: Record<ProjectPermission, string> = {
   canEditProject: 'Renombrar el proyecto y cambiar su descripción',
   canViewReports: 'Ver los reportes y usar el asistente',
   canDeleteProject: 'Eliminar el proyecto',
+  canManageSprint: 'Planear, iniciar y cerrar sprints',
+  canEditDocuments: 'Crear y editar documentos',
 };
 
 /**
@@ -419,15 +423,15 @@ export type PermissionMap = Partial<Record<ProjectPermission, boolean>>;
  * "editar" y "crear", y sin decirlo el usuario cree que concede menos.
  */
 export const PERMISSION_IMPLIES: Partial<Record<ProjectPermission, ProjectPermission[]>> = {
-  canDeleteBoard: ['canEditBoard', 'canCreateBoard', 'canEditProject'],
-  canEditBoard: ['canCreateBoard', 'canEditProject'],
+  canDeleteBoard: ['canEditBoard', 'canCreateBoard', 'canEditProject', 'canManageSprint'],
+  canEditBoard: ['canCreateBoard', 'canEditProject', 'canManageSprint'],
   canEditProject: ['canViewReports'],
   canManageMembers: ['canViewReports'],
   canManageRoles: ['canManageAutomations', 'canManageIntegrations'],
   canDeleteColumn: ['canEditColumn', 'canCreateColumn'],
   canEditColumn: ['canCreateColumn'],
   canDeleteTask: ['canEditTask', 'canMoveTask', 'canComment', 'canCreateTask'],
-  canEditTask: ['canMoveTask', 'canComment', 'canCreateTask'],
+  canEditTask: ['canMoveTask', 'canComment', 'canCreateTask', 'canEditDocuments'],
   canDeleteProject: [
     'canDeleteBoard',
     'canEditBoard',
@@ -491,6 +495,8 @@ export interface Column {
   /** Token del design system, no un hex. Viaja con la columna al reordenar. */
   color: ColumnColor;
   boardId: string;
+  /** Límite de trabajo en curso, blando: se avisa, no se bloquea. `null` = sin límite. */
+  wipLimit: number | null;
 }
 
 export interface Board {
@@ -499,17 +505,119 @@ export interface Board {
   workspaceId: string;
   createdAt: string;
   columns: Column[];
+  /**
+   * Scrum encendido: además de sus columnas (que todo tablero tiene), trabaja
+   * por sprints. Ver `docs/PLAN-SCRUM-KANBAN.md`, D1.
+   */
+  scrumEnabled: boolean;
 }
+
+export type SprintStatus = 'PLANNED' | 'ACTIVE' | 'CLOSED';
+
+/** Un bloque de tiempo de un tablero Scrum. Como mucho uno `ACTIVE` por tablero. */
+export interface Sprint {
+  id: string;
+  boardId: string;
+  name: string;
+  goal: string | null;
+  status: SprintStatus;
+  /** `null` mientras esté `PLANNED`: las fechas se fijan al iniciarlo. */
+  startDate: string | null;
+  endDate: string | null;
+  /**
+   * El instante en que se pulsó «Empezar». `startDate` es una fecha de
+   * calendario —medianoche del día elegido—: lo planeado esa mañana quedaría
+   * después de ella y contaría como añadido. El burndown compara contra esto.
+   */
+  startedAt: string | null;
+  createdAt: string;
+  closedAt: string | null;
+  /** Lo que dejó el cierre: la revisión del sprint. `null` hasta cerrarlo. */
+  closeSummary?: SprintCloseSummary | null;
+}
+
+export interface SprintCloseSummary {
+  hechas: number;
+  puntosHechos: number;
+  alSiguiente: number;
+  alBacklog: number;
+}
+
+/**
+ * Una tarea reducida a lo que necesitan el burndown y la velocidad. Llega de
+ * `GET /boards/:id/sprints/metrics`, sin tope de página: la pantalla ya no
+ * calcula sobre las cien primeras tareas del tablero.
+ */
+export interface SprintMetricRow {
+  id: string;
+  sprintId: string | null;
+  sprintAssignedAt: string | null;
+  completedAt: string | null;
+  estimatePoints: number | null;
+}
+
+export interface SprintMetrics {
+  /** Los cerrados que entran en la velocidad, del más reciente al más viejo. */
+  velocitySprintIds: string[];
+  tasks: SprintMetricRow[];
+}
+
+/** Una tarea sin terminar de un sprint, tal como la devuelve `/pending`. */
+export interface PendingSprintTask {
+  id: string;
+  title: string;
+  columnId: string;
+  status: string;
+  priority: Priority;
+}
+
+/**
+ * El 409 de cerrar un sprint con tareas sin resolver. Trae la lista en
+ * `details.pending` (D6: cerrar con pendientes siempre pregunta).
+ */
+export const SPRINT_HAS_PENDING_TASKS_CODE = 'SPRINT_HAS_PENDING_TASKS';
 
 export interface Workspace {
   id: string;
   name: string;
+  /** Tableros o documentos, nunca las dos cosas (PLAN-DOCUMENTOS, D7). */
+  kind: 'BOARDS' | 'DOCUMENTS';
   projectId: string;
   createdAt: string;
   updatedAt: string;
   /** `GET /projects/:id` los trae embebidos, con sus columnas. */
   boards: Board[];
+  /**
+   * Los documentos del espacio, **sin contenido** (`docs/PLAN-DOCUMENTOS.md`).
+   * Opcional: un backend anterior a los documentos no lo manda.
+   */
+  documents?: WorkspaceDocumentRef[];
 }
+
+/** Lo que trae el árbol del proyecto de cada documento: lo justo para la pestaña. */
+export interface WorkspaceDocumentRef {
+  id: string;
+  title: string;
+  workspaceId: string;
+  updatedAt: string;
+}
+
+/**
+ * Un documento entero, en Markdown. Se llama `ProjectDocument` y no `Document`
+ * porque `Document` es un global del DOM y sombrearlo no da ningún error.
+ */
+export interface ProjectDocument extends WorkspaceDocumentRef {
+  content: string;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+}
+
+/** Tope del contenido de un documento. Espejo de `DOCUMENT_CONTENT_MAX` del backend. */
+export const DOCUMENT_CONTENT_MAX = 100_000;
+
+/** 409 al guardar sobre una versión que ya no es la última (D4 de PLAN-DOCUMENTOS). */
+export const DOCUMENT_CHANGED_CODE = 'DOCUMENT_CHANGED';
 
 export const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
 export type Priority = (typeof PRIORITIES)[number];
@@ -709,6 +817,16 @@ export interface Task {
   order: number;
   createdAt: string;
   updatedAt: string;
+  /** Cuándo entró en una columna de cierre. `null` mientras siga abierta. */
+  completedAt: string | null;
+  /** Sprint al que pertenece. `null` = backlog del tablero (o tablero sin Scrum). */
+  sprintId: string | null;
+  /** Cuándo se fijó el `sprintId` actual. Separa alcance original de scope creep. */
+  sprintAssignedAt: string | null;
+  /** Puntos de estimación. `null` = sin estimar, que no es lo mismo que 0. */
+  estimatePoints: number | null;
+  /** Veces que pasó sin terminar de un sprint cerrado al siguiente. */
+  carryOverCount?: number;
   assignees: TaskAssignee[];
   checklists: ChecklistItem[];
   labels: TaskLabel[];

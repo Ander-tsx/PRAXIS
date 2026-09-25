@@ -18,7 +18,12 @@ import {
   ProjectPermission,
   REPORT_CROSS_DIMENSIONS,
   ReportBundleQueryDto,
-  type ReportFiltersQueryDto,
+  /* ⚠️ Import de **valor**, no `type`: con `type` el parámetro de `@Query()`
+     queda tipado en runtime como `Function`, y el `ValidationPipe` con
+     `forbidNonWhitelisted` rechazaba cualquier filtro en las cuatro rutas que
+     usan la clase base (snapshot y compañía) — 400 «property boardId should
+     not exist». Misma trampa que el `Omit<>` de CLAUDE.md, trampa 3. */
+  ReportFiltersQueryDto,
   ReportMatrixQueryDto,
   ReportWeeklyQueryDto,
   ReportWindowQueryDto,
@@ -136,7 +141,7 @@ export class ReportsController {
    * por veinte años convierten cada informe en un recorrido del historial entero.
    */
   private filtros(query: ReportFiltersQueryDto): ReportFiltersQueryDto | undefined {
-    const { from, boardId, assigneeId, labelId, priority } = query;
+    const { from, boardId, assigneeId, labelId, priority, sprintId } = query;
 
     /* Un `to` suelto no filtra nada: sería la ventana por defecto acabando antes,
        que no es una pregunta que nadie haga. Se ignora en vez de responder 400 —
@@ -159,7 +164,7 @@ export class ReportsController {
       }
     }
 
-    const filtros = { from, to, boardId, assigneeId, labelId, priority };
+    const filtros = { from, to, boardId, assigneeId, labelId, priority, sprintId };
     return Object.values(filtros).some((valor) => valor !== undefined) ? filtros : undefined;
   }
 

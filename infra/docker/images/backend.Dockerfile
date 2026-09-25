@@ -59,12 +59,17 @@ COPY apps/backend/services/permissions/package.json     apps/backend/services/pe
 COPY apps/backend/services/projects/package.json        apps/backend/services/projects/
 COPY apps/backend/services/reports/package.json         apps/backend/services/reports/
 COPY apps/backend/services/tasks/package.json           apps/backend/services/tasks/
+COPY apps/backend/services/collab/package.json          apps/backend/services/collab/
 COPY apps/frontend/commons/package.json                 apps/frontend/commons/
 COPY apps/frontend/web/package.json                     apps/frontend/web/
 COPY packages/shared-devtools/package.json              packages/shared-devtools/
+# El esquema del editor de documentos: lo usan el frontend y collab-service.
+COPY packages/editor-schema/package.json                packages/editor-schema/
 COPY e2e/package.json                                   e2e/
 
-RUN pnpm install --frozen-lockfile --filter "./apps/backend/**"
+# `...` al final: también las dependencias de workspace de lo filtrado. Sin él,
+# `@praxis/editor-schema` se enlaza pero sus paquetes (TipTap) no se instalan.
+RUN pnpm install --frozen-lockfile --filter "./apps/backend/**..."
 
 # ────────────────────────── build ───────────────────────────
 FROM deps AS build

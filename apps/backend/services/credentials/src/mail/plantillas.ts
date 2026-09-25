@@ -124,3 +124,42 @@ export function correoDeInvitacion(datos: {
     texto: `${quien} a ${datos.organizacion} en PRAXIS.\n\nAbre este enlace para aceptar. Caduca en ${datos.horas} horas.\n\n${datos.enlace}\n\nSi no tienes cuenta, el enlace te llevará a crearla primero, y tienes que usar esta misma dirección de correo.\n\nSi no esperabas este correo, ignóralo.`,
   };
 }
+
+/** Lo que escribe una persona no entra en un correo sin escapar. */
+function escapar(valor: string): string {
+  return valor
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Invitación a un documento (E8 de `docs/PLAN-DOCUMENTOS.md`). El título lo
+ * escribió alguien, así que va escapado: en un correo HTML sería una puerta.
+ */
+export function correoDeDocumentoCompartido(datos: {
+  enlace: string;
+  titulo: string;
+  invitaPor: string | null;
+  puedeEditar: boolean;
+}) {
+  const quien = datos.invitaPor ? `${datos.invitaPor} ha compartido` : 'Han compartido';
+  const titulo = datos.titulo || 'Sin título';
+  const permiso = datos.puedeEditar ? 'Puedes leerlo y editarlo.' : 'Puedes leerlo.';
+
+  return {
+    asunto: `${quien} «${titulo}» contigo`,
+    html: marco(
+      escapar(titulo),
+      `<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:${TINTA_SUAVE};">
+         ${escapar(quien)} un documento contigo en PRAXIS. ${permiso}
+       </p>${boton(datos.enlace, 'Abrir el documento')}
+       <p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:${TENUE};">
+         Entra con esta misma dirección de correo: la invitación solo vale para ella.
+         Si no tienes cuenta, puedes crearla con este correo.
+       </p>`,
+    ),
+    texto: `${quien} «${titulo}» contigo en PRAXIS. ${permiso}\n\n${datos.enlace}\n\nEntra con esta misma dirección de correo: la invitación solo vale para ella.`,
+  };
+}

@@ -365,6 +365,28 @@ export function TaskCard({
 
         <Chip color={priorityColor}>{PRIORITY_LABELS[task.priority]}</Chip>
 
+        {task.estimatePoints !== null && task.estimatePoints !== undefined && (
+          <Chip color={colors.textSecondary}>
+            <span title="Estimación en puntos">{task.estimatePoints} pt</span>
+          </Chip>
+        )}
+
+        {/* Viene sin terminar de un sprint anterior: el trabajo que se
+            arrastra tiene que verse sin abrir la tarea (D19). */}
+        {(task.carryOverCount ?? 0) > 0 && (
+          <Chip color={colors.warning}>
+            <span
+              title={
+                task.carryOverCount === 1
+                  ? 'Viene de un sprint anterior'
+                  : `Ha pasado por ${task.carryOverCount} sprints sin terminar`
+              }
+            >
+              ↻{(task.carryOverCount ?? 0) > 1 ? ` ${task.carryOverCount}` : ''}
+            </span>
+          </Chip>
+        )}
+
         {total > 0 && (
           <Chip color={done === total ? colors.success : colors.textSecondary}>
             {done}/{total}

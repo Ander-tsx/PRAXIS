@@ -150,6 +150,7 @@ function whereDeTarea(filtros?: ReportFilters): Prisma.TaskWhereInput {
     };
   }
   if (filtros.boardId) where.boardId = filtros.boardId;
+  if (filtros.sprintId) where.sprintId = filtros.sprintId;
   if (filtros.priority) where.priority = filtros.priority;
   /* `some` y no una igualdad: las dos son relaciones de muchos a muchos, y una
      tarea con tres responsables entra si **alguno** es el pedido. */
@@ -190,6 +191,9 @@ function condicionesDeTarea(
 
   if (filtros.boardId) {
     condiciones.push(Prisma.sql`${tabla}."boardId" = ${filtros.boardId}::text`);
+  }
+  if (filtros.sprintId) {
+    condiciones.push(Prisma.sql`${tabla}."sprintId" = ${filtros.sprintId}::text`);
   }
   if (filtros.priority) {
     /* A texto los dos lados: `priority` es un enum de Postgres y comparar un
@@ -259,7 +263,12 @@ function andDeEvento(filtros: ReportFilters | undefined, alias: string): Prisma.
 
   /* Sin el tramo ni el tablero, que ya se resolvieron sobre el evento. */
   const deLaTarea = condicionesDeTarea(
-    { assigneeId: filtros.assigneeId, labelId: filtros.labelId, priority: filtros.priority },
+    {
+      assigneeId: filtros.assigneeId,
+      labelId: filtros.labelId,
+      priority: filtros.priority,
+      sprintId: filtros.sprintId,
+    },
     { alias: 'ft', fecha: null },
   );
   if (deLaTarea.length > 0) {
@@ -1191,6 +1200,7 @@ export class StatsService {
         assigneeId: filtros?.assigneeId,
         labelId: filtros?.labelId,
         priority: filtros?.priority,
+        sprintId: filtros?.sprintId,
       },
       { alias: 'ft', fecha: null },
     );

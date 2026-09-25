@@ -26,6 +26,14 @@ import { entrarConCuenta } from '../../fixtures/ui';
  * parte que hay que ver — el mismo patrón que `05-equipo` y `06-chat-zona`.
  */
 
+/*
+ * ⚠️ **Las tarjetas y los mensajes se buscan por rol, nunca con `locator('li')`
+ * ni con un `getByText` suelto.** Al cargar la página entera, React hace
+ * streaming: el contenido llega primero dentro de un `<div hidden id="S:n">` y
+ * durante unos milisegundos convive con la copia ya revelada. El modo estricto
+ * de Playwright cuenta los dos nodos y falla **sin reintentar**, así que la
+ * prueba se pone roja o verde según el reloj. `getByRole` excluye lo oculto.
+ */
 async function apiContext(): Promise<APIRequestContext> {
   return contextoDePeticion.newContext({
     baseURL: process.env.E2E_GATEWAY_URL ?? 'http://localhost:3000',
@@ -213,7 +221,7 @@ test.describe('Reglas del proyecto', () => {
 
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
-    const tarjeta = page.locator('li', { hasText: nombreRegla });
+    const tarjeta = page.getByRole('listitem').filter({ hasText: nombreRegla });
     await expect(tarjeta).toBeVisible(ESPERA_TRAS_GUARDAR);
     await expect(
       tarjeta.getByText(/Cuando una tarea esté a punto de vencer, si prioridad es Alta/),
@@ -246,7 +254,8 @@ test.describe('Reglas del proyecto', () => {
 
     await expect(
       page
-        .locator('li', { hasText: nombreRegla })
+        .getByRole('listitem')
+        .filter({ hasText: nombreRegla })
         .getByText('Sin condiciones: actúa sobre toda tarea que encaje con el disparador.'),
     ).toBeVisible();
   });
@@ -319,7 +328,7 @@ test.describe('Reglas del proyecto', () => {
     await entrarConCuenta(page, mundo.duenno.email);
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
-    const tarjeta = page.locator('li', { hasText: nombreRegla });
+    const tarjeta = page.getByRole('listitem').filter({ hasText: nombreRegla });
     const panel = page.getByRole('form', { name: `Editar «${nombreRegla}»` });
 
     await tarjeta.getByRole('button', { name: 'Editar' }).click();
@@ -484,7 +493,8 @@ test.describe('Reglas del proyecto', () => {
     await page.getByRole('button', { name: 'Crear regla' }).click();
     await expect(
       page
-        .locator('li', { hasText: nombreEntero })
+        .getByRole('listitem')
+        .filter({ hasText: nombreEntero })
         .getByText(/Cuando una tarea esté a punto de vencer, si número de encargados es 2/),
     ).toBeVisible(ESPERA_TRAS_GUARDAR);
 
@@ -503,7 +513,8 @@ test.describe('Reglas del proyecto', () => {
     await page.getByRole('button', { name: 'Crear regla' }).click();
     await expect(
       page
-        .locator('li', { hasText: nombreBooleano })
+        .getByRole('listitem')
+        .filter({ hasText: nombreBooleano })
         .getByText(/Cuando una tarea lleve demasiado tiempo sin moverse, si está vencida es sí/),
     ).toBeVisible(ESPERA_TRAS_GUARDAR);
 
@@ -537,7 +548,8 @@ test.describe('Reglas del proyecto', () => {
     await page.getByRole('button', { name: 'Crear regla' }).click();
     await expect(
       page
-        .locator('li', { hasText: nombreFecha })
+        .getByRole('listitem')
+        .filter({ hasText: nombreFecha })
         .getByText(
           new RegExp(
             `Cuando una tarea esté a punto de vencer, si fecha de vencimiento es ${fechaElegida}`,
@@ -559,7 +571,8 @@ test.describe('Reglas del proyecto', () => {
     await page.getByRole('button', { name: 'Crear regla' }).click();
     await expect(
       page
-        .locator('li', { hasText: nombreLista })
+        .getByRole('listitem')
+        .filter({ hasText: nombreLista })
         .getByText(
           /Cuando una tarea esté a punto de vencer, si prioridad es alguno de Alta, Urgente/,
         ),
@@ -586,7 +599,7 @@ test.describe('Reglas del proyecto', () => {
     await entrarConCuenta(page, mundo.duenno.email);
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
-    const tarjeta = page.locator('li', { hasText: nombreRegla });
+    const tarjeta = page.getByRole('listitem').filter({ hasText: nombreRegla });
     await expect(
       tarjeta.getByText(/Cuando una tarea esté a punto de vencer, si prioridad es Baja/),
     ).toBeVisible();
@@ -794,7 +807,7 @@ test.describe('Reglas del proyecto', () => {
     await page.getByLabel('Activar la regla al guardar').check({ force: true });
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
-    const tarjeta = page.locator('li', { hasText: nombreRegla });
+    const tarjeta = page.getByRole('listitem').filter({ hasText: nombreRegla });
     await expect(tarjeta).toBeVisible(ESPERA_TRAS_GUARDAR);
     await expect(tarjeta.getByText('Activa', { exact: true })).toBeVisible();
 
@@ -820,7 +833,7 @@ test.describe('Reglas del proyecto', () => {
     await rellenarReglaMinima(page, page.getByRole('form', { name: 'Nueva regla' }), nombreRegla);
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
-    const tarjeta = page.locator('li', { hasText: nombreRegla });
+    const tarjeta = page.getByRole('listitem').filter({ hasText: nombreRegla });
     await expect(tarjeta).toBeVisible(ESPERA_TRAS_GUARDAR);
 
     /* La confirmación ya no es una ventana aparte: sale en la propia fila, con
@@ -832,7 +845,7 @@ test.describe('Reglas del proyecto', () => {
 
     await tarjeta.getByRole('button', { name: 'Eliminar' }).click();
     await tarjeta.getByRole('button', { name: 'Sí, eliminar' }).click();
-    await expect(page.locator('li', { hasText: nombreRegla })).toHaveCount(0);
+    await expect(page.getByRole('listitem').filter({ hasText: nombreRegla })).toHaveCount(0);
   });
 
   test('con una regla habilitada y una candidata, «Revisar ahora» muestra el resumen y una segunda revisión no duplica la fila (Bloque 6)', async ({
@@ -966,7 +979,7 @@ test.describe('Reglas del proyecto', () => {
        sola aserción sobre la frase de `describeRule`. Se acota a la fila de la
        regla: «avisa a quien lleva el proyecto» vuelve a salir en la sección
        «Entonces» del panel de edición en cuanto se despliega. */
-    const tarjeta = page.locator('li', { hasText: nombreRegla });
+    const tarjeta = page.getByRole('listitem').filter({ hasText: nombreRegla });
     await expect(
       tarjeta.getByText(
         'Cuando una tarea lleve demasiado tiempo sin moverse, si está vencida es no, entonces avisa a quien lleva el proyecto.',
@@ -993,7 +1006,9 @@ test.describe('Reglas del proyecto', () => {
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
     await expect(
-      page.getByText('No tienes permiso para administrar automatizaciones en este proyecto.'),
+      page
+        .getByRole('main')
+        .getByText('No tienes permiso para administrar automatizaciones en este proyecto.'),
     ).toBeVisible();
   });
 
@@ -1018,12 +1033,16 @@ test.describe('Reglas del proyecto', () => {
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
     await expect(
-      page.getByText(
-        'La automatización de este proyecto no se puede ver ni administrar mientras esté suspendido.',
-      ),
+      page
+        .getByRole('main')
+        .getByText(
+          'La automatización de este proyecto no se puede ver ni administrar mientras esté suspendido.',
+        ),
     ).toBeVisible();
     await expect(
-      page.getByText('No tienes permiso para administrar automatizaciones en este proyecto.'),
+      page
+        .getByRole('main')
+        .getByText('No tienes permiso para administrar automatizaciones en este proyecto.'),
     ).not.toBeVisible();
   });
 });

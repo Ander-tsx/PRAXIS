@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { alpha, colors } from '../../tokens';
 
 export interface SlideOverProps {
@@ -24,6 +24,20 @@ export interface SlideOverProps {
    * y siguen exactamente igual.
    */
   tone?: 'default' | 'dark';
+  /**
+   * `false` para un panel **de trabajo** que convive con la página: el del
+   * backlog se queda abierto mientras arrastras tareas al tablero, y un clic
+   * fuera —el que genera soltar la tarea— no puede cerrarlo. Se cierra con su
+   * botón o con Escape.
+   */
+  closeOnOutsideClick?: boolean;
+  /** Nombre accesible del panel, para lectores de pantalla y pruebas. */
+  ariaLabel?: string;
+  /**
+   * Cómo se llama este panel en el «← Volver a …» del que se abra encima. Sin
+   * él, el de encima no ofrece volver.
+   */
+  etiquetaDeVuelta?: string;
 }
 
 const sizeClasses = {
@@ -37,6 +51,60 @@ const paddingSizes = {
   lg: '32rem',
   xl: '36rem',
 } as const;
+
+/**
+ * Paneles abiertos y el hueco que pide cada uno.
+ *
+ * ⚠️ **Puede haber dos a la vez** —el backlog y, encima, el panel de una de
+ * sus tareas—. Cada uno ponía `padding-right` al abrir y lo dejaba a 0 al
+ * cerrar, así que cerrar el de encima hacía que el tablero se metiera por
+ * debajo del que seguía abierto. El `body` lleva el mayor de los que haya.
+ */
+const huecos = new Map<symbol, string>();
+
+/**
+ * Los paneles abiertos, en el orden en que se abrieron. **Solo se ve el de
+ * encima** (D21 de `docs/PLAN-SCRUM-KANBAN.md`): abrir una tarea desde el
+ * backlog apilaba los dos paneles a la derecha, uno asomando por debajo del
+ * otro. Ahora el de debajo se esconde —sin desmontarse, así que conserva lo
+ * que tenía— y el de encima ofrece volver a él. Escape y el clic fuera
+ * también son solo del de encima, y de ninguno si hay un `<dialog>` modal.
+ */
+const pila: { id: symbol; etiqueta?: string }[] = [];
+const oyentes = new Set<() => void>();
+let version = 0;
+
+/** Cuándo se cerró el último panel: si otro se abre en el mismo instante, es un relevo. */
+let ultimoCierre = 0;
+
+/**
+ * ¿Este cambio de un panel es un **relevo** —otro panel ocupa o deja el sitio a
+ * la vez— y no una apertura o un cierre de verdad?
+ *
+ * En un relevo no se anima nada: si uno se desliza hacia fuera mientras el otro
+ * entra, durante 300 ms se ven los dos a medias y, entre ellos, el fondo de la
+ * página —el «fondo negro raro»—. El relevo es instantáneo, como cambiar de
+ * pestaña; deslizar queda para abrir desde nada o cerrar del todo.
+ */
+function esRelevo(id: symbol): boolean {
+  return pila.some((p) => p.id !== id) || performance.now() - ultimoCierre < 120;
+}
+
+function avisarPila() {
+  version += 1;
+  for (const oyente of oyentes) oyente();
+}
+
+function suscribirPila(oyente: () => void) {
+  oyentes.add(oyente);
+  return () => oyentes.delete(oyente);
+}
+
+function aplicarHueco() {
+  const valores = [...huecos.values()];
+  const mayor = valores.sort((a, b) => Number.parseFloat(b) - Number.parseFloat(a))[0];
+  document.body.style.paddingRight = mayor ?? '0px';
+}
 
 /**
  * SlideOver panel.
@@ -53,28 +121,50 @@ export function SlideOver({
   children,
   size = 'md',
   tone = 'default',
+  closeOnOutsideClick = true,
+  ariaLabel,
+  etiquetaDeVuelta,
 }: SlideOverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const idDelHueco = useRef(Symbol('slide-over'));
   const dark = tone === 'dark';
 
-  useEffect(() => {
+  /* Se lee la pila en cada cambio: si otro panel se abre encima, este se esconde. */
+  useSyncExternalStore(
+    suscribirPila,
+    () => version,
+    () => 0,
+  );
+  const posicion = pila.findIndex((p) => p.id === idDelHueco.current);
+  const esCima = posicion !== -1 && posicion === pila.length - 1;
+  const visible = open && (posicion === -1 || esCima);
+  const debajo = esCima && posicion > 0 ? pila[posicion - 1] : null;
+
+  useLayoutEffect(() => {
     const isDesktop = window.matchMedia('(min-width: 640px)').matches;
+    const id = idDelHueco.current;
     if (open && isDesktop) {
-      document.body.style.paddingRight = paddingSizes[size];
+      huecos.set(id, paddingSizes[size]);
       document.body.style.transition = 'padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
     } else {
-      document.body.style.paddingRight = '0px';
+      huecos.delete(id);
     }
+    aplicarHueco();
 
     return () => {
-      document.body.style.paddingRight = '0px';
+      huecos.delete(id);
+      aplicarHueco();
     };
   }, [open, size]);
 
   useEffect(() => {
     if (!open) return;
 
+    const id = idDelHueco.current;
+    const esLaDeEncima = () => pila[pila.length - 1]?.id === id;
+
     const handleGlobalClick = (event: MouseEvent) => {
+      if (!closeOnOutsideClick || !esLaDeEncima()) return;
       const target = event.target as Node;
       if (!document.contains(target)) return;
       if (panelRef.current && panelRef.current.contains(target)) return;
@@ -82,7 +172,10 @@ export function SlideOver({
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Escape') return;
+      if (!esLaDeEncima()) return;
+      if (document.querySelector('dialog[open]')) return;
+      onClose();
     };
 
     const timeoutId = setTimeout(() => {
@@ -95,12 +188,58 @@ export function SlideOver({
       document.removeEventListener('click', handleGlobalClick);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open, onClose]);
+  }, [open, onClose, closeOnOutsideClick]);
+
+  /**
+   * Entrar y salir de la pila, **solo cuando cambia `open`**. Estaba en el
+   * efecto de los oyentes, que depende de `onClose`: si esa función cambiaba de
+   * identidad, el panel salía y volvía a entrar —arriba del todo—, tapando al
+   * que de verdad estaba encima. Y en layout, para que el relevo (abajo) vea la
+   * pila ya actualizada antes de pintar.
+   */
+  const etiqueta = useRef(etiquetaDeVuelta);
+  etiqueta.current = etiquetaDeVuelta;
+  useLayoutEffect(() => {
+    if (!open) return;
+    const id = idDelHueco.current;
+    pila.push({ id, etiqueta: etiqueta.current });
+    avisarPila();
+    return () => {
+      const indice = pila.findIndex((p) => p.id === id);
+      if (indice !== -1) pila.splice(indice, 1);
+      ultimoCierre = performance.now();
+      avisarPila();
+    };
+  }, [open]);
+
+  /* Relevo: sin transición en el panel ni en el hueco del `body`. Se decide en
+     una microtarea —después de todos los efectos de layout del mismo commit,
+     antes de pintar— para ver la pila con los dos paneles ya colocados. */
+  const visiblePrevio = useRef(visible);
+  useLayoutEffect(() => {
+    if (visiblePrevio.current === visible) return;
+    visiblePrevio.current = visible;
+    const id = idDelHueco.current;
+    queueMicrotask(() => {
+      const el = panelRef.current;
+      if (!el || !esRelevo(id)) return;
+      el.style.transition = 'none';
+      document.body.style.transition = 'none';
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          el.style.transition = '';
+          document.body.style.transition = 'padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+        }),
+      );
+    });
+  }, [visible]);
 
   return (
     <>
       <div
         ref={panelRef}
+        role={ariaLabel ? 'complementary' : undefined}
+        aria-label={ariaLabel}
         /* `data-tone="dark"` redefine los tokens de color para todo el subárbol
            (ver `theme.css`): los átomos de dentro —Select, SelectorDeFecha,
            Input…— salen en la paleta near-black sin tocarlos uno a uno. El
@@ -113,10 +252,29 @@ export function SlideOver({
             ? 'bg-[#202020] text-white sm:border-white/[0.08]'
             : 'bg-surface text-text-primary sm:border-border',
           sizeClasses[size],
-          open ? 'translate-x-0' : 'translate-x-full',
+          visible ? 'translate-x-0' : 'translate-x-full',
         ].join(' ')}
       >
         <div className="flex h-full flex-col">
+          {debajo?.etiqueta && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="-mt-2 mb-3 flex w-fit cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+            >
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              {debajo.etiqueta}
+            </button>
+          )}
           <header className="mb-6 flex shrink-0 items-start justify-between gap-4">
             <div className="flex flex-col gap-1">
               {title && <h2 className="font-sans text-xl font-bold tracking-tight">{title}</h2>}

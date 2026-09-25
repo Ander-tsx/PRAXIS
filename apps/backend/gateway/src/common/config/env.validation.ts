@@ -119,4 +119,6 @@ export const envValidationSchema = Joi.object({
    * devolvería el navegador a `localhost` desde producción.
    */
   PUBLIC_APP_URL: Joi.string().optional().allow(''),
+  /** Dónde conecta el navegador al tiempo real de los documentos (`wss://` en producción). */
+  COLLAB_PUBLIC_URL: Joi.string().optional().allow(''),
 });

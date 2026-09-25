@@ -8,6 +8,7 @@ import { ChecklistsController } from './checklists.controller';
 import { CommentsController } from './comments.controller';
 import { LabelsController } from './labels.controller';
 import { MyTasksController } from './my-tasks.controller';
+import { TaskDocumentsController } from './task-documents.controller';
 import { TasksController } from './tasks.controller';
 
 /**
@@ -60,6 +61,7 @@ import { TasksController } from './tasks.controller';
     LabelsController,
     CommentsController,
     AttachmentsController,
+    TaskDocumentsController,
   ],
 })
 export class TasksModule {}

@@ -31,6 +31,28 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Borra toda clave que empiece por `prefix`.
+   *
+   * `tasks:board:<id>` se cachea también con sufijos por `columnId`,
+   * `sprintId` y `onlyBacklog` (`findAllTasks`), y un borrado por clave exacta
+   * solo limpiaba la variante sin filtros: quien filtraba heredaba el listado
+   * de quien no filtraba hasta que expirara el TTL. Es la misma trampa que ya
+   * mordió con los agregados de Análisis (`CLAUDE.md`), aquí en tasks-service.
+   *
+   * `SCAN` y no `KEYS`: no bloquea Redis mientras recorre, a costa de no ser
+   * atómico — aceptable para invalidar caché, que como mucho deja una lectura
+   * de más sirviendo un dato viejo por un instante.
+   */
+  async delByPrefix(prefix: string): Promise<void> {
+    let cursor = '0';
+    do {
+      const [next, keys] = await this.client.scan(cursor, 'MATCH', `${prefix}*`, 'COUNT', 100);
+      cursor = next;
+      if (keys.length > 0) await this.client.del(...keys);
+    } while (cursor !== '0');
+  }
+
+  /**
    * Añade un hecho al stream, **con tope**.
    *
    * 🔴 **Sin `MAXLEN` esto no se libera nunca.** Un `XACK` saca la entrada de

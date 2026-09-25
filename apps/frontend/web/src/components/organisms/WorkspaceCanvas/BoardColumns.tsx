@@ -1,7 +1,12 @@
 'use client';
 
 import { moveTaskAction, reorderColumnsAction } from '@/app/(privado)/projects/[id]/actions';
-import { COLUMN_INITIAL_STATE, TASK_INITIAL_STATE } from '@/lib/projects/action-state';
+import { planTaskAction } from '@/app/(privado)/projects/[id]/sprint-actions';
+import {
+  COLUMN_INITIAL_STATE,
+  SPRINT_INITIAL_STATE,
+  TASK_INITIAL_STATE,
+} from '@/lib/projects/action-state';
 import {
   type Board,
   type Column,
@@ -14,7 +19,7 @@ import {
   colors,
   useAccion,
 } from '@praxis/commons';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ColumnTasks } from '../TaskBoard/ColumnTasks';
 import { TaskCard } from '../TaskBoard/TaskCard';
@@ -25,13 +30,34 @@ import { repartirPorColumna, useMovimientosOptimistas } from '../TaskBoard/movim
 import { useArrastreDeTablero } from '../TaskBoard/useArrastreDeTablero';
 import { useReposicionAnimada } from '../TaskBoard/useReposicionAnimada';
 import { AddColumnCard } from './AddColumnCard';
+import { BacklogPanel } from './BacklogPanel';
 import { ColumnMenu } from './ColumnMenu';
 import { MinimizarIcono } from './TableroExpandible';
+import { BACKLOG } from './scrum';
 import { BOARD_SURFACE } from './superficie-tablero';
+
+/**
+ * Lo que un tablero con Scrum añade a sus columnas: el backlog, que se pinta
+ * en un panel lateral pero vive **dentro de este motor de arrastre** como una
+ * columna más (D17 de `docs/PLAN-SCRUM-KANBAN.md`).
+ */
+export interface PlanificacionDelTablero {
+  backlog: Task[];
+  panelAbierto: boolean;
+  onCerrarPanel: () => void;
+  /** Sprint al que entra lo que se suelta en una columna. `null`: se crea al soltar. */
+  sprintDestino: { id: string; name: string } | null;
+  /** Nombre del sprint que se crea si no hay ninguno. */
+  nombreNuevo: string;
+  /** Pasar tareas entre backlog y sprint es editarlas: `canEditTask`. */
+  canPlan: boolean;
+}
 
 export interface BoardColumnsProps {
   board: Board;
   projectId: string;
+  /** Solo en un tablero con Scrum encendido. */
+  planificacion?: PlanificacionDelTablero;
   /**
    * Crear columnas. Es `canCreateColumn`, no `canCreateBoard` como estaba:
    * gatearlo con el de tableros ocultaba el botón a quien sí podía usarlo.
@@ -140,19 +166,38 @@ export function BoardColumns({
   canManageLabels,
   canEditTask,
   canDeleteTask,
+  planificacion,
 }: BoardColumnsProps) {
+  const backlog = planificacion?.backlog;
+  /**
+   * Las tareas tal como son (para el panel de tarea) y tal como las ve el
+   * motor: las del backlog con `columnId = BACKLOG`, para que repartirlas,
+   * moverlas en optimista y medir el hueco sea el mismo código para todas.
+   */
+  const originales = useMemo(() => (backlog ? [...tasks, ...backlog] : tasks), [tasks, backlog]);
+  const todas = useMemo(
+    () => (backlog ? [...tasks, ...backlog.map((t) => ({ ...t, columnId: BACKLOG }))] : tasks),
+    [tasks, backlog],
+  );
   const [columns, setColumns] = useState<Column[]>(() =>
     [...board.columns].sort((a, b) => a.order - b.order),
   );
 
-  const [openTask, setOpenTask] = useState<Task | null>(
-    () => tasks.find((task) => task.id === openTaskId) ?? null,
+  const [openTask, setOpenTaskCrudo] = useState<Task | null>(
+    () => originales.find((task) => task.id === openTaskId) ?? null,
+  );
+  /* Una tarjeta del backlog llega con `columnId = BACKLOG`; el panel necesita
+     la tarea de verdad. */
+  const setOpenTask = useCallback(
+    (task: Task | null) =>
+      setOpenTaskCrudo(task ? (originales.find((t) => t.id === task.id) ?? task) : null),
+    [originales],
   );
 
   const [renderedTask, setRenderedTask] = useState<Task | null>(openTask);
 
   const handleCloseTask = useCallback(() => {
-    setOpenTask(null);
+    setOpenTaskCrudo(null);
   }, []);
 
   /**
@@ -188,11 +233,11 @@ export function BoardColumns({
 
   useEffect(() => {
     if (!recienCreada) return;
-    const nueva = tasks.find((task) => task.id === recienCreada);
+    const nueva = originales.find((task) => task.id === recienCreada);
     if (!nueva) return;
-    setOpenTask(nueva);
+    setOpenTaskCrudo(nueva);
     setRecienCreada(null);
-  }, [tasks, recienCreada]);
+  }, [originales, recienCreada]);
 
   useEffect(() => {
     if (openTask) setRenderedTask(openTask);
@@ -200,10 +245,10 @@ export function BoardColumns({
 
   useEffect(() => {
     if (!openTask) return;
-    const fresh = tasks.find((task) => task.id === openTask.id);
-    if (fresh && fresh !== openTask) setOpenTask(fresh);
-    if (!fresh) setOpenTask(null);
-  }, [tasks, openTask]);
+    const fresh = originales.find((task) => task.id === openTask.id);
+    if (fresh && fresh !== openTask) setOpenTaskCrudo(fresh);
+    if (!fresh) setOpenTaskCrudo(null);
+  }, [originales, openTask]);
 
   /**
    * ⚠️ **La tarea que se pinta también se refresca con el panel cerrado.**
@@ -218,9 +263,9 @@ export function BoardColumns({
    */
   useEffect(() => {
     if (openTask || !renderedTask) return;
-    const fresh = tasks.find((task) => task.id === renderedTask.id);
+    const fresh = originales.find((task) => task.id === renderedTask.id);
     if (fresh && fresh !== renderedTask) setRenderedTask(fresh);
-  }, [tasks, openTask, renderedTask]);
+  }, [originales, openTask, renderedTask]);
 
   /**
    * Columna con el menú abierto. Mientras lo esté, esa columna no se arrastra.
@@ -240,11 +285,12 @@ export function BoardColumns({
 
   const [moveState, moveAction] = useAccion(moveTaskAction, TASK_INITIAL_STATE);
   const [reorderState, reorderAction] = useAccion(reorderColumnsAction, COLUMN_INITIAL_STATE);
+  const [planState, planAction] = useAccion(planTaskAction, SPRINT_INITIAL_STATE);
 
-  const { movimientos, registrar, confirmar, revertir } = useMovimientosOptimistas(tasks);
+  const { movimientos, registrar, confirmar, revertir } = useMovimientosOptimistas(todas);
   const reposicion = useReposicionAnimada();
 
-  const tasksByColumn = repartirPorColumna(tasks, movimientos);
+  const tasksByColumn = repartirPorColumna(todas, movimientos);
 
   /**
    * A qué tarea corresponde cada respuesta.
@@ -268,6 +314,19 @@ export function BoardColumns({
     else confirmar(taskId);
   }, [moveState, revertir, confirmar]);
 
+  /* Lo mismo para los gestos de planificar (backlog ↔ sprint): otra acción,
+     otra cola, el mismo criterio. */
+  const colaDePlan = useRef<string[]>([]);
+  const ultimoPlan = useRef(planState);
+  useEffect(() => {
+    if (planState === ultimoPlan.current) return;
+    ultimoPlan.current = planState;
+    const taskId = colaDePlan.current.shift();
+    if (!taskId) return;
+    if (planState.error) revertir(taskId);
+    else confirmar(taskId);
+  }, [planState, revertir, confirmar]);
+
   /**
    * El servidor manda: cuando la página revalida, el orden que llega sustituye
    * al local. Sin esto, un fallo al guardar dejaría la pantalla mintiendo.
@@ -284,9 +343,14 @@ export function BoardColumns({
       destino: { columnId: string; indice: number },
       cajaDelFantasma: DOMRect | null,
     ) => {
-      const task = tasks.find((candidata) => candidata.id === taskId);
-      const columnaDestino = columns.find((column) => column.id === destino.columnId);
-      if (!task || !columnaDestino) return;
+      const task = todas.find((candidata) => candidata.id === taskId);
+      const destinoEsBacklog = destino.columnId === BACKLOG;
+      const columnaDestino = destinoEsBacklog
+        ? undefined
+        : columns.find((column) => column.id === destino.columnId);
+      if (!task || (!columnaDestino && !destinoEsBacklog)) return;
+      const tocaElBacklog = destinoEsBacklog || task.columnId === BACKLOG;
+      if (tocaElBacklog && !planificacion?.canPlan) return;
 
       const actual = tasksByColumn.get(task.columnId) ?? [];
       const posicionActual = actual.findIndex((candidata) => candidata.id === taskId);
@@ -307,6 +371,12 @@ export function BoardColumns({
       );
       const finales = [...sinLaTarea];
       finales.splice(Math.min(destino.indice, finales.length), 0, task);
+
+      if (tocaElBacklog && planificacion) {
+        planificar(task, destino, finales);
+        return;
+      }
+      if (!columnaDestino) return;
 
       registrar({
         taskId,
@@ -342,7 +412,66 @@ export function BoardColumns({
       colaDeMovimientos.current.push(taskId);
       moveAction(datos);
     },
-    [tasks, columns, tasksByColumn, projectId, moveAction, registrar, reposicion],
+    [todas, columns, tasksByColumn, projectId, moveAction, registrar, reposicion, planificacion],
+  );
+
+  /**
+   * Guarda un gesto que entra o sale del backlog: planificar.
+   *
+   * La tarea cambia de sitio en pantalla al soltar, como cualquier otra, y el
+   * servidor recibe una sola acción que cambia el sprint, la columna y el
+   * orden. Volver al backlog la lleva a la primera columna: el backlog es
+   * trabajo por empezar.
+   */
+  function planificar(task: Task, destino: { columnId: string; indice: number }, finales: Task[]) {
+    if (!planificacion) return;
+    const primera = columns[0];
+    if (!primera) return;
+    const alBacklog = destino.columnId === BACKLOG;
+    const columna = alBacklog ? primera : columns.find((c) => c.id === destino.columnId);
+    if (!columna) return;
+    const desdeElBacklog = task.columnId === BACKLOG;
+
+    registrar({
+      taskId: task.id,
+      columnId: destino.columnId,
+      status: columna.name,
+      indice: destino.indice,
+    });
+
+    /* La columna de verdad de cada vecina: en el backlog, la que ya tenían. */
+    const columnaReal = (id: string) =>
+      alBacklog ? (originales.find((t) => t.id === id)?.columnId ?? primera.id) : columna.id;
+    const renumerar = finales
+      .map((candidata, indice) => ({ candidata, indice }))
+      .filter(({ candidata, indice }) => candidata.id !== task.id && candidata.order !== indice)
+      .map(({ candidata, indice }) => `${candidata.id}:${indice}:${columnaReal(candidata.id)}`)
+      .join(',');
+
+    const datos = new FormData();
+    datos.set('projectId', projectId);
+    datos.set('boardId', board.id);
+    datos.set('taskId', task.id);
+    datos.set('destino', alBacklog ? 'backlog' : columna.id);
+    datos.set('status', columna.name);
+    datos.set('primeraColumna', primera.id);
+    datos.set('order', String(finales.findIndex((t) => t.id === task.id)));
+    datos.set('cambiaSprint', String(desdeElBacklog !== alBacklog));
+    datos.set('sprintId', planificacion.sprintDestino?.id ?? '');
+    datos.set('nombreNuevo', planificacion.nombreNuevo);
+    datos.set('renumerar', renumerar);
+
+    colaDePlan.current.push(task.id);
+    planAction(datos);
+  }
+
+  /** Pasar al sprint o devolver al backlog sin arrastrar: panel de tarea y teclado. */
+  const moverSinArrastrar = useCallback(
+    (taskId: string, columnId: string) => {
+      const indice = (tasksByColumn.get(columnId) ?? []).length;
+      guardarMovimiento(taskId, { columnId, indice }, null);
+    },
+    [tasksByColumn, guardarMovimiento],
   );
 
   const guardarOrdenDeColumnas = useCallback(
@@ -462,7 +591,7 @@ export function BoardColumns({
 
   /** La tarea que viaja, para pintarla dentro del fantasma. */
   const tareaEnVuelo =
-    arrastre?.tipo === 'tarea' ? tasks.find((task) => task.id === arrastre.id) : undefined;
+    arrastre?.tipo === 'tarea' ? todas.find((task) => task.id === arrastre.id) : undefined;
   const columnaEnVuelo =
     arrastre?.tipo === 'columna' ? columns.find((column) => column.id === arrastre.id) : undefined;
 
@@ -531,11 +660,29 @@ export function BoardColumns({
                 />
               </>
             )}
+            {/* Con límite WIP, «3/5»; pasado, en tono de aviso. Es blando (D13
+                de docs/PLAN-SCRUM-KANBAN.md): se dice, no se impide. */}
             <span
               className="rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-white"
-              style={{ background: alpha(colors.border, 60) }}
+              style={{
+                background:
+                  column.wipLimit && deLaColumna.length > column.wipLimit
+                    ? alpha(colors.warning, 25)
+                    : alpha(colors.border, 60),
+                color:
+                  column.wipLimit && deLaColumna.length > column.wipLimit
+                    ? colors.warning
+                    : undefined,
+              }}
+              title={
+                column.wipLimit
+                  ? deLaColumna.length > column.wipLimit
+                    ? `Pasa del límite de ${column.wipLimit} en curso`
+                    : `Límite de ${column.wipLimit} en curso`
+                  : undefined
+              }
             >
-              {deLaColumna.length}
+              {column.wipLimit ? `${deLaColumna.length}/${column.wipLimit}` : deLaColumna.length}
             </span>
             <ColumnMenu
               boardId={board.id}
@@ -544,6 +691,7 @@ export function BoardColumns({
               columnName={column.name}
               columnColor={column.color}
               taskCount={deLaColumna.length}
+              wipLimit={column.wipLimit ?? null}
               canEdit={canEditColumn}
               canDelete={canDeleteColumn}
               onOpenChange={(isOpen) => setMenuOpenColumnId(isOpen ? column.id : null)}
@@ -607,7 +755,7 @@ export function BoardColumns({
     guardarOrdenDeColumnas(next);
   }
 
-  const aviso = moveState.error ?? reorderState.error;
+  const aviso = moveState.error ?? reorderState.error ?? planState.error;
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -818,11 +966,13 @@ export function BoardColumns({
         <TaskMobileMoveSheet
           isOpen={!!mobileMenuTask}
           onClose={() => setMobileMenuTask(null)}
-          columns={columns.map((c) => ({ id: c.id, name: c.name }))}
+          columns={[
+            ...(planificacion?.canPlan ? [{ id: BACKLOG, name: 'Backlog' }] : []),
+            ...columns.map((c) => ({ id: c.id, name: c.name })),
+          ]}
           currentColumnId={mobileMenuTask.columnId}
           onMoveToColumn={(destColId) => {
-            const destIndex = tasksByColumn.get(destColId)?.length ?? 0;
-            guardarMovimiento(mobileMenuTask.id, { columnId: destColId, indice: destIndex }, null);
+            moverSinArrastrar(mobileMenuTask.id, destColId);
           }}
         />
       )}
@@ -846,6 +996,52 @@ export function BoardColumns({
           canEdit={canEditTask}
           canDelete={canDeleteTask}
           onSaved={handleTaskSaved}
+          planificacion={
+            planificacion?.canPlan && columns[0]
+              ? (() => {
+                  const enBacklog = (tasksByColumn.get(BACKLOG) ?? []).some(
+                    (t) => t.id === renderedTask.id,
+                  );
+                  return {
+                    enBacklog,
+                    sprint: planificacion.sprintDestino?.name ?? planificacion.nombreNuevo,
+                    onMover: () =>
+                      moverSinArrastrar(renderedTask.id, enBacklog ? columns[0].id : BACKLOG),
+                  };
+                })()
+              : undefined
+          }
+        />
+      )}
+
+      {planificacion && (
+        <BacklogPanel
+          abierto={planificacion.panelAbierto}
+          onCerrar={planificacion.onCerrarPanel}
+          board={board}
+          projectId={projectId}
+          tareas={tasksByColumn.get(BACKLOG) ?? []}
+          members={members}
+          labels={labels}
+          usersById={usersById}
+          currentUserId={currentUserId}
+          canCreate={canCreateTask}
+          canMove={planificacion.canPlan}
+          canComment={canComment}
+          canManageLabels={canManageLabels}
+          canEdit={canEditTask}
+          canDelete={canDeleteTask}
+          onOpenTask={setOpenTask}
+          openTaskId={openTask?.id ?? null}
+          ultimoGuardado={ultimoGuardado}
+          arrastre={arrastre}
+          destino={destinoTarea}
+          alEmpezarArrastre={empezarArrastreDeTarea}
+          registrarColumna={registrarColumna}
+          registrarLista={registrarLista}
+          registrarTarjeta={registrarTarjeta}
+          registrarReposicion={reposicion.registrar}
+          alDesplazar={reposicion.invalidar}
         />
       )}
     </div>

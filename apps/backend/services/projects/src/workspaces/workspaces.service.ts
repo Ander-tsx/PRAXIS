@@ -22,7 +22,7 @@ export class WorkspacesService {
     let workspace: Awaited<ReturnType<typeof this.prisma.workspace.create>>;
     try {
       workspace = await this.prisma.workspace.create({
-        data: { name: dto.name, projectId: dto.projectId },
+        data: { name: dto.name, projectId: dto.projectId, kind: dto.kind ?? 'BOARDS' },
       });
     } catch (error) {
       /**

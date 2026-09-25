@@ -118,6 +118,29 @@ export enum ProjectPermission {
    * sus tableros, espacios, tareas y miembros.
    */
   CAN_DELETE_PROJECT = 'canDeleteProject',
+
+  /**
+   * Crear, iniciar y cerrar sprints en un tablero con Scrum encendido.
+   *
+   * Acotado a propósito, en vez de reusar `canEditBoard`: un equipo puede
+   * querer que alguien edite tareas sin poder decidir cuándo arranca o
+   * termina un sprint — esa decisión suele ser de quien lleva el proceso, no
+   * de todo el equipo. `canEditBoard` lo implica por jerarquía, así que quien
+   * ya administra la estructura del tablero no pierde nada.
+   *
+   * No cubre encender o apagar Scrum en el tablero (`Board.scrumEnabled`):
+   * eso es una propiedad del tablero, como su nombre, y sigue pidiendo
+   * `canEditBoard` directamente. Ver `docs/PLAN-SCRUM-KANBAN.md`, D1 y D7.
+   */
+  CAN_MANAGE_SPRINT = 'canManageSprint',
+
+  /**
+   * Crear, editar y borrar los documentos de los espacios del proyecto.
+   *
+   * Leerlos pide `canViewProject`. Lo implica `canEditTask` por jerarquía:
+   * quien escribe el trabajo escribe sus notas. Ver `docs/PLAN-DOCUMENTOS.md`, D3.
+   */
+  CAN_EDIT_DOCUMENTS = 'canEditDocuments',
 }
 
 /** Claves válidas de un mapa de permisos. Se usa para validar lo que llega. */

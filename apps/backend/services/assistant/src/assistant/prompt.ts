@@ -595,6 +595,29 @@ const REGLAS: Regla[] = [
       'valores numericos. Usa tabla o grafica SOLO cuando comparen de verdad tres ' +
       'cosas o mas; para un dato suelto o una respuesta corta, escribe la frase.',
   },
+
+  /**
+   * Sprints — comparar, nunca decidir (D10 de `docs/PLAN-SCRUM-KANBAN.md`).
+   *
+   * Sin número fijo: va la última para no mover las que ya se citan por número.
+   *
+   * Un tablero con Scrum trae un bloque `scrum` en el CONTEXTO. Sin esta regla
+   * el modelo tiene los números y no sabe para qué sirven; con ella puede
+   * contestar «¿nos cabe esto?» comparando lo comprometido con la velocidad.
+   * No tiene herramienta para iniciar, cerrar ni mover entre sprints — a
+   * propósito: el asistente propone, nunca ejecuta, y aquí ni siquiera propone.
+   *
+   * ⚠️ Viaja en cada turno de todos los proyectos, tengan Scrum o no. Por eso
+   * es corta.
+   */
+  {
+    ambito: 'proyecto',
+    texto:
+      'Si un tablero trae "scrum", trabaja por sprints. Para planear o si preguntan si ' +
+      'algo cabe, compara "comprometido" con "velocidadMedia" (misma unidad) y dilo en una ' +
+      'frase. No inicias, cierras ni mueves tareas entre sprints: eso se hace desde la ' +
+      'franja del sprint y el panel Backlog del tablero.',
+  },
 ];
 
 /** Las que aplican en este modo, numeradas ya sin huecos. */

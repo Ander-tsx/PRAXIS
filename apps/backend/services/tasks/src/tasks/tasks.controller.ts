@@ -114,6 +114,68 @@ export class TasksController {
     return this.tasksService.restatusTasks(dto);
   }
 
+  // ─── Sprints (D6 de `docs/PLAN-SCRUM-KANBAN.md`) ──────────────────────────
+
+  /** Las tareas de un sprint que todavía no están cerradas. */
+  @MessagePattern({ cmd: 'task_pending_in_sprint' })
+  pendingInSprint(@Payload() dto: { boardId: string; sprintId: string }) {
+    return this.tasksService.pendingInSprint(dto.boardId, dto.sprintId);
+  }
+
+  /**
+   * Cuánto hay y cuánto está hecho en cada sprint, en tareas y en puntos. Lo
+   * usa el briefing del asistente para hablar de capacidad (P3.3).
+   */
+  @MessagePattern({ cmd: 'task_sprint_summary' })
+  sprintSummary(@Payload() dto: { sprintIds: string[] }) {
+    return this.tasksService.sprintSummary(dto.sprintIds ?? []);
+  }
+
+  /**
+   * Mueve un lote de tareas de un sprint a otro, o al backlog (`toSprintId:
+   * null`). Lo llaman el cierre de sprint y las rutas de sprint del gateway, que ya validaron.
+   */
+  @MessagePattern({ cmd: 'task_reassign_sprint' })
+  reassignSprint(
+    @Payload()
+    dto: {
+      boardId: string;
+      fromSprintId: string | null;
+      taskIds: string[];
+      toSprintId: string | null;
+      carry?: boolean;
+    },
+  ) {
+    return this.tasksService.reassignSprint(dto);
+  }
+
+  /** Filas mínimas para burndown y velocidad, sin tope de página (auditoría S2). */
+  @MessagePattern({ cmd: 'task_sprint_metric_rows' })
+  sprintMetricRows(@Payload() dto: { sprintIds: string[] }) {
+    return this.tasksService.sprintMetricRows(dto.sprintIds ?? []);
+  }
+
+  // ─── Documentos vinculados (E9 de `docs/PLAN-DOCUMENTOS.md`) ──────────────
+
+  @MessagePattern({ cmd: 'task_documents' })
+  taskDocuments(@Payload() dto: { taskId: string; projectId: string }) {
+    return this.tasksService.taskDocuments(dto.taskId, dto.projectId);
+  }
+
+  @MessagePattern({ cmd: 'task_document_link' })
+  linkDocument(
+    @Payload() dto: { taskId: string; projectId: string; documentId: string; requesterId: string },
+  ) {
+    return this.tasksService.linkDocument(dto);
+  }
+
+  @MessagePattern({ cmd: 'task_document_unlink' })
+  unlinkDocument(
+    @Payload() dto: { taskId: string; projectId: string; documentId: string; requesterId: string },
+  ) {
+    return this.tasksService.unlinkDocument(dto);
+  }
+
   // ─── Etiquetas ────────────────────────────────────────────────────────────
 
   @MessagePattern({ cmd: 'label_find_all' })

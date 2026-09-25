@@ -17,7 +17,9 @@ export const PERMISSION_GROUPS: { title: string; permissions: ProjectPermission[
     permissions: ['canViewProject', 'canMoveTask', 'canComment'],
   },
   { title: 'Tableros', permissions: ['canCreateBoard', 'canEditBoard', 'canDeleteBoard'] },
+  { title: 'Sprints', permissions: ['canManageSprint'] },
   { title: 'Etiquetas', permissions: ['canManageLabels'] },
+  { title: 'Documentos', permissions: ['canEditDocuments'] },
   { title: 'Columnas', permissions: ['canCreateColumn', 'canEditColumn', 'canDeleteColumn'] },
   { title: 'Tareas', permissions: ['canCreateTask', 'canEditTask', 'canDeleteTask'] },
   /* Los dos del proyecto van juntos y al final: son los de mayor alcance, y

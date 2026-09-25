@@ -36,8 +36,10 @@ module.exports = {
     {
       name: 'web',
       cwd: '/app/apps/frontend/web',
-      script: 'node_modules/next/dist/bin/next',
-      args: 'start --port 4100',
+      /* `server.mjs` y no `next start`: es Next tal cual más el reenvío del
+         WebSocket del tiempo real de los documentos, porque el `api` no tiene
+         dominio público y el navegador solo llega a `web`. Ver ese archivo. */
+      script: 'server.mjs',
       interpreter: 'node',
       /* Mismo motivo que en el backend (ver backend.pm2.config.cjs): sin techo
          al heap de V8, el arranque en frío de un deploy puede inflar la
@@ -54,7 +56,7 @@ module.exports = {
       kill_timeout: 10000,
       merge_logs: true,
       time: false,
-      env: { NODE_ENV, GATEWAY_URL, JWT_SECRET },
+      env: { NODE_ENV, GATEWAY_URL, JWT_SECRET, PORT: 4100 },
     },
   ],
 };

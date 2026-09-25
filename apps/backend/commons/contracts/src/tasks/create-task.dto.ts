@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -77,6 +78,36 @@ export class CreateTaskBodyDto {
   @IsOptional()
   @IsUUID('4')
   parentTaskId?: string;
+
+  /**
+   * A qué sprint entra. Lo decide el cliente, y las dos respuestas válidas
+   * significan cosas distintas:
+   *
+   * - **Ausente** (la clave no viaja en el cuerpo): el gateway decide — si el
+   *   tablero tiene Scrum encendido y hay un sprint activo, la ata a ese
+   *   sprint; si no, queda en `null`. Es lo que manda "Añadir tarea" desde una
+   *   columna del Kanban.
+   * - **`null` explícito**: queda en el backlog del tablero, sin importar si
+   *   hay un sprint activo. Es lo que manda "Añadir tarea" desde el Backlog.
+   *
+   * Ver `docs/PLAN-SCRUM-KANBAN.md`, D12.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID('4')
+  sprintId?: string | null;
+
+  /**
+   * Puntos de estimación, sin escala impuesta (D4 de
+   * `docs/PLAN-SCRUM-KANBAN.md`). `null` borra la estimación: sin estimar no
+   * es lo mismo que cero.
+   */
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(999)
+  estimatePoints?: number | null;
 }
 
 /** Payload al microservicio: el cuerpo + lo que inyecta el gateway. */
@@ -91,4 +122,10 @@ export class CreateTaskDto extends CreateTaskBodyDto {
   /** Resuelto por el guard desde la ruta, no por el cliente. */
   @IsUUID('4')
   projectId: string;
+}
+
+/** Cuerpo de `POST /tasks/:taskId/documents` (E9 de `docs/PLAN-DOCUMENTOS.md`). */
+export class LinkTaskDocumentBodyDto {
+  @IsUUID('4')
+  documentId: string;
 }

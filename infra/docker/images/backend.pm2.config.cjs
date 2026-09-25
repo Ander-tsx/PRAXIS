@@ -56,6 +56,8 @@ const {
   /* ⚠️ La base de los enlaces de los correos. Con el valor por defecto de
      desarrollo, cada confirmación apuntaría a la máquina de quien la abre. */
   PUBLIC_APP_URL = 'http://localhost:4100',
+  /* `wss://<dominio de web>/api/collab`. Ver el proceso `collab`. */
+  COLLAB_PUBLIC_URL = '',
   /* Los adjuntos del chat. Solo los usa projects-service; el resto de
      procesos ni los recibe. "postgres" es el mismo valor por defecto que en
      desarrollo — sin bucket configurado, el driver de GCS ni se instancia. */
@@ -290,10 +292,29 @@ module.exports = {
 
     /* Lo único que escucha fuera del contenedor. El health check del
        balanceador pega en `/api` — con el prefijo global, no en `/`. */
+    /* El tiempo real de los documentos (docs/PLAN-DOCUMENTOS.md, E3). Escucha
+       en loopback. El navegador llega por `wss://<web>/api/collab`: `web`
+       (server.mjs) lo reenvía al gateway por la red privada y el gateway
+       (collab-proxy.ts) a este proceso. No tiene base propia: carga y guarda
+       por projects-service. */
+    proceso('collab', '/app/apps/backend/services/collab', {
+      ...comun,
+      COLLAB_PORT: 3010,
+      JWT_SECRET,
+      PROJECTS_SERVICE_HOST: rutas.PROJECTS_SERVICE_HOST,
+      PROJECTS_SERVICE_PORT: rutas.PROJECTS_SERVICE_PORT,
+    }),
     proceso('gateway', '/app/apps/backend/gateway', {
       ...comun,
       HTTP_PORT: 3000,
       JWT_SECRET,
+      /* Adónde se conecta el navegador para el tiempo real: el dominio público
+         de `web` con `/api/collab` (el `api` no tiene dominio público). Sin
+         ella, el billete apunta a localhost y el editor se queda
+         «Conectando…» en producción. */
+      COLLAB_PUBLIC_URL,
+      COLLAB_SERVICE_HOST: '127.0.0.1',
+      COLLAB_SERVICE_PORT: 3010,
       /* ⚠️ El gateway necesita Redis, y esto es fácil de pasar por alto porque
          durante mucho tiempo no lo necesitó: es el único que mantiene abiertas
          las conexiones SSE de los avisos en vivo, y se suscribe al canal donde
