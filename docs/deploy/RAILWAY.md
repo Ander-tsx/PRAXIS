@@ -113,10 +113,11 @@ Railway les da variables propias (`DATABASE_URL`, `PGHOST`, `PGPORT`, `PGUSER`,
    STORAGE_DRIVER=postgres
 
    # Tiempo real de los documentos (docs/PLAN-DOCUMENTOS.md, E3). El dominio
-   # público de ESTE servicio con /api/collab: el gateway reenvía los WebSocket
-   # de esa ruta a collab, que escucha dentro del contenedor. Sin ella, el
-   # editor se queda en «Conectando…».
-   COLLAB_PUBLIC_URL=wss://api-XXXX.up.railway.app/api/collab
+   # público de `web` con /api/collab: el `api` no tiene dominio público, así
+   # que el WebSocket entra por `web` (server.mjs), que lo reenvía al gateway
+   # por la red privada, y el gateway a collab dentro de este contenedor. Sin
+   # ella, el editor se queda en «Conectando…».
+   COLLAB_PUBLIC_URL=wss://<dominio de web>/api/collab
    ```
 
 ### 4. Servicio `web`
@@ -179,7 +180,7 @@ build y el deploy. El `migrar.sh` del pre-deploy corre en cada release.
 | `REDIS_URL` | ✅ | — | plugin Redis (`${{Redis.REDIS_URL}}`) |
 | `GATEWAY_URL` | — | ✅ | `http://api.railway.internal:3000` |
 | `PUBLIC_APP_URL` | ✅ | — | dominio público de `web` (también la base de los enlaces `/d/…` de documentos compartidos) |
-| `COLLAB_PUBLIC_URL` | ✅ | — | `wss://` + dominio público de `api` + `/api/collab` |
+| `COLLAB_PUBLIC_URL` | ✅ | — | `wss://` + dominio público de **`web`** + `/api/collab` (entra por `web/server.mjs`) |
 | `GEMINI_API_KEY` | ✅ (opc.) | — | aistudio.google.com/apikey |
 | `MAIL_API_KEY` / `MAIL_FROM` | ✅ (opc.) | — | Resend |
 | `STRIPE_*` | ✅ (opc.) | — | dashboard de Stripe (webhook secret nuevo) |

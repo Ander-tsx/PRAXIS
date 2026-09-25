@@ -56,7 +56,7 @@ const {
   /* ⚠️ La base de los enlaces de los correos. Con el valor por defecto de
      desarrollo, cada confirmación apuntaría a la máquina de quien la abre. */
   PUBLIC_APP_URL = 'http://localhost:4100',
-  /* `wss://<dominio del api>/api/collab`. Ver el proceso `collab`. */
+  /* `wss://<dominio de web>/api/collab`. Ver el proceso `collab`. */
   COLLAB_PUBLIC_URL = '',
   /* Los adjuntos del chat. Solo los usa projects-service; el resto de
      procesos ni los recibe. "postgres" es el mismo valor por defecto que en
@@ -293,9 +293,10 @@ module.exports = {
     /* Lo único que escucha fuera del contenedor. El health check del
        balanceador pega en `/api` — con el prefijo global, no en `/`. */
     /* El tiempo real de los documentos (docs/PLAN-DOCUMENTOS.md, E3). Escucha
-       en loopback: el navegador llega a él por el gateway, `wss://<api>/api/
-       collab` (ver `collab-proxy.ts`), porque Railway publica un solo puerto
-       por servicio. No tiene base propia: carga y guarda por projects-service. */
+       en loopback. El navegador llega por `wss://<web>/api/collab`: `web`
+       (server.mjs) lo reenvía al gateway por la red privada y el gateway
+       (collab-proxy.ts) a este proceso. No tiene base propia: carga y guarda
+       por projects-service. */
     proceso('collab', '/app/apps/backend/services/collab', {
       ...comun,
       COLLAB_PORT: 3010,
@@ -308,8 +309,9 @@ module.exports = {
       HTTP_PORT: 3000,
       JWT_SECRET,
       /* Adónde se conecta el navegador para el tiempo real: el dominio público
-         del propio `api` con `/api/collab`. Sin ella, el billete apunta a
-         localhost y el editor se queda «Conectando…» en producción. */
+         de `web` con `/api/collab` (el `api` no tiene dominio público). Sin
+         ella, el billete apunta a localhost y el editor se queda
+         «Conectando…» en producción. */
       COLLAB_PUBLIC_URL,
       COLLAB_SERVICE_HOST: '127.0.0.1',
       COLLAB_SERVICE_PORT: 3010,

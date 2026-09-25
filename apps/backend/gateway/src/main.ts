@@ -5,9 +5,9 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from '@praxis/observability';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { montarProxyDeCollab } from './collab-proxy';
 import { StandardExceptionFilter } from './common/filters/standard-exception.filter';
 import { StandardResponseInterceptor } from './common/interceptors/standard-response.interceptor';
-import { montarProxyDeCollab } from './collab-proxy';
 
 async function bootstrap() {
   /**

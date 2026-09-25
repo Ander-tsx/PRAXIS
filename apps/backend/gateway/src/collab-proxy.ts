@@ -9,10 +9,11 @@ export const RUTA_COLLAB = '/api/collab';
  * Reenvía los WebSocket de `/api/collab` a `collab-service` (E3 de
  * `docs/PLAN-DOCUMENTOS.md`).
  *
- * En Railway cada servicio publica **un** puerto, y el del contenedor del
- * backend es el 3000 del gateway. Collab escucha en `127.0.0.1:3010`, dentro
- * del mismo contenedor, así que el navegador llega a él por aquí:
- * `wss://<api>/api/collab`. No se abre un segundo dominio ni un servicio más.
+ * Collab escucha en `127.0.0.1:3010`, dentro del contenedor del backend, y
+ * el único puerto que sale de él es el 3000 del gateway. En Railway el `api`
+ * ni siquiera tiene dominio público: el navegador entra por `web`
+ * (`wss://<web>/api/collab`, ver `apps/frontend/web/server.mjs`), que lo
+ * reenvía aquí por la red privada. En local se conecta aquí directo.
  *
  * El reenvío es a nivel de socket —la petición de `upgrade` tal cual y luego
  * los bytes en las dos direcciones—, sin librería: no hay nada que entender del
