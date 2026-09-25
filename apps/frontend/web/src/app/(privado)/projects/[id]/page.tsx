@@ -436,7 +436,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     return { sprints, tareas, backlog, metricas };
   }
 
-  const [boardTasks, scrumDeTableros, documentos] = await Promise.all([
+  const [boardTasks, scrumDeTableros, documentos, historiales] = await Promise.all([
     Promise.all(
       visibleBoards
         .filter((board) => !board.scrumEnabled)
@@ -459,7 +459,21 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           .get<ProjectDocument[]>(`/workspaces/${activeWorkspace.id}/documents`)
           .catch(() => [] as ProjectDocument[])
       : Promise.resolve([] as ProjectDocument[]),
+    /* Los sprints de los tableros **sin** Scrum: si alguna vez lo tuvieron, su
+       historial sigue consultable desde el menú del tablero (invariante 3 y
+       auditoría S8). Una lista corta por tablero. */
+    Promise.all(
+      visibleBoards
+        .filter((board) => !board.scrumEnabled)
+        .map((board) =>
+          api
+            .get<Sprint[]>(`/boards/${board.id}/sprints`)
+            .then((sprints) => [board.id, sprints.filter((x) => x.status === 'CLOSED')] as const)
+            .catch(() => [board.id, [] as Sprint[]] as const),
+        ),
+    ),
   ]);
+  const historialByBoard = new Map(historiales.filter(([, sprints]) => sprints.length > 0));
   /* Para el resto de la página, el tablero Scrum «tiene» las tareas de su
      sprint: son las que se ven, y las que cuenta la pestaña del tablero. */
   for (const [boardId, datos] of scrumDeTableros) boardTasks.push([boardId, datos.tareas]);
@@ -545,7 +559,9 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
        y con un nombre largo además se truncaba. La cabecera nombra la sección,
        igual que el enlace de la barra lateral por el que se llega. */
     <AppHeader title="Proyectos" lleno={esTablero}>
-      <div className={esTablero ? 'flex min-h-0 flex-1 flex-col gap-3' : 'flex flex-col gap-6'}>
+      {/* El mismo `gap` en todas las pestañas: era `gap-3` en Espacios y `gap-6`
+          en las demás, y la cabecera saltaba de sitio al cambiar de sección. */}
+      <div className={esTablero ? 'flex min-h-0 flex-1 flex-col gap-4' : 'flex flex-col gap-4'}>
         {/* Antes de la cabecera: es la condición que explica todo lo que sigue. */}
         {suspendido && (
           <div className="shrink-0">
@@ -678,6 +694,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             canManageLabels={can.canManageLabels}
             canDeleteTask={can.canDeleteTask}
             scrumByBoard={scrumByBoard}
+            historialByBoard={historialByBoard}
             /* Planear, iniciar y cerrar sprints. Encender Scrum en el tablero
                sigue siendo `canEditBoard` (D1 y D7). */
             canManageSprint={can.canManageSprint ?? false}

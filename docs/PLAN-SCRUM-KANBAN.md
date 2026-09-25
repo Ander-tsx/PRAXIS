@@ -387,6 +387,24 @@ Encender no mueve nada, pero lo que el equipo *ve* es su tablero en blanco
 al Sprint 1** (planeado, no en marcha) o dejarlas todas en el backlog.
 Apagar Scrum con un sprint en marcha no se puede: primero se cierra (S8).
 
+### D21 — Sprint y Backlog son dos paneles gemelos, y nunca se apilan
+
+Pedido por el dueño del producto al probar D18 (2026-09-25): el `⋯` del
+sprint, a un palmo del `⋯` del tablero, eran dos menús iguales para cosas
+distintas; y abrir una tarea desde el backlog apilaba los dos paneles.
+
+- La franja tiene **dos botones iguales**, «Sprint» y «Backlog», y cada uno
+  abre su panel lateral. Solo uno a la vez.
+- El panel del sprint (`SprintPanel`) lo tiene todo: nombre, meta y fechas
+  editables en el sitio, cómo va, el burndown, **quién lleva qué** (R4) y los
+  sprints anteriores con lo que dejó cada cierre (S15, `Sprint.closeSummary`).
+  Empezar, cerrar y descartar siguen siendo diálogos: son decisiones.
+- **`SlideOver` solo enseña el de encima.** Si se abre una tarea con el
+  backlog abierto, el backlog se esconde —sin perder su estado— y la tarea
+  ofrece «‹ Backlog» para volver. Vale para cualquier pareja de paneles de la
+  aplicación, no solo para estos.
+- Los diálogos van en la paleta cálida (`Dialog tone="dark"`, título en sans).
+
 ### D11 — Se implementa tocando `apps/backend/` directo, en esta rama
 
 Sin pasar por `PENDIENTES-BACKEND.md`: el equipo de frontend lo trabaja con
@@ -760,7 +778,7 @@ Scrum básico · 🟡 confunde o es inconsistente · ⚪ higiene.
   **Arreglo:** diálogo al encender que diga qué va a pasar y ofrezca *«Empezar
   el primer sprint con las N tareas abiertas que ya están en columnas»*.
 
-- [ ] **S8 — Apagar Scrum no se comporta como dicen D1 y el invariante 3.**
+- [x] **S8 — Apagar Scrum no se comporta como dicen D1 y el invariante 3.**
   - Reproducido: `POST …/start` con Scrum **apagado** → 201. `createSprint`
     lo comprueba; `startSprint` no.
   - Apagar con un sprint activo lo deja `ACTIVE` y con el reloj corriendo;
@@ -806,10 +824,10 @@ Scrum básico · 🟡 confunde o es inconsistente · ⚪ higiene.
   cuenta **tareas** («1/4 hechas»), la vista Sprint **puntos** («3 de 18 ·
   17 %»), y la pestaña del tablero cuenta **todo el historial** («Equipo Web
   11» con 4 en el Kanban).
-- [ ] **S14 — Calendario y Tabla filtradas al sprint esconden las fechas
+- [x] **S14 — Calendario y Tabla filtradas al sprint esconden las fechas
   límite del backlog**, y no queda ninguna vista con todas las tareas del
   tablero. Para un equipo, la Tabla es justo donde se refina el backlog.
-- [ ] **S15 — Cerrar un sprint no deja nada que revisar.** Sin resumen al
+- [x] **S15 — Cerrar un sprint no deja nada que revisar.** Sin resumen al
   cerrar (qué se terminó, qué pasó al siguiente, alcance añadido), el
   historial son barras sin enlace y un sprint cerrado no se puede abrir.
   La *Sprint Review* no tiene soporte.
@@ -840,7 +858,7 @@ Scrum básico · 🟡 confunde o es inconsistente · ⚪ higiene.
 - [x] **S21 — «→ columna» deja meter una tarea directamente en Done.** Entra
   completada y cuenta como hecha el mismo día sin haberse trabajado en el
   sprint. Ofrecer solo columnas que no cierran.
-- [ ] **S22 — Estimar es escribir un número a mano.** D4 se mantiene (sin
+- [x] **S22 — Estimar es escribir un número a mano.** D4 se mantiene (sin
   escala impuesta), pero unos atajos 1·2·3·5·8·13 junto al campo, y poder
   estimar desde el backlog, ahorran la mitad de una sesión de refinamiento.
 
@@ -866,7 +884,7 @@ Scrum básico · 🟡 confunde o es inconsistente · ⚪ higiene.
   burndown, y en el móvil casi no se encuentra.
 - [x] **R3 — La franja da la puerta a la vista Sprint en el móvil**: un botón
   «Sprint» explícito, no el nombre como enlace invisible (S11).
-- [ ] **R4 — La vista Sprint enseña las tareas**, agrupadas por persona, entre
+- [x] **R4 — La vista Sprint enseña las tareas**, agrupadas por persona, entre
   las barras y el burndown. Hoy dice cuántas hay por columna pero no cuáles,
   que es lo primero que se pregunta en la daily.
 - [x] **R5 — El panel del backlog cambia «→ columna» por «Al sprint»**
@@ -874,7 +892,7 @@ Scrum básico · 🟡 confunde o es inconsistente · ⚪ higiene.
   filas se abren con un clic (S6).
 - [x] **R6 — La pestaña del tablero cuenta lo del sprint en curso**, no el
   historial (S13).
-- [ ] **R7 — Tabla con selector de alcance**: *Sprint en curso · Backlog ·
+- [x] **R7 — Tabla con selector de alcance**: *Sprint en curso · Backlog ·
   Todo · Sprint X*. El Kanban sigue siendo solo el sprint (D12 no se toca);
   Tabla y Calendario pasan a ser donde se ve el resto (S14).
 
@@ -965,4 +983,20 @@ quitó; el backlog, en cambio, no pinta su contenido cerrado.
   no en el mismo fotograma que la tarjeta.
 - La tabla «Lo que un equipo Scrum necesita» (retro, papel de Scrum Master,
   avisos) sigue siendo producto por decidir.
+
+### 2026-09-25 — Pendientes cerrados (bloque 0 de la etapa 2 de Documentos)
+
+- D21: panel del sprint, paneles que no se apilan, diálogos cálidos.
+- S8: los sprints cerrados de un tablero sin Scrum se leen en su menú
+  («Sprints anteriores»). S14/R7: Tabla y Calendario con Sprint · Backlog ·
+  Todo. S15: `closeSummary` al cerrar. S22: atajos 1·2·3·5·8·13. R4: quién
+  lleva qué, en el panel del sprint.
+- **Arrastrar desde el backlog ya no desplaza el tablero solo.** Se entraba a
+  la pista por su borde derecho, que es la franja de autodesplazamiento. Ahora
+  se **arma** al pasar por el interior de la pista, o tras 450 ms quieto en el
+  borde (`armarHorizontal` en `useArrastreDeTablero`).
+- La cabecera del proyecto tenía `gap-3` en Espacios y `gap-6` en el resto:
+  saltaba al cambiar de sección. `gap-4` en todas.
+- ⚠️ **`biome check --write` sobre una carpeta entera reformatea archivos
+  ajenos.** Se pasa solo sobre los archivos tocados.
 

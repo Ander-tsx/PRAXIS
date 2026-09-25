@@ -230,7 +230,7 @@ export class SprintsService {
    * reasignación falla a mitad de camino, el sprint sigue `ACTIVE` y nada
    * queda en un estado a medias — cerrado pero con tareas todavía apuntándolo.
    */
-  async markSprintClosed(id: string, boardId: string) {
+  async markSprintClosed(id: string, boardId: string, summary?: Record<string, number>) {
     const sprint = await this.prisma.sprint.findUnique({ where: { id } });
     if (!sprint) {
       throw new RpcException({ statusCode: 404, message: 'Sprint no encontrado' });
@@ -247,7 +247,7 @@ export class SprintsService {
 
     const updated = await this.prisma.sprint.update({
       where: { id },
-      data: { status: 'CLOSED', closedAt: new Date() },
+      data: { status: 'CLOSED', closedAt: new Date(), ...(summary && { closeSummary: summary }) },
     });
 
     await this.redis.del(`sprints:board:${boardId}`);

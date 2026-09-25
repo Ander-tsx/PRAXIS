@@ -31,13 +31,12 @@ import {
 } from './scrum';
 
 /**
- * Los diálogos del sprint. Viven aparte de la franja (`SprintStrip`) para que
- * ella solo decida **qué** se abre; aquí está el **cómo**.
+ * Los diálogos del sprint: las tres **decisiones** —empezar, cerrar,
+ * descartar—. Todo lo demás del sprint (meta, fechas, progreso, historial)
+ * vive en su panel lateral, `SprintPanel` (D21 de `docs/PLAN-SCRUM-KANBAN.md`).
  *
- * Sustituyen a la vista «Sprint», que tenía pocas cosas para ser una pantalla
- * propia (D18 de `docs/PLAN-SCRUM-KANBAN.md`): empezar y editar son un
- * formulario, cerrar es una decisión, y el progreso es una consulta. Ninguna
- * de las tres necesita sacarte del tablero.
+ * Van en tono cálido (`tone="dark"`): son la paleta de la aplicación, no la
+ * azulada de antes.
  */
 
 const CAMPO =
@@ -122,6 +121,7 @@ export function FormularioDeSprint({
 
   return (
     <Dialog
+      tone="dark"
       open={abierto}
       onClose={onCerrar}
       title={modo === 'empezar' ? `Empezar ${sprint.name}` : 'Editar sprint'}
@@ -268,7 +268,7 @@ export function CerrarSprintDialog({
   const columnaDe = (id: string) => board.columns.find((c) => c.id === id)?.name ?? '';
 
   return (
-    <Dialog open={abierto} onClose={onCerrar} title={`Cerrar ${sprint.name}`} size="lg">
+    <Dialog tone="dark" open={abierto} onClose={onCerrar} title={`Cerrar ${sprint.name}`} size="lg">
       <div className="flex flex-col gap-5">
         <dl className="grid grid-cols-2 gap-3">
           <Cifra etiqueta="Terminadas" valor={hechas} />
@@ -359,7 +359,9 @@ function Cifra({ etiqueta, valor, aviso }: { etiqueta: string; valor: number; av
   return (
     <div className="flex flex-col gap-0.5 rounded-xl border border-border px-4 py-3">
       <dt className="font-sans text-xs text-text-secondary">{etiqueta}</dt>
-      <dd className={`font-display text-3xl ${aviso ? 'text-warning' : 'text-text-primary'}`}>
+      <dd
+        className={`font-sans text-3xl font-semibold tabular-nums ${aviso ? 'text-warning' : 'text-text-primary'}`}
+      >
         {valor}
       </dd>
     </div>
@@ -406,7 +408,13 @@ export function DescartarSprintDialog({
   useAlConfirmar(estado.done, onCerrar);
 
   return (
-    <Dialog open={abierto} onClose={onCerrar} title={`Descartar ${sprint.name}`} size="sm">
+    <Dialog
+      tone="dark"
+      open={abierto}
+      onClose={onCerrar}
+      title={`Descartar ${sprint.name}`}
+      size="sm"
+    >
       <p className="font-sans text-sm text-text-secondary">
         {tareas === 0
           ? 'No tiene tareas.'
@@ -437,171 +445,5 @@ export function DescartarSprintDialog({
         </Button>
       </div>
     </Dialog>
-  );
-}
-
-/* ─── Progreso ──────────────────────────────────────────────────────────── */
-
-/**
- * Cómo va el sprint y cómo fueron los anteriores. Es una consulta, así que es
- * un diálogo que se abre desde la barra de progreso de la franja, no una
- * pantalla.
- */
-export function ProgresoDialog({
-  abierto,
-  onCerrar,
-  sprint,
-  sprints,
-  metricas,
-  unidad,
-}: {
-  abierto: boolean;
-  onCerrar: () => void;
-  sprint: Sprint;
-  sprints: Sprint[];
-  metricas: SprintMetrics;
-  unidad: Unidad;
-}) {
-  const burndown = useMemo(
-    () => calcularBurndown(sprint, metricas.tasks, unidad),
-    [sprint, metricas.tasks, unidad],
-  );
-  const cerrados = useMemo(
-    () => sprintsCerrados(sprints).filter((s) => metricas.velocitySprintIds.includes(s.id)),
-    [sprints, metricas.velocitySprintIds],
-  );
-  const velocidad = useMemo(
-    () => calcularVelocidad(cerrados, metricas.tasks, unidad),
-    [cerrados, metricas.tasks, unidad],
-  );
-
-  const delSprint = metricas.tasks.filter((t) => t.sprintId === sprint.id);
-  const total = delSprint.reduce((s, t) => s + valor(t, unidad), 0);
-  const hecho = delSprint.filter((t) => t.completedAt).reduce((s, t) => s + valor(t, unidad), 0);
-  const totalDias = burndown?.dias.length ?? 0;
-  const dias = diasRestantes(sprint);
-  const transcurridos = dias === null ? 0 : Math.min(totalDias, Math.max(0, totalDias - dias + 1));
-  const pctTiempo = totalDias === 0 ? 0 : Math.round((transcurridos / totalDias) * 100);
-  const pctTrabajo = total === 0 ? 0 : Math.round((hecho / total) * 100);
-  const vencido = dias !== null && dias < 1;
-  const diferencia = pctTrabajo - pctTiempo;
-  /* Los primeros días todo parece «al ritmo» o «por detrás»: sin trabajo
-     cerrado todavía no hay nada que juzgar. */
-  const veredicto =
-    total === 0
-      ? 'El sprint está vacío.'
-      : pctTrabajo === 100
-        ? 'Todo hecho.'
-        : vencido
-          ? 'Se acabó el tiempo.'
-          : transcurridos <= 1
-            ? 'Acaba de empezar.'
-            : diferencia >= 10
-              ? 'Van por delante del ritmo.'
-              : diferencia <= -15
-                ? 'Van por detrás del ritmo.'
-                : 'Van al ritmo.';
-
-  return (
-    <Dialog open={abierto} onClose={onCerrar} title={sprint.name} size="xl">
-      <div className="flex flex-col gap-8">
-        <p className="-mt-3 font-sans text-sm text-text-secondary">
-          {[rangoDeFechas(sprint), textoDiasRestantes(dias)].filter(Boolean).join(' · ')}
-          {sprint.goal && (
-            <>
-              <br />
-              <span className="text-text-primary">{sprint.goal}</span>
-            </>
-          )}
-        </p>
-
-        <div className="flex flex-col gap-4">
-          <Barra
-            etiqueta="Tiempo"
-            detalle={`día ${transcurridos} de ${totalDias}`}
-            porcentaje={pctTiempo}
-            color={vencido ? colors.warning : colors.textSecondary}
-          />
-          <Barra
-            etiqueta="Trabajo"
-            detalle={`${conUnidad(hecho, unidad)} de ${conUnidad(total, unidad)}`}
-            porcentaje={pctTrabajo}
-            color={colors.primary}
-          />
-          <p className="font-sans text-sm font-medium text-text-primary">{veredicto}</p>
-        </div>
-
-        {burndown && total > 0 && <BurndownChart datos={burndown} />}
-
-        {velocidad.sprints.length > 0 && (
-          <section aria-label="Sprints anteriores" className="flex flex-col gap-3">
-            <div className="flex items-baseline justify-between gap-2 border-b border-border pb-2">
-              <h4 className="font-sans text-sm font-semibold text-text-primary">
-                Sprints anteriores
-              </h4>
-              {velocidad.media !== null && (
-                <span className="font-sans text-xs text-text-secondary">
-                  media: {conUnidad(velocidad.media, unidad)}
-                </span>
-              )}
-            </div>
-            <ul className="flex flex-col gap-2">
-              {velocidad.sprints.map(({ sprint: s, hecho: h }) => {
-                const maximo = Math.max(1, ...velocidad.sprints.map((x) => x.hecho));
-                return (
-                  <li
-                    key={s.id}
-                    className="grid grid-cols-[minmax(0,8rem)_1fr_auto] items-center gap-3 font-sans text-xs"
-                  >
-                    <span
-                      className="truncate text-text-primary"
-                      title={rangoDeFechas(s) ?? undefined}
-                    >
-                      {s.name}
-                    </span>
-                    <span className="h-2 overflow-hidden rounded-full bg-border" aria-hidden="true">
-                      <span
-                        className="block h-full rounded-full bg-primary"
-                        style={{ width: `${(h / maximo) * 100}%` }}
-                      />
-                    </span>
-                    <span className="tabular-nums text-text-secondary">{conUnidad(h, unidad)}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
-      </div>
-    </Dialog>
-  );
-}
-
-function Barra({
-  etiqueta,
-  detalle,
-  porcentaje,
-  color,
-}: {
-  etiqueta: string;
-  detalle: string;
-  porcentaje: number;
-  color: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between font-sans text-xs">
-        <span className="font-medium text-text-primary">{etiqueta}</span>
-        <span className="tabular-nums text-text-secondary">
-          {detalle} · {porcentaje}%
-        </span>
-      </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-border" aria-hidden="true">
-        <div
-          className="h-full rounded-full transition-all"
-          style={{ width: `${porcentaje}%`, background: color }}
-        />
-      </div>
-    </div>
   );
 }

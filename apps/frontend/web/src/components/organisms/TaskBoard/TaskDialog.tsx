@@ -381,18 +381,51 @@ export function TaskDialog({
 
           {/* Puntos sin escala impuesta (D4 de `docs/PLAN-SCRUM-KANBAN.md`):
               vacío es «sin estimar», que no es lo mismo que 0. */}
-          <FloatingLabelInput
-            id="task-estimate"
-            name="estimatePoints"
-            label="Estimación (puntos)"
-            type="number"
-            inputMode="numeric"
-            min={0}
-            max={999}
-            step={1}
-            defaultValue={task.estimatePoints ?? ''}
-            disabled={readOnly}
-          />
+          <div className="flex flex-col gap-1.5">
+            <FloatingLabelInput
+              id="task-estimate"
+              name="estimatePoints"
+              label="Estimación (puntos)"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={999}
+              step={1}
+              defaultValue={task.estimatePoints ?? ''}
+              disabled={readOnly}
+            />
+            {/* Atajos de la escala más usada, sin imponerla (S22): escribir
+                cualquier otro número sigue valiendo. Escriben en el campo no
+                controlado, así que el guardado al cerrar los ve como un cambio
+                más. */}
+            {!readOnly && (
+              <div className="flex flex-wrap gap-1" aria-label="Estimaciones rápidas">
+                {[1, 2, 3, 5, 8, 13].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => {
+                      const campo = formRef.current?.elements.namedItem(
+                        'estimatePoints',
+                      ) as HTMLInputElement | null;
+                      if (!campo) return;
+                      /* Con el setter nativo, no `campo.value =`: React vigila
+                         ese y no dispararía su `onChange`, así que la etiqueta
+                         flotante no subiría. */
+                      Object.getOwnPropertyDescriptor(
+                        HTMLInputElement.prototype,
+                        'value',
+                      )?.set?.call(campo, String(n));
+                      campo.dispatchEvent(new Event('input', { bubbles: true }));
+                    }}
+                    className="h-7 min-w-7 cursor-pointer rounded-md border border-white/[0.12] px-2 font-sans text-xs tabular-nums text-text-secondary transition-colors hover:border-primary hover:text-primary"
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/**

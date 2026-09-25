@@ -34,6 +34,13 @@ export interface DialogProps {
    * pierde la capacidad de hacer scroll interno.
    */
   overflowVisible?: boolean;
+  /**
+   * Paleta, igual que en `SlideOver`. `dark` es la actual de la aplicación
+   * —negro casi puro, tokens redefinidos por `data-tone="dark"`— con el
+   * título en sans. `default` es la azulada de antes, con Redaction: la
+   * conservan los diálogos que todavía no se han pasado.
+   */
+  tone?: 'default' | 'dark';
 }
 
 const sizeClasses = {
@@ -64,7 +71,9 @@ export function Dialog({
   footer,
   size = 'md',
   overflowVisible = false,
+  tone = 'default',
 }: DialogProps) {
+  const dark = tone === 'dark';
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = `dialog-title-${title.replace(/\s+/g, '-').toLowerCase()}`;
 
@@ -81,6 +90,7 @@ export function Dialog({
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
+      data-tone={dark ? 'dark' : undefined}
       onClose={onClose}
       /**
        * Con `showModal()` el fondo es el `::backdrop` del propio dialog, así
@@ -117,10 +127,21 @@ export function Dialog({
     >
       <div className="mb-5 flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h3 id={titleId} className="font-display text-2xl text-text-primary">
+          <h3
+            id={titleId}
+            className={
+              dark
+                ? 'font-sans text-xl font-semibold tracking-tight text-text-primary'
+                : 'font-display text-2xl text-text-primary'
+            }
+          >
             {title}
           </h3>
-          {description && <p className="font-sans text-sm text-white">{description}</p>}
+          {description && (
+            <p className={`font-sans text-sm ${dark ? 'text-text-secondary' : 'text-white'}`}>
+              {description}
+            </p>
+          )}
         </div>
 
         <button

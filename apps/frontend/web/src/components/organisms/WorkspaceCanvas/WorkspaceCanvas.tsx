@@ -3,6 +3,7 @@
 import {
   type Label,
   type ProjectDocument,
+  type Sprint,
   type Task,
   type UserProfile,
   type Workspace,
@@ -99,6 +100,8 @@ export interface WorkspaceCanvasProps {
   canDeleteTask: boolean;
   /** Sprints, backlog y métricas de los tableros con Scrum del espacio abierto. */
   scrumByBoard: Map<string, ScrumDelTablero>;
+  /** Sprints cerrados de los tableros que ya no tienen Scrum: su historial. */
+  historialByBoard: Map<string, Sprint[]>;
   /** Empezar, editar y cerrar sprints: `canManageSprint`. */
   canManageSprint: boolean;
   /** Los documentos del espacio abierto, con contenido (`docs/PLAN-DOCUMENTOS.md`). */
@@ -166,6 +169,7 @@ export function WorkspaceCanvas({
   canEditTask,
   canDeleteTask,
   scrumByBoard,
+  historialByBoard,
   canManageSprint,
   documentos,
   documentoInicial,
@@ -499,6 +503,7 @@ export function WorkspaceCanvas({
       canEditTask={canEditTask}
       canDeleteTask={canDeleteTask}
       scrum={boardActivo.scrumEnabled ? scrumByBoard.get(boardActivo.id) : undefined}
+      historial={historialByBoard.get(boardActivo.id)}
       canManageSprint={canManageSprint}
       onCambiarVista={cambiarVista}
     />

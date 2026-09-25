@@ -290,6 +290,10 @@ model Sprint {
 
   createdAt DateTime  @default(now())
   closedAt  DateTime?
+  /// Lo que dejó el cierre: terminadas, puntos, las que pasaron al siguiente y
+  /// las que volvieron al backlog. Es la revisión del sprint: después de
+  /// cerrar, lo pendiente ya no apunta aquí y no se podría recontar.
+  closeSummary Json?
 
   /// Como mucho un `ACTIVE` por tablero (D3). La regla la impone un índice
   /// único **parcial** escrito a mano en la migración

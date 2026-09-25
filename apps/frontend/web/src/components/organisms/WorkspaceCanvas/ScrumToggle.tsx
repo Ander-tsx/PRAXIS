@@ -90,6 +90,7 @@ export function ScrumToggle({
       <div aria-hidden="true" className="mx-2 my-1 border-t border-border" />
 
       <Dialog
+        tone="dark"
         open={preguntando}
         onClose={() => setPreguntando(false)}
         title="Trabajar por sprints"

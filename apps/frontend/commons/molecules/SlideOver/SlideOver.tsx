@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef, useSyncExternalStore } from 'react';
 import { alpha, colors } from '../../tokens';
 
 export interface SlideOverProps {
@@ -33,6 +33,11 @@ export interface SlideOverProps {
   closeOnOutsideClick?: boolean;
   /** Nombre accesible del panel, para lectores de pantalla y pruebas. */
   ariaLabel?: string;
+  /**
+   * Cómo se llama este panel en el «← Volver a …» del que se abra encima. Sin
+   * él, el de encima no ofrece volver.
+   */
+  etiquetaDeVuelta?: string;
 }
 
 const sizeClasses = {
@@ -58,11 +63,26 @@ const paddingSizes = {
 const huecos = new Map<symbol, string>();
 
 /**
- * Orden en que se abrieron. **Escape cierra solo el de encima**: con el panel
- * de una tarea abierto sobre el backlog, una pulsación se llevaba los dos. Y
- * ninguno si hay un `<dialog>` modal abierto, que tiene su propio Escape.
+ * Los paneles abiertos, en el orden en que se abrieron. **Solo se ve el de
+ * encima** (D21 de `docs/PLAN-SCRUM-KANBAN.md`): abrir una tarea desde el
+ * backlog apilaba los dos paneles a la derecha, uno asomando por debajo del
+ * otro. Ahora el de debajo se esconde —sin desmontarse, así que conserva lo
+ * que tenía— y el de encima ofrece volver a él. Escape y el clic fuera
+ * también son solo del de encima, y de ninguno si hay un `<dialog>` modal.
  */
-const pila: symbol[] = [];
+const pila: { id: symbol; etiqueta?: string }[] = [];
+const oyentes = new Set<() => void>();
+let version = 0;
+
+function avisarPila() {
+  version += 1;
+  for (const oyente of oyentes) oyente();
+}
+
+function suscribirPila(oyente: () => void) {
+  oyentes.add(oyente);
+  return () => oyentes.delete(oyente);
+}
 
 function aplicarHueco() {
   const valores = [...huecos.values()];
@@ -87,10 +107,22 @@ export function SlideOver({
   tone = 'default',
   closeOnOutsideClick = true,
   ariaLabel,
+  etiquetaDeVuelta,
 }: SlideOverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const idDelHueco = useRef(Symbol('slide-over'));
   const dark = tone === 'dark';
+
+  /* Se lee la pila en cada cambio: si otro panel se abre encima, este se esconde. */
+  useSyncExternalStore(
+    suscribirPila,
+    () => version,
+    () => 0,
+  );
+  const posicion = pila.findIndex((p) => p.id === idDelHueco.current);
+  const esCima = posicion !== -1 && posicion === pila.length - 1;
+  const visible = open && (posicion === -1 || esCima);
+  const debajo = esCima && posicion > 0 ? pila[posicion - 1] : null;
 
   useEffect(() => {
     const isDesktop = window.matchMedia('(min-width: 640px)').matches;
@@ -112,20 +144,23 @@ export function SlideOver({
   useEffect(() => {
     if (!open) return;
 
+    const id = idDelHueco.current;
+    const esLaDeEncima = () => pila[pila.length - 1]?.id === id;
+
     const handleGlobalClick = (event: MouseEvent) => {
-      if (!closeOnOutsideClick) return;
+      if (!closeOnOutsideClick || !esLaDeEncima()) return;
       const target = event.target as Node;
       if (!document.contains(target)) return;
       if (panelRef.current && panelRef.current.contains(target)) return;
       onClose();
     };
 
-    const id = idDelHueco.current;
-    pila.push(id);
+    pila.push({ id, etiqueta: etiquetaDeVuelta });
+    avisarPila();
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (pila[pila.length - 1] !== id) return;
+      if (!esLaDeEncima()) return;
       if (document.querySelector('dialog[open]')) return;
       onClose();
     };
@@ -139,10 +174,11 @@ export function SlideOver({
       clearTimeout(timeoutId);
       document.removeEventListener('click', handleGlobalClick);
       document.removeEventListener('keydown', handleKeyDown);
-      const posicion = pila.lastIndexOf(id);
-      if (posicion !== -1) pila.splice(posicion, 1);
+      const indice = pila.findIndex((p) => p.id === id);
+      if (indice !== -1) pila.splice(indice, 1);
+      avisarPila();
     };
-  }, [open, onClose, closeOnOutsideClick]);
+  }, [open, onClose, closeOnOutsideClick, etiquetaDeVuelta]);
 
   return (
     <>
@@ -162,10 +198,29 @@ export function SlideOver({
             ? 'bg-[#202020] text-white sm:border-white/[0.08]'
             : 'bg-surface text-text-primary sm:border-border',
           sizeClasses[size],
-          open ? 'translate-x-0' : 'translate-x-full',
+          visible ? 'translate-x-0' : 'translate-x-full',
         ].join(' ')}
       >
         <div className="flex h-full flex-col">
+          {debajo?.etiqueta && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="-mt-2 mb-3 flex w-fit cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+            >
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              {debajo.etiqueta}
+            </button>
+          )}
           <header className="mb-6 flex shrink-0 items-start justify-between gap-4">
             <div className="flex flex-col gap-1">
               {title && <h2 className="font-sans text-xl font-bold tracking-tight">{title}</h2>}

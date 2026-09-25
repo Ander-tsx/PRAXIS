@@ -532,6 +532,15 @@ export interface Sprint {
   startedAt: string | null;
   createdAt: string;
   closedAt: string | null;
+  /** Lo que dejó el cierre: la revisión del sprint. `null` hasta cerrarlo. */
+  closeSummary?: SprintCloseSummary | null;
+}
+
+export interface SprintCloseSummary {
+  hechas: number;
+  puntosHechos: number;
+  alSiguiente: number;
+  alBacklog: number;
 }
 
 /**

@@ -119,6 +119,7 @@ export function BacklogPanel({
       tone="dark"
       closeOnOutsideClick={false}
       ariaLabel="Backlog del tablero"
+      etiquetaDeVuelta="Backlog"
     >
       {/* Cerrado, el panel sigue montado para animar la entrada, pero **sin
           contenido**: sus tarjetas estarían en la página —para un lector de

@@ -64,7 +64,9 @@ export class SprintsController {
 
   /** Último paso del cierre; el gateway ya reasignó las tareas pendientes (D6). */
   @MessagePattern({ cmd: 'sprint_mark_closed' })
-  markSprintClosed(@Payload() dto: { id: string; boardId: string }) {
-    return this.sprintsService.markSprintClosed(dto.id, dto.boardId);
+  markSprintClosed(
+    @Payload() dto: { id: string; boardId: string; summary?: Record<string, number> },
+  ) {
+    return this.sprintsService.markSprintClosed(dto.id, dto.boardId, dto.summary);
   }
 }

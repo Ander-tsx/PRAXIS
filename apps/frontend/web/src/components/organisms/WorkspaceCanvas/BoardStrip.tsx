@@ -1,11 +1,11 @@
 'use client';
 
-import type { Board, Label, Task, UserProfile } from '@praxis/commons';
+import type { Board, Label, Sprint, Task, UserProfile } from '@praxis/commons';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { BoardCalendar } from './BoardCalendar';
 import { BoardColumns, type PlanificacionDelTablero } from './BoardColumns';
 import { BoardTable } from './BoardTable';
-import { SprintStrip } from './SprintStrip';
+import { type PanelDelTablero, SprintStrip } from './SprintStrip';
 import { TableroExpandible } from './TableroExpandible';
 import { TableroMenu } from './TableroMenu';
 import type { VistaTablero } from './VistaSelector';
@@ -64,6 +64,8 @@ export interface BoardStripProps {
   canDeleteTask: boolean;
   /** Solo en un tablero con Scrum: sprints, backlog y filas del burndown. */
   scrum?: ScrumDelTablero;
+  /** Sprints cerrados de un tablero que ya no tiene Scrum. */
+  historial?: Sprint[];
   /** Empezar, editar y cerrar sprints: `canManageSprint`. */
   canManageSprint: boolean;
   /** Para abrir el backlog desde Calendario o Tabla: vuelve al Kanban. */
@@ -109,12 +111,18 @@ export function BoardStrip({
   canEditTask,
   canDeleteTask,
   scrum,
+  historial,
   canManageSprint,
   onCambiarVista,
 }: BoardStripProps) {
   const columnCount = board.columns.length;
-  const [backlogAbierto, setBacklogAbierto] = useState(false);
-  const cerrarBacklog = useCallback(() => setBacklogAbierto(false), []);
+  /* Un solo panel lateral a la vez: el del sprint o el del backlog (D21). */
+  const [panelPedido, setPanel] = useState<PanelDelTablero>(null);
+  /* El backlog vive en el Kanban (se arrastra a sus columnas): en Calendario o
+     Tabla no está, y su botón no puede quedarse marcado como abierto. */
+  const panel: PanelDelTablero =
+    panelPedido === 'backlog' && vista !== 'kanban' ? null : panelPedido;
+  const cerrarBacklog = useCallback(() => setPanel(null), []);
 
   const sprints = scrum?.sprints;
   const enTablero = sprints ? sprintEnTablero(sprints) : null;
@@ -136,20 +144,32 @@ export function BoardStrip({
       scrum
         ? {
             backlog: scrum.backlog,
-            panelAbierto: backlogAbierto,
+            panelAbierto: panel === 'backlog',
             onCerrarPanel: cerrarBacklog,
             sprintDestino: enTablero ? { id: enTablero.id, name: enTablero.name } : null,
             nombreNuevo: nombreDelSiguiente(scrum.sprints),
             canPlan: canEditTask,
           }
         : undefined,
-    [scrum, backlogAbierto, cerrarBacklog, enTablero, canEditTask],
+    [scrum, panel, cerrarBacklog, enTablero, canEditTask],
   );
 
-  function alternarBacklog() {
+  /**
+   * Qué enseñan Tabla y Calendario en un tablero Scrum (S14). El Kanban es
+   * siempre el sprint (D12); estas dos vistas son para mirar más allá: la
+   * fecha límite de algo del backlog tiene que poder verse.
+   */
+  const [alcance, setAlcance] = useState<'sprint' | 'backlog' | 'todo'>('sprint');
+  const tareasDeLaVista = useMemo(() => {
+    if (!scrum || alcance === 'sprint') return tasks;
+    if (alcance === 'backlog') return scrum.backlog;
+    return [...tasks, ...scrum.backlog];
+  }, [scrum, alcance, tasks]);
+
+  function cambiarPanel(siguiente: PanelDelTablero) {
     /* El backlog se arrastra al Kanban: desde Calendario o Tabla, se vuelve a él. */
-    if (vista !== 'kanban') onCambiarVista('kanban');
-    setBacklogAbierto((a) => !a);
+    if (siguiente === 'backlog' && vista !== 'kanban') onCambiarVista('kanban');
+    setPanel(siguiente);
   }
 
   return (
@@ -177,6 +197,7 @@ export function BoardStrip({
             canDelete={canDeleteBoard}
             tareasAbiertas={scrum ? [] : tasks.filter((t) => !t.completedAt).map((t) => t.id)}
             haySprintEnCurso={sprints ? sprintActivo(sprints) !== null : false}
+            historial={historial}
           />
         }
         nombre={board.name}
@@ -202,16 +223,47 @@ export function BoardStrip({
             velocidadMedia={velocidadMedia}
             nombreSiguiente={nombreDelSiguiente(scrum.sprints)}
             enBacklog={scrum.backlog.length}
-            backlogAbierto={backlogAbierto}
-            onBacklog={alternarBacklog}
+            usersById={usersById}
+            panel={panel}
+            onPanel={cambiarPanel}
             canManageSprint={canManageSprint}
           />
+        )}
+        {scrum && vista !== 'kanban' && (
+          <div
+            role="radiogroup"
+            aria-label="Qué tareas enseñar"
+            className="flex w-fit shrink-0 items-center gap-0.5 rounded-lg border border-border p-0.5"
+          >
+            {(
+              [
+                ['sprint', 'Sprint'],
+                ['backlog', 'Backlog'],
+                ['todo', 'Todo'],
+              ] as const
+            ).map(([valor, etiqueta]) => (
+              <button
+                key={valor}
+                type="button"
+                role="radio"
+                aria-checked={alcance === valor}
+                onClick={() => setAlcance(valor)}
+                className={`cursor-pointer rounded-md px-2.5 py-1 font-sans text-xs transition-colors ${
+                  alcance === valor
+                    ? 'bg-white/[0.08] text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                {etiqueta}
+              </button>
+            ))}
+          </div>
         )}
         {vista === 'calendario' ? (
           <BoardCalendar
             board={board}
             projectId={projectId}
-            tasks={tasks}
+            tasks={tareasDeLaVista}
             members={members}
             labels={labels}
             usersById={usersById}
@@ -227,7 +279,7 @@ export function BoardStrip({
           <BoardTable
             board={board}
             projectId={projectId}
-            tasks={tasks}
+            tasks={tareasDeLaVista}
             members={members}
             labels={labels}
             usersById={usersById}

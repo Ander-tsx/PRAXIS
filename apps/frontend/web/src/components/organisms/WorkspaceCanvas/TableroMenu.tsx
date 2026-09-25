@@ -5,7 +5,8 @@ import { EntityMenu } from '@/components/molecules/EntityMenu';
 import { BOARD_INITIAL_STATE } from '@/lib/projects/action-state';
 import { BOARD_NAME_MAX, validateBoard } from '@/lib/projects/validation';
 import { useAccion } from '@praxis/commons';
-import type { Board } from '@praxis/commons';
+import type { Board, Sprint } from '@praxis/commons';
+import { HistorialDeSprints } from './HistorialDeSprints';
 import { ScrumToggle } from './ScrumToggle';
 
 export interface TableroMenuProps {
@@ -19,6 +20,8 @@ export interface TableroMenuProps {
   tareasAbiertas?: string[];
   /** Con un sprint en marcha, Scrum no se apaga: primero se cierra (S8). */
   haySprintEnCurso?: boolean;
+  /** Sprints cerrados de cuando el tablero tenía Scrum. */
+  historial?: Sprint[];
 }
 
 /**
@@ -40,6 +43,7 @@ export function TableroMenu({
   canDelete,
   tareasAbiertas = [],
   haySprintEnCurso = false,
+  historial,
 }: TableroMenuProps) {
   const [estadoRenombrar, renombrar, renombrando] = useAccion(
     updateBoardAction,
@@ -60,12 +64,15 @@ export function TableroMenu({
       /* Encender Scrum es editar el tablero: el `PATCH` pide `canEditBoard`. */
       extras={
         canEdit ? (
-          <ScrumToggle
-            projectId={projectId}
-            board={board}
-            tareasAbiertas={tareasAbiertas}
-            haySprintEnCurso={haySprintEnCurso}
-          />
+          <>
+            <ScrumToggle
+              projectId={projectId}
+              board={board}
+              tareasAbiertas={tareasAbiertas}
+              haySprintEnCurso={haySprintEnCurso}
+            />
+            {historial && historial.length > 0 && <HistorialDeSprints sprints={historial} />}
+          </>
         ) : undefined
       }
       exigeEscribirNombre={columnas > 0}

@@ -312,8 +312,23 @@ export class SprintsController {
       throw error;
     }
 
+    /* Lo terminado se cuenta **después** de reasignar: lo que queda apuntando
+       a este sprint es exactamente lo que se hizo en él. */
+    const [resumen] = await firstValueFrom(
+      this.tasksClient.send<{ hechas: number; puntosHechos: number; estimadas: number }[]>(
+        { cmd: 'task_sprint_summary' },
+        { sprintIds: [sprintId] },
+      ),
+    ).catch(() => [] as { hechas: number; puntosHechos: number; estimadas: number }[]);
+    const summary = {
+      hechas: resumen?.hechas ?? 0,
+      puntosHechos: resumen?.puntosHechos ?? 0,
+      alSiguiente: alSiguiente.length,
+      alBacklog: alBacklog.length,
+    };
+
     const cerrado = await firstValueFrom(
-      this.projectsClient.send({ cmd: 'sprint_mark_closed' }, { id: sprintId, boardId }),
+      this.projectsClient.send({ cmd: 'sprint_mark_closed' }, { id: sprintId, boardId, summary }),
     );
     return { ...cerrado, nextSprintId: siguiente?.id ?? null };
   }

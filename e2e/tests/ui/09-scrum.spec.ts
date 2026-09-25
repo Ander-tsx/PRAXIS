@@ -72,7 +72,8 @@ test.describe('Scrum en un tablero', () => {
     await page.keyboard.press('Escape');
 
     // D19: el tablero enseña el sprint planeado, con su tarea, sin empezar.
-    await expect(page.getByText('Sin empezar')).toBeVisible({ timeout: 20_000 });
+    const sprint = page.getByRole('button', { name: /^Sprint:/ });
+    await expect(sprint).toContainText('sin empezar', { timeout: 20_000 });
     await expect(page.getByText(pendiente.title)).toBeVisible();
 
     // Planear: una tarea nueva en el backlog, arrastrada a la segunda columna.
@@ -88,23 +89,26 @@ test.describe('Scrum en un tablero', () => {
       page.getByRole('heading', { name: mundo.columnas[1].name, exact: true }),
     );
     await expect(panel.getByText(nueva)).toHaveCount(0, { timeout: 20_000 });
-    await page.getByRole('button', { name: 'Cerrar panel' }).click();
+    await page.getByRole('button', { name: /^Backlog,/ }).click();
 
     // Empezar: un diálogo, y la franja pasa a contar los días.
     await page.getByRole('button', { name: 'Empezar sprint' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Empezar sprint' }).click();
-    await expect(page.getByText(/quedan \d+ días/)).toBeVisible({ timeout: 20_000 });
+    await expect(sprint).toContainText(/quedan \d+ días/, { timeout: 20_000 });
 
     // D6: cerrar pregunta; por defecto lo pendiente pasa al siguiente.
-    await page.getByRole('button', { name: 'Opciones del sprint' }).click();
-    await page.getByRole('menuitem', { name: 'Cerrar sprint' }).click();
+    await page.getByRole('button', { name: /^Sprint:/ }).click();
+    await page
+      .getByRole('complementary', { name: 'Sprint' })
+      .getByRole('button', { name: 'Cerrar sprint' })
+      .click();
     const cierre = page.getByRole('dialog');
     await expect(cierre.getByText(pendiente.title, { exact: true })).toBeVisible();
     await cierre.getByRole('button', { name: 'Cerrar sprint' }).click();
 
     // El siguiente queda planeado, con lo arrastrado en su columna y marcado.
-    await expect(page.getByText('Sprint 2', { exact: true })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText('Sin empezar')).toBeVisible();
+    await expect(sprint).toContainText('Sprint 2', { timeout: 20_000 });
+    await expect(sprint).toContainText('sin empezar');
     await expect(page.getByTitle('Viene de un sprint anterior').first()).toBeVisible();
 
     const tras = await data<{ carryOverCount: number; columnId: string }>(
