@@ -86,6 +86,13 @@
 > la sesión entera en probar un negativo en vez de tocar lo que sí está
 > abierto.
 >
+> **Reverificación del 2026-09-25 (decimoctava vez).** Mismos tres comandos,
+> misma respuesta; árbol limpio en `feature/scrum-kanban`. No se re-ejecutó ni
+> R9 ni Enterprise, y **no se lanzó `next build`**: `next dev` vivo en el 4100
+> y un build le borraría `.next/` (trampa escrita en `CLAUDE.md`). Lo que sí
+> está vivo es Scrum + Documentos etapa 2, sin fusionar y esperando el visto
+> bueno del dueño — no se toca en frío sin él.
+>
 > **Reverificación del 2026-09-18 (duodécima vez).** Mismo resultado, mismos
 > tres comandos (`99b2f6d` sigue siendo ancestro de `main`,
 > `report_column_time` en los dos controladores, `billing/src` con
