@@ -1,5 +1,6 @@
 'use client';
 
+import { FileText, NotebookText, Plus, SquareKanban } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -38,6 +39,7 @@ import { useMessageCount } from '../../realtime/useMessageCount';
 import { avisarDeAvisosLeidos, useNoticeCount } from '../../realtime/useNoticeCount';
 import { alpha, colors } from '../../tokens';
 import { KylooWordmark } from '../KylooWordmark';
+import { CrearEnProyecto, type TipoDeEspacio } from './CrearEnProyecto';
 import { DirectorioDeChatsProvider, useDirectorioDeChats } from './DirectorioDeChats';
 import { DockColumn, DockProvider } from './DockPanel';
 import { NavList } from './NavList';
@@ -993,31 +995,24 @@ function ChevronIcon({ open, className = 'h-3 w-3' }: { open: boolean; className
   );
 }
 
-function WorkspaceLeafIcon({ className = 'h-3.5 w-3.5' }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      aria-hidden="true"
-    >
-      <rect x="3.5" y="4" width="7" height="7" rx="1.5" />
-      <rect x="13.5" y="4" width="7" height="7" rx="1.5" />
-      <rect x="3.5" y="14" width="7" height="6" rx="1.5" />
-      <rect x="13.5" y="14" width="7" height="6" rx="1.5" />
-    </svg>
-  );
-}
-
 interface SidebarProject {
   id: string;
   name: string;
   slug: string;
   iconKey: string | null;
   color: string | null;
-  workspaces: Array<{ id: string; name: string }>;
+  workspaces: EspacioDeLaBarra[];
+}
+
+/**
+ * Un espacio en la barra: su tipo decide el icono, y los de documentos
+ * enseñan sus documentos debajo (E10 de `docs/PLAN-DOCUMENTOS.md`).
+ */
+interface EspacioDeLaBarra {
+  id: string;
+  name: string;
+  kind: TipoDeEspacio;
+  documents: Array<{ id: string; title: string }>;
 }
 
 /**
@@ -1086,15 +1081,30 @@ interface SidebarProjectResumen {
 async function fetchWorkspaces(
   zonePath: string,
   ids: string[],
-): Promise<Map<string, Array<{ id: string; name: string }>>> {
+): Promise<Map<string, EspacioDeLaBarra[]>> {
   const api = createApiClient({ gatewayPath: `${zonePath}/api/gateway` });
 
   const resueltos = await Promise.all(
     ids.map(async (id) => {
       const detalle = await api
-        .get<{ workspaces?: Array<{ id: string; name: string }> }>(`/projects/${id}`)
+        .get<{
+          workspaces?: Array<{
+            id: string;
+            name: string;
+            kind?: TipoDeEspacio;
+            documents?: Array<{ id: string; title: string }>;
+          }>;
+        }>(`/projects/${id}`)
         .catch(() => null);
-      return [id, (detalle?.workspaces ?? []).map((w) => ({ id: w.id, name: w.name }))] as const;
+      return [
+        id,
+        (detalle?.workspaces ?? []).map((w) => ({
+          id: w.id,
+          name: w.name,
+          kind: w.kind ?? 'BOARDS',
+          documents: (w.documents ?? []).map((d) => ({ id: d.id, title: d.title })),
+        })),
+      ] as const;
     }),
   );
 
@@ -1333,6 +1343,8 @@ function SidebarProjectsTree({
   const [projects, setProjects] = useState<SidebarProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(() => desplegadosGuardados());
+  /** El proyecto en el que se está creando algo desde la barra, si hay uno. */
+  const [creandoEn, setCreandoEn] = useState<string | null>(null);
 
   /**
    * Los proyectos cuyo detalle ya se pidió, para no volver a pedirlo.
@@ -1460,6 +1472,26 @@ function SidebarProjectsTree({
       vigente = false;
     };
   }, [projects, expanded, zonePath]);
+
+  /** Tras crear algo desde la barra: vuelve a pedir los espacios de ese proyecto. */
+  const refrescarProyecto = useCallback(
+    (id: string) => {
+      fetchWorkspaces(zonePath, [id]).then((porProyecto) => {
+        const espacios = porProyecto.get(id);
+        if (!espacios) return;
+        setProjects((previos) =>
+          previos.map((p) => (p.id === id ? { ...p, workspaces: espacios } : p)),
+        );
+      });
+      setExpanded((previos) => {
+        if (previos.has(id)) return previos;
+        const siguiente = new Set(previos).add(id);
+        guardarDesplegados(siguiente);
+        return siguiente;
+      });
+    },
+    [zonePath],
+  );
 
   function toggleProject(id: string) {
     setExpanded((previos) => {
@@ -1606,6 +1638,24 @@ function SidebarProjectsTree({
                 >
                   {project.name}
                 </Link>
+
+                {/* Crear sin entrar al proyecto: documento, tablero o espacio. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    /* Los espacios se piden al desplegar; el formulario los
+                       necesita para ofrecer dónde crear. */
+                    refrescarProyecto(project.id);
+                    setCreandoEn(project.id);
+                  }}
+                  aria-label={`Nuevo en ${project.name}`}
+                  title="Nuevo documento, tablero o espacio"
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-secondary transition hover:bg-white/10 hover:text-white focus-visible:opacity-100 ${
+                    isActiveProject ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                  }`}
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
               </div>
 
               <div
@@ -1626,20 +1676,40 @@ function SidebarProjectsTree({
                         // URL correcta: /projects/{slug}?tab=espacios&ws={wsId}
                         const wsHref = `/projects/${project.slug}?tab=espacios&ws=${ws.id}`;
                         const isActiveWs = activePath.includes(`ws=${ws.id}`);
+                        const Icono = ws.kind === 'DOCUMENTS' ? NotebookText : SquareKanban;
                         return (
-                          <Link
-                            key={ws.id}
-                            href={wsHref}
-                            aria-current={isActiveWs ? 'page' : undefined}
-                            className={`flex items-center gap-2 rounded-md px-2 py-[5px] text-[12px] transition-colors ${
-                              isActiveWs
-                                ? 'bg-white/10 text-white font-medium'
-                                : 'text-text-secondary hover:text-white hover:bg-white/[0.06]'
-                            }`}
-                          >
-                            <WorkspaceLeafIcon />
-                            <span className="truncate">{ws.name}</span>
-                          </Link>
+                          <div key={ws.id} className="flex flex-col gap-0.5">
+                            <Link
+                              href={wsHref}
+                              aria-current={isActiveWs ? 'page' : undefined}
+                              className={`flex items-center gap-2 rounded-md px-2 py-[5px] text-[12px] transition-colors ${
+                                isActiveWs
+                                  ? 'bg-white/10 text-white font-medium'
+                                  : 'text-text-secondary hover:text-white hover:bg-white/[0.06]'
+                              }`}
+                            >
+                              <Icono className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                              <span className="truncate">{ws.name}</span>
+                            </Link>
+                            {ws.documents.map((doc) => {
+                              const docActivo = activePath.includes(`doc=${doc.id}`);
+                              return (
+                                <Link
+                                  key={doc.id}
+                                  href={`${wsHref}&doc=${doc.id}`}
+                                  aria-current={docActivo ? 'page' : undefined}
+                                  className={`ml-4 flex items-center gap-2 rounded-md px-2 py-[4px] text-[12px] transition-colors ${
+                                    docActivo
+                                      ? 'bg-white/10 text-white'
+                                      : 'text-text-secondary hover:text-white hover:bg-white/[0.06]'
+                                  }`}
+                                >
+                                  <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                  <span className="truncate">{doc.title || 'Sin título'}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
                         );
                       })
                     )}
@@ -1650,6 +1720,20 @@ function SidebarProjectsTree({
           );
         })}
       </nav>
+      {(() => {
+        const proyecto = projects.find((p) => p.id === creandoEn);
+        if (!proyecto) return null;
+        return (
+          <CrearEnProyecto
+            abierto
+            onCerrar={() => setCreandoEn(null)}
+            proyecto={proyecto}
+            espacios={proyecto.workspaces}
+            gatewayPath={`${zonePath}/api/gateway`}
+            onCreado={() => refrescarProyecto(proyecto.id)}
+          />
+        );
+      })()}
     </div>
   );
 }
