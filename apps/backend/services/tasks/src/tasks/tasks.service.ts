@@ -382,14 +382,7 @@ export class TasksService {
    * tablero —o de otro proyecto— podría colarse en el burndown de uno ajeno.
    */
   private async assertSprintInBoard(boardId: string, sprintId: string): Promise<void> {
-    const sprints = await firstValueFrom(
-      this.projectsClient.send<Array<{ id: string; boardId: string }>>(
-        { cmd: 'sprint_find_by_ids' },
-        { ids: [sprintId] },
-      ),
-    );
-
-    const sprint = (sprints ?? [])[0];
+    const sprint = await this.sprintDe(sprintId);
     if (!sprint) {
       throw new RpcException({ statusCode: 404, message: 'El sprint no existe' });
     }
@@ -397,6 +390,41 @@ export class TasksService {
       throw new RpcException({
         statusCode: 400,
         message: 'Ese sprint no es de este tablero',
+      });
+    }
+    /* Un sprint cerrado es historial: meterle una tarea cambia su velocidad
+       después de cerrarlo (auditoría S3 de `docs/PLAN-SCRUM-KANBAN.md`). */
+    if (sprint.status === 'CLOSED') {
+      throw new RpcException({
+        statusCode: 409,
+        message: 'Ese sprint ya está cerrado: no admite tareas nuevas',
+      });
+    }
+  }
+
+  private async sprintDe(
+    sprintId: string,
+  ): Promise<{ id: string; boardId: string; status: string } | null> {
+    const sprints = await firstValueFrom(
+      this.projectsClient.send<Array<{ id: string; boardId: string; status: string }>>(
+        { cmd: 'sprint_find_by_ids' },
+        { ids: [sprintId] },
+      ),
+    );
+    return (sprints ?? [])[0] ?? null;
+  }
+
+  /**
+   * Una tarea de un sprint cerrado no sale de él (S3): lo que se hizo en ese
+   * sprint es lo que cuenta su velocidad, y moverla después la reescribe.
+   */
+  private async assertNoSaleDeUnSprintCerrado(sprintIdActual: string | null): Promise<void> {
+    if (!sprintIdActual) return;
+    const actual = await this.sprintDe(sprintIdActual);
+    if (actual?.status === 'CLOSED') {
+      throw new RpcException({
+        statusCode: 409,
+        message: 'Esta tarea es de un sprint cerrado: forma parte de su historial',
       });
     }
   }
@@ -620,7 +648,13 @@ export class TasksService {
     const where: any = { boardId: dto.boardId };
     if (dto.columnId) where.columnId = dto.columnId;
     if (dto.sprintId) where.sprintId = dto.sprintId;
-    if (dto.onlyBacklog) where.sprintId = null;
+    /* El backlog es lo que falta por hacer: una tarea terminada sin sprint
+       —las que ya estaban en Done al encender Scrum— no es trabajo pendiente
+       (auditoría S6). */
+    if (dto.onlyBacklog) {
+      where.sprintId = null;
+      where.completedAt = null;
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.task.findMany({
@@ -695,9 +729,11 @@ export class TasksService {
    */
   async reassignSprint(dto: {
     boardId: string;
-    fromSprintId: string;
+    fromSprintId: string | null;
     taskIds: string[];
     toSprintId: string | null;
+    /** El cierre las pasa al siguiente sin terminar: se suma `carryOverCount`. */
+    carry?: boolean;
   }) {
     if (dto.taskIds.length === 0) return { count: 0 };
     if (dto.toSprintId) await this.assertSprintInBoard(dto.boardId, dto.toSprintId);
@@ -707,6 +743,7 @@ export class TasksService {
       data: {
         sprintId: dto.toSprintId,
         sprintAssignedAt: dto.toSprintId ? new Date() : null,
+        ...(dto.carry && { carryOverCount: { increment: 1 } }),
       },
     });
 
@@ -716,6 +753,28 @@ export class TasksService {
     ]);
 
     return { count };
+  }
+
+  /**
+   * Lo mínimo de cada tarea de unos sprints para dibujar el burndown y la
+   * velocidad: sin relaciones, sin tope.
+   *
+   * La pantalla los calculaba sobre las cien primeras tareas del tablero, y
+   * un tablero Scrum acumula historial por diseño: pasado el centenar, las
+   * cifras se recortaban sin avisar (auditoría S2).
+   */
+  async sprintMetricRows(sprintIds: string[]) {
+    if (sprintIds.length === 0) return [];
+    return this.prisma.task.findMany({
+      where: { sprintId: { in: sprintIds } },
+      select: {
+        id: true,
+        sprintId: true,
+        sprintAssignedAt: true,
+        completedAt: true,
+        estimatePoints: true,
+      },
+    });
   }
 
   /**
@@ -833,8 +892,9 @@ export class TasksService {
     if (dto.columnId !== undefined) {
       await this.assertColumnInBoard(task.boardId, dto.columnId);
     }
-    if (dto.sprintId !== undefined && dto.sprintId !== null) {
-      await this.assertSprintInBoard(task.boardId, dto.sprintId);
+    if (dto.sprintId !== undefined && dto.sprintId !== task.sprintId) {
+      await this.assertNoSaleDeUnSprintCerrado(task.sprintId);
+      if (dto.sprintId !== null) await this.assertSprintInBoard(task.boardId, dto.sprintId);
     }
 
     // Se validan antes de abrir la transacción: si alguien no es del proyecto,

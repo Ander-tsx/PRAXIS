@@ -1,8 +1,12 @@
-import type { Sprint, Task } from '@praxis/commons';
+import type { Sprint, SprintMetricRow } from '@praxis/commons';
 
 /**
- * Burndown y velocidad, calculados en vivo sobre las tareas que ya están en
- * pantalla (D9 de `docs/PLAN-SCRUM-KANBAN.md`).
+ * Burndown y velocidad, calculados en vivo sobre las filas de
+ * `GET /boards/:id/sprints/metrics` (D9 de `docs/PLAN-SCRUM-KANBAN.md`).
+ *
+ * ⚠️ **No sobre las tareas de la página.** Lo hacía, y la página pide las cien
+ * primeras del tablero: un tablero Scrum acumula historial por diseño, así que
+ * pasado el centenar las cifras se recortaban sin avisar (auditoría S2).
  *
  * ## Puntos, o tareas si nadie estimó
  *
@@ -51,27 +55,33 @@ function medianoche(fecha: Date): Date {
   return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
 }
 
-export function unidadDe(tareas: readonly Task[]): Unidad {
+type Fila = Pick<SprintMetricRow, 'estimatePoints'>;
+
+export function unidadDe(tareas: readonly Fila[]): Unidad {
   return tareas.some((t) => t.estimatePoints !== null && t.estimatePoints !== undefined)
     ? 'puntos'
     : 'tareas';
 }
 
-function valor(tarea: Task, unidad: Unidad): number {
+export function valor(tarea: Fila, unidad: Unidad): number {
   return unidad === 'puntos' ? (tarea.estimatePoints ?? 0) : 1;
 }
 
 export function calcularBurndown(
   sprint: Sprint,
-  todas: readonly Task[],
+  todas: readonly SprintMetricRow[],
+  unidad: Unidad,
   ahora = new Date(),
 ): Burndown | null {
   if (!sprint.startDate || !sprint.endDate) return null;
 
   const tareas = todas.filter((t) => t.sprintId === sprint.id);
-  const unidad = unidadDe(tareas);
-  const inicio = new Date(sprint.startDate);
-  const primerDia = medianoche(inicio);
+  /* El compromiso se cierra al pulsar «Empezar». Los sprints de antes de
+     `startedAt` no lo tienen: para ellos, el final del primer día. */
+  const inicio = sprint.startedAt
+    ? new Date(sprint.startedAt)
+    : new Date(medianoche(new Date(sprint.startDate)).getTime() + UN_DIA - 1);
+  const primerDia = medianoche(new Date(sprint.startDate));
   const ultimoDia = medianoche(new Date(sprint.endDate));
   const totalDias = Math.max(
     1,
@@ -80,7 +90,8 @@ export function calcularBurndown(
 
   /* Sin `sprintAssignedAt` (no debería pasar, pero es un campo anulable) se
      trata como si hubiera estado desde el principio. */
-  const entro = (t: Task) => (t.sprintAssignedAt ? new Date(t.sprintAssignedAt) : inicio);
+  const entro = (t: SprintMetricRow) =>
+    t.sprintAssignedAt ? new Date(t.sprintAssignedAt) : inicio;
 
   const alcanceOriginal = tareas
     .filter((t) => entro(t) <= inicio)
@@ -116,34 +127,37 @@ export function calcularBurndown(
 }
 
 export interface Velocidad {
-  unidad: Unidad;
   sprints: { sprint: Sprint; hecho: number }[];
+  /**
+   * `null` hasta que haya **dos** sprints cerrados con algo terminado: con uno
+   * solo la «media» es un dato suelto, y con cero decía «este va más cargado
+   * de lo habitual» a cualquier sprint (auditoría S10).
+   */
   media: number | null;
 }
 
 /**
- * Lo terminado en los últimos sprints cerrados.
+ * Lo terminado en los últimos sprints cerrados (los que manda el servidor,
+ * los mismos tres que usa PRAX).
  *
  * Tras el cierre, lo pendiente ya salió del sprint (D6), así que lo que queda
  * con su `sprintId` es exactamente lo que se terminó en él.
  */
 export function calcularVelocidad(
   cerrados: readonly Sprint[],
-  todas: readonly Task[],
-  cuantos = 5,
+  filas: readonly SprintMetricRow[],
+  unidad: Unidad,
 ): Velocidad {
-  const recientes = cerrados.slice(0, cuantos);
-  const ids = new Set(recientes.map((s) => s.id));
-  const unidad = unidadDe(todas.filter((t) => t.sprintId && ids.has(t.sprintId)));
-  const sprints = recientes.map((sprint) => ({
+  const sprints = cerrados.map((sprint) => ({
     sprint,
-    hecho: todas
+    hecho: filas
       .filter((t) => t.sprintId === sprint.id && t.completedAt)
       .reduce((suma, t) => suma + valor(t, unidad), 0),
   }));
+  const conTrabajo = sprints.filter((s) => s.hecho > 0);
   const media =
-    sprints.length === 0 ? null : sprints.reduce((s, x) => s + x.hecho, 0) / sprints.length;
-  return { unidad, sprints, media };
+    conTrabajo.length < 2 ? null : conTrabajo.reduce((s, x) => s + x.hecho, 0) / conTrabajo.length;
+  return { sprints, media };
 }
 
 export function conUnidad(n: number, unidad: Unidad): string {

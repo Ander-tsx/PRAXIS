@@ -1,5 +1,7 @@
 import {
   type APIRequestContext,
+  type Locator,
+  type Page,
   request as contextoDePeticion,
   expect,
   test,
@@ -12,9 +14,14 @@ import { entrarConCuenta } from '../../fixtures/ui';
  * Scrum encima del Kanban (`docs/PLAN-SCRUM-KANBAN.md`).
  *
  * El contrato de la API se comprobó aparte; aquí va lo que solo se ve en la
- * pantalla: que el interruptor enciende las pestañas, que el Kanban se queda
- * vacío sin sprint en curso (D12) y enseña solo el sprint cuando lo hay, y que
- * cerrar pregunta por cada pendiente antes de dejarte (D6).
+ * pantalla, en el orden en que lo vive un equipo:
+ *
+ * 1. Encender Scrum con trabajo en columnas pregunta, y ofrece que ese trabajo
+ *    sea el primer sprint (S7).
+ * 2. El sprint se **planea antes de empezarlo**: el tablero enseña el planeado
+ *    y «Empezar sprint» fija el compromiso (D19, S1).
+ * 3. Cerrar pregunta por lo pendiente, y lo que pasa al siguiente sigue en su
+ *    columna, marcado como arrastrado (D6, D19).
  */
 
 async function apiContext(): Promise<APIRequestContext> {
@@ -23,77 +30,88 @@ async function apiContext(): Promise<APIRequestContext> {
   });
 }
 
+/**
+ * Arrastra con el ratón paso a paso. El tablero no usa el arrastre nativo del
+ * navegador sino eventos de puntero medidos por fotograma: un `dragTo` de un
+ * solo salto termina antes de que el motor mida el destino.
+ */
+async function arrastrar(page: Page, desde: Locator, hasta: Locator) {
+  const a = await desde.boundingBox();
+  const b = await hasta.boundingBox();
+  if (!a || !b) throw new Error('Sin caja para arrastrar');
+  await page.mouse.move(a.x + 20, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(a.x + 40, a.y + a.height / 2 + 10, { steps: 5 });
+  await page.mouse.move(b.x + 40, b.y + 60, { steps: 25 });
+  await page.waitForTimeout(150);
+  await page.mouse.up();
+}
+
 test.describe('Scrum en un tablero', () => {
   test.beforeAll(async ({ request }) => {
     await request.get('/projects/calentar-turbopack', { timeout: 60_000 }).catch(() => {});
   });
 
-  test('backlog, sprint en curso y cierre que pregunta', async ({ page }) => {
+  test('encender, planear, empezar y cerrar un sprint', async ({ page }) => {
     test.setTimeout(180_000);
     const api = await apiContext();
     const mundo = await crearMundo(api);
     const cabeceras = comoBearer(mundo.duenno.accessToken);
 
-    const enBacklog = await crearTarea(api, mundo.duenno.accessToken, mundo, {
-      titulo: nombreUnico('Backlog'),
-    });
-    const alSprint = await crearTarea(api, mundo.duenno.accessToken, mundo, {
+    const pendiente = await crearTarea(api, mundo.duenno.accessToken, mundo, {
       titulo: nombreUnico('Comprometida'),
     });
 
     await entrarConCuenta(page, mundo.duenno.email);
     await page.goto(`/projects/${mundo.proyecto.id}?board=${mundo.boardId}`);
 
-    // Sin Scrum: no hay vista Sprint.
-    const vistas = page.getByRole('tablist', { name: 'Vista del tablero' });
-    await expect(vistas.getByRole('tab', { name: 'Kanban' })).toBeVisible();
-    await expect(vistas.getByRole('tab', { name: 'Sprint' })).toHaveCount(0);
-
-    // Encender Scrum desde el menú del tablero.
+    // S7: encender con trabajo en columnas pregunta, y se lo lleva al Sprint 1.
     await page.getByRole('button', { name: /^Opciones del tablero/ }).click();
     await page.getByRole('switch', { name: /Trabajar por sprints/ }).click();
-    await expect(vistas.getByRole('tab', { name: 'Sprint' })).toBeVisible({ timeout: 20_000 });
+    await page.getByRole('button', { name: /al Sprint 1/ }).click();
     await page.keyboard.press('Escape');
 
-    // D12: sin sprint en curso el Kanban no enseña tareas, y lo dice.
-    await expect(page.getByRole('heading', { name: 'No hay sprint en curso' })).toBeVisible();
-    await expect(page.getByText(alSprint.title)).toHaveCount(0);
+    // D19: el tablero enseña el sprint planeado, con su tarea, sin empezar.
+    await expect(page.getByText('Sin empezar')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(pendiente.title)).toBeVisible();
 
-    // D16: empezar un sprint es un solo paso.
-    await vistas.getByRole('tab', { name: 'Sprint' }).click();
-    await page.getByRole('textbox', { name: 'Nombre' }).fill('Sprint E2E');
-    await page.getByRole('button', { name: 'Empezar sprint' }).click();
-    await expect(page.getByRole('region', { name: 'Sprint en curso' })).toBeVisible({
-      timeout: 20_000,
-    });
-
-    // D15: en el Kanban, la franja dice qué sprint es; D14: el backlog es un panel.
-    await vistas.getByRole('tab', { name: 'Kanban' }).click();
-    await expect(page.getByTitle('Ver el sprint')).toContainText('Sprint E2E');
+    // Planear: una tarea nueva en el backlog, arrastrada a la segunda columna.
     await page.getByRole('button', { name: /^Backlog/ }).click();
     const panel = page.getByRole('complementary', { name: 'Backlog del tablero' });
-    await expect(panel.getByText(alSprint.title)).toBeVisible();
-    await panel
-      .getByRole('combobox', { name: `Meter «${alSprint.title}» en el sprint, en la columna` })
-      .selectOption({ label: mundo.columnas[1].name });
-    await expect(panel.getByText(alSprint.title)).toHaveCount(0, { timeout: 20_000 });
-    await page.getByRole('button', { name: 'Cerrar el backlog' }).click();
-    await expect(page.getByText(alSprint.title)).toBeVisible();
-    await expect(page.getByText(enBacklog.title)).toHaveCount(0);
+    const nueva = nombreUnico('Planeada');
+    await panel.getByLabel('Título de la tarea nueva en el backlog').fill(nueva);
+    await panel.getByLabel('Título de la tarea nueva en el backlog').press('Enter');
+    await expect(panel.getByText(nueva)).toBeVisible({ timeout: 20_000 });
+    await arrastrar(
+      page,
+      panel.getByText(nueva),
+      page.getByRole('heading', { name: mundo.columnas[1].name, exact: true }),
+    );
+    await expect(panel.getByText(nueva)).toHaveCount(0, { timeout: 20_000 });
+    await page.getByRole('button', { name: 'Cerrar panel' }).click();
 
-    // D6: cerrar con una pendiente exige decidir antes de dejar cerrar.
-    await vistas.getByRole('tab', { name: 'Sprint' }).click();
-    await page.getByRole('button', { name: 'Cerrar sprint' }).click();
-    await expect(page.getByRole('button', { name: /Faltan 1 por decidir/ })).toBeDisabled();
-    await page.getByRole('button', { name: 'Backlog', exact: true }).click();
-    await page.getByRole('button', { name: 'Cerrar sprint', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Empieza un sprint' })).toBeVisible({
-      timeout: 20_000,
-    });
+    // Empezar: un diálogo, y la franja pasa a contar los días.
+    await page.getByRole('button', { name: 'Empezar sprint' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Empezar sprint' }).click();
+    await expect(page.getByText(/quedan \d+ días/)).toBeVisible({ timeout: 20_000 });
 
-    // Y la tarea volvió al backlog en el servidor, no solo en pantalla.
-    const respuesta = await api.get(`/api/tasks/${alSprint.id}`, { headers: cabeceras });
-    expect((await data<{ sprintId: string | null }>(respuesta)).sprintId).toBeNull();
+    // D6: cerrar pregunta; por defecto lo pendiente pasa al siguiente.
+    await page.getByRole('button', { name: 'Opciones del sprint' }).click();
+    await page.getByRole('menuitem', { name: 'Cerrar sprint' }).click();
+    const cierre = page.getByRole('dialog');
+    await expect(cierre.getByText(pendiente.title, { exact: true })).toBeVisible();
+    await cierre.getByRole('button', { name: 'Cerrar sprint' }).click();
+
+    // El siguiente queda planeado, con lo arrastrado en su columna y marcado.
+    await expect(page.getByText('Sprint 2', { exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('Sin empezar')).toBeVisible();
+    await expect(page.getByTitle('Viene de un sprint anterior').first()).toBeVisible();
+
+    const tras = await data<{ carryOverCount: number; columnId: string }>(
+      await api.get(`/api/tasks/${pendiente.id}`, { headers: cabeceras }),
+    );
+    expect(tras.carryOverCount).toBe(1);
+    expect(tras.columnId).toBe(pendiente.columnId);
   });
 
   test('la estimación sale en la tarjeta y el límite WIP avisa sin bloquear', async ({ page }) => {
@@ -131,40 +149,45 @@ test.describe('Scrum en un tablero', () => {
     expect(respuesta.status(), 'El límite no bloquea').toBe(201);
   });
 
-  test('arrastrar del backlog a una columna mete la tarea en el sprint', async ({ page }) => {
+  test('una tarea sale del sprint desde su panel, sin cerrar el sprint', async ({ page }) => {
     test.setTimeout(150_000);
     const api = await apiContext();
     const mundo = await crearMundo(api);
     const cabeceras = comoBearer(mundo.duenno.accessToken);
     const tarea = await crearTarea(api, mundo.duenno.accessToken, mundo, {
-      titulo: nombreUnico('Arrastrada'),
+      titulo: nombreUnico('Recortada'),
     });
 
-    /* Scrum encendido y un sprint en marcha, por la API: aquí solo interesa el gesto. */
-    await api.patch(`/api/boards/${mundo.boardId}`, { headers: cabeceras, data: { scrumEnabled: true } });
-    const sprint = await data<{ id: string }>(
-      await api.post(`/api/boards/${mundo.boardId}/sprints`, { headers: cabeceras, data: { name: 'Sprint arrastre' } }),
-    );
-    const hoy = new Date();
-    const fin = new Date(hoy.getTime() + 13 * 86_400_000);
-    await api.post(`/api/boards/${mundo.boardId}/sprints/${sprint.id}/start`, {
+    await api.patch(`/api/boards/${mundo.boardId}`, {
       headers: cabeceras,
-      data: { startDate: hoy.toISOString(), endDate: fin.toISOString() },
+      data: { scrumEnabled: true },
+    });
+    const sprint = await data<{ id: string }>(
+      await api.post(`/api/boards/${mundo.boardId}/sprints`, {
+        headers: cabeceras,
+        data: { name: 'Sprint recorte' },
+      }),
+    );
+    await api.post(`/api/boards/${mundo.boardId}/sprints/${sprint.id}/tasks`, {
+      headers: cabeceras,
+      data: { taskIds: [tarea.id] },
     });
 
     await entrarConCuenta(page, mundo.duenno.email);
-    await page.goto(`/projects/${mundo.proyecto.id}?board=${mundo.boardId}`);
-    await page.getByRole('button', { name: /^Backlog/ }).click();
-    const panel = page.getByRole('complementary', { name: 'Backlog del tablero' });
+    await page.goto(`/projects/${mundo.proyecto.id}?board=${mundo.boardId}&task=${tarea.id}`);
 
-    const destino = page.getByRole('heading', { name: mundo.columnas[1].name, exact: true });
-    await panel.getByText(tarea.title).dragTo(destino);
-
-    await expect(panel.getByText(tarea.title)).toHaveCount(0, { timeout: 20_000 });
-    const tras = await data<{ sprintId: string | null; columnId: string }>(
-      await api.get(`/api/tasks/${tarea.id}`, { headers: cabeceras }),
-    );
-    expect(tras.sprintId).toBe(sprint.id);
-    expect(tras.columnId).toBe(mundo.columnas[1].id);
+    // S5: recortar alcance es un botón del panel de la tarea.
+    await page.getByRole('button', { name: 'Devolver al backlog' }).click();
+    await expect
+      .poll(
+        async () =>
+          (
+            await data<{ sprintId: string | null }>(
+              await api.get(`/api/tasks/${tarea.id}`, { headers: cabeceras }),
+            )
+          ).sprintId,
+        { timeout: 20_000 },
+      )
+      .toBeNull();
   });
 });

@@ -6,6 +6,15 @@
 > del producto lo pruebe y decida si se fusiona; lo que queda abierto está al
 > final: la fase futura de Espacios y Documentos, que requiere discutirse.
 >
+> 🔴 **Auditoría del 2026-09-24** —cuatro fallos daban datos equivocados sin
+> ningún error—. ✅ **Corregida el 2026-09-25** con un rediseño de la
+> interfaz (D17–D20): el Bloque 1 entero y casi todo el 2 están cerrados;
+> lo que queda abierto está marcado sin casilla en [la auditoría](#auditoría-2026-09-24)
+> y resumido en [su registro](#2026-09-25--rediseño-tras-la-auditoría).
+>
+> ⚠️ **D14, D15 y D16 quedan sustituidas por D17–D20.** Se conservan porque
+> explican de dónde se venía.
+>
 > Nace de una necesidad propia del dueño del producto: tiene un proyecto real
 > donde su equipo trabaja con Scrum + Kanban a la vez, y Praxis hoy solo tiene
 > Kanban — con un tablero *llamado* "Sprint de Lanzamiento" que no es más que
@@ -306,6 +315,78 @@ La vista se reorganizó para leerse sola: dos barras que se comparan —tiempo
 gastado y trabajo hecho— con una frase («vais al ritmo»), el reparto por
 columna, el burndown explicado en una línea y el historial como barras.
 
+### D17 — El backlog es un panel lateral que forma parte del arrastre del tablero
+
+Sustituye a D14. Decidido con el dueño del producto tras la auditoría
+(2026-09-25): «un componente similar al desplegable de editar una tarea».
+
+El panel es el mismo `SlideOver` que el de la tarea, empuja el tablero en vez
+de taparlo y **no se cierra al hacer clic fuera** —soltar una tarea en el
+tablero es un clic fuera—. Dentro, las tarjetas son las del tablero
+(`ColumnTasks`), y el panel se registra en el motor de arrastre como **una
+columna más** (`BACKLOG` en `scrum.ts`). De ahí sale todo lo demás sin código
+propio:
+
+- arrastrar del backlog a una columna, de una columna al backlog y reordenar
+  el backlog son **el mismo gesto**, con el mismo fantasma, el hueco exacto y
+  el movimiento optimista del tablero (el de antes era arrastre HTML5 nativo:
+  fantasma translúcido, ningún hueco y esperar al servidor);
+- una tarea del backlog se **abre** con un clic y se refina en su panel;
+- en el móvil, la pulsación larga abre la hoja de mover con «Backlog» como
+  destino más, y el panel de la tarea tiene «Pasar al sprint» /
+  «Devolver al backlog».
+
+Arriba del panel se escribe una tarea nueva con solo el título, como un paso
+del checklist. Volver al backlog lleva la tarea a la primera columna: el
+backlog es trabajo por empezar, y lo terminado no se enseña en él.
+
+### D18 — No hay vista «Sprint»: todo el sprint va en la franja
+
+Sustituye a D15 y D16. La vista tenía cuatro cosas y obligaba a salir del
+tablero para verlas. La franja encima del tablero (`SprintStrip`) lleva el
+nombre, la **meta**, las fechas, los días que quedan, el progreso y el botón
+del backlog; lo demás se abre encima sin perder el sitio:
+
+- **Progreso** (clic en la barra): tiempo frente a trabajo, el burndown y los
+  sprints anteriores.
+- **Empezar** y **Editar**: un diálogo con nombre, meta y fechas.
+- **Cerrar**: en el menú `⋯`, y como botón visible cuando ya toca (se acabó
+  el tiempo o está todo hecho).
+
+El selector de vistas vuelve a ser Kanban / Calendario / Tabla. Una
+`?vista=sprint` de un enlace viejo cae al Kanban.
+
+### D19 — El tablero enseña «el sprint de ahora», y entre dos sprints se planifica
+
+Contesta a «¿cómo se ven varios sprints en un mismo tablero?».
+
+- **El tablero es siempre el mismo** —mismas columnas— y enseña un solo
+  sprint: el que está en curso o, si no hay, el **planeado** (el siguiente).
+  Solo puede haber uno de cada.
+- **Planificar es arrastrar**: con el sprint planeado en el tablero, se
+  sueltan tareas del backlog en sus columnas. «Empezar sprint» fija ahí el
+  compromiso (`Sprint.startedAt`); lo que entre después es alcance añadido en
+  el burndown. Esto es lo que arregla S1 de raíz.
+- **Al cerrar**, lo terminado se queda en el sprint cerrado —es su historial
+  y su velocidad— y **desaparece del tablero**: Done empieza vacío en el
+  sprint siguiente. Lo que no se terminó pasa por defecto al siguiente, **en
+  la misma columna en la que estaba** (si iba por Doing, sigue en Doing), con
+  una marca ↻ en la tarjeta que dice que viene arrastrado
+  (`Task.carryOverCount`). También se puede mandar al backlog.
+- **El siguiente nace planeado, no en marcha.** El equipo lo ve en el
+  tablero con lo arrastrado, añade lo que quiera y lo empieza. Antes el
+  cierre lo arrancaba al instante y todo lo que se añadía después contaba
+  como alcance añadido.
+- Sin ningún sprint, la franja ofrece «Planear sprint», y soltar la primera
+  tarea en una columna también lo crea.
+
+### D20 — Encender Scrum con trabajo en columnas pregunta
+
+Encender no mueve nada, pero lo que el equipo *ve* es su tablero en blanco
+(S7). Si hay tareas abiertas en las columnas, un diálogo ofrece **llevarlas
+al Sprint 1** (planeado, no en marcha) o dejarlas todas en el backlog.
+Apagar Scrum con un sprint en marcha no se puede: primero se cierra (S8).
+
 ### D11 — Se implementa tocando `apps/backend/` directo, en esta rama
 
 Sin pasar por `PENDIENTES-BACKEND.md`: el equipo de frontend lo trabaja con
@@ -550,3 +631,338 @@ sale como «hasta 6». Un día de desfase en una cifra que PRAX solo nombra.
 entre backlog y sprint pide `canEditTask` (es un `PATCH` de la tarea), no
 `canManageSprint`. Planificar qué entra es trabajo del equipo; arrancar y
 cerrar el reloj es de quien lleva el proceso.
+
+---
+
+## Auditoría (2026-09-24)
+
+> Pedida por el dueño del producto: código, lógica de negocio, interfaz y si
+> sirve de verdad a un equipo Scrum. Sin suavizar. Cada hallazgo lleva casilla:
+> **se marca al cerrarlo**, como en `AUDITORIA-ORGANIZACION-CHAT-MOVIL.md`.
+
+### Cómo se hizo
+
+- Lectura del diff entero de la rama contra `main` en lo que es de Scrum
+  (backend, contratos, gateway, las acciones y los once componentes).
+  Documentos queda fuera: tiene su propio plan.
+- **Reproducción por API** contra el stack construido: un proyecto de prueba
+  («Auditoria Scrum B», en el espacio personal de `sofia@praxis.dev`) con
+  columnas To Do / Doing / Review / Done, dos sprints y ocho tareas estimadas.
+- **Capturas** con Playwright en 1440×900 y 390×844: Kanban con franja, panel
+  del backlog, vista Sprint, cierre y menú del tablero.
+
+### Veredicto
+
+La base es buena y las decisiones de fondo aguantan: Scrum como capa (D1), el
+backlog como `sprintId = null` (D2), un solo activo (D3), cierre que pregunta
+(D6) y WIP blando (D13). **Lo que falla es lo que un equipo mira cada día**:
+el burndown sale mal en el flujo normal, las cifras se truncan en silencio
+cuando el tablero crece —y un tablero Scrum crece por diseño—, el historial se
+puede reescribir, y faltan tres gestos básicos: sacar una tarea del sprint,
+ordenar el backlog y abrir una tarea del backlog para refinarla.
+
+Hoy sirve para **enseñarlo en una demo**. No aguanta dos sprints de un
+equipo real sin dar un número falso.
+
+### Hallazgos
+
+Severidad: 🔴 dato equivocado o pérdida sin error · 🟠 impide un flujo
+Scrum básico · 🟡 confunde o es inconsistente · ⚪ higiene.
+
+#### 🔴 Críticos
+
+- [x] **S1 — El burndown da alcance original 0 en el flujo normal.**
+  `fechasDelFormulario` fija `startDate` a las 00:00 del día elegido, y desde
+  D14/D16 una tarea **solo puede entrar en un sprint que ya está en curso**
+  (no hay planificación previa). Así que todo `sprintAssignedAt` es posterior
+  al inicio y `calcularBurndown` lo cuenta como *añadido después*.
+  Reproducido: *«Alcance al arrancar: 0 puntos · añadido después: 18 puntos»*
+  y la línea ideal plana en 0. El gráfico dice que todo el sprint es scope
+  creep y el veredicto de ritmo no significa nada.
+  **Arreglo:** o se vuelve a poder planear antes de empezar (ver P1 abajo), o
+  como mínimo lo que entra **durante el primer día** cuenta como alcance
+  original. Con test unitario de `burndown.ts` para los dos casos.
+
+- [x] **S2 — Todo Scrum se calcula sobre las primeras 100 tareas del tablero.**
+  `page.tsx` pide `/boards/:id/tasks?limit=100`, ordenado por `order`, y con
+  eso se calculan el burndown, la velocidad, el backlog, los contadores de la
+  franja y la lista local del cierre. Un tablero Scrum **acumula** tareas
+  cerradas sprint tras sprint: pasado el centenar, la velocidad de los sprints
+  viejos cae a cero, el backlog pierde filas y el Kanban del sprint puede
+  perder tarjetas — sin ningún aviso. Y *cuáles* caen es arbitrario (`order`
+  es por columna, así que se intercalan). Nota: el bloque de PRAX sí cuenta
+  en el servidor (`task_sprint_summary`), así que **pantalla y PRAX darán
+  números distintos**. Es la regla de `CLAUDE.md` —«un recorte mudo es peor
+  que no recortar»— rota en la pantalla principal.
+  **Arreglo:** pedir por alcance —`?sprintId=<activo>` y `?backlog=true`, que
+  ya existen— y sacar burndown y velocidad a una ruta del servidor
+  (`GET /boards/:id/sprints/:sid/stats` y `/velocity`) sobre la misma
+  consulta que ya usa PRAX. La pantalla deja de depender de tener todas las
+  tareas en memoria.
+
+- [x] **S3 — Un sprint cerrado no es de solo lectura.** Reproducido por API:
+  `PATCH /tasks/:id {sprintId: <cerrado>}` → 200, y `PATCH {sprintId: null}`
+  sobre una tarea de un sprint cerrado → 200. Cualquiera con `canEditTask`
+  reescribe la velocidad histórica. `assertSprintInBoard` solo mira el
+  tablero, no el estado; `POST /boards/:id/tasks` con `sprintId` explícito
+  tiene el mismo hueco. Contradice el comentario de `SprintCloseAction` («un
+  sprint que va a quedar `CLOSED` y de solo lectura»).
+  **Arreglo:** en tasks-service, rechazar con 409 entrar en un sprint
+  `CLOSED` y salir de uno; `sprint_find_by_ids` ya devuelve el `status`.
+
+- [x] **S4 — «Cerrar y empezar el siguiente» no es atómico, y puede dejar
+  tareas invisibles.** `closeSprintAction` encadena tres llamadas desde el
+  servidor de Next: crear el siguiente (`PLANNED`) → cerrar → arrancarlo.
+  - Si el cierre responde 409 (alguien movió una tarea entre medias), el
+    sprint recién creado **queda huérfano**, y el reintento crea otro.
+  - Si el arranque falla después de cerrar, las tareas pasadas «al
+    siguiente» quedan en un sprint `PLANNED` que **ninguna pantalla enseña**:
+    no están en el backlog (`sprintId ≠ null`) ni en el Kanban (no es el
+    activo). Desaparecen para el equipo.
+  - Los huérfanos inflan el nombre sugerido (`Sprint ${sprints.length + 1}`)
+    y el texto de `SinSprintActivo` («N sprints planeados esperando»), que
+    ofrece «Iniciar un sprint» sin forma de iniciarlos.
+  **Arreglo:** el cierre del gateway acepta `next: {name, goal, startDate,
+  endDate}` y orquesta crear → reasignar → cerrar → arrancar en ese orden,
+  deshaciendo la creación si algo falla. Y mientras existan sprints
+  `PLANNED`, la interfaz los enseña.
+
+#### 🟠 Altos
+
+- [x] **S5 — No se puede sacar una tarea del sprint desde la interfaz, ni ver
+  en cuál está.** El panel de tarea no tiene campo de sprint. Recortar
+  alcance a mitad de sprint —el gesto más normal de un equipo que va tarde—
+  solo se puede cerrando el sprint. `UpdateTaskBodyDto` lo documenta («devolver
+  al backlog desde el tablero») y la pantalla no lo implementa.
+  **Arreglo:** en el panel de tarea, una línea «Sprint: S2 · Devolver al
+  backlog»; y en el menú de la tarjeta, lo mismo.
+
+- [x] **S6 — El backlog no es un product backlog.**
+  - **No se ordena.** P1.3 tenía flechas; D14 las perdió. El orden que se
+    ve es el `order` de columnas distintas mezclado con `backlog.length` de
+    las altas nuevas: no significa nada. Un backlog sin prioridad explícita
+    no es un backlog.
+  - **Las filas no se abren.** No se puede leer la descripción, cambiar la
+    estimación ni refinar nada sin meter la tarea en el sprint primero.
+  - **Enseña tareas terminadas** (reproducido: «Tarea A», completada, está en
+    el backlog). Al encender Scrum en un tablero viejo, todo lo que estaba en
+    Done aparece como trabajo pendiente.
+  - Sin búsqueda, filtro por etiqueta/prioridad ni total de puntos por
+    selección.
+  **Arreglo:** excluir `completedAt ≠ null`; fila clicable que abre el panel
+  de tarea de siempre; asa para reordenar (y flechas en el móvil) reusando
+  `POST /tasks/:id/move`; buscador arriba.
+
+- [x] **S7 — Encender Scrum vacía el Kanban de todo el equipo de golpe.**
+  `ScrumToggle` no confirma «porque no mueve nada», pero lo que **ve** el
+  equipo es que su tablero se queda en blanco y lo que tenía en Doing pasa a
+  un backlog. El dato no se pierde; la confianza sí.
+  **Arreglo:** diálogo al encender que diga qué va a pasar y ofrezca *«Empezar
+  el primer sprint con las N tareas abiertas que ya están en columnas»*.
+
+- [ ] **S8 — Apagar Scrum no se comporta como dicen D1 y el invariante 3.**
+  - Reproducido: `POST …/start` con Scrum **apagado** → 201. `createSprint`
+    lo comprueba; `startSprint` no.
+  - Apagar con un sprint activo lo deja `ACTIVE` y con el reloj corriendo;
+    al volver a encender, la franja dice «terminó hace 30 días».
+  - **El historial no es consultable con Scrum apagado**, contra el
+    invariante 3: `page.tsx` solo pide sprints si `scrumEnabled` y la vista
+    Sprint desaparece del selector.
+  **Arreglo:** comprobar `scrumEnabled` al iniciar; al apagar con un sprint
+  activo, pedir cerrarlo antes (o avisar); mantener la vista Sprint en solo
+  lectura si hay sprints cerrados.
+
+- [x] **S9 — Dos sprints activos por carrera.** `startSprint` hace
+  comprobar-y-luego-escribir sin transacción ni índice. Dos clics o dos
+  personas a la vez dejan dos `ACTIVE` y `sprintActivo()` elige uno al azar.
+  **Arreglo:** `CREATE UNIQUE INDEX … ON sprints("boardId") WHERE status =
+  'ACTIVE'` y traducir el P2002 a 409.
+
+- [x] **S10 — La velocidad mezcla unidades y compara contra cero.**
+  - `calcularVelocidad` decide su unidad sobre los sprints cerrados;
+    `SprintEnCurso` la imprime con la unidad **del sprint actual**.
+    Reproducido: *«terminó de media 0 puntos»* cuando la media era en tareas.
+  - Con media 0 dispara *«este va más cargado de lo habitual»*: cualquier
+    número es mayor que 0 × 1,2.
+  - Pantalla promedia 5 sprints; PRAX, 3. Dirán medias distintas.
+  - Cuenta como hecho lo que se completó **antes** de entrar en el sprint.
+  **Arreglo:** una sola unidad por tablero, calculada en el servidor (S2);
+  no comparar hasta tener 2–3 sprints cerrados con algo hecho; misma ventana
+  en los dos sitios; contar solo `completedAt ≥ startDate`.
+
+- [x] **S11 — En el móvil, la vista Sprint no tiene puerta.** El selector de
+  vistas es `hidden sm:flex` (`TableroExpandible`). Solo se llega tocando el
+  nombre del sprint en la franja —sin nada que diga que es un botón— o desde
+  el vacío sin sprint. Cerrar un sprint en el móvil es un acertijo. Y el panel
+  del backlog dice «Arrastra una tarea a una columna» en una pantalla donde
+  no se puede arrastrar.
+
+#### 🟡 Medios
+
+- [x] **S12 — Un sprint no se edita.** Ni nombre, ni meta, ni fechas
+  (alargar una semana es habitual), ni se borra uno creado por error. El
+  cierre crea el siguiente **sin meta** y no deja ponérsela.
+- [x] **S13 — Tres cifras que no casan en la misma pantalla.** La franja
+  cuenta **tareas** («1/4 hechas»), la vista Sprint **puntos** («3 de 18 ·
+  17 %»), y la pestaña del tablero cuenta **todo el historial** («Equipo Web
+  11» con 4 en el Kanban).
+- [ ] **S14 — Calendario y Tabla filtradas al sprint esconden las fechas
+  límite del backlog**, y no queda ninguna vista con todas las tareas del
+  tablero. Para un equipo, la Tabla es justo donde se refina el backlog.
+- [ ] **S15 — Cerrar un sprint no deja nada que revisar.** Sin resumen al
+  cerrar (qué se terminó, qué pasó al siguiente, alcance añadido), el
+  historial son barras sin enlace y un sprint cerrado no se puede abrir.
+  La *Sprint Review* no tiene soporte.
+- [x] **S16 — «Vais al ritmo».** Voseo peninsular en una aplicación que
+  formatea en `es-MX` y trata de tú: *«Van al ritmo»*, *«van bien»*.
+- [x] **S17 — Colores a pelo, contra la regla de `CLAUDE.md` (hallazgo E4).**
+  `bg-[#161616]` y `bg-[#1c1c1b]` en `BacklogDrawer` y `SprintPanel`,
+  `stroke="#191919"` y `background: '#1c1c1b'` en `BurndownChart`,
+  `text-white` y `bg-[#191919]` en el formulario de WIP de `ColumnMenu`.
+- [x] **S18 — PRAX con información vieja.** Su regla, que viaja en **cada
+  turno de todos los proyectos**, manda a «la vista Sprint o Backlog»: el
+  Backlog ya no es una vista. Ventana de 3 frente a 5 (S10). Y al insertar
+  `scrumDeTableros` en `reports.service.ts` quedó debajo del JSDoc del método
+  siguiente, que se quedó sin el suyo.
+
+#### ⚪ Bajos
+
+- [x] **S19 — Ni una prueba unitaria.** `burndown.ts` es lógica pura y
+  aislada precisamente para probarla; `SprintsService` y el cierre del
+  gateway orquestan dos servicios. Solo hay e2e del camino feliz. S1 y S10
+  no habrían llegado aquí con tres casos de `burndown.spec.ts`.
+- [x] **S20 — Textos y documentos desfasados tras D14.** `ScrumToggle`
+  («Backlog y Sprint activos»), JSDoc de `VistaSelector` («añade Backlog y
+  Sprint»), `SinSprintActivo` («Planear un sprint», planeados), el comentario
+  de `CreateTaskBodyDto` («desde el Backlog»), la tabla de fases (P1.3
+  «pestañas Backlog»), y las decisiones fuera de orden (D12 antes de D10, D11
+  al final).
+- [x] **S21 — «→ columna» deja meter una tarea directamente en Done.** Entra
+  completada y cuenta como hecha el mismo día sin haberse trabajado en el
+  sprint. Ofrecer solo columnas que no cierran.
+- [ ] **S22 — Estimar es escribir un número a mano.** D4 se mantiene (sin
+  escala impuesta), pero unos atajos 1·2·3·5·8·13 junto al campo, y poder
+  estimar desde el backlog, ahorran la mitad de una sesión de refinamiento.
+
+### Lo que un equipo Scrum necesita y aquí no está
+
+| Ceremonia / artefacto | Qué hay | Qué falta |
+|---|---|---|
+| **Product backlog** | Lista sin orden, de solo lectura | Orden, refinamiento en el sitio, búsqueda (S6) |
+| **Sprint planning** | Empezar vacío y arrastrar después | Planear antes de arrancar, con los puntos del carrito frente a la velocidad (P1) |
+| **Sprint goal** | Se escribe al empezar, se ve solo en la vista Sprint | Siempre visible en la franja; editable (S12, R1) |
+| **Daily** | Kanban del sprint | Agrupar por persona, y qué lleva días sin moverse — el dato ya existe en Análisis (`blocked`) |
+| **Sprint review** | Nada | Resumen al cerrar y sprint cerrado navegable (S15) |
+| **Retrospectiva** | Nada | Un documento de retro por sprint, creado al cerrar: encaja con Documentos si se fusiona |
+| **Scrum Master** | `canManageSprint`, acotado | Un papel predefinido «Scrum Master» para no montarlo a mano |
+| **Avisos** | Ninguno | Aviso a los miembros al empezar y al cerrar un sprint; disparadores de automatización |
+
+### Lo que se mueve de sitio (UX)
+
+- [x] **R1 — La meta del sprint va en la franja**, junto al nombre. Es el
+  artefacto que más se tiene que ver y hoy solo está en la vista Sprint.
+- [x] **R2 — «Cerrar sprint» sube a la franja**, en un menú `⋯` del sprint
+  junto a «Editar sprint». Hoy está al fondo de la vista Sprint, debajo del
+  burndown, y en el móvil casi no se encuentra.
+- [x] **R3 — La franja da la puerta a la vista Sprint en el móvil**: un botón
+  «Sprint» explícito, no el nombre como enlace invisible (S11).
+- [ ] **R4 — La vista Sprint enseña las tareas**, agrupadas por persona, entre
+  las barras y el burndown. Hoy dice cuántas hay por columna pero no cuáles,
+  que es lo primero que se pregunta en la daily.
+- [x] **R5 — El panel del backlog cambia «→ columna» por «Al sprint»**
+  (entra en la primera columna), con la columna como opción secundaria; las
+  filas se abren con un clic (S6).
+- [x] **R6 — La pestaña del tablero cuenta lo del sprint en curso**, no el
+  historial (S13).
+- [ ] **R7 — Tabla con selector de alcance**: *Sprint en curso · Backlog ·
+  Todo · Sprint X*. El Kanban sigue siendo solo el sprint (D12 no se toca);
+  Tabla y Calendario pasan a ser donde se ve el resto (S14).
+
+### Decisiones que esta auditoría reabre (las toma el dueño del producto)
+
+- **P1 — ¿Se vuelve a poder planear un sprint antes de empezarlo?** Reabre
+  D14 y D16. **Recomendado: sí.** Cuando no hay sprint en curso, la vista
+  Sprint pasa a ser *Planificar el siguiente*: backlog a un lado, el sprint a
+  otro, con la suma frente a la velocidad, y «Empezar» fija el compromiso.
+  Arregla S1 de raíz y da soporte al sprint planning, que hoy no existe.
+  Si no, el mínimo es la gracia del primer día de S1.
+- **P2 — ¿Tabla y Calendario enseñan todo el tablero con filtro (R7), o
+  siguen solo con el sprint?** Recomendado: con filtro.
+- **P3 — ¿Se fusiona antes de cerrar los críticos?** Recomendado: **no**. S1
+  a S4 dan números falsos sin error, y S3 no se puede deshacer una vez que
+  haya historial real reescrito.
+
+### Orden propuesto
+
+| Bloque | Qué | Por qué primero |
+|---|---|---|
+| **1 — Datos correctos** | S1, S2, S3, S4, S8, S9, con S19 (pruebas) a la vez | Dan números falsos o pierden tareas sin error. Condición para fusionar |
+| **2 — Flujo básico** | S5, S6, S7, S10, S11, R1–R5 | Sin ellos un equipo no pasa del segundo sprint |
+| **3 — Pulido** | S12–S18, S20–S22, R6, R7 | Inconsistencias y deuda de estilo |
+| **4 — Lo que falta** | La tabla de arriba: daily por persona, review, retro, papel de Scrum Master, avisos | Producto nuevo; cada uno se decide aparte |
+
+⚠️ **Datos de prueba que dejó la auditoría:** tres proyectos «Auditoria
+Scrum…» en el espacio personal de `sofia@praxis.dev`, en la base local. Se
+pueden borrar sin consecuencias.
+
+### 2026-09-25 — Rediseño tras la auditoría
+
+El dueño del producto pidió trabajar sobre las recomendaciones (P1: planear
+antes de empezar, sí; P2: Tabla con filtro, sí; P3: no fusionar antes del
+Bloque 1). Sale en D17–D20.
+
+**Backend**
+
+- `Sprint.startedAt` y el índice único parcial `sprints_one_active_per_board`
+  (`20260925000000_sprint_started_at`); `Task.carryOverCount`
+  (`20260925000001_task_carry_over`).
+- `startSprint` exige Scrum encendido y traduce el P2002 a 409; un solo
+  sprint planeado por tablero; `PATCH` y `DELETE` de sprint (de uno en curso
+  solo el final; descartar solo uno planeado, devolviendo antes sus tareas al
+  backlog).
+- tasks-service: un sprint cerrado no admite tareas ni las suelta (409); el
+  backlog excluye lo terminado; `task_sprint_metric_rows` sin tope de página.
+- Gateway: el cierre orquesta crear-el-siguiente → reasignar → cerrar en una
+  llamada y deshace el sprint creado si la reasignación falla; `GET
+  …/sprints/metrics`; `POST …/sprints/:id/tasks` para meter en bloque; una
+  tarea creada en una columna va al sprint en curso o, sin él, al planeado.
+  Apagar Scrum con un sprint en marcha da 409.
+- PRAX: regla actualizada (ya no hay vista Backlog); ventana de velocidad de
+  3 sprints, la misma que la pantalla.
+
+**Frontend**
+
+- La página pide por alcance los tableros Scrum (sprint del tablero, backlog
+  y métricas) en vez de las cien primeras tareas.
+- `BacklogPanel`, `SprintStrip` y `SprintDialogs` sustituyen a
+  `BacklogDrawer`, `SprintBanner`, `SprintPanel` y `SinSprintActivo`.
+- `SlideOver`: `closeOnOutsideClick`, y dos paneles a la vez ya no se pisan
+  el margen del `body` ni se cierran juntos con un Escape.
+- El motor de arrastre ya no desplaza el tablero con el puntero fuera de la
+  pista (sobre el panel).
+
+**Pruebas:** `burndown.spec.ts` (8) y `sprints.service.spec.ts` (7), nuevas;
+`09-scrum.spec.ts` reescrita para el flujo nuevo (3 casos). Pasan también
+`08-panel-de-tarea` y `10-documentos`, y las suites unitarias de projects,
+tasks, gateway, reports y web.
+
+**Trampa que apareció:** marcar el `SlideOver` cerrado como `inert` rompe
+`08-panel-de-tarea`, que comprueba el formulario del panel ya cerrado. Se
+quitó; el backlog, en cambio, no pinta su contenido cerrado.
+
+**Queda abierto**, a propósito:
+
+- **S14 / R7** — Tabla con selector de alcance (sprint · backlog · todo). Hoy
+  Tabla y Calendario enseñan el sprint del tablero.
+- **S8, la mitad** — con Scrum apagado el historial de sprints no se ve (se
+  conserva y vuelve al encender).
+- **S15** — resumen de *sprint review* al cerrar y sprint cerrado navegable.
+  El diálogo de cierre ya cuenta terminadas y pendientes, y Progreso enseña
+  los anteriores.
+- **S22** — atajos de estimación 1·2·3·5·8·13.
+- **R4** — la daily agrupada por persona.
+- Los contadores de la franja se actualizan al revalidar (~1 s tras soltar),
+  no en el mismo fotograma que la tarjeta.
+- La tabla «Lo que un equipo Scrum necesita» (retro, papel de Scrum Master,
+  avisos) sigue siendo producto por decidir.
+

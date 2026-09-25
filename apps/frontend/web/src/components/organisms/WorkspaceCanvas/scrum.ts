@@ -1,9 +1,40 @@
-import type { Sprint, Task } from '@praxis/commons';
+import type { Sprint, SprintMetrics, Task } from '@praxis/commons';
 
 /**
  * Lo que las vistas de Scrum comparten, sin estado ni JSX.
  * Ver `docs/PLAN-SCRUM-KANBAN.md`.
  */
+
+/**
+ * Lo que la página carga de un tablero con Scrum, además de las tareas del
+ * sprint que enseña: sus sprints, su backlog y las filas del burndown.
+ */
+export interface ScrumDelTablero {
+  sprints: Sprint[];
+  backlog: Task[];
+  metricas: SprintMetrics;
+}
+
+/**
+ * Id de la «columna» del backlog dentro del motor de arrastre del tablero. El
+ * panel se registra con él como una columna más: así arrastrar del backlog a
+ * una columna, de una columna al backlog o reordenar el backlog son el mismo
+ * gesto, con el mismo fantasma y el mismo hueco (D17).
+ */
+export const BACKLOG = '__backlog__';
+
+/**
+ * El sprint que enseña el tablero: el que está en curso o, sin él, el
+ * planeado. Entre dos sprints el tablero es la planificación del siguiente.
+ */
+export function sprintEnTablero(sprints: readonly Sprint[]): Sprint | null {
+  return sprintActivo(sprints) ?? sprintsPlaneados(sprints)[0] ?? null;
+}
+
+/** Nombre por defecto del siguiente: «Sprint N», contando todos los que hubo. */
+export function nombreDelSiguiente(sprints: readonly Sprint[]): string {
+  return `Sprint ${sprints.length + 1}`;
+}
 
 /** Como mucho hay uno por tablero (D3). */
 export function sprintActivo(sprints: readonly Sprint[]): Sprint | null {
@@ -21,11 +52,6 @@ export function sprintsCerrados(sprints: readonly Sprint[]): Sprint[] {
   return sprints
     .filter((s) => s.status === 'CLOSED')
     .sort((a, b) => (b.closedAt ?? '').localeCompare(a.closedAt ?? ''));
-}
-
-/** Orden del backlog y de cada sprint: el mismo `order` que la columna (D5). */
-export function porOrden(a: Task, b: Task): number {
-  return a.order - b.order || a.createdAt.localeCompare(b.createdAt);
 }
 
 /** `YYYY-MM-DD` en hora local, para un `<input type="date">`. */
@@ -75,4 +101,9 @@ export function textoDiasRestantes(dias: number | null): string {
   if (dias === 1) return 'último día';
   if (dias === 0) return 'terminó ayer';
   return `terminó hace ${-dias + 1} días`;
+}
+
+/** Fecha de un sprint como `YYYY-MM-DD` local, para rellenar un `<input type="date">`. */
+export function diaDe(iso: string | null): string | null {
+  return iso ? claveDiaLocal(new Date(iso)) : null;
 }

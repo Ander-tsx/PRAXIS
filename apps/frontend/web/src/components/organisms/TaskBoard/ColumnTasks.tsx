@@ -65,6 +65,8 @@ export interface ColumnTasksProps {
    * treinta tarjetas en una sola fila desperdiciaría toda la pantalla.
    */
   layout?: Disposicion;
+  /** Lo que dice la lista vacía. El backlog no es una columna y no dice «Sin tareas». */
+  textoVacio?: string;
 }
 
 /**
@@ -108,6 +110,7 @@ export function ColumnTasks({
   registrarReposicion,
   alDesplazar,
   layout = 'columna',
+  textoVacio = 'Sin tareas',
 }: ColumnTasksProps) {
   const enRejilla = layout === 'rejilla';
 
@@ -238,7 +241,7 @@ export function ColumnTasks({
               style={{ background: '#191919' }}
             >
               <span className="font-sans text-xs text-white">
-                {arrastrandoTarea ? 'Suelta aquí' : 'Sin tareas'}
+                {arrastrandoTarea ? 'Suelta aquí' : textoVacio}
               </span>
             </div>
           ) : (

@@ -96,14 +96,6 @@ export class ReportsService {
   }
 
   /**
-   * Las columnas del proyecto, con su nombre y su color.
-   *
-   * Hacen falta en casi todos los informes: los datos de tasks vienen con
-   * `columnId` y nada más, porque las columnas son de projects-service. Aquí es
-   * donde se cruzan las dos mitades, que es literalmente para lo que existe este
-   * servicio.
-   */
-  /**
    * Lo que PRAX necesita para hablar de capacidad en un tablero con Scrum
    * (P3.3 y D10 de `docs/PLAN-SCRUM-KANBAN.md`): el sprint en curso con lo
    * comprometido y lo hecho, y la velocidad media de los últimos cerrados.
@@ -194,6 +186,14 @@ export class ReportsService {
     return resultado;
   }
 
+  /**
+   * Las columnas del proyecto, con su nombre y su color.
+   *
+   * Hacen falta en casi todos los informes: los datos de tasks vienen con
+   * `columnId` y nada más, porque las columnas son de projects-service. Aquí es
+   * donde se cruzan las dos mitades, que es literalmente para lo que existe este
+   * servicio.
+   */
   private async columnas(projectId: string) {
     const project = await this.ask<{
       workspaces?: {

@@ -74,6 +74,22 @@ export class BoardsService {
       throw new RpcException({ statusCode: 404, message: 'Board no encontrado' });
     }
 
+    /* Apagar Scrum con un sprint en marcha lo dejaba corriendo sin que nadie
+       lo viera, y al volver a encender la franja decía «terminó hace 30 días»
+       (auditoría S8). Primero se cierra. */
+    if (dto.scrumEnabled === false && board.scrumEnabled) {
+      const activo = await this.prisma.sprint.findFirst({
+        where: { boardId: dto.id, status: 'ACTIVE' },
+        select: { name: true },
+      });
+      if (activo) {
+        throw new RpcException({
+          statusCode: 409,
+          message: `Cierra «${activo.name}» antes de dejar de trabajar por sprints.`,
+        });
+      }
+    }
+
     const updated = await this.prisma.board.update({
       where: { id: dto.id },
       data: {

@@ -6,6 +6,7 @@ import {
   FindSprintsByBoardDto,
   FindSprintsByIdsDto,
   StartSprintDto,
+  UpdateSprintDto,
 } from '@praxis/contracts';
 import { SprintsService } from './sprints.service';
 
@@ -38,6 +39,22 @@ export class SprintsController {
   @MessagePattern({ cmd: 'sprint_find_active' })
   findActiveSprint(@Payload() dto: FindSprintsByBoardDto) {
     return this.sprintsService.findActiveSprint(dto.boardId);
+  }
+
+  @MessagePattern({ cmd: 'sprint_find_planned' })
+  findPlannedSprint(@Payload() dto: FindSprintsByBoardDto) {
+    return this.sprintsService.findPlannedSprint(dto.boardId);
+  }
+
+  @MessagePattern({ cmd: 'sprint_update' })
+  updateSprint(@Payload() dto: UpdateSprintDto) {
+    return this.sprintsService.updateSprint(dto);
+  }
+
+  /** Último paso de descartar un planeado; el gateway ya devolvió sus tareas al backlog. */
+  @MessagePattern({ cmd: 'sprint_delete_planned' })
+  deletePlannedSprint(@Payload() dto: { id: string; boardId: string }) {
+    return this.sprintsService.deletePlannedSprint(dto.id, dto.boardId);
   }
 
   @MessagePattern({ cmd: 'sprint_start' })

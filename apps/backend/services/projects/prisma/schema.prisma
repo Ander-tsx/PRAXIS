@@ -281,13 +281,20 @@ model Sprint {
   startDate DateTime?
   endDate   DateTime?
 
+  /// El instante exacto en que se pulsó «Empezar». No es `startDate`: esa es
+  /// una fecha de calendario (medianoche del día elegido) y lo que se planeó
+  /// esa misma mañana quedaría *después* de ella. El burndown separa el
+  /// alcance comprometido del añadido comparando contra este campo
+  /// (auditoría S1 de `docs/PLAN-SCRUM-KANBAN.md`).
+  startedAt DateTime?
+
   createdAt DateTime  @default(now())
   closedAt  DateTime?
 
-  /// Como mucho un `ACTIVE` por tablero (D3). Este índice no impone la regla
-  /// —Postgres no tiene "único condicionado a un valor de enum" sin un índice
-  /// parcial escrito a mano en SQL—, pero sí hace barata la consulta que la
-  /// aplica: "¿hay ya un sprint activo en este tablero?" antes de crear otro.
+  /// Como mucho un `ACTIVE` por tablero (D3). La regla la impone un índice
+  /// único **parcial** escrito a mano en la migración
+  /// `20260925000000_sprint_started_at` —Prisma no sabe declararlo—; este solo
+  /// abarata la consulta por tablero y estado.
   @@index([boardId, status])
   @@schema("projects")
   @@map("sprints")

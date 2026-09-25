@@ -267,8 +267,9 @@ export function useArrastreDeTablero({
       const tira = pista.current;
       if (tira) {
         const caja = tira.getBoundingClientRect();
-        if (x < caja.left + MARGEN_DE_AUTODESPLAZAMIENTO) return true;
-        if (x > caja.right - MARGEN_DE_AUTODESPLAZAMIENTO) return true;
+        const dentro = x >= caja.left && x <= caja.right;
+        if (dentro && x < caja.left + MARGEN_DE_AUTODESPLAZAMIENTO) return true;
+        if (dentro && x > caja.right - MARGEN_DE_AUTODESPLAZAMIENTO) return true;
       }
       const encima = columnaBajoElPuntero(x, y);
       const lista = encima ? listas.current.get(encima) : null;
@@ -300,8 +301,12 @@ export function useArrastreDeTablero({
     /* Horizontal: la pista de columnas. Es lo que permite llevar una tarjeta a
        una columna que ni siquiera está en pantalla. */
     const tira = pista.current;
-    if (tira) {
-      const caja = tira.getBoundingClientRect();
+    const cajaDeTira = tira?.getBoundingClientRect();
+    /* Solo con el puntero **dentro** de la pista. Fuera de ella —sobre el panel
+       del backlog, que se abre a su derecha— el empuje salía al máximo y el
+       tablero se iba solo mientras reordenabas el backlog. */
+    if (tira && cajaDeTira && x >= cajaDeTira.left && x <= cajaDeTira.right) {
+      const caja = cajaDeTira;
       const empuje = empujeDeAutodesplazamiento(x, caja.left, caja.right);
       if (empuje !== 0 && tira.scrollWidth > tira.clientWidth) {
         const antes = tira.scrollLeft;

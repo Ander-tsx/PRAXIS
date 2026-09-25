@@ -133,7 +133,7 @@ export function BurndownChart({ datos }: { datos: Burndown }) {
               cy={escala.y(vistos[ultimo].restante)}
               r={4}
               fill={colors.primary}
-              stroke="#191919"
+              stroke={colors.surface}
               strokeWidth={2}
             />
           )}
@@ -145,7 +145,7 @@ export function BurndownChart({ datos }: { datos: Burndown }) {
                 x2={escala.x(foco)}
                 y1={MARGEN.arriba}
                 y2={ALTO - MARGEN.abajo}
-                stroke="rgba(255,255,255,0.25)"
+                stroke={colors.borderStrong}
                 strokeWidth={1}
               />
               {enFoco.transcurrido && (
@@ -154,7 +154,7 @@ export function BurndownChart({ datos }: { datos: Burndown }) {
                   cy={escala.y(enFoco.restante)}
                   r={4}
                   fill={colors.primary}
-                  stroke="#191919"
+                  stroke={colors.surface}
                   strokeWidth={2}
                 />
               )}
@@ -166,7 +166,7 @@ export function BurndownChart({ datos }: { datos: Burndown }) {
           <div
             className="pointer-events-none absolute top-0 rounded-md border border-border px-2 py-1 font-sans text-[11px] text-text-primary"
             style={{
-              background: '#1c1c1b',
+              background: colors.surfaceElevated,
               left: `${(escala.x(foco) / ANCHO) * 100}%`,
               transform: foco > dias.length / 2 ? 'translateX(-105%)' : 'translateX(5%)',
             }}

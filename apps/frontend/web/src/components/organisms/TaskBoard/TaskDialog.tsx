@@ -67,6 +67,17 @@ export interface TaskDialogProps {
    * usar `task.id` en ese momento haría brillar la tarjeta equivocada.
    */
   onSaved?: (taskId: string) => void;
+  /**
+   * En un tablero con Scrum: si la tarea está en el backlog o en el sprint, y
+   * cómo pasarla al otro lado sin arrastrar. Sin esto, recortar alcance a
+   * mitad de sprint solo se podía cerrando el sprint (auditoría S5).
+   */
+  planificacion?: {
+    enBacklog: boolean;
+    /** Nombre del sprint que enseña el tablero. */
+    sprint: string;
+    onMover: () => void;
+  };
 }
 
 /**
@@ -135,6 +146,7 @@ export function TaskDialog({
   canEdit,
   canDelete,
   onSaved,
+  planificacion,
 }: TaskDialogProps) {
   /* Sin el tercer elemento (`enMarcha`) a propósito: ver `handleClose`. */
   const [state, formAction] = useAccion(updateTaskAction, TASK_INITIAL_STATE);
@@ -284,11 +296,23 @@ export function TaskDialog({
       tone="dark"
       title={task.title}
       description={
-        <span className="flex items-center gap-2">
+        <span className="flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-white/[0.08] px-2 py-0.5 font-sans text-[11px] text-white">
-            {columnName}
+            {planificacion?.enBacklog ? 'Backlog' : columnName}
           </span>
+          {planificacion && !planificacion.enBacklog && (
+            <span className="font-sans text-xs text-text-secondary">{planificacion.sprint}</span>
+          )}
           <span className="font-sans text-xs">Creada {formatDate(task.createdAt)}</span>
+          {planificacion && (
+            <button
+              type="button"
+              onClick={planificacion.onMover}
+              className="cursor-pointer rounded-full border border-white/[0.12] px-2 py-0.5 font-sans text-[11px] text-text-secondary transition-colors hover:border-primary hover:text-primary"
+            >
+              {planificacion.enBacklog ? `Pasar a ${planificacion.sprint}` : 'Devolver al backlog'}
+            </button>
+          )}
         </span>
       }
     >

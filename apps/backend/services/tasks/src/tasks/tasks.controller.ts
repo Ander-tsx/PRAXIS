@@ -133,19 +133,26 @@ export class TasksController {
 
   /**
    * Mueve un lote de tareas de un sprint a otro, o al backlog (`toSprintId:
-   * null`). Solo lo llama el cierre de sprint del gateway, que ya validó.
+   * null`). Lo llaman el cierre de sprint y las rutas de sprint del gateway, que ya validaron.
    */
   @MessagePattern({ cmd: 'task_reassign_sprint' })
   reassignSprint(
     @Payload()
     dto: {
       boardId: string;
-      fromSprintId: string;
+      fromSprintId: string | null;
       taskIds: string[];
       toSprintId: string | null;
+      carry?: boolean;
     },
   ) {
     return this.tasksService.reassignSprint(dto);
+  }
+
+  /** Filas mínimas para burndown y velocidad, sin tope de página (auditoría S2). */
+  @MessagePattern({ cmd: 'task_sprint_metric_rows' })
+  sprintMetricRows(@Payload() dto: { sprintIds: string[] }) {
+    return this.tasksService.sprintMetricRows(dto.sprintIds ?? []);
   }
 
   // ─── Etiquetas ────────────────────────────────────────────────────────────

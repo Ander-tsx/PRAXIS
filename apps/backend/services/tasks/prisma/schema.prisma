@@ -69,6 +69,11 @@ model Task {
   /// velocidad. `null` = sin estimar, que **no** es lo mismo que 0.
   estimatePoints Int?
 
+  /// Cuántas veces pasó sin terminar de un sprint cerrado al siguiente. La
+  /// tarjeta lo enseña para que se vea qué trabajo se arrastra; se suma en
+  /// `reassignSprint` cuando el cierre la manda al siguiente sprint.
+  carryOverCount Int @default(0)
+
   /// Para «mis tareas»: se filtra por vencimiento dentro de los proyectos visibles.
   @@index([projectId, dueDate])
   /// Para el throughput: cuántas se cerraron en cada tramo de fechas.

@@ -1,32 +1,23 @@
 'use client';
 
-import { pullToSprintAction } from '@/app/(privado)/projects/[id]/sprint-actions';
-import { SPRINT_INITIAL_STATE } from '@/lib/projects/action-state';
-import {
-  type Board,
-  type Column,
-  type Label,
-  type Sprint,
-  type Task,
-  type UserProfile,
-  useAccion,
-} from '@praxis/commons';
+import type { Board, Label, Task, UserProfile } from '@praxis/commons';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
-import { BacklogDrawer } from './BacklogDrawer';
 import { BoardCalendar } from './BoardCalendar';
-import { BoardColumns } from './BoardColumns';
+import { BoardColumns, type PlanificacionDelTablero } from './BoardColumns';
 import { BoardTable } from './BoardTable';
-import { SinSprintActivo } from './SinSprintActivo';
-import { SprintBanner } from './SprintBanner';
-import { SprintPanel } from './SprintPanel';
+import { SprintStrip } from './SprintStrip';
 import { TableroExpandible } from './TableroExpandible';
 import { TableroMenu } from './TableroMenu';
-import { type VistaTablero, esVistaScrum } from './VistaSelector';
-import { sprintActivo, sprintsPlaneados } from './scrum';
+import type { VistaTablero } from './VistaSelector';
+import { calcularVelocidad, unidadDe } from './burndown';
+import {
+  type ScrumDelTablero,
+  nombreDelSiguiente,
+  sprintActivo,
+  sprintEnTablero,
+  sprintsCerrados,
+} from './scrum';
 import { BOARD_SURFACE } from './superficie-tablero';
-
-/** Ver `SIN_TAREAS` en `WorkspaceCanvas`: la identidad del array importa. */
-const NINGUNA: Task[] = [];
 
 export interface BoardStripProps {
   /** El selector de vista + el filtro de «solo mis tareas». */
@@ -71,11 +62,11 @@ export interface BoardStripProps {
   canManageLabels: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
-  /** Sprints del tablero. Vacío si no tiene Scrum encendido. */
-  sprints: Sprint[];
-  /** Planear, iniciar y cerrar sprints. */
+  /** Solo en un tablero con Scrum: sprints, backlog y filas del burndown. */
+  scrum?: ScrumDelTablero;
+  /** Empezar, editar y cerrar sprints: `canManageSprint`. */
   canManageSprint: boolean;
-  /** Para que el estado vacío del Kanban sin sprint pueda llevar a Backlog o Sprint. */
+  /** Para abrir el backlog desde Calendario o Tabla: vuelve al Kanban. */
   onCambiarVista: (vista: VistaTablero) => void;
 }
 
@@ -84,10 +75,11 @@ export interface BoardStripProps {
  *
  * ## Con Scrum encendido (`docs/PLAN-SCRUM-KANBAN.md`)
  *
- * Kanban, Calendario y Tabla enseñan **solo el sprint en curso** (D12): son las
- * vistas de trabajar, y lo que se trabaja es lo comprometido. Sin sprint en
- * curso no hay nada que enseñar, y se dice. Backlog y Sprint reciben todas las
- * tareas del tablero: son las vistas de planear.
+ * El tablero enseña **el sprint de ahora** (D12 y D19): el que está en curso
+ * o, entre dos sprints, el planeado —la planificación del siguiente—. Encima,
+ * la franja (`SprintStrip`) con todo lo del sprint; al lado, el backlog en un
+ * panel que es parte del mismo arrastre (D17). `tasks` ya llega acotado a ese
+ * sprint: la página lo pide por alcance, no entero.
  *
  * La tira de columnas vive en `BoardColumns`, que es cliente porque gestiona el
  * arrastre. Aquí solo va la cabecera, que no necesita JavaScript.
@@ -116,44 +108,49 @@ export function BoardStrip({
   canManageLabels,
   canEditTask,
   canDeleteTask,
-  sprints,
+  scrum,
   canManageSprint,
   onCambiarVista,
 }: BoardStripProps) {
   const columnCount = board.columns.length;
-  const scrum = board.scrumEnabled;
-  const activo = scrum ? sprintActivo(sprints) : null;
-  const activoId = activo?.id ?? null;
-  /* Si la URL pide Backlog o Sprint en un tablero sin Scrum, se cae a Kanban. */
-  const vistaReal: VistaTablero = !scrum && esVistaScrum(vista) ? 'kanban' : vista;
-
-  /* Memorizado, no filtrado en cada render: `BoardColumns` detecta datos nuevos
-     por la identidad del array (ver `SIN_TAREAS` en `WorkspaceCanvas`). */
-  const tareasDelSprint = useMemo(
-    () => (!scrum ? tasks : activoId ? tasks.filter((t) => t.sprintId === activoId) : NINGUNA),
-    [scrum, tasks, activoId],
-  );
-  const sinSprint = scrum && !activo && !esVistaScrum(vistaReal);
-
-  /* El panel del backlog y el paso de una tarea al sprint en curso (D14). */
   const [backlogAbierto, setBacklogAbierto] = useState(false);
   const cerrarBacklog = useCallback(() => setBacklogAbierto(false), []);
-  const [estadoTraer, traer, trayendo] = useAccion(pullToSprintAction, SPRINT_INITIAL_STATE);
-  const traerAlSprint = useCallback(
-    (taskId: string, column: Column) => {
-      if (!activoId) return;
-      const datos = new FormData();
-      datos.set('projectId', projectId);
-      datos.set('taskId', taskId);
-      datos.set('sprintId', activoId);
-      datos.set('columnId', column.id);
-      datos.set('status', column.name);
-      traer(datos);
-    },
-    [activoId, projectId, traer],
+
+  const sprints = scrum?.sprints;
+  const enTablero = sprints ? sprintEnTablero(sprints) : null;
+  const metricas = scrum?.metricas;
+  /* Una sola unidad para todo el tablero —franja, burndown, velocidad—: si
+     cada pieza decidía la suya, la franja decía «1/4 hechas» y el progreso
+     «3 de 18 puntos» a la vez (auditoría S13). */
+  const unidad = useMemo(() => unidadDe(metricas?.tasks ?? []), [metricas]);
+  const velocidadMedia = useMemo(() => {
+    if (!sprints || !metricas) return null;
+    const cerrados = sprintsCerrados(sprints).filter((s) =>
+      metricas.velocitySprintIds.includes(s.id),
+    );
+    return calcularVelocidad(cerrados, metricas.tasks, unidad).media;
+  }, [sprints, metricas, unidad]);
+
+  const planificacion: PlanificacionDelTablero | undefined = useMemo(
+    () =>
+      scrum
+        ? {
+            backlog: scrum.backlog,
+            panelAbierto: backlogAbierto,
+            onCerrarPanel: cerrarBacklog,
+            sprintDestino: enTablero ? { id: enTablero.id, name: enTablero.name } : null,
+            nombreNuevo: nombreDelSiguiente(scrum.sprints),
+            canPlan: canEditTask,
+          }
+        : undefined,
+    [scrum, backlogAbierto, cerrarBacklog, enTablero, canEditTask],
   );
-  const enBacklog = scrum ? tasks.filter((t) => t.sprintId === null).length : 0;
-  const hechas = tareasDelSprint.filter((t) => t.completedAt).length;
+
+  function alternarBacklog() {
+    /* El backlog se arrastra al Kanban: desde Calendario o Tabla, se vuelve a él. */
+    if (vista !== 'kanban') onCambiarVista('kanban');
+    setBacklogAbierto((a) => !a);
+  }
 
   return (
     <section
@@ -178,6 +175,8 @@ export function BoardStrip({
             board={board}
             canEdit={canEditBoard}
             canDelete={canDeleteBoard}
+            tareasAbiertas={scrum ? [] : tasks.filter((t) => !t.completedAt).map((t) => t.id)}
+            haySprintEnCurso={sprints ? sprintActivo(sprints) !== null : false}
           />
         }
         nombre={board.name}
@@ -185,43 +184,34 @@ export function BoardStrip({
           columnCount === 0
             ? 'sin columnas'
             : `${columnCount} ${columnCount === 1 ? 'columna' : 'columnas'}`
-        }${tareasDelSprint.length > 0 ? ` · ${tareasDelSprint.length} ${tareasDelSprint.length === 1 ? 'tarea' : 'tareas'}` : ''}${
-          activo ? ` · ${activo.name}` : ''
+        }${tasks.length > 0 ? ` · ${tasks.length} ${tasks.length === 1 ? 'tarea' : 'tareas'}` : ''}${
+          enTablero ? ` · ${enTablero.name}` : ''
         }`}
       >
         {/* Kanban es la de siempre —arrastre incluido—; Calendario y Tabla son
             solo lectura de la misma lista y comparten el panel de tarea. */}
-        {scrum && activo && !esVistaScrum(vistaReal) && (
-          <SprintBanner
-            activo={activo}
-            hechas={hechas}
-            total={tareasDelSprint.length}
-            enBacklog={enBacklog}
-            backlogAbierto={backlogAbierto}
-            onBacklog={() => setBacklogAbierto((a) => !a)}
-            onVerSprint={() => onCambiarVista('sprint')}
-          />
-        )}
-        {vistaReal === 'sprint' ? (
-          <SprintPanel
+        {scrum && metricas && (
+          <SprintStrip
             board={board}
             projectId={projectId}
-            tasks={tasks}
-            sprints={sprints}
+            sprints={scrum.sprints}
+            enTablero={enTablero}
+            tareas={tasks}
+            metricas={metricas}
+            unidad={unidad}
+            velocidadMedia={velocidadMedia}
+            nombreSiguiente={nombreDelSiguiente(scrum.sprints)}
+            enBacklog={scrum.backlog.length}
+            backlogAbierto={backlogAbierto}
+            onBacklog={alternarBacklog}
             canManageSprint={canManageSprint}
           />
-        ) : sinSprint ? (
-          <SinSprintActivo
-            planeados={sprintsPlaneados(sprints).length}
-            enBacklog={enBacklog}
-            onIr={onCambiarVista}
-            onBacklog={() => setBacklogAbierto(true)}
-          />
-        ) : vistaReal === 'calendario' ? (
+        )}
+        {vista === 'calendario' ? (
           <BoardCalendar
             board={board}
             projectId={projectId}
-            tasks={tareasDelSprint}
+            tasks={tasks}
             members={members}
             labels={labels}
             usersById={usersById}
@@ -233,11 +223,11 @@ export function BoardStrip({
             canEditTask={canEditTask}
             canDeleteTask={canDeleteTask}
           />
-        ) : vistaReal === 'tabla' ? (
+        ) : vista === 'tabla' ? (
           <BoardTable
             board={board}
             projectId={projectId}
-            tasks={tareasDelSprint}
+            tasks={tasks}
             members={members}
             labels={labels}
             usersById={usersById}
@@ -253,18 +243,18 @@ export function BoardStrip({
           <BoardColumns
             board={board}
             projectId={projectId}
-            onSoltarDesdeBacklog={activo && canEditTask ? traerAlSprint : undefined}
+            planificacion={planificacion}
             canCreateColumn={canCreateColumn}
             canEditColumn={canEditColumn}
             canDeleteColumn={canDeleteColumn}
-            tasks={tareasDelSprint}
+            tasks={tasks}
             members={members}
             labels={labels}
             usersById={usersById}
             currentUserId={currentUserId}
             canCreateTask={canCreateTask}
-            canMoveTask={canMoveTask}
             openTaskId={openTaskId}
+            canMoveTask={canMoveTask}
             canComment={canComment}
             canManageLabels={canManageLabels}
             canEditTask={canEditTask}
@@ -272,24 +262,6 @@ export function BoardStrip({
           />
         )}
       </TableroExpandible>
-
-      {scrum && (
-        <BacklogDrawer
-          abierto={backlogAbierto}
-          onCerrar={cerrarBacklog}
-          board={board}
-          projectId={projectId}
-          tasks={tasks}
-          activo={activo}
-          members={members}
-          usersById={usersById}
-          canCreateTask={canCreateTask}
-          canEditTask={canEditTask}
-          onTraer={traerAlSprint}
-          trayendo={trayendo}
-          error={estadoTraer.error}
-        />
-      )}
     </section>
   );
 }

@@ -227,7 +227,9 @@ export function ColumnMenu({
                     </span>
                     Límite de trabajo en curso
                     {wipLimit !== null && (
-                      <span className="ml-auto font-sans text-[10px] text-white">{wipLimit}</span>
+                      <span className="ml-auto font-sans text-[10px] text-text-secondary">
+                        {wipLimit}
+                      </span>
                     )}
                   </MenuItem>
                 </>
@@ -395,7 +397,7 @@ export function ColumnMenu({
 
               <label
                 htmlFor={`wip-${columnId}`}
-                className="font-sans text-[11px] uppercase tracking-wide text-white"
+                className="font-sans text-[11px] uppercase tracking-wide text-text-secondary"
               >
                 Máximo de tareas a la vez
               </label>
@@ -408,7 +410,7 @@ export function ColumnMenu({
                 max={999}
                 defaultValue={wipLimit ?? ''}
                 placeholder="Sin límite"
-                className="h-9 rounded-lg border border-white/10 bg-[#191919] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
+                className="h-9 rounded-lg border border-border bg-background px-2.5 font-sans text-sm text-text-primary outline-none focus:border-primary"
               />
               <span className="font-sans text-[11px] leading-snug text-text-secondary">
                 Pasarlo no bloquea nada: el contador de la columna se pone en aviso. Vacío quita el
@@ -427,7 +429,7 @@ export function ColumnMenu({
                 <button
                   type="button"
                   onClick={() => show('menu')}
-                  className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white transition-colors hover:text-white"
+                  className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
                 >
                   Cancelar
                 </button>

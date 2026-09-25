@@ -89,6 +89,57 @@ export class StartSprintDto extends StartSprintBodyDto {
 }
 
 /**
+ * Cuerpo de `PATCH /boards/:boardId/sprints/:sprintId`.
+ *
+ * De un sprint en curso solo se cambia el final; uno cerrado no se toca.
+ */
+export class UpdateSprintBodyDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  name?: string;
+
+  /** Cadena vacía borra la meta. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  goal?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsISO8601()
+  startDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsISO8601()
+  endDate?: string;
+}
+
+export class UpdateSprintDto extends UpdateSprintBodyDto {
+  @IsUUID('4')
+  id: string;
+
+  @IsUUID('4')
+  boardId: string;
+}
+
+/**
+ * Cuerpo de `POST /boards/:boardId/sprints/:sprintId/tasks`: mete un lote de
+ * tareas **del backlog** en un sprint planeado o en curso. Lo usa encender
+ * Scrum con «empezar con lo que ya está en columnas».
+ */
+export class AddTasksToSprintBodyDto {
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(100, { each: true })
+  taskIds: string[];
+}
+
+/**
  * Qué hacer con una tarea pendiente al cerrar el sprint.
  *
  * Solo dos opciones, a propósito (D6 de `docs/PLAN-SCRUM-KANBAN.md`): nunca
@@ -140,6 +191,19 @@ export class CloseSprintBodyDto {
   @IsOptional()
   @IsUUID('4')
   nextSprintId?: string;
+
+  /**
+   * Nombre del siguiente sprint si hay que crearlo. Nace **planeado, no en
+   * marcha**: entre un sprint y otro va la planificación, y lo que entre en
+   * ella tiene que contar como compromiso y no como añadido (auditoría S1).
+   * Si ya hay un planeado, las tareas van a ese y esto se ignora.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  nextName?: string;
 }
 
 export class CloseSprintDto extends CloseSprintBodyDto {
@@ -149,4 +213,3 @@ export class CloseSprintDto extends CloseSprintBodyDto {
   @IsUUID('4')
   boardId: string;
 }
-

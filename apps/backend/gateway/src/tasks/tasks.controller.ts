@@ -110,8 +110,8 @@ export class TasksController {
    *
    * - La clave **viene** en el cuerpo (un id o `null`): manda el cliente. Es
    *   el caso del Backlog, que manda `null` para que no se ate a nada.
-   * - La clave **no viene**: si el tablero tiene Scrum y hay un sprint activo,
-   *   va a ese sprint. Es "Añadir tarea" desde una columna del Kanban, que en
+   * - La clave **no viene**: si el tablero tiene Scrum, va al sprint en curso
+   *   o, sin él, al planeado —el que enseña el tablero entonces—. Es "Añadir tarea" desde una columna del Kanban, que en
    *   un tablero Scrum solo enseña el sprint activo — una tarea creada ahí
    *   que no entrara en él desaparecería de la vista en cuanto se guarda.
    *
@@ -121,10 +121,7 @@ export class TasksController {
    * comprobación las tareas de un tablero Kanban se seguirían atando a un
    * sprint que ya nadie ve.
    */
-  private async sprintForNewTask(
-    boardId: string,
-    body: CreateTaskBodyDto,
-  ): Promise<string | null> {
+  private async sprintForNewTask(boardId: string, body: CreateTaskBodyDto): Promise<string | null> {
     if (body.sprintId !== undefined) return body.sprintId;
     if (body.parentTaskId) return null;
 
@@ -137,12 +134,16 @@ export class TasksController {
     if (!board?.scrumEnabled) return null;
 
     const active = await firstValueFrom(
-      this.projectsClient.send<{ id: string } | null>(
-        { cmd: 'sprint_find_active' },
-        { boardId },
-      ),
+      this.projectsClient.send<{ id: string } | null>({ cmd: 'sprint_find_active' }, { boardId }),
     );
-    return active?.id ?? null;
+    if (active) return active.id;
+
+    /* Sin sprint en curso, el tablero enseña el planeado: lo que se crea en
+       una columna entra ahí, que es lo que se ve. */
+    const planned = await firstValueFrom(
+      this.projectsClient.send<{ id: string } | null>({ cmd: 'sprint_find_planned' }, { boardId }),
+    );
+    return planned?.id ?? null;
   }
 
   /** Lista tareas de un board (requiere canViewProject) */
@@ -169,7 +170,9 @@ export class TasksController {
     @Query('backlog') backlog?: string,
   ) {
     if (sprintId && backlog === 'true') {
-      throw new BadRequestException('`sprintId` y `backlog` no se combinan: uno pide un sprint, el otro ninguno');
+      throw new BadRequestException(
+        '`sprintId` y `backlog` no se combinan: uno pide un sprint, el otro ninguno',
+      );
     }
     const findDto: FindTasksDto = {
       boardId,

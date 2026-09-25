@@ -615,8 +615,8 @@ const REGLAS: Regla[] = [
     texto:
       'Si un tablero trae "scrum", trabaja por sprints. Para planear o si preguntan si ' +
       'algo cabe, compara "comprometido" con "velocidadMedia" (misma unidad) y dilo en una ' +
-      'frase. No inicias, cierras ni mueves tareas entre sprints: eso se hace en la vista ' +
-      'Sprint o Backlog del tablero.',
+      'frase. No inicias, cierras ni mueves tareas entre sprints: eso se hace desde la ' +
+      'franja del sprint y el panel Backlog del tablero.',
   },
 ];
 

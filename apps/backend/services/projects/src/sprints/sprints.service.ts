@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { CreateSprintDto, StartSprintDto } from '@praxis/contracts';
+import { CreateSprintDto, StartSprintDto, UpdateSprintDto } from '@praxis/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 
@@ -31,6 +31,17 @@ export class SprintsService {
       throw new RpcException({
         statusCode: 400,
         message: 'Este tablero no tiene Scrum encendido',
+      });
+    }
+
+    /* Un solo sprint planeado: «el siguiente». La interfaz no tiene dónde
+       enseñar un segundo, y un planeado que nadie ve es donde se pierden
+       tareas (auditoría S4). */
+    const planeado = await this.findPlannedSprint(dto.boardId);
+    if (planeado) {
+      throw new RpcException({
+        statusCode: 409,
+        message: `Ya hay un sprint planeado en este tablero: "${planeado.name}".`,
       });
     }
 
@@ -75,6 +86,79 @@ export class SprintsService {
     return this.prisma.sprint.findFirst({ where: { boardId, status: 'ACTIVE' } });
   }
 
+  /** El sprint `PLANNED` de un tablero —el siguiente—, o `null`. */
+  async findPlannedSprint(boardId: string) {
+    return this.prisma.sprint.findFirst({
+      where: { boardId, status: 'PLANNED' },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /**
+   * Nombre, meta y fechas. Un sprint cerrado no se toca: es historial.
+   *
+   * De uno en curso solo se mueve el **final** —alargar una semana es
+   * corriente—; el inicio ya pasó y cambiarlo reescribiría el burndown.
+   */
+  async updateSprint(dto: UpdateSprintDto) {
+    const sprint = await this.prisma.sprint.findUnique({ where: { id: dto.id } });
+    if (!sprint || sprint.boardId !== dto.boardId) {
+      throw new RpcException({ statusCode: 404, message: 'Sprint no encontrado' });
+    }
+    if (sprint.status === 'CLOSED') {
+      throw new RpcException({ statusCode: 409, message: 'Un sprint cerrado ya no se edita' });
+    }
+    if (sprint.status === 'ACTIVE' && dto.startDate !== undefined) {
+      throw new RpcException({
+        statusCode: 400,
+        message: 'El sprint ya empezó: solo se puede cambiar cuándo termina',
+      });
+    }
+
+    const startDate = dto.startDate ? new Date(dto.startDate) : sprint.startDate;
+    const endDate = dto.endDate ? new Date(dto.endDate) : sprint.endDate;
+    if (startDate && endDate && endDate <= startDate) {
+      throw new RpcException({
+        statusCode: 400,
+        message: 'La fecha de fin tiene que ser posterior a la de inicio',
+      });
+    }
+
+    const updated = await this.prisma.sprint.update({
+      where: { id: dto.id },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        /* Cadena vacía borra la meta. */
+        ...(dto.goal !== undefined && { goal: dto.goal || null }),
+        ...(dto.startDate !== undefined && { startDate }),
+        ...(dto.endDate !== undefined && { endDate }),
+      },
+    });
+
+    await this.redis.del(`sprints:board:${dto.boardId}`);
+    return updated;
+  }
+
+  /**
+   * Descarta un sprint planeado. Sus tareas ya volvieron al backlog: lo hace el
+   * gateway antes de llamar aquí, igual que en el cierre.
+   */
+  async deletePlannedSprint(id: string, boardId: string) {
+    const sprint = await this.prisma.sprint.findUnique({ where: { id } });
+    if (!sprint || sprint.boardId !== boardId) {
+      throw new RpcException({ statusCode: 404, message: 'Sprint no encontrado' });
+    }
+    if (sprint.status !== 'PLANNED') {
+      throw new RpcException({
+        statusCode: 409,
+        message: 'Solo se puede descartar un sprint que todavía no ha empezado',
+      });
+    }
+    await this.prisma.sprint.delete({ where: { id } });
+    await this.redis.del(`sprints:board:${boardId}`);
+    return { deleted: true };
+  }
+
   async startSprint(dto: StartSprintDto) {
     const sprint = await this.prisma.sprint.findUnique({ where: { id: dto.id } });
     if (!sprint) {
@@ -87,6 +171,15 @@ export class SprintsService {
       throw new RpcException({
         statusCode: 400,
         message: 'Solo se puede iniciar un sprint que todavía no ha arrancado',
+      });
+    }
+    /* `createSprint` ya lo comprobaba y esto no (auditoría S8): con Scrum
+       apagado se arrancaban sprints que nadie veía. */
+    const board = await this.prisma.board.findUnique({ where: { id: dto.boardId } });
+    if (!board?.scrumEnabled) {
+      throw new RpcException({
+        statusCode: 400,
+        message: 'Este tablero no tiene Scrum encendido',
       });
     }
 
@@ -108,10 +201,22 @@ export class SprintsService {
       });
     }
 
-    const updated = await this.prisma.sprint.update({
-      where: { id: dto.id },
-      data: { status: 'ACTIVE', startDate, endDate },
-    });
+    const updated = await this.prisma.sprint
+      .update({
+        where: { id: dto.id },
+        data: { status: 'ACTIVE', startDate, endDate, startedAt: new Date() },
+      })
+      .catch((error: unknown) => {
+        /* El índice parcial `sprints_one_active_per_board`: otro inicio ganó la
+           carrera entre la comprobación de arriba y esta escritura (S9). */
+        if ((error as { code?: string } | null)?.code === 'P2002') {
+          throw new RpcException({
+            statusCode: 409,
+            message: 'Ya hay un sprint activo en este tablero. Ciérralo antes de iniciar otro.',
+          });
+        }
+        throw error;
+      });
 
     await this.redis.del(`sprints:board:${dto.boardId}`);
     return updated;

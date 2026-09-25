@@ -24,6 +24,15 @@ export interface SlideOverProps {
    * y siguen exactamente igual.
    */
   tone?: 'default' | 'dark';
+  /**
+   * `false` para un panel **de trabajo** que convive con la página: el del
+   * backlog se queda abierto mientras arrastras tareas al tablero, y un clic
+   * fuera —el que genera soltar la tarea— no puede cerrarlo. Se cierra con su
+   * botón o con Escape.
+   */
+  closeOnOutsideClick?: boolean;
+  /** Nombre accesible del panel, para lectores de pantalla y pruebas. */
+  ariaLabel?: string;
 }
 
 const sizeClasses = {
@@ -37,6 +46,29 @@ const paddingSizes = {
   lg: '32rem',
   xl: '36rem',
 } as const;
+
+/**
+ * Paneles abiertos y el hueco que pide cada uno.
+ *
+ * ⚠️ **Puede haber dos a la vez** —el backlog y, encima, el panel de una de
+ * sus tareas—. Cada uno ponía `padding-right` al abrir y lo dejaba a 0 al
+ * cerrar, así que cerrar el de encima hacía que el tablero se metiera por
+ * debajo del que seguía abierto. El `body` lleva el mayor de los que haya.
+ */
+const huecos = new Map<symbol, string>();
+
+/**
+ * Orden en que se abrieron. **Escape cierra solo el de encima**: con el panel
+ * de una tarea abierto sobre el backlog, una pulsación se llevaba los dos. Y
+ * ninguno si hay un `<dialog>` modal abierto, que tiene su propio Escape.
+ */
+const pila: symbol[] = [];
+
+function aplicarHueco() {
+  const valores = [...huecos.values()];
+  const mayor = valores.sort((a, b) => Number.parseFloat(b) - Number.parseFloat(a))[0];
+  document.body.style.paddingRight = mayor ?? '0px';
+}
 
 /**
  * SlideOver panel.
@@ -53,21 +85,27 @@ export function SlideOver({
   children,
   size = 'md',
   tone = 'default',
+  closeOnOutsideClick = true,
+  ariaLabel,
 }: SlideOverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const idDelHueco = useRef(Symbol('slide-over'));
   const dark = tone === 'dark';
 
   useEffect(() => {
     const isDesktop = window.matchMedia('(min-width: 640px)').matches;
+    const id = idDelHueco.current;
     if (open && isDesktop) {
-      document.body.style.paddingRight = paddingSizes[size];
+      huecos.set(id, paddingSizes[size]);
       document.body.style.transition = 'padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
     } else {
-      document.body.style.paddingRight = '0px';
+      huecos.delete(id);
     }
+    aplicarHueco();
 
     return () => {
-      document.body.style.paddingRight = '0px';
+      huecos.delete(id);
+      aplicarHueco();
     };
   }, [open, size]);
 
@@ -75,14 +113,21 @@ export function SlideOver({
     if (!open) return;
 
     const handleGlobalClick = (event: MouseEvent) => {
+      if (!closeOnOutsideClick) return;
       const target = event.target as Node;
       if (!document.contains(target)) return;
       if (panelRef.current && panelRef.current.contains(target)) return;
       onClose();
     };
 
+    const id = idDelHueco.current;
+    pila.push(id);
+
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Escape') return;
+      if (pila[pila.length - 1] !== id) return;
+      if (document.querySelector('dialog[open]')) return;
+      onClose();
     };
 
     const timeoutId = setTimeout(() => {
@@ -94,13 +139,17 @@ export function SlideOver({
       clearTimeout(timeoutId);
       document.removeEventListener('click', handleGlobalClick);
       document.removeEventListener('keydown', handleKeyDown);
+      const posicion = pila.lastIndexOf(id);
+      if (posicion !== -1) pila.splice(posicion, 1);
     };
-  }, [open, onClose]);
+  }, [open, onClose, closeOnOutsideClick]);
 
   return (
     <>
       <div
         ref={panelRef}
+        role={ariaLabel ? 'complementary' : undefined}
+        aria-label={ariaLabel}
         /* `data-tone="dark"` redefine los tokens de color para todo el subárbol
            (ver `theme.css`): los átomos de dentro —Select, SelectorDeFecha,
            Input…— salen en la paleta near-black sin tocarlos uno a uno. El

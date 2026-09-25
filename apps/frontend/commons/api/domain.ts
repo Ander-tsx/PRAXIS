@@ -524,8 +524,33 @@ export interface Sprint {
   /** `null` mientras esté `PLANNED`: las fechas se fijan al iniciarlo. */
   startDate: string | null;
   endDate: string | null;
+  /**
+   * El instante en que se pulsó «Empezar». `startDate` es una fecha de
+   * calendario —medianoche del día elegido—: lo planeado esa mañana quedaría
+   * después de ella y contaría como añadido. El burndown compara contra esto.
+   */
+  startedAt: string | null;
   createdAt: string;
   closedAt: string | null;
+}
+
+/**
+ * Una tarea reducida a lo que necesitan el burndown y la velocidad. Llega de
+ * `GET /boards/:id/sprints/metrics`, sin tope de página: la pantalla ya no
+ * calcula sobre las cien primeras tareas del tablero.
+ */
+export interface SprintMetricRow {
+  id: string;
+  sprintId: string | null;
+  sprintAssignedAt: string | null;
+  completedAt: string | null;
+  estimatePoints: number | null;
+}
+
+export interface SprintMetrics {
+  /** Los cerrados que entran en la velocidad, del más reciente al más viejo. */
+  velocitySprintIds: string[];
+  tasks: SprintMetricRow[];
 }
 
 /** Una tarea sin terminar de un sprint, tal como la devuelve `/pending`. */
@@ -791,6 +816,8 @@ export interface Task {
   sprintAssignedAt: string | null;
   /** Puntos de estimación. `null` = sin estimar, que no es lo mismo que 0. */
   estimatePoints: number | null;
+  /** Veces que pasó sin terminar de un sprint cerrado al siguiente. */
+  carryOverCount?: number;
   assignees: TaskAssignee[];
   checklists: ChecklistItem[];
   labels: TaskLabel[];

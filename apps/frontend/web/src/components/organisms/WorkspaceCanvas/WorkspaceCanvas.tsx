@@ -3,7 +3,6 @@
 import {
   type Label,
   type ProjectDocument,
-  type Sprint,
   type Task,
   type UserProfile,
   type Workspace,
@@ -20,6 +19,7 @@ import { DocumentTabs } from './DocumentTabs';
 import { DocumentView } from './DocumentView';
 import { VistaSelector, type VistaTablero, esVista } from './VistaSelector';
 import { WorkspacePicker } from './WorkspacePicker';
+import type { ScrumDelTablero } from './scrum';
 import { BOARD_SURFACE } from './superficie-tablero';
 
 /**
@@ -33,8 +33,6 @@ import { BOARD_SURFACE } from './superficie-tablero';
  * servidor lo haya confirmado — justo el parpadeo que veníamos a quitar.
  */
 const SIN_TAREAS: Task[] = [];
-/** Misma razón que `SIN_TAREAS`: un `?? []` en el JSX sería un array nuevo por render. */
-const SIN_SPRINTS: Sprint[] = [];
 
 export interface WorkspaceCanvasProps {
   /**
@@ -99,9 +97,9 @@ export interface WorkspaceCanvasProps {
   canManageLabels: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
-  /** Sprints de los tableros con Scrum encendido del espacio abierto. */
-  sprintsByBoard: Map<string, Sprint[]>;
-  /** Planear, iniciar y cerrar sprints: `canManageSprint`. */
+  /** Sprints, backlog y métricas de los tableros con Scrum del espacio abierto. */
+  scrumByBoard: Map<string, ScrumDelTablero>;
+  /** Empezar, editar y cerrar sprints: `canManageSprint`. */
   canManageSprint: boolean;
   /** Los documentos del espacio abierto, con contenido (`docs/PLAN-DOCUMENTOS.md`). */
   documentos: ProjectDocument[];
@@ -167,7 +165,7 @@ export function WorkspaceCanvas({
   canManageLabels,
   canEditTask,
   canDeleteTask,
-  sprintsByBoard,
+  scrumByBoard,
   canManageSprint,
   documentos,
   documentoInicial,
@@ -367,11 +365,7 @@ export function WorkspaceCanvas({
      tablero, y comparten sitio encima del lienzo. */
   const controlesDeVista = (
     <>
-      <VistaSelector
-        value={vista}
-        onChange={cambiarVista}
-        scrum={boardActivo?.scrumEnabled ?? false}
-      />
+      <VistaSelector value={vista} onChange={cambiarVista} />
       {filtroMisTareas}
     </>
   );
@@ -504,7 +498,7 @@ export function WorkspaceCanvas({
       canManageLabels={canManageLabels}
       canEditTask={canEditTask}
       canDeleteTask={canDeleteTask}
-      sprints={sprintsByBoard.get(boardActivo.id) ?? SIN_SPRINTS}
+      scrum={boardActivo.scrumEnabled ? scrumByBoard.get(boardActivo.id) : undefined}
       canManageSprint={canManageSprint}
       onCambiarVista={cambiarVista}
     />

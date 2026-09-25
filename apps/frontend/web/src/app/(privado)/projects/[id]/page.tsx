@@ -23,6 +23,7 @@ import {
   type ProjectInvitation,
   type ProjectMember,
   type Sprint,
+  type SprintMetrics,
   TabNav,
   type Task,
   personLabel,
@@ -395,27 +396,61 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
    * un tablero es mucho mejor que perder el proyecto entero.
    */
   const visibleBoards = activeTab === 'espacios' ? (activeWorkspace?.boards ?? []) : [];
-  /* Los sprints solo de los tableros con Scrum encendido, y en paralelo con las
-     tareas: como ellas, se filtran al pintar —el Kanban de un tablero Scrum
-     enseña solo el sprint activo (D12 de docs/PLAN-SCRUM-KANBAN.md)—. */
-  const [boardTasks, boardSprints, documentos] = await Promise.all([
+  /**
+   * Un tablero con Scrum no se pide entero: se pide **por alcance** —el sprint
+   * que enseña el tablero, el backlog y las filas mínimas del burndown—.
+   *
+   * ⚠️ Antes compartía el `?limit=100` de los demás y todo Scrum se calculaba
+   * sobre esas cien: un tablero Scrum acumula historial por diseño, así que
+   * pasado el centenar la velocidad, el backlog y el Kanban del sprint se
+   * recortaban sin avisar (auditoría S2 de docs/PLAN-SCRUM-KANBAN.md).
+   */
+  const LIMITE_POR_ALCANCE = 1000;
+  async function cargarScrum(boardId: string): Promise<{
+    sprints: Sprint[];
+    tareas: Task[];
+    backlog: Task[];
+    metricas: SprintMetrics;
+  }> {
+    const sprints = await api.get<Sprint[]>(`/boards/${boardId}/sprints`).catch(() => []);
+    /* El tablero enseña el sprint en curso o, sin él, el planeado. */
+    const enTablero =
+      sprints.find((s) => s.status === 'ACTIVE') ?? sprints.find((s) => s.status === 'PLANNED');
+    const [tareas, backlog, metricas] = await Promise.all([
+      enTablero
+        ? api
+            .get<Paginated<Task>>(
+              `/boards/${boardId}/tasks?sprintId=${enTablero.id}&limit=${LIMITE_POR_ALCANCE}`,
+            )
+            .then((page) => page.items)
+            .catch(() => [] as Task[])
+        : Promise.resolve([] as Task[]),
+      api
+        .get<Paginated<Task>>(`/boards/${boardId}/tasks?backlog=true&limit=${LIMITE_POR_ALCANCE}`)
+        .then((page) => page.items)
+        .catch(() => [] as Task[]),
+      api
+        .get<SprintMetrics>(`/boards/${boardId}/sprints/metrics`)
+        .catch(() => ({ velocitySprintIds: [], tasks: [] }) as SprintMetrics),
+    ]);
+    return { sprints, tareas, backlog, metricas };
+  }
+
+  const [boardTasks, scrumDeTableros, documentos] = await Promise.all([
     Promise.all(
-      visibleBoards.map((board) =>
-        api
-          .get<Paginated<Task>>(`/boards/${board.id}/tasks?limit=100`)
-          .then((page) => [board.id, page.items] as const)
-          .catch(() => [board.id, [] as Task[]] as const),
-      ),
+      visibleBoards
+        .filter((board) => !board.scrumEnabled)
+        .map((board) =>
+          api
+            .get<Paginated<Task>>(`/boards/${board.id}/tasks?limit=100`)
+            .then((page) => [board.id, page.items] as const)
+            .catch(() => [board.id, [] as Task[]] as const),
+        ),
     ),
     Promise.all(
       visibleBoards
         .filter((board) => board.scrumEnabled)
-        .map((board) =>
-          api
-            .get<Sprint[]>(`/boards/${board.id}/sprints`)
-            .then((sprints) => [board.id, sprints] as const)
-            .catch(() => [board.id, [] as Sprint[]] as const),
-        ),
+        .map((board) => cargarScrum(board.id).then((datos) => [board.id, datos] as const)),
     ),
     /* Los documentos del espacio abierto, con su contenido: como las tareas,
        cambiar de uno a otro no pasa por el servidor. */
@@ -425,7 +460,15 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           .catch(() => [] as ProjectDocument[])
       : Promise.resolve([] as ProjectDocument[]),
   ]);
-  const sprintsByBoard = new Map(boardSprints);
+  /* Para el resto de la página, el tablero Scrum «tiene» las tareas de su
+     sprint: son las que se ven, y las que cuenta la pestaña del tablero. */
+  for (const [boardId, datos] of scrumDeTableros) boardTasks.push([boardId, datos.tareas]);
+  const scrumByBoard = new Map(
+    scrumDeTableros.map(
+      ([boardId, { sprints, backlog, metricas }]) =>
+        [boardId, { sprints, backlog, metricas }] as const,
+    ),
+  );
   /**
    * «Solo mis tareas».
    *
@@ -634,7 +677,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
                ello el vocabulario del proyecto entero. */
             canManageLabels={can.canManageLabels}
             canDeleteTask={can.canDeleteTask}
-            sprintsByBoard={sprintsByBoard}
+            scrumByBoard={scrumByBoard}
             /* Planear, iniciar y cerrar sprints. Encender Scrum en el tablero
                sigue siendo `canEditBoard` (D1 y D7). */
             canManageSprint={can.canManageSprint ?? false}

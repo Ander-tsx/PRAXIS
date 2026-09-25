@@ -3,30 +3,44 @@ import {
   Body,
   ConflictException,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Inject,
+  Logger,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
+  AddTasksToSprintBodyDto,
   CloseSprintBodyDto,
   CreateSprintBodyDto,
   ProjectPermission,
   SPRINT_HAS_PENDING_TASKS_CODE,
   SprintCloseAction,
   StartSprintBodyDto,
+  UpdateSprintBodyDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 
-type SprintRow = { id: string; boardId: string; name: string; status: string };
+type SprintRow = {
+  id: string;
+  boardId: string;
+  name: string;
+  status: string;
+  closedAt?: string | null;
+};
+
+/** Sprints cerrados que entran en la velocidad. El mismo número que usa PRAX. */
+const SPRINTS_DE_VELOCIDAD = 3;
 type PendingTask = { id: string; title: string; columnId: string; status: string };
 
 /**
@@ -41,6 +55,8 @@ type PendingTask = { id: string; title: string; columnId: string; status: string
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('boards/:boardId/sprints')
 export class SprintsController {
+  private readonly log = new Logger(SprintsController.name);
+
   constructor(
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     @Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy,
@@ -58,9 +74,7 @@ export class SprintsController {
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_SPRINT)
   @ApiOperation({ summary: 'Planea un sprint (nace sin fechas; arrancarlo es otro paso)' })
   create(@Param('boardId') boardId: string, @Body() body: CreateSprintBodyDto) {
-    return firstValueFrom(
-      this.projectsClient.send({ cmd: 'sprint_create' }, { ...body, boardId }),
-    );
+    return firstValueFrom(this.projectsClient.send({ cmd: 'sprint_create' }, { ...body, boardId }));
   }
 
   @Post(':sprintId/start')
@@ -74,6 +88,98 @@ export class SprintsController {
   ) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'sprint_start' }, { ...body, id: sprintId, boardId }),
+    );
+  }
+
+  /**
+   * Lo que la pantalla necesita para el burndown y la velocidad: el sprint en
+   * curso, el planeado y los últimos cerrados, con una fila mínima por tarea.
+   *
+   * Existe porque la pantalla lo calculaba sobre las cien primeras tareas del
+   * tablero y los números se recortaban en silencio (auditoría S2).
+   */
+  @Get('metrics')
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
+  @ApiOperation({ summary: 'Filas mínimas por tarea para burndown y velocidad' })
+  async metrics(@Param('boardId') boardId: string) {
+    const sprints: SprintRow[] = await firstValueFrom(
+      this.projectsClient.send({ cmd: 'sprint_find_by_board' }, { boardId }),
+    );
+    const cerrados = sprints
+      .filter((s) => s.status === 'CLOSED')
+      .sort((a, b) => (b.closedAt ?? '').localeCompare(a.closedAt ?? ''))
+      .slice(0, SPRINTS_DE_VELOCIDAD);
+    const ids = [
+      ...sprints.filter((s) => s.status !== 'CLOSED').map((s) => s.id),
+      ...cerrados.map((s) => s.id),
+    ];
+    const tasks = await firstValueFrom(
+      this.tasksClient.send({ cmd: 'task_sprint_metric_rows' }, { sprintIds: ids }),
+    );
+    return { velocitySprintIds: cerrados.map((s) => s.id), tasks };
+  }
+
+  @Patch(':sprintId')
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_SPRINT)
+  @ApiOperation({ summary: 'Nombre, meta y fechas. De uno en curso, solo el final' })
+  update(
+    @Param('boardId') boardId: string,
+    @Param('sprintId') sprintId: string,
+    @Body() body: UpdateSprintBodyDto,
+  ) {
+    return firstValueFrom(
+      this.projectsClient.send({ cmd: 'sprint_update' }, { ...body, id: sprintId, boardId }),
+    );
+  }
+
+  /**
+   * Descarta un sprint planeado. Sus tareas vuelven al backlog **antes** de
+   * borrarlo: al revés, quedarían apuntando a un sprint que ya no existe.
+   */
+  @Delete(':sprintId')
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_SPRINT)
+  @ApiOperation({ summary: 'Descarta un sprint planeado; sus tareas vuelven al backlog' })
+  async remove(@Param('boardId') boardId: string, @Param('sprintId') sprintId: string) {
+    const sprint = await this.sprintOfBoard(boardId, sprintId);
+    if (sprint.status !== 'PLANNED') {
+      throw new ConflictException('Solo se puede descartar un sprint que todavía no ha empezado');
+    }
+    const suyas: { id: string }[] = await firstValueFrom(
+      this.tasksClient.send(
+        { cmd: 'task_find_all' },
+        { boardId, sprintId, query: { limit: 10_000 } },
+      ),
+    ).then((page: { items: { id: string }[] }) => page.items);
+    await firstValueFrom(
+      this.tasksClient.send(
+        { cmd: 'task_reassign_sprint' },
+        { boardId, fromSprintId: sprintId, taskIds: suyas.map((t) => t.id), toSprintId: null },
+      ),
+    );
+    return firstValueFrom(
+      this.projectsClient.send({ cmd: 'sprint_delete_planned' }, { id: sprintId, boardId }),
+    );
+  }
+
+  /** Mete tareas del backlog en un sprint planeado o en curso, en bloque. */
+  @Post(':sprintId/tasks')
+  @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_SPRINT)
+  @ApiOperation({ summary: 'Mete un lote de tareas del backlog en el sprint' })
+  async addTasks(
+    @Param('boardId') boardId: string,
+    @Param('sprintId') sprintId: string,
+    @Body() body: AddTasksToSprintBodyDto,
+  ) {
+    const sprint = await this.sprintOfBoard(boardId, sprintId);
+    if (sprint.status === 'CLOSED') {
+      throw new ConflictException('Ese sprint ya está cerrado');
+    }
+    return firstValueFrom(
+      this.tasksClient.send(
+        { cmd: 'task_reassign_sprint' },
+        { boardId, fromSprintId: null, taskIds: body.taskIds, toSprintId: sprintId },
+      ),
     );
   }
 
@@ -139,36 +245,77 @@ export class SprintsController {
       .filter((task) => decision.get(task.id) === SprintCloseAction.BACKLOG)
       .map((task) => task.id);
 
+    /**
+     * El siguiente sprint: el que se pida, el planeado que ya haya, o uno nuevo.
+     * Nace **planeado**, no en marcha — entre sprint y sprint va la
+     * planificación. Antes lo creaba y arrancaba el cliente con tres llamadas
+     * sueltas, y un fallo a mitad dejaba sprints huérfanos o tareas en un
+     * planeado que ninguna pantalla enseñaba (auditoría S4).
+     */
+    let siguiente: SprintRow | null = null;
+    let creadoAqui = false;
     if (alSiguiente.length > 0) {
-      if (!body.nextSprintId) {
-        throw new BadRequestException('Falta elegir a qué sprint pasan las tareas');
+      if (body.nextSprintId) {
+        siguiente = await this.sprintOfBoard(boardId, body.nextSprintId);
+      } else {
+        siguiente = await firstValueFrom(
+          this.projectsClient.send({ cmd: 'sprint_find_planned' }, { boardId }),
+        );
+        if (!siguiente) {
+          siguiente = await firstValueFrom(
+            this.projectsClient.send(
+              { cmd: 'sprint_create' },
+              { boardId, name: body.nextName ?? 'Siguiente sprint' },
+            ),
+          );
+          creadoAqui = true;
+        }
       }
-      const siguiente = await this.sprintOfBoard(boardId, body.nextSprintId);
-      if (siguiente.status !== 'PLANNED') {
+      if (!siguiente || siguiente.status !== 'PLANNED') {
         throw new BadRequestException(
           'Las tareas solo pueden pasar a un sprint planeado que todavía no haya arrancado',
         );
       }
-      await firstValueFrom(
-        this.tasksClient.send(
-          { cmd: 'task_reassign_sprint' },
-          { boardId, fromSprintId: sprintId, taskIds: alSiguiente, toSprintId: siguiente.id },
-        ),
-      );
     }
 
-    if (alBacklog.length > 0) {
-      await firstValueFrom(
-        this.tasksClient.send(
-          { cmd: 'task_reassign_sprint' },
-          { boardId, fromSprintId: sprintId, taskIds: alBacklog, toSprintId: null },
-        ),
-      );
+    try {
+      if (siguiente) {
+        await firstValueFrom(
+          this.tasksClient.send(
+            { cmd: 'task_reassign_sprint' },
+            {
+              boardId,
+              fromSprintId: sprintId,
+              taskIds: alSiguiente,
+              toSprintId: siguiente.id,
+              carry: true,
+            },
+          ),
+        );
+      }
+      if (alBacklog.length > 0) {
+        await firstValueFrom(
+          this.tasksClient.send(
+            { cmd: 'task_reassign_sprint' },
+            { boardId, fromSprintId: sprintId, taskIds: alBacklog, toSprintId: null },
+          ),
+        );
+      }
+    } catch (error) {
+      /* Si el planeado lo creó este cierre y no llegó a recibir nada, se
+         descarta: un reintento no debe ir dejando sprints vacíos por el camino. */
+      if (creadoAqui && siguiente) {
+        await firstValueFrom(
+          this.projectsClient.send({ cmd: 'sprint_delete_planned' }, { id: siguiente.id, boardId }),
+        ).catch((e: unknown) => this.log.warn(`No se pudo descartar el sprint: ${String(e)}`));
+      }
+      throw error;
     }
 
-    return firstValueFrom(
+    const cerrado = await firstValueFrom(
       this.projectsClient.send({ cmd: 'sprint_mark_closed' }, { id: sprintId, boardId }),
     );
+    return { ...cerrado, nextSprintId: siguiente?.id ?? null };
   }
 
   /**
