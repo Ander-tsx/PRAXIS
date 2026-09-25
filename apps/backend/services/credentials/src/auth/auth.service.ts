@@ -720,4 +720,15 @@ export class AuthService {
     const enviado = await this.tokens.enviarInvitacion({ ...datos, horas: 168 }).catch(() => false);
     return { enviado };
   }
+
+  async enviarDocumentoCompartido(datos: {
+    email: string;
+    titulo: string;
+    invitaPor: string | null;
+    puedeEditar: boolean;
+    enlace: string;
+  }): Promise<{ enviado: boolean }> {
+    const enviado = await this.tokens.enviarDocumentoCompartido(datos).catch(() => false);
+    return { enviado };
+  }
 }

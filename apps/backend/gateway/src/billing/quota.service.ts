@@ -559,9 +559,21 @@ export class QuotaService {
       .filter((proyecto) => proyecto.status !== 'DELETED')
       .map((proyecto) => proyecto.id);
 
-    return firstValueFrom(
-      this.tasksClient.send<number>({ cmd: 'attachment_bytes_of_projects' }, { projectIds: vivos }),
-    ).catch(() => null);
+    /* Los adjuntos de las tareas y las imágenes de los documentos: viven en
+       dos servicios que no se hablan, y la suma solo la puede hacer aquí. */
+    const [adjuntos, imagenes] = await Promise.all([
+      firstValueFrom(
+        this.tasksClient.send<number>({ cmd: 'attachment_bytes_of_projects' }, { projectIds: vivos }),
+      ).catch(() => null),
+      firstValueFrom(
+        this.projectsClient.send<number>(
+          { cmd: 'document_asset_bytes_of_projects' },
+          { projectIds: vivos },
+        ),
+      ).catch(() => null),
+    ]);
+    if (adjuntos === null || imagenes === null) return null;
+    return adjuntos + imagenes;
   }
 
   /**

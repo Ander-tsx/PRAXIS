@@ -199,19 +199,108 @@ model Document {
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   title       String
-  /// Markdown, sin HTML. Hasta 100 000 caracteres (D2).
+  /// Markdown, sin HTML. Es una **copia** del estado en vivo (`yState`),
+  /// regenerada en cada guardado del tiempo real: lo que leen PRAX, la
+  /// búsqueda y la exportación (E2 de `docs/PLAN-DOCUMENTOS.md`).
   content     String    @default("")
+  /// El estado de Yjs: la verdad en vivo, lo que fusiona a dos personas
+  /// escribiendo a la vez. `null` en un documento que nunca se abrió en el
+  /// editor nuevo: se construye desde `content` la primera vez.
+  yState      Bytes?
+  /// Quién entra por enlace (E8). `NONE` hasta que alguien lo comparte.
+  linkAccess  DocumentLinkAccess @default(NONE)
+  /// Lo que lleva el enlace. Se regenera para revocar el anterior.
+  linkToken   String?   @unique
   /// Sin clave foránea: las personas viven en credentials-service.
   createdBy   String
   updatedBy   String
   createdAt   DateTime  @default(now())
-  /// El `PATCH` lo compara con `expectedUpdatedAt`: si alguien guardó entre
-  /// medias, 409 y no se pisa nada (D4).
   updatedAt   DateTime  @updatedAt
+
+  invites     DocumentInvite[]
+  assets      DocumentAsset[]
+  revisions   DocumentRevision[]
 
   @@index([workspaceId, createdAt])
   @@schema("projects")
   @@map("documents")
+}
+
+enum DocumentLinkAccess {
+  NONE
+  READ
+  EDIT
+
+  @@schema("projects")
+}
+
+enum DocumentRole {
+  READ
+  EDIT
+
+  @@schema("projects")
+}
+
+/// Alguien invitado por correo a un documento (E8). Entra con **ese** correo y
+/// no ocupa asiento: ve este documento y nada más del proyecto.
+model DocumentInvite {
+  id         String       @id @default(uuid())
+  documentId String
+  document   Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  /// En minúsculas: es lo que se compara con el correo de la sesión.
+  email      String
+  role       DocumentRole @default(READ)
+  invitedBy  String
+  createdAt  DateTime     @default(now())
+
+  @@unique([documentId, email])
+  @@index([email])
+  @@schema("projects")
+  @@map("document_invites")
+}
+
+/// Una imagen de un documento (E6). Los bytes van en su propia fila, como
+/// `AttachmentBlob` en tasks: listar no los arrastra.
+model DocumentAsset {
+  id         String             @id @default(uuid())
+  documentId String
+  document   Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  filename   String
+  mimeType   String
+  size       Int
+  uploadedBy String
+  createdAt  DateTime           @default(now())
+  blob       DocumentAssetBlob?
+
+  @@index([documentId])
+  @@schema("projects")
+  @@map("document_assets")
+}
+
+model DocumentAssetBlob {
+  assetId String        @id
+  asset   DocumentAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  data    Bytes
+
+  @@schema("projects")
+  @@map("document_asset_blobs")
+}
+
+/// Una versión del documento, en Markdown (E5). Se guarda como mucho una cada
+/// diez minutos, o cuando cambia quién escribe.
+model DocumentRevision {
+  id         String   @id @default(uuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  title      String
+  content    String
+  /// Quién escribió desde la versión anterior.
+  authorIds  String[]
+  createdAt  DateTime @default(now())
+
+  @@index([documentId, createdAt])
+  @@schema("projects")
+  @@map("document_revisions")
 }
 
 model Board {

@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MailService } from '../mail/mail.service';
-import { correoDeInvitacion, correoDeRecuperacion, correoDeVerificacion } from '../mail/plantillas';
+import { correoDeDocumentoCompartido, correoDeInvitacion, correoDeRecuperacion, correoDeVerificacion } from '../mail/plantillas';
 import { PrismaService } from '../prisma/prisma.service';
 
 type TipoDeToken = 'EMAIL_VERIFICATION' | 'PASSWORD_RESET';
@@ -162,6 +162,17 @@ export class TokensService {
       invitaPor: datos.invitaPor,
       horas: datos.horas,
     });
+    return this.mail.enviar(datos.email, asunto, html, texto);
+  }
+
+  async enviarDocumentoCompartido(datos: {
+    email: string;
+    titulo: string;
+    invitaPor: string | null;
+    puedeEditar: boolean;
+    enlace: string;
+  }): Promise<boolean> {
+    const { asunto, html, texto } = correoDeDocumentoCompartido(datos);
     return this.mail.enviar(datos.email, asunto, html, texto);
   }
 }
