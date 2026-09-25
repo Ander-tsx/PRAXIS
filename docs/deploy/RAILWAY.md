@@ -11,7 +11,7 @@ Dos contenedores, un Postgres, un Redis. Nada más.
 |---|---|---|---|
 | **Postgres** | plugin de Railway | — | privado |
 | **Redis** | plugin de Railway | — | privado |
-| **`api`** | gateway + los 9 microservicios (pm2, se hablan por `127.0.0.1:300x`) | `infra/docker/images/backend.Dockerfile` | `:3000` |
+| **`api`** | gateway + los 10 microservicios (pm2, se hablan por `127.0.0.1:300x`), incluido `collab` (tiempo real de documentos, WebSocket en `127.0.0.1:3010`) | `infra/docker/images/backend.Dockerfile` | `:3000` |
 | **`web`** | la aplicación Next, **un solo proceso** bajo pm2 | `infra/docker/images/frontend.Dockerfile` | `:4100` |
 
 Los Dockerfiles y los supervisores pm2 (`*.pm2.config.cjs`) ya existían para GCP y
@@ -111,6 +111,12 @@ Railway les da variables propias (`DATABASE_URL`, `PGHOST`, `PGPORT`, `PGUSER`,
 
    # Adjuntos del chat: por defecto en Postgres, sin bucket.
    STORAGE_DRIVER=postgres
+
+   # Tiempo real de los documentos (docs/PLAN-DOCUMENTOS.md, E3). El dominio
+   # público de ESTE servicio con /api/collab: el gateway reenvía los WebSocket
+   # de esa ruta a collab, que escucha dentro del contenedor. Sin ella, el
+   # editor se queda en «Conectando…».
+   COLLAB_PUBLIC_URL=wss://api-XXXX.up.railway.app/api/collab
    ```
 
 ### 4. Servicio `web`
@@ -172,7 +178,8 @@ build y el deploy. El `migrar.sh` del pre-deploy corre en cada release.
 | `POSTGRES_*` | ✅ | — | plugin Postgres (`${{Postgres.PG*}}`) |
 | `REDIS_URL` | ✅ | — | plugin Redis (`${{Redis.REDIS_URL}}`) |
 | `GATEWAY_URL` | — | ✅ | `http://api.railway.internal:3000` |
-| `PUBLIC_APP_URL` | ✅ | — | dominio público de `web` |
+| `PUBLIC_APP_URL` | ✅ | — | dominio público de `web` (también la base de los enlaces `/d/…` de documentos compartidos) |
+| `COLLAB_PUBLIC_URL` | ✅ | — | `wss://` + dominio público de `api` + `/api/collab` |
 | `GEMINI_API_KEY` | ✅ (opc.) | — | aistudio.google.com/apikey |
 | `MAIL_API_KEY` / `MAIL_FROM` | ✅ (opc.) | — | Resend |
 | `STRIPE_*` | ✅ (opc.) | — | dashboard de Stripe (webhook secret nuevo) |
