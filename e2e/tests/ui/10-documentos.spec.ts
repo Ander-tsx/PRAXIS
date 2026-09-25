@@ -9,11 +9,11 @@ import { crearMundo } from '../../fixtures/mundo';
 import { entrarConCuenta } from '../../fixtures/ui';
 
 /**
- * Documentos dentro de un espacio (`docs/PLAN-DOCUMENTOS.md`).
+ * Documentos, etapa 2 (`docs/PLAN-DOCUMENTOS.md`): el editor en bloques en
+ * tiempo real, su copia en Markdown y compartir por enlace.
  *
- * Lo que se prueba es lo que no se ve en la API: que el «+» crea y abre, que
- * se escribe en Markdown y se lee con formato, y que guardar encima de una
- * versión que otro cambió **no pisa nada** (D4).
+ * Necesita `collab-service` levantado (puerto 3010): el editor no escribe por
+ * REST, escribe por el tiempo real (E4).
  */
 
 async function apiContext(): Promise<APIRequestContext> {
@@ -27,78 +27,102 @@ test.describe('Documentos de un espacio', () => {
     await request.get('/projects/calentar-turbopack', { timeout: 60_000 }).catch(() => {});
   });
 
-  test('crear, escribir, leer con formato, y no pisar a otro', async ({ page }) => {
-    test.setTimeout(150_000);
+  test('se escribe en bloques, se ve en vivo, se guarda en Markdown y se comparte', async ({
+    page,
+    browser,
+  }) => {
+    test.setTimeout(180_000);
     const api = await apiContext();
     const mundo = await crearMundo(api);
     const cabeceras = comoBearer(mundo.duenno.accessToken);
 
-    // D7: los documentos viven en un espacio de documentos, no junto a los tableros.
-    const espacio = await api.post(`/api/projects/${mundo.proyecto.id}/workspaces`, {
-      headers: cabeceras,
-      data: { name: nombreUnico('Wiki'), kind: 'DOCUMENTS' },
-    });
-    expect(espacio.status(), 'Crear espacio de documentos').toBe(201);
-    const espacioDocs = await data<{ id: string }>(espacio);
-    const tablero = await api.post(`/api/workspaces/${espacioDocs.id}/boards`, {
+    // D7: un espacio de documentos no admite tableros.
+    const espacio = await data<{ id: string }>(
+      await api.post(`/api/projects/${mundo.proyecto.id}/workspaces`, {
+        headers: cabeceras,
+        data: { name: nombreUnico('Wiki'), kind: 'DOCUMENTS' },
+      }),
+    );
+    const tablero = await api.post(`/api/workspaces/${espacio.id}/boards`, {
       headers: cabeceras,
       data: { name: 'No cabe aquí' },
     });
-    expect(tablero.status(), 'Un espacio de documentos no admite tableros').toBe(400);
+    expect(tablero.status()).toBe(400);
+
+    const titulo = nombreUnico('Acta');
+    const doc = await data<{ id: string }>(
+      await api.post(`/api/workspaces/${espacio.id}/documents`, {
+        headers: cabeceras,
+        data: { title: titulo },
+      }),
+    );
+
+    // E4: el contenido ya no se escribe por REST.
+    const porRest = await api.patch(`/api/workspaces/${espacio.id}/documents/${doc.id}`, {
+      headers: cabeceras,
+      data: { title: titulo, content: 'no' },
+    });
+    expect(porRest.status(), 'PATCH con contenido').toBe(400);
 
     await entrarConCuenta(page, mundo.duenno.email);
-    await page.goto(`/projects/${mundo.proyecto.id}?tab=espacios&ws=${espacioDocs.id}`);
-    await expect(page.getByRole('heading', { name: 'Ningún documento todavía' })).toBeVisible();
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=espacios&ws=${espacio.id}&doc=${doc.id}`);
+    const cuerpo = page.locator('.documento-praxis');
+    await expect(cuerpo).toBeVisible({ timeout: 30_000 });
 
-    // El «+» de documentos crea «Sin título» y lo abre en modo escribir.
-    await page.getByRole('button', { name: 'Nuevo documento' }).click();
-    const titulo = page.getByRole('textbox', { name: 'Título del documento' });
-    await expect(titulo).toHaveValue('Sin título', { timeout: 20_000 });
+    // E1: atajos de Markdown al teclear y el menú «/».
+    await cuerpo.click();
+    await page.keyboard.type('## Acuerdos');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('/tare');
+    await expect(page.getByRole('button', { name: /Lista de tareas/ })).toBeVisible();
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Salir el viernes');
+    await expect(cuerpo.locator('h2', { hasText: 'Acuerdos' })).toBeVisible();
+    await expect(cuerpo.locator('ul[data-type="taskList"]')).toContainText('Salir el viernes');
 
-    const nombre = nombreUnico('Acta');
-    await titulo.fill(nombre);
-    await page
-      .getByRole('textbox', { name: 'Contenido del documento, en Markdown' })
-      .fill('## Acuerdos\n\n- **Salir** el viernes');
-    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
-    await expect(page.getByText(/^Editado /)).toBeVisible({ timeout: 20_000 });
-
-    // Leer: el Markdown sale con formato, no con la sintaxis.
-    await page.getByRole('button', { name: 'Leer' }).click();
-    const leido = page.getByRole('article', { name: `Documento ${nombre}` });
-    await expect(leido.getByText('Acuerdos', { exact: true })).toBeVisible();
-    await expect(leido.locator('strong', { hasText: 'Salir' })).toBeVisible();
-    await expect(leido.getByText('## Acuerdos')).toHaveCount(0);
-
-    // La pestaña existe y el servidor lo tiene.
-    await expect(page.getByRole('tab', { name: nombre })).toBeVisible();
-    const lista = await api.get(`/api/workspaces/${espacioDocs.id}/documents`, {
-      headers: cabeceras,
+    // E3: otra sesión del mismo documento lo ve sin recargar.
+    const otra = await browser.newPage();
+    await entrarConCuenta(otra, mundo.duenno.email);
+    await otra.goto(`/projects/${mundo.proyecto.id}?tab=espacios&ws=${espacio.id}&doc=${doc.id}`);
+    await expect(otra.locator('.documento-praxis')).toContainText('Salir el viernes', {
+      timeout: 30_000,
     });
-    const docs = await data<{ id: string; title: string; updatedAt: string }[]>(lista);
-    const doc = docs.find((d) => d.title === nombre);
-    expect(doc, 'El documento está en el servidor').toBeTruthy();
-
-    // D4: otra persona guarda por la API; guardar aquí encima da conflicto.
-    const ajeno = await api.patch(`/api/workspaces/${espacioDocs.id}/documents/${doc!.id}`, {
-      headers: cabeceras,
-      data: { content: 'Versión de otra persona', expectedUpdatedAt: doc!.updatedAt },
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('Llevar la demo');
+    await expect(otra.locator('.documento-praxis')).toContainText('Llevar la demo', {
+      timeout: 15_000,
     });
-    expect(ajeno.status()).toBe(200);
 
-    await page.getByRole('button', { name: 'Escribir' }).click();
-    await page
-      .getByRole('textbox', { name: 'Contenido del documento, en Markdown' })
-      .fill('Mi versión, que no debe pisar la otra');
-    await page.getByRole('button', { name: 'Guardar', exact: true }).click();
-    await expect(page.getByText(/Alguien guardó este documento/)).toBeVisible({
-      timeout: 20_000,
-    });
-    await expect(page.getByRole('button', { name: 'Copiar lo mío' })).toBeVisible();
+    // E2: el servidor guarda la copia en Markdown (con calma: 2 s sin cambios).
+    await expect
+      .poll(
+        async () =>
+          (
+            await data<{ content: string }>(
+              await api.get(`/api/documents/${doc.id}`, { headers: cabeceras }),
+            )
+          ).content,
+        { timeout: 30_000 },
+      )
+      .toContain('- [ ] Llevar la demo');
 
-    const tras = await api.get(`/api/workspaces/${espacioDocs.id}/documents/${doc!.id}`, {
-      headers: cabeceras,
+    // E8: por enlace de lectura, sin cuenta, se lee y no se escribe.
+    const compartido = await data<{ link: string }>(
+      await api.patch(`/api/documents/${doc.id}/share`, {
+        headers: cabeceras,
+        data: { linkAccess: 'READ' },
+      }),
+    );
+    const anonimo = await (await browser.newContext()).newPage();
+    await anonimo.goto(compartido.link.replace(/^https?:\/\/[^/]+/, ''));
+    await expect(anonimo.locator('.documento-praxis')).toContainText('Salir el viernes', {
+      timeout: 30_000,
     });
-    expect((await data<{ content: string }>(tras)).content).toBe('Versión de otra persona');
+    await expect(anonimo.getByText('Solo lectura')).toBeVisible();
+    await expect(anonimo.locator('.documento-praxis')).toHaveAttribute('contenteditable', 'false');
+
+    // Sin el token del enlace, no se entra sin cuenta.
+    const sinToken = await api.get(`/api/documents/${doc.id}`);
+    expect(sinToken.status()).toBe(401);
   });
 });

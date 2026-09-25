@@ -264,3 +264,57 @@ vieja y con Redaction, y así se ven desentonados.
 | 5 | Compartir y la página `/d/` | `feat(documentos)` |
 | 6 | Documentos en las tareas | `feat(documentos)` |
 | 7 | e2e y registro | `test` / `docs` |
+
+### Registro de la etapa 2
+
+#### 2026-09-25 — entregada entera (sesión nocturna, con el dueño del producto dormido)
+
+| # | Commit | Qué |
+|---|---|---|
+| 0 | `cd1f8c5` | Pendientes de Scrum (ver D21 en `PLAN-SCRUM-KANBAN.md`) |
+| 1 | `61a6c72` | Barra lateral: iconos por tipo, documentos bajo su espacio, «+» por proyecto |
+| 2 | `ff88c97` | Backend: `yState`, enlace, invitaciones, imágenes, versiones, vista previa, billete |
+| 3 | `20041c3` | `collab-service` y `@praxis/editor-schema` |
+| 4–5 | `aef5fcf` | Editor en bloques en tiempo real, compartir y `/d/<id>` |
+| 6 | `4293d26f` | Documentos en las tareas |
+
+Verificado: e2e `10-documentos` reescrita (bloques, dos sesiones viéndose en
+vivo, Markdown en el servidor, enlace de lectura sin cuenta, 401 sin token),
+junto con `02-guards`, `08-panel-de-tarea` y `09-scrum`; 19 pruebas de ida y
+vuelta del Markdown y 21 de las defensas SSRF. A mano: una persona invitada que
+no es del proyecto entra con su cuenta, vuelve sola al documento y edita, sin
+ocupar asiento.
+
+**Trampas que aparecieron:**
+
+- 🔴 **El proveedor de Hocuspocus no se crea en el inicializador de
+  `useState`.** En modo estricto React monta, desmonta y vuelve a montar: la
+  limpieza destruía el proveedor y el segundo montaje reutilizaba el destruido.
+  El editor se quedaba «Guardando…» para siempre, sin un error en ninguna
+  consola —desde Node conectaba perfectamente—. Va dentro de un `useEffect`.
+- 🔴 **`@praxis/editor-schema` es ESM, y tiene que serlo.** Compilado como CJS,
+  el navegador y collab cargaban **dos copias de TipTap** (la CJS por el esquema
+  y la ESM por el resto) y TypeScript veía dos tipos `AnyExtension`
+  incompatibles. Se reconstruye con `pnpm build:shared`.
+- ⚠️ **El guard de proyecto tiene una lista escrita de controladores de
+  tarea** (`TASK_CONTROLLERS`). Un controlador nuevo con `:taskId` que no esté
+  en ella responde 403 «Contexto de proyecto no encontrado» a todo.
+- ⚠️ **`WorkspaceCanvas` leía `?doc=` solo al montarse.** Un enlace de la
+  barra lateral o «Crear y abrir» desde una tarea navegaban al documento nuevo y
+  seguían enseñando el anterior. Ahora sigue a la URL.
+- ⚠️ Los comandos de TipTap (`toggleBold`…) los declara cada extensión
+  ampliando `@tiptap/core`; como las extensiones llegan por el esquema, `web`
+  los importa como tipos en `DocumentEditor/tiptap-comandos.d.ts`.
+- ⚠️ `/api/gateway` exige sesión, así que la lectura por enlace va por su
+  propia puerta, `/api/doc/*`, limitada a `/documents/<uuid>` del gateway.
+
+**Queda abierto:**
+
+- En local el correo de invitación no sale (no hay SMTP); la invitación vale
+  igual y el enlace se puede pasar a mano. En producción usa el mismo envío que
+  las invitaciones a organización.
+- Traer el título real de un documento **privado** de Google exige la
+  integración con Google (OAuth): hoy la tarjeta dice «Documento de Google».
+- El título se renombra por REST, fuera del tiempo real: dos personas
+  renombrando a la vez se pisan (gana la última).
+- PRAX todavía no lee documentos.
