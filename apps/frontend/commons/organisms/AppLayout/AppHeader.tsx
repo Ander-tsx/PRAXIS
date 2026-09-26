@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react';
 import { useAppShell, useSidebarPlegada } from './AppShell';
-import { PraxLauncher } from './PraxLauncher';
 
 export interface AppHeaderProps {
   anchoCompleto?: boolean;
@@ -62,7 +61,10 @@ export interface AppHeaderProps {
  *   ⚠️ No se podía simplemente borrar: es la **única** forma de abrir el cajón
  *   en un teléfono, y sin él no se llega ni a los proyectos ni a los chats. Es
  *   el mismo agujero que ya se arregló una vez.
- * - **PRAX** se va abajo a la derecha, flotando. Ver `PraxLauncher`.
+ * - **PRAX** ya no vive aquí. El lanzador flotante tapaba el tablero más de
+ *   lo que ayudaba; cada pantalla llama a PRAX con su propio botón integrado
+ *   (`PraxProjectButton` en un proyecto, por ejemplo), y quien no tenga uno
+ *   todavía sigue llegando por la entrada de la barra lateral.
  *
  * ## El título sigue existiendo, pero solo para quien no ve
  *
@@ -150,10 +152,6 @@ export function AppHeader({
           {children}
         </div>
       </main>
-
-      {/* PRAX, flotando abajo a la derecha. Sale en todas las pantallas porque
-          `AppHeader` va en todas. Ver `PraxLauncher`. */}
-      <PraxLauncher />
     </>
   );
 }

@@ -331,13 +331,14 @@ export function AssistantChat({
      variantes— `dock` es `null` y el aspa ni se pinta. */
   const dock = useDock();
   const cerrarCajon = dock?.cerrar;
-  /* PRAX global: solo se usa en la variante `flotante` —cambiar de modo y
-     cerrar la ventana—. `null` en el resto de variantes. */
+  /* PRAX global: solo se usa en la variante `flotante` —el atajo a pantalla
+     completa—. `null` en el resto de variantes. Cerrar ya lo hace el aspa del
+     propio `SlideOver` que monta este panel (`PraxWindow`), no un botón de
+     aquí dentro. */
   const prax = usePrax();
   /** Las últimas conversaciones, para el desplegable del nombre (solo `flotante`). */
   const [recientes, setRecientes] = useState<ConversationSummary[]>([]);
   const [menuRecientes, setMenuRecientes] = useState(false);
-  const [menuModo, setMenuModo] = useState(false);
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   /**
    * Los archivos del mensaje que se está escribiendo.
@@ -1134,28 +1135,33 @@ export function AssistantChat({
               </button>
             )}
 
-            {/* Solo en la ventana flotante de PRAX global: cambiar de modo y
-                cerrar. El resto de variantes no tienen ventana que gobernar. */}
+            {/* Solo en el panel de PRAX global: el atajo a pantalla completa.
+                Cerrar es el aspa del `SlideOver` que lo monta, no algo de
+                aquí dentro — el resto de variantes no tienen panel que abrir
+                a pantalla completa. */}
             {esFlotante && prax && (
-              <ModoYCerrar
-                modo={prax.modo}
-                menuAbierto={menuModo}
-                onAlternarMenu={() => setMenuModo((v) => !v)}
-                onCerrarMenu={() => setMenuModo(false)}
-                onAcoplar={() => {
-                  setMenuModo(false);
-                  prax.ponerModo('acoplado');
-                }}
-                onFlotante={() => {
-                  setMenuModo(false);
-                  prax.ponerModo('flotante');
-                }}
-                onPantallaCompleta={() => {
-                  setMenuModo(false);
-                  prax.aPantallaCompleta();
-                }}
-                onCerrar={prax.cerrar}
-              />
+              <button
+                type="button"
+                onClick={prax.aPantallaCompleta}
+                title="Pantalla completa"
+                aria-label="Abrir PRAX a pantalla completa"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/5 hover:text-white"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"
+                  />
+                </svg>
+              </button>
             )}
           </div>
         </header>
@@ -2187,143 +2193,6 @@ function NombreConRecientes({
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * El cambio de modo (acoplado / flotante / pantalla completa) y el aspa de
- * cerrar, para la esquina superior derecha del minichat flotante.
- */
-function ModoYCerrar({
-  modo,
-  menuAbierto,
-  onAlternarMenu,
-  onCerrarMenu,
-  onAcoplar,
-  onFlotante,
-  onPantallaCompleta,
-  onCerrar,
-}: {
-  modo: 'flotante' | 'acoplado';
-  menuAbierto: boolean;
-  onAlternarMenu: () => void;
-  onCerrarMenu: () => void;
-  onAcoplar: () => void;
-  onFlotante: () => void;
-  onPantallaCompleta: () => void;
-  onCerrar: () => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuAbierto) return;
-    function fuera(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onCerrarMenu();
-    }
-    document.addEventListener('mousedown', fuera);
-    return () => document.removeEventListener('mousedown', fuera);
-  }, [menuAbierto, onCerrarMenu]);
-
-  const claseBoton =
-    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/5 hover:text-white';
-
-  return (
-    <div ref={ref} className="relative flex items-center gap-1">
-      <button
-        type="button"
-        onClick={onAlternarMenu}
-        aria-expanded={menuAbierto}
-        aria-haspopup="menu"
-        title="Modo de la ventana"
-        aria-label="Cambiar el modo de la ventana"
-        className={claseBoton}
-      >
-        <svg
-          className="h-4 w-4"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.75}
-          aria-hidden="true"
-        >
-          <rect x="3" y="4" width="18" height="16" rx="2" />
-          <path strokeLinecap="round" d="M15 4v16" />
-        </svg>
-      </button>
-
-      <button
-        type="button"
-        onClick={onCerrar}
-        title="Cerrar"
-        aria-label="Cerrar PRAX"
-        className={claseBoton}
-      >
-        <svg
-          className="h-4 w-4"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-
-      {menuAbierto && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-20 mt-1.5 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl"
-        >
-          <OpcionModo
-            activa={modo === 'flotante'}
-            onClick={onFlotante}
-            etiqueta="Ventana flotante"
-          />
-          <OpcionModo
-            activa={modo === 'acoplado'}
-            onClick={onAcoplar}
-            etiqueta="Acoplado al lateral"
-          />
-          <OpcionModo activa={false} onClick={onPantallaCompleta} etiqueta="Pantalla completa" />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function OpcionModo({
-  activa,
-  onClick,
-  etiqueta,
-}: {
-  activa: boolean;
-  onClick: () => void;
-  etiqueta: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-sans text-[13px] transition-colors ${
-        activa ? 'bg-white/10 text-white' : 'text-white hover:bg-white/5 hover:text-white'
-      }`}
-    >
-      {etiqueta}
-      {activa && (
-        <svg
-          className="h-3.5 w-3.5 shrink-0"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2.5}
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      )}
-    </button>
   );
 }
 

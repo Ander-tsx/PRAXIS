@@ -329,10 +329,15 @@ function NewTaskInline({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex shrink-0 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-white/10 bg-transparent px-3 py-2 font-sans text-sm font-medium text-white transition-colors hover:border-white/20 hover:bg-white/5 hover:text-white"
+        /* Invisible hasta que se pasa por la columna entera —`group` va en su
+           `<div>`, en `BoardColumns`—, no solo por este botón: así no hace
+           falta bajar hasta el fondo de la lista para saber que está ahí.
+           `focus-visible` lo enseña igual sin ratón, que si no quedaba
+           inalcanzable por teclado con la columna vacía de foco. */
+        className="flex shrink-0 w-full cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 font-sans text-xs text-white/45 opacity-0 transition-opacity hover:bg-white/5 hover:text-white focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100"
       >
         <svg
-          className="h-4 w-4"
+          className="h-3.5 w-3.5"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

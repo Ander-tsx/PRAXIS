@@ -1,5 +1,6 @@
 import { TabIcon } from '@/components/atoms/TabIcon';
 import { PendingInvitationGate } from '@/components/organisms/PendingInvitationGate';
+import { PraxProjectButton } from '@/components/organisms/PraxProjectButton';
 import { ProjectChatPreview } from '@/components/organisms/ProjectChat';
 import { ProjectHeader } from '@/components/organisms/ProjectHeader';
 import { ProjectMembers } from '@/components/organisms/ProjectMembers';
@@ -615,6 +616,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             )}
           />
           <div className="hidden sm:flex items-center gap-2">
+            <PraxProjectButton />
             <a
               href={`/chat/proyecto/${project.id}`}
               className="flex items-center gap-2 rounded-lg border border-white/[0.12] bg-white/[0.04] px-3.5 py-1.5 font-sans text-sm font-medium text-white transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"

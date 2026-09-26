@@ -1,6 +1,13 @@
 'use client';
 
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
+import {
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { alpha, colors } from '../../tokens';
 
 export interface SlideOverProps {
@@ -59,36 +66,32 @@ const paddingSizes = {
  * sus tareas—. Cada uno ponía `padding-right` al abrir y lo dejaba a 0 al
  * cerrar, así que cerrar el de encima hacía que el tablero se metiera por
  * debajo del que seguía abierto. El `body` lleva el mayor de los que haya.
+ *
+ * Con todos los paneles a la misma anchura (`xl`, D-todos-igual) este máximo
+ * es siempre el mismo número, pero se deja el cálculo: es gratis y cubre el
+ * día que alguien registre un tamaño distinto.
  */
 const huecos = new Map<symbol, string>();
 
 /**
- * Los paneles abiertos, en el orden en que se abrieron. **Solo se ve el de
- * encima** (D21 de `docs/PLAN-SCRUM-KANBAN.md`): abrir una tarea desde el
- * backlog apilaba los dos paneles a la derecha, uno asomando por debajo del
- * otro. Ahora el de debajo se esconde —sin desmontarse, así que conserva lo
- * que tenía— y el de encima ofrece volver a él. Escape y el clic fuera
- * también son solo del de encima, y de ninguno si hay un `<dialog>` modal.
+ * Los paneles abiertos, en el orden en que se abrieron.
+ *
+ * **Solo el de encima recibe Escape y el clic fuera**, y solo él ofrece
+ * «← Volver» al que tiene debajo — eso no cambió. Lo que sí cambió es **cómo
+ * se ve el relevo** cuando uno se abre sobre otro (una tarea desde el
+ * backlog, o al revés):
+ *
+ * El de debajo **no se anima**. Se queda quieto, tapado por el de encima
+ * —mismo ancho, mismo borde derecho, así que lo cubre entero mientras dura la
+ * entrada— y solo cuando el de encima ya terminó de deslizarse se le manda a
+ * `translate-x-full` **sin transición**, porque para entonces ya no se ve.
+ * Antes los dos perdían su animación a la vez —«relevo instantáneo»— y el
+ * cambio se sentía como un salto seco en vez de un deslizamiento. Ver
+ * `cubierto` y el `useEffect` del plazo, dentro del componente.
  */
 const pila: { id: symbol; etiqueta?: string }[] = [];
 const oyentes = new Set<() => void>();
 let version = 0;
-
-/** Cuándo se cerró el último panel: si otro se abre en el mismo instante, es un relevo. */
-let ultimoCierre = 0;
-
-/**
- * ¿Este cambio de un panel es un **relevo** —otro panel ocupa o deja el sitio a
- * la vez— y no una apertura o un cierre de verdad?
- *
- * En un relevo no se anima nada: si uno se desliza hacia fuera mientras el otro
- * entra, durante 300 ms se ven los dos a medias y, entre ellos, el fondo de la
- * página —el «fondo negro raro»—. El relevo es instantáneo, como cambiar de
- * pestaña; deslizar queda para abrir desde nada o cerrar del todo.
- */
-function esRelevo(id: symbol): boolean {
-  return pila.some((p) => p.id !== id) || performance.now() - ultimoCierre < 120;
-}
 
 function avisarPila() {
   version += 1;
@@ -137,8 +140,30 @@ export function SlideOver({
   );
   const posicion = pila.findIndex((p) => p.id === idDelHueco.current);
   const esCima = posicion !== -1 && posicion === pila.length - 1;
-  const visible = open && (posicion === -1 || esCima);
+  /** Alguien se abrió encima: seguimos «abiertos» pero ya no se nos ve a nosotros. */
+  const cubierto = posicion !== -1 && !esCima;
   const debajo = esCima && posicion > 0 ? pila[posicion - 1] : null;
+
+  /**
+   * Mientras estamos tapados nos quedamos quietos —ver el comentario de
+   * `pila` más arriba—, y solo pasado el tiempo que tarda el de encima en
+   * terminar de entrar nos vamos a `translate-x-full`. `esperando` guarda si
+   * ese plazo ya venció; si el de encima se cierra antes, se cancela y
+   * volvemos a enseñarnos tal cual estábamos, sin deslizar nada.
+   */
+  const [esperando, setEsperando] = useState(false);
+  useEffect(() => {
+    if (!cubierto) {
+      setEsperando(false);
+      return;
+    }
+    /* 320ms: el `sm:duration-300` del panel de encima, con un margen pequeño
+       para no adelantarnos al último frame de su transición. */
+    const id = setTimeout(() => setEsperando(true), 320);
+    return () => clearTimeout(id);
+  }, [cubierto]);
+
+  const visible = open && !(cubierto && esperando);
 
   useLayoutEffect(() => {
     const isDesktop = window.matchMedia('(min-width: 640px)').matches;
@@ -207,32 +232,9 @@ export function SlideOver({
     return () => {
       const indice = pila.findIndex((p) => p.id === id);
       if (indice !== -1) pila.splice(indice, 1);
-      ultimoCierre = performance.now();
       avisarPila();
     };
   }, [open]);
-
-  /* Relevo: sin transición en el panel ni en el hueco del `body`. Se decide en
-     una microtarea —después de todos los efectos de layout del mismo commit,
-     antes de pintar— para ver la pila con los dos paneles ya colocados. */
-  const visiblePrevio = useRef(visible);
-  useLayoutEffect(() => {
-    if (visiblePrevio.current === visible) return;
-    visiblePrevio.current = visible;
-    const id = idDelHueco.current;
-    queueMicrotask(() => {
-      const el = panelRef.current;
-      if (!el || !esRelevo(id)) return;
-      el.style.transition = 'none';
-      document.body.style.transition = 'none';
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          el.style.transition = '';
-          document.body.style.transition = 'padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-        }),
-      );
-    });
-  }, [visible]);
 
   return (
     <>
@@ -240,14 +242,24 @@ export function SlideOver({
         ref={panelRef}
         role={ariaLabel ? 'complementary' : undefined}
         aria-label={ariaLabel}
+        /* Tapado por otro panel: ni clic ni foco ni lector de pantalla — todo
+           eso es del de encima mientras dure. `inert` lo quita de los tres a
+           la vez, y es justo el estado en el que nos quedamos quietos (ver
+           `esperando` arriba), así que no hace falta más que esto. */
+        inert={cubierto || undefined}
         /* `data-tone="dark"` redefine los tokens de color para todo el subárbol
            (ver `theme.css`): los átomos de dentro —Select, SelectorDeFecha,
            Input…— salen en la paleta near-black sin tocarlos uno a uno. El
            panel además fija su propio fondo/borde a pelo porque quiere el
            `#0c0c0b` del rebrand, un peldaño por debajo del `surface` de dentro. */
         data-tone={dark ? 'dark' : undefined}
+        /* Por posición en la pila: el que se abrió después pinta encima, y es
+           lo que hace que tape por completo al de debajo mientras entra —sin
+           esto, cuál queda arriba dependía del orden en el árbol de React, no
+           de cuál se abrió último. */
+        style={{ zIndex: 40 + Math.max(posicion, 0) }}
         className={[
-          'fixed inset-y-0 right-0 z-40 m-0 h-full w-full max-h-screen overflow-y-auto p-6 text-left transition-none sm:transition-transform sm:duration-300 sm:left-auto sm:border-l cursor-default',
+          'fixed inset-y-0 right-0 m-0 h-full w-full max-h-screen overflow-y-auto p-6 text-left transition-none sm:transition-transform sm:duration-300 sm:left-auto sm:border-l cursor-default',
           dark
             ? 'bg-[#202020] text-white sm:border-white/[0.08]'
             : 'bg-surface text-text-primary sm:border-border',

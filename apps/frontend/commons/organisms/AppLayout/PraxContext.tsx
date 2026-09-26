@@ -8,17 +8,13 @@ import { createContext, useContext } from 'react';
  * es quien monta el `AssistantChat`.
  */
 
-export type PraxModo = 'flotante' | 'acoplado';
-
 export interface PraxContextValue {
   /** La ruta pública de la zona (`/projects`, `/assistant`…). */
   zonePath: string;
   abierto: boolean;
-  modo: PraxModo;
   abrir: () => void;
   cerrar: () => void;
   alternar: () => void;
-  ponerModo: (modo: PraxModo) => void;
   /** Sale del minichat y lleva a `/assistant`. */
   aPantallaCompleta: () => void;
   /**

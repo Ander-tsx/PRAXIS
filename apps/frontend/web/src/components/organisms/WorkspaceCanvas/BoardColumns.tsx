@@ -606,7 +606,10 @@ export function BoardColumns({
           registrarColumna(column.id, el);
           reposicion.registrar(`columna:${column.id}`, el);
         }}
-        className="flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-[#202020]"
+        /* `group`: lo que activa el botón de «Añadir tarea» al fondo de la
+           columna (`ColumnTasks`), que ahora solo se enseña al pasar por
+           aquí, no siempre. */
+        className="group flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-[#202020]"
         style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
       >
         {/**
@@ -633,11 +636,19 @@ export function BoardColumns({
             .join(' ')}
         >
           <span className="flex min-w-0 items-center gap-2">
-            <span
-              className="h-2 w-2 shrink-0 rounded-full transition-colors"
-              style={{ background: tintOf(column.color, index) }}
-            />
-            <h5 className="truncate font-sans text-sm font-semibold text-white">{column.name}</h5>
+            {/* El color de la columna ya no es un punto: es el fondo tenue de
+                la propia píldora del nombre, como en Jira. Tenue y no sólido
+                a propósito — sólido competiría con las tarjetas de dentro,
+                que son las que de verdad hay que leer. */}
+            <h5
+              className="truncate rounded-full px-2.5 py-0.5 font-sans text-sm font-semibold transition-colors"
+              style={{
+                background: alpha(tintOf(column.color, index), 16),
+                color: tintOf(column.color, index),
+              }}
+            >
+              {column.name}
+            </h5>
           </span>
 
           <span className="flex shrink-0 items-center gap-1">
@@ -897,14 +908,18 @@ export function BoardColumns({
           style={{ ...BOARD_SURFACE, backgroundColor: '#080807' }}
         >
           <header className="flex flex-wrap items-center gap-3">
-            <span
-              className="h-2.5 w-2.5 shrink-0 rounded-full"
+            <h4
+              className="rounded-full px-2.5 py-1 font-sans text-lg font-semibold"
               style={{
-                background: tintOf(columnaExpandida.color, columns.indexOf(columnaExpandida)),
+                background: alpha(
+                  tintOf(columnaExpandida.color, columns.indexOf(columnaExpandida)),
+                  16,
+                ),
+                color: tintOf(columnaExpandida.color, columns.indexOf(columnaExpandida)),
               }}
-              aria-hidden="true"
-            />
-            <h4 className="font-sans text-lg font-semibold text-white">{columnaExpandida.name}</h4>
+            >
+              {columnaExpandida.name}
+            </h4>
             <span className="font-sans text-xs text-white">
               {board.name} · {(() => {
                 const total = tasksByColumn.get(columnaExpandida.id)?.length ?? 0;
@@ -1088,8 +1103,12 @@ function ColumnaFantasma({
       style={{ boxShadow: `0 24px 48px -12px ${alpha(colors.overlay, 70)}` }}
     >
       <span className="flex min-w-0 items-center gap-2">
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: tono }} />
-        <h5 className="truncate font-sans text-sm font-semibold text-white">{nombre}</h5>
+        <h5
+          className="truncate rounded-full px-2.5 py-0.5 font-sans text-sm font-semibold"
+          style={{ background: alpha(tono, 16), color: tono }}
+        >
+          {nombre}
+        </h5>
         <span
           className="ml-auto rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-white"
           style={{ background: alpha(colors.border, 60) }}
