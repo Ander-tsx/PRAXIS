@@ -22,5 +22,3 @@ export type { PresenceFooterProps } from './PresenceFooter';
 export * from './DockPanel';
 export { PraxProvider } from './PraxWindow';
 export { usePrax } from './PraxContext';
-export type { PraxModo } from './PraxContext';
-export { PraxLauncher } from './PraxLauncher';

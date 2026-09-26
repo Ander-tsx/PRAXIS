@@ -115,7 +115,10 @@ export function BacklogPanel({
           {puntos > 0 && ` · ${puntos} pt`}
         </span>
       }
-      size="md"
+      /* Misma anchura que el panel de tarea y el de sprint: los tres se
+         relevan entre sí (D-todos-igual, `SlideOver.tsx`), y con anchuras
+         distintas el que queda debajo no cubre entero al que se abre encima. */
+      size="xl"
       tone="dark"
       closeOnOutsideClick={false}
       ariaLabel="Backlog del tablero"
