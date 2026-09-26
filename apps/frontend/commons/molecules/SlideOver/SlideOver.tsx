@@ -40,11 +40,6 @@ export interface SlideOverProps {
   closeOnOutsideClick?: boolean;
   /** Nombre accesible del panel, para lectores de pantalla y pruebas. */
   ariaLabel?: string;
-  /**
-   * Cómo se llama este panel en el «← Volver a …» del que se abra encima. Sin
-   * él, el de encima no ofrece volver.
-   */
-  etiquetaDeVuelta?: string;
 }
 
 const sizeClasses = {
@@ -67,7 +62,7 @@ const paddingSizes = {
  * cerrar, así que cerrar el de encima hacía que el tablero se metiera por
  * debajo del que seguía abierto. El `body` lleva el mayor de los que haya.
  *
- * Con todos los paneles a la misma anchura (`xl`, D-todos-igual) este máximo
+ * Con todos los paneles a la misma anchura (`lg`, D-todos-igual) este máximo
  * es siempre el mismo número, pero se deja el cálculo: es gratis y cubre el
  * día que alguien registre un tamaño distinto.
  */
@@ -76,20 +71,21 @@ const huecos = new Map<symbol, string>();
 /**
  * Los paneles abiertos, en el orden en que se abrieron.
  *
- * **Solo el de encima recibe Escape y el clic fuera**, y solo él ofrece
- * «← Volver» al que tiene debajo — eso no cambió. Lo que sí cambió es **cómo
- * se ve el relevo** cuando uno se abre sobre otro (una tarea desde el
- * backlog, o al revés):
+ * **Solo el de encima recibe Escape y el clic fuera.** Cuando uno se abre
+ * sobre otro (una tarea desde el backlog, por ejemplo), el de debajo **no se
+ * anima**: se queda quieto, tapado por el de encima —mismo ancho, mismo
+ * borde derecho, así que lo cubre entero mientras dura la entrada— y solo
+ * cuando el de encima ya terminó de deslizarse se cierra **de verdad**, no
+ * solo se esconde: se le avisa a quien lo abrió (`onClose`) igual que si
+ * hubiera pulsado su aspa.
  *
- * El de debajo **no se anima**. Se queda quieto, tapado por el de encima
- * —mismo ancho, mismo borde derecho, así que lo cubre entero mientras dura la
- * entrada— y solo cuando el de encima ya terminó de deslizarse se le manda a
- * `translate-x-full` **sin transición**, porque para entonces ya no se ve.
- * Antes los dos perdían su animación a la vez —«relevo instantáneo»— y el
- * cambio se sentía como un salto seco en vez de un deslizamiento. Ver
- * `cubierto` y el `useEffect` del plazo, dentro del componente.
+ * ⚠️ **A propósito no «vuelve».** Se probó lo contrario —el de debajo se
+ * escondía sin cerrarse y reaparecía al cerrar el de encima, con un «← Volver
+ * a Backlog»— y resultó confuso: cerrar la tarea traía de vuelta un backlog
+ * que la persona ya daba por cerrado. Si hace falta volver a abrirlo, se abre
+ * con su propio botón, como cualquier otro.
  */
-const pila: { id: symbol; etiqueta?: string }[] = [];
+const pila: symbol[] = [];
 const oyentes = new Set<() => void>();
 let version = 0;
 
@@ -126,7 +122,6 @@ export function SlideOver({
   tone = 'default',
   closeOnOutsideClick = true,
   ariaLabel,
-  etiquetaDeVuelta,
 }: SlideOverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const idDelHueco = useRef(Symbol('slide-over'));
@@ -138,19 +133,20 @@ export function SlideOver({
     () => version,
     () => 0,
   );
-  const posicion = pila.findIndex((p) => p.id === idDelHueco.current);
+  const posicion = pila.indexOf(idDelHueco.current);
   const esCima = posicion !== -1 && posicion === pila.length - 1;
   /** Alguien se abrió encima: seguimos «abiertos» pero ya no se nos ve a nosotros. */
   const cubierto = posicion !== -1 && !esCima;
-  const debajo = esCima && posicion > 0 ? pila[posicion - 1] : null;
 
   /**
    * Mientras estamos tapados nos quedamos quietos —ver el comentario de
    * `pila` más arriba—, y solo pasado el tiempo que tarda el de encima en
-   * terminar de entrar nos vamos a `translate-x-full`. `esperando` guarda si
-   * ese plazo ya venció; si el de encima se cierra antes, se cancela y
-   * volvemos a enseñarnos tal cual estábamos, sin deslizar nada.
+   * terminar de entrar avisamos que nos cerramos de verdad. Si el de encima
+   * se cierra antes de que venza el plazo, se cancela y ni se nota: seguimos
+   * abiertos tal cual estábamos, sin deslizar nada.
    */
+  const alCerrar = useRef(onClose);
+  alCerrar.current = onClose;
   const [esperando, setEsperando] = useState(false);
   useEffect(() => {
     if (!cubierto) {
@@ -159,7 +155,10 @@ export function SlideOver({
     }
     /* 320ms: el `sm:duration-300` del panel de encima, con un margen pequeño
        para no adelantarnos al último frame de su transición. */
-    const id = setTimeout(() => setEsperando(true), 320);
+    const id = setTimeout(() => {
+      setEsperando(true);
+      alCerrar.current();
+    }, 320);
     return () => clearTimeout(id);
   }, [cubierto]);
 
@@ -186,7 +185,7 @@ export function SlideOver({
     if (!open) return;
 
     const id = idDelHueco.current;
-    const esLaDeEncima = () => pila[pila.length - 1]?.id === id;
+    const esLaDeEncima = () => pila[pila.length - 1] === id;
 
     const handleGlobalClick = (event: MouseEvent) => {
       if (!closeOnOutsideClick || !esLaDeEncima()) return;
@@ -219,18 +218,15 @@ export function SlideOver({
    * Entrar y salir de la pila, **solo cuando cambia `open`**. Estaba en el
    * efecto de los oyentes, que depende de `onClose`: si esa función cambiaba de
    * identidad, el panel salía y volvía a entrar —arriba del todo—, tapando al
-   * que de verdad estaba encima. Y en layout, para que el relevo (abajo) vea la
-   * pila ya actualizada antes de pintar.
+   * que de verdad estaba encima.
    */
-  const etiqueta = useRef(etiquetaDeVuelta);
-  etiqueta.current = etiquetaDeVuelta;
   useLayoutEffect(() => {
     if (!open) return;
     const id = idDelHueco.current;
-    pila.push({ id, etiqueta: etiqueta.current });
+    pila.push(id);
     avisarPila();
     return () => {
-      const indice = pila.findIndex((p) => p.id === id);
+      const indice = pila.indexOf(id);
       if (indice !== -1) pila.splice(indice, 1);
       avisarPila();
     };
@@ -259,7 +255,7 @@ export function SlideOver({
            de cuál se abrió último. */
         style={{ zIndex: 40 + Math.max(posicion, 0) }}
         className={[
-          'fixed inset-y-0 right-0 m-0 h-full w-full max-h-screen overflow-y-auto p-6 text-left transition-none sm:transition-transform sm:duration-300 sm:left-auto sm:border-l cursor-default',
+          'fixed inset-y-0 right-0 m-0 h-full w-full max-h-screen overflow-y-auto p-5 text-left transition-none sm:transition-transform sm:duration-300 sm:left-auto sm:border-l cursor-default',
           dark
             ? 'bg-[#202020] text-white sm:border-white/[0.08]'
             : 'bg-surface text-text-primary sm:border-border',
@@ -267,51 +263,43 @@ export function SlideOver({
           visible ? 'translate-x-0' : 'translate-x-full',
         ].join(' ')}
       >
-        <div className="flex h-full flex-col">
-          {debajo?.etiqueta && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="-mt-2 mb-3 flex w-fit cursor-pointer items-center gap-1.5 rounded-md py-1 pr-2 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
-            >
-              <svg
-                className="h-3.5 w-3.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden="true"
+        <div className="flex h-full min-w-0 flex-col">
+          {/* Sin `title` ni `description` no hay cabecera de este panel: es lo
+              que usa PRAX, que trae la suya propia (el desplegable del nombre
+              de la conversación) dentro de `children`. Ponerla igual aquí
+              vacía —solo el aspa, flotando sobre un hueco— era justo la
+              «separación extraña arriba» que se veía: dos cabeceras, una sin
+              nada dentro. Sin `title`, quien encierra este panel tiene que
+              traer su propio botón de cerrar dentro de `children`. */}
+          {(title || description) && (
+            <header className="mb-5 flex shrink-0 items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-col gap-1">
+                {title && (
+                  <h2 className="truncate font-sans text-lg font-bold tracking-tight">{title}</h2>
+                )}
+                {description && <p className="font-sans text-sm text-white">{description}</p>}
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Cerrar panel"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-hover hover:text-text-primary"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-              {debajo.etiqueta}
-            </button>
+                <svg
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </header>
           )}
-          <header className="mb-6 flex shrink-0 items-start justify-between gap-4">
-            <div className="flex flex-col gap-1">
-              {title && <h2 className="font-sans text-xl font-bold tracking-tight">{title}</h2>}
-              {description && <p className="font-sans text-sm text-white">{description}</p>}
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Cerrar panel"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-hover hover:text-text-primary"
-            >
-              <svg
-                className="h-5 w-5"
-                aria-hidden="true"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </header>
 
-          <div className="flex-1 min-h-0 flex flex-col pr-1 -mr-1">{children}</div>
+          <div className="flex-1 min-h-0 min-w-0 flex flex-col pr-1 -mr-1">{children}</div>
         </div>
       </div>
     </>

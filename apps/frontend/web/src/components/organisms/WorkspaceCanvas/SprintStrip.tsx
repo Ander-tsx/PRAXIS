@@ -49,7 +49,9 @@ export interface SprintStripProps {
  *
  * Dos botones iguales, uno al lado del otro: **Sprint** y **Backlog**. Cada
  * uno abre su panel lateral, y solo puede haber uno abierto; si encima se abre
- * una tarea, el panel se esconde hasta volver a él (lo hace `SlideOver`). Antes el sprint tenía su propio `⋯`, y a un palmo
+ * una tarea, el panel se cierra de verdad —no se esconde a la espera de
+ * volver— y hay que abrirlo otra vez si hace falta (lo decide `SlideOver`, D
+ * relevo-cierra-de-verdad). Antes el sprint tenía su propio `⋯`, y a un palmo
  * del `⋯` del tablero eran dos menús idénticos para cosas distintas.
  *
  * La única acción que sale fuera del panel es la que toca hacer: «Empezar

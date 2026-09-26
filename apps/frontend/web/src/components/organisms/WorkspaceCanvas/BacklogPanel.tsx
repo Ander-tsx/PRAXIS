@@ -118,11 +118,10 @@ export function BacklogPanel({
       /* Misma anchura que el panel de tarea y el de sprint: los tres se
          relevan entre sí (D-todos-igual, `SlideOver.tsx`), y con anchuras
          distintas el que queda debajo no cubre entero al que se abre encima. */
-      size="xl"
+      size="lg"
       tone="dark"
       closeOnOutsideClick={false}
       ariaLabel="Backlog del tablero"
-      etiquetaDeVuelta="Backlog"
     >
       {/* Cerrado, el panel sigue montado para animar la entrada, pero **sin
           contenido**: sus tarjetas estarían en la página —para un lector de

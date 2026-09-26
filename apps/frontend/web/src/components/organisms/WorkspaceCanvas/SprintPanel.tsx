@@ -79,12 +79,10 @@ export function SprintPanel({
     <SlideOver
       open={abierto}
       onClose={onCerrar}
-      /* El ancho del panel de tarea: las fechas largas caben en una línea y
-         pasar de uno a otro no mueve el tablero. */
-      size="xl"
+      /* El ancho del panel de tarea: pasar de uno a otro no mueve el tablero. */
+      size="lg"
       tone="dark"
       ariaLabel="Sprint"
-      etiquetaDeVuelta={sprint.name}
       title={sprint.name}
       description={
         <span className="flex flex-wrap items-center gap-2 text-text-secondary">

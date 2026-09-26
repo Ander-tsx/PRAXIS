@@ -293,7 +293,7 @@ export function TaskDialog({
     <SlideOver
       open={open}
       onClose={handleClose}
-      size="xl"
+      size="lg"
       tone="dark"
       title={task.title}
       description={
@@ -350,83 +350,84 @@ export function TaskDialog({
           disabled={readOnly}
         />
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Select
-            name="priority"
-            label="Prioridad"
-            defaultValue={task.priority}
-            disabled={readOnly}
-            /* Con el color delante, «Urgente» no hay que leerlo: se reconoce
-               por el mismo rojo que lleva su chip en la tarjeta. */
-            options={PRIORITIES.map((priority) => ({
-              value: priority,
-              label: PRIORITY_LABELS[priority],
-              color: PRIORITY_COLORS[priority],
-            }))}
-          />
+        {/* Verticales, no en columnas: el panel se estrechó (D-todos-igual,
+            `SlideOver.tsx`) y dos columnas de 3 campos quedaban apretadas.
+            Uno debajo del otro cabe igual de cómodo y no obliga a leer en
+            zigzag. */}
+        <Select
+          name="priority"
+          label="Prioridad"
+          defaultValue={task.priority}
+          disabled={readOnly}
+          /* Con el color delante, «Urgente» no hay que leerlo: se reconoce
+             por el mismo rojo que lleva su chip en la tarjeta. */
+          options={PRIORITIES.map((priority) => ({
+            value: priority,
+            label: PRIORITY_LABELS[priority],
+            color: PRIORITY_COLORS[priority],
+          }))}
+        />
 
-          {/* Calendario propio en vez de `<input type="date">`: el nativo lo
-              dibuja el navegador, sale distinto en cada uno y en tema oscuro
-              aparece en claro. Manda el mismo `yyyy-mm-dd` en un campo oculto,
-              así que la acción de servidor no se entera del cambio. */}
-          <SelectorDeFecha
-            name="dueDate"
-            label="Fecha límite (opcional)"
-            defaultValue={toDateInput(task.dueDate)}
-            disabled={readOnly}
-            /* Va en la columna derecha de un panel estrecho: el panel de 18rem
-               se salía por la derecha. Se pega al borde derecho y crece hacia
-               dentro. */
-            align="right"
-          />
+        {/* Calendario propio en vez de `<input type="date">`: el nativo lo
+            dibuja el navegador, sale distinto en cada uno y en tema oscuro
+            aparece en claro. Manda el mismo `yyyy-mm-dd` en un campo oculto,
+            así que la acción de servidor no se entera del cambio. */}
+        <SelectorDeFecha
+          name="dueDate"
+          label="Fecha límite (opcional)"
+          defaultValue={toDateInput(task.dueDate)}
+          disabled={readOnly}
+          /* El panel es estrecho: el calendario desplegable se pega al borde
+             derecho y crece hacia dentro, para no salirse por la derecha. */
+          align="right"
+        />
 
-          {/* Puntos sin escala impuesta (D4 de `docs/PLAN-SCRUM-KANBAN.md`):
-              vacío es «sin estimar», que no es lo mismo que 0. */}
-          <div className="flex flex-col gap-1.5">
-            <FloatingLabelInput
-              id="task-estimate"
-              name="estimatePoints"
-              label="Estimación (puntos)"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={999}
-              step={1}
-              defaultValue={task.estimatePoints ?? ''}
-              disabled={readOnly}
-            />
-            {/* Atajos de la escala más usada, sin imponerla (S22): escribir
-                cualquier otro número sigue valiendo. Escriben en el campo no
-                controlado, así que el guardado al cerrar los ve como un cambio
-                más. */}
-            {!readOnly && (
-              <div className="flex flex-wrap gap-1" aria-label="Estimaciones rápidas">
-                {[1, 2, 3, 5, 8, 13].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => {
-                      const campo = formRef.current?.elements.namedItem(
-                        'estimatePoints',
-                      ) as HTMLInputElement | null;
-                      if (!campo) return;
-                      /* Con el setter nativo, no `campo.value =`: React vigila
-                         ese y no dispararía su `onChange`, así que la etiqueta
-                         flotante no subiría. */
-                      Object.getOwnPropertyDescriptor(
-                        HTMLInputElement.prototype,
-                        'value',
-                      )?.set?.call(campo, String(n));
-                      campo.dispatchEvent(new Event('input', { bubbles: true }));
-                    }}
-                    className="h-7 min-w-7 cursor-pointer rounded-md border border-white/[0.12] px-2 font-sans text-xs tabular-nums text-text-secondary transition-colors hover:border-primary hover:text-primary"
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+        {/* Puntos sin escala impuesta (D4 de `docs/PLAN-SCRUM-KANBAN.md`):
+            vacío es «sin estimar», que no es lo mismo que 0. */}
+        <div className="flex flex-col gap-1.5">
+          <FloatingLabelInput
+            id="task-estimate"
+            name="estimatePoints"
+            label="Estimación (puntos)"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={999}
+            step={1}
+            defaultValue={task.estimatePoints ?? ''}
+            disabled={readOnly}
+          />
+          {/* Atajos de la escala más usada, sin imponerla (S22): escribir
+              cualquier otro número sigue valiendo. Escriben en el campo no
+              controlado, así que el guardado al cerrar los ve como un cambio
+              más. */}
+          {!readOnly && (
+            <div className="flex flex-wrap gap-1" aria-label="Estimaciones rápidas">
+              {[1, 2, 3, 5, 8, 13].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => {
+                    const campo = formRef.current?.elements.namedItem(
+                      'estimatePoints',
+                    ) as HTMLInputElement | null;
+                    if (!campo) return;
+                    /* Con el setter nativo, no `campo.value =`: React vigila
+                       ese y no dispararía su `onChange`, así que la etiqueta
+                       flotante no subiría. */
+                    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+                      campo,
+                      String(n),
+                    );
+                    campo.dispatchEvent(new Event('input', { bubbles: true }));
+                  }}
+                  className="h-7 min-w-7 cursor-pointer rounded-md border border-white/[0.12] px-2 font-sans text-xs tabular-nums text-text-secondary transition-colors hover:border-primary hover:text-primary"
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/**
