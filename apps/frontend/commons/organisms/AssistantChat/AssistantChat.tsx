@@ -886,7 +886,11 @@ export function AssistantChat({
                  contenedor — sin él, un `flex-1` con contenido largo crece y el
                  scroll se lo queda la página entera, que es justo lo que se
                  quiere evitar en un chat. */
-              `flex min-h-0 flex-1 flex-col gap-4 ${enCajon || esFlotante ? 'p-4' : ''}`
+              /* `esFlotante` ya no se acolcha aquí: vive dentro de un
+                 `SlideOver` sin cabecera propia (ver `SlideOver.tsx`) y es
+                 ESE panel quien pone el margen alrededor — acolcharlo también
+                 aquí era el doble espacio que se veía arriba del todo. */
+              `flex min-h-0 flex-1 flex-col gap-4 ${enCajon ? 'p-4' : ''}`
             : 'flex flex-col gap-4 rounded-sm border p-5'
         }
         style={
@@ -1136,32 +1140,53 @@ export function AssistantChat({
             )}
 
             {/* Solo en el panel de PRAX global: el atajo a pantalla completa.
-                Cerrar es el aspa del `SlideOver` que lo monta, no algo de
-                aquí dentro — el resto de variantes no tienen panel que abrir
-                a pantalla completa. */}
+                El `SlideOver` que lo monta va **sin cabecera propia** —para
+                no repetir la del minichat encima— así que el aspa de cerrar
+                vive aquí también, no allí. El resto de variantes no tienen
+                panel que abrir a pantalla completa ni cerrar. */}
             {esFlotante && prax && (
-              <button
-                type="button"
-                onClick={prax.aPantallaCompleta}
-                title="Pantalla completa"
-                aria-label="Abrir PRAX a pantalla completa"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/5 hover:text-white"
-              >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.75}
-                  aria-hidden="true"
+              <>
+                <button
+                  type="button"
+                  onClick={prax.aPantallaCompleta}
+                  title="Pantalla completa"
+                  aria-label="Abrir PRAX a pantalla completa"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/5 hover:text-white"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"
-                  />
-                </svg>
-              </button>
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"
+                    />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={prax.cerrar}
+                  title="Cerrar"
+                  aria-label="Cerrar PRAX"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/5 hover:text-white"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </>
             )}
           </div>
         </header>

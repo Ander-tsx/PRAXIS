@@ -71,7 +71,7 @@ export function PraxProvider({
     <PraxContext.Provider value={valor}>
       {children}
       {montado && (
-        <SlideOver open={abierto} onClose={cerrar} size="xl" tone="dark" ariaLabel="PRAX">
+        <SlideOver open={abierto} onClose={cerrar} size="lg" tone="dark" ariaLabel="PRAX">
           <AssistantChat
             projectId={null}
             gatewayPath={`${zonePath}/api/gateway`}
