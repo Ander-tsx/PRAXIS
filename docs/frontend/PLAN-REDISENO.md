@@ -86,6 +86,19 @@
 > la sesión entera en probar un negativo en vez de tocar lo que sí está
 > abierto.
 >
+> **Reverificación del 2026-09-26 (decimonovena vez).** Mismos tres comandos,
+> misma respuesta: `99b2f6d` sigue ancestro de `main`, `report_column_time` en
+> los dos controladores, `billing/src` conserva `organizations/` y
+> `subscriptions/`, y no existe `apps/frontend/reports-front`. Árbol limpio al
+> empezar salvo un archivo suelto sin seguimiento —`prisma:generate`, el log de
+> un `pnpm prisma:generate` que alguien redirigió por error a un fichero con ese
+> nombre literal— que se borró por no ser trabajo de nadie. Rama activa:
+> `feature/scrum-kanban`, no `main`. **No se re-ejecutó ni R9 ni Enterprise**: el
+> prompt de arranque sigue sin mencionar Scrum+Documentos ni Organizaciones, que
+> son las etapas vivas de verdad. Esta es la tercera vez que se deja escrito que
+> el prompt debe retirarse o apuntar a la etapa viva — cada repetición gasta la
+> sesión entera demostrando un negativo.
+>
 > **Reverificación del 2026-09-25 (decimoctava vez).** Mismos tres comandos,
 > misma respuesta; árbol limpio en `feature/scrum-kanban`. No se re-ejecutó ni
 > R9 ni Enterprise, y **no se lanzó `next build`**: `next dev` vivo en el 4100
