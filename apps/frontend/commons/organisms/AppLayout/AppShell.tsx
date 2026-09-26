@@ -1035,10 +1035,17 @@ interface EspacioDeLaBarra {
  * ⚠️ No se ha tocado el backend. `GET /projects` podría devolver los espacios y
  * ahorrarse hasta eso, pero es otro equipo y esto ya deja de ser un problema.
  */
+/**
+ * `null` es «no se pudo preguntar» —el `GET` falló—, y es distinto de `[]`,
+ * que es «se preguntó y de verdad no hay ninguno». Quien llama tiene que
+ * distinguirlos: confundirlos fue el motivo de que la barra se quedara
+ * enseñando «Crea tu primer proyecto» con proyectos de verdad detrás. Ver
+ * `cargar`, más abajo.
+ */
 async function fetchProjectsTree(
   zonePath: string,
   organizacionActivaId: string | null,
-): Promise<SidebarProject[]> {
+): Promise<SidebarProject[] | null> {
   const params = new URLSearchParams({ limit: '50' });
   if (organizacionActivaId) params.set('organizationId', organizacionActivaId);
 
@@ -1047,7 +1054,9 @@ async function fetchProjectsTree(
     .get<Paginated<SidebarProjectResumen>>(`/projects?${params}`)
     .catch(() => null);
 
-  return (page?.items ?? []).map((project) => ({
+  if (!page) return null;
+
+  return page.items.map((project) => ({
     id: project.id,
     name: project.name,
     slug: project.slug,
@@ -1360,6 +1369,16 @@ function SidebarProjectsTree({
   const cargar = useCallback(() => {
     fetchProjectsTree(zonePath, organizacionActivaId)
       .then((lista) => {
+        /* ⚠️ `null` no se pinta: es un `GET` que falló —el `focus` de la
+           ventana lo dispara con el token de acceso ya caducado (dura 15
+           minutos), justo lo que pasa al volver de otra pestaña— y no «cero
+           proyectos». Antes se aplanaba a `[]` dentro de `fetchProjectsTree`
+           y aquí se asignaba igual que una lista de verdad: la barra tenía
+           proyectos, la recarga fallaba en silencio, y «Crea tu primer
+           proyecto» sustituía una lista que seguía existiendo en el
+           servidor. Se deja como estaba y se reintentará solo (el próximo
+           `focus`, o el usuario recargando la pantalla). */
+        if (lista === null) return;
         setProjects((previos) => {
           /* Se conservan los espacios ya resueltos: la lista no los trae, y
              perderlos en cada recarga replegaría el árbol a la vista. */

@@ -252,8 +252,15 @@ export function SlideOver({
         /* Por posición en la pila: el que se abrió después pinta encima, y es
            lo que hace que tape por completo al de debajo mientras entra —sin
            esto, cuál queda arriba dependía del orden en el árbol de React, no
-           de cuál se abrió último. */
-        style={{ zIndex: 40 + Math.max(posicion, 0) }}
+           de cuál se abrió último.
+           ⚠️ **`-1` (fuera de la pila) va a 39, no a 40.** Es el panel que se
+           está cerrando: acaba de salir de la pila —su propio efecto lo quita
+           antes de pintar— y si aquí se aplanara a 0 empataría con el que
+           quede de verdad en esa posición, y el empate lo resuelve el orden
+           en el árbol, no quién se abrió último. Con eso, cerrar el de
+           encima mientras quedaba otro debajo lo hacía «aparecer por
+           encima» un instante, a medio deslizar. */
+        style={{ zIndex: posicion === -1 ? 39 : 40 + posicion }}
         className={[
           'fixed inset-y-0 right-0 m-0 h-full w-full max-h-screen overflow-y-auto p-5 text-left transition-none sm:transition-transform sm:duration-300 sm:left-auto sm:border-l cursor-default',
           dark
