@@ -7,6 +7,7 @@ import {
   ImagenDeDocumento,
   LinkCard,
   extensionesDelDocumento,
+  markdownAJson,
   reconocerProveedor,
 } from '@praxis/editor-schema';
 import type { AnyExtension, Editor } from '@tiptap/core';
@@ -43,6 +44,27 @@ function modoAlPegar(url: string): 'card' | 'embed' {
   const p = reconocerProveedor(url);
   if (!p?.embed) return 'card';
   return ['youtube', 'loom', 'vimeo', 'figma', 'miro'].includes(p.id) ? 'embed' : 'card';
+}
+
+/**
+ * ¿Este texto pegado es Markdown? Basta una señal de bloque (título, lista,
+ * cita, código, tabla, regla) o dos de línea (negrita, enlace, código en
+ * línea). Una frase suelta no lo es: ahí se pega como texto normal.
+ */
+function pareceMarkdown(texto: string): boolean {
+  if (!texto.includes('\n') && !/^#{1,6}\s|^```/.test(texto)) return false;
+  if (/^(#{1,6}\s|>\s|[-*+]\s|\d+\.\s|```|\|.+\||-{3,}$)/m.test(texto)) return true;
+  const senales = [/\*\*[^*\n]+\*\*/, /\[[^\]\n]+\]\([^)\n]+\)/, /`[^`\n]+`/];
+  return senales.filter((r) => r.test(texto)).length >= 2;
+}
+
+/**
+ * El portapapeles trae HTML de verdad —una página web, Word, Notion— cuando
+ * tiene estructura: ahí manda el HTML. Un editor de código (VS Code) manda
+ * HTML solo con `<span>` de color, y ese es Markdown en crudo.
+ */
+function htmlConEstructura(html: string): boolean {
+  return /<(h[1-6]|ul|ol|li|table|blockquote|pre|strong|em|b|i|a)[\s>]/i.test(html);
 }
 
 interface Billete {
@@ -322,6 +344,7 @@ function EditorVivo({
         /**
          * Pegar:
          * - imágenes → se suben y entran como bloque;
+         * - Markdown (de un .md o del portapapeles de un editor) → bloques;
          * - un enlace solo, en una línea vacía → tarjeta (o incrustado si el
          *   servicio lo permite). En medio de un texto, sigue siendo un enlace.
          */
@@ -334,6 +357,15 @@ function EditorVivo({
             return true;
           }
           const texto = evento.clipboardData?.getData('text/plain').trim() ?? '';
+          const html = evento.clipboardData?.getData('text/html') ?? '';
+          if (texto && pareceMarkdown(texto) && !htmlConEstructura(html)) {
+            editorRef.current
+              ?.chain()
+              .focus()
+              .insertContent(markdownAJson(texto).content ?? [])
+              .run();
+            return true;
+          }
           const { $from, empty } = view.state.selection;
           if (
             empty &&
