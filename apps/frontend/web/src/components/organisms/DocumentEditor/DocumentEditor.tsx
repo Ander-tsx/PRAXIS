@@ -59,6 +59,16 @@ function pareceMarkdown(texto: string): boolean {
 }
 
 /**
+ * Dos o más líneas que empiezan por «# » en el texto plano: es Markdown en
+ * crudo aunque el portapapeles traiga HTML (un bloque de código de un chat
+ * llega como `<pre>`). Una página renderizada, en cambio, pega «Título», sin
+ * almohadillas.
+ */
+function tituloLiteral(texto: string): boolean {
+  return (texto.match(/^#{1,6}\s+\S/gm)?.length ?? 0) >= 2;
+}
+
+/**
  * El portapapeles trae HTML de verdad —una página web, Word, Notion— cuando
  * tiene estructura: ahí manda el HTML. Un editor de código (VS Code) manda
  * HTML solo con `<span>` de color, y ese es Markdown en crudo.
@@ -358,7 +368,11 @@ function EditorVivo({
           }
           const texto = evento.clipboardData?.getData('text/plain').trim() ?? '';
           const html = evento.clipboardData?.getData('text/html') ?? '';
-          if (texto && pareceMarkdown(texto) && !htmlConEstructura(html)) {
+          if (
+            texto &&
+            pareceMarkdown(texto) &&
+            (!htmlConEstructura(html) || tituloLiteral(texto))
+          ) {
             editorRef.current
               ?.chain()
               .focus()
