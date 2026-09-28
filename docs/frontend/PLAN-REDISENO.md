@@ -118,6 +118,20 @@
 > (línea 646 de `docs/AUDITORIA-ORGANIZACION-CHAT-MOVIL.md`) — no se abordó
 > hoy por ir fuera del encargo que pedía esta sesión.
 >
+> **Reverificación del 2026-09-28 (vigesimoprimera vez).** Mismos tres
+> comandos, misma respuesta: `99b2f6d` ancestro de `main` y de `HEAD`
+> (`feature/scrum-kanban`), `report_column_time` en los dos controladores,
+> `billing/src` con `organizations/` y `subscriptions/`. **No se re-ejecutó ni
+> R9 ni Enterprise.** Lo único nuevo es de la máquina, no del código: **el
+> repositorio estaba sin `node_modules`**, ni en la raíz ni en `web`. Un `npx
+> next build` en ese estado no falla por falta de Next: `npx` descarga un
+> `next` suelto, arranca, y Turbopack muere con «Could not find the Next.js
+> package (next/package.json)» — parece un fallo de configuración del
+> monorepo y no lo es. Se arregló con `pnpm install --frozen-lockfile` +
+> `pnpm build:shared`, y `pnpm --filter @praxis/web build` salió verde. Para
+> compilar `web`, el filtro de pnpm, nunca `npx`: con dependencias instaladas
+> da igual, sin ellas el primero dice la verdad y el segundo despista.
+>
 > **Reverificación del 2026-09-25 (decimoctava vez).** Mismos tres comandos,
 > misma respuesta; árbol limpio en `feature/scrum-kanban`. No se re-ejecutó ni
 > R9 ni Enterprise, y **no se lanzó `next build`**: `next dev` vivo en el 4100
