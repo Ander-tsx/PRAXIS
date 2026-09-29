@@ -2,7 +2,7 @@
 
 # PRAXIS
 
-**Gestión de proyectos ágil con tableros Kanban, reportes predictivos y asistente de voz.**
+**Gestión de proyectos ágil con tableros Kanban, Scrum, documentos en tiempo real y un asistente con IA.**
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)](#-stack-tecnológico)
 [![Next.js](https://img.shields.io/badge/Next.js_16-000000?style=flat-square&logo=next.js&logoColor=white)](#-stack-tecnológico)
@@ -44,9 +44,9 @@
 
 # <img src="https://api.iconify.design/lucide/rocket.svg?color=%233b82f6" width="24" height="24" alt="Sobre"> Sobre el proyecto
 
-PRAXIS es una plataforma de gestión de proyectos construida sobre una arquitectura SOFEA (Service-Oriented Front-End Architecture). Combina tableros Kanban interactivos, un sistema de permisos granular de tres capas, reportes con pronósticos Monte Carlo, chat en tiempo real con SSE, automatizaciones que reaccionan a lo que pasa en el tablero, facturación con Stripe y un asistente conversacional impulsado por Gemini — accesible también por voz a través de una skill de Alexa.
+PRAXIS es una plataforma de gestión de proyectos construida sobre una arquitectura SOFEA (Service-Oriented Front-End Architecture). Combina tableros Kanban interactivos, un sistema de permisos granular de tres capas, reportes con pronósticos Monte Carlo, chat en tiempo real con SSE, automatizaciones que reaccionan a lo que pasa en el tablero, facturación con Stripe y un asistente conversacional impulsado por Gemini.
 
-El frontend es **una sola aplicación Next.js 16** (`apps/frontend/web`), sin `basePath`: la landing pública, las pantallas de sesión y las cinco secciones privadas, con un guard único y un solo proxy autenticado hacia el backend. Fue un Multi-Zones de siete zonas hasta la etapa de fusión ([docs/PLAN-FUSION-ZONAS.md](docs/PLAN-FUSION-ZONAS.md)); ninguna URL cambió al juntarlas. El backend son **9 microservicios NestJS** que se comunican por TCP nativo detrás de un API Gateway único.
+El frontend es **una sola aplicación Next.js 16** (`apps/frontend/web`), sin `basePath`: la landing pública, las pantallas de sesión y las cinco secciones privadas, con un guard único y un solo proxy autenticado hacia el backend. Fue un Multi-Zones de siete zonas hasta la etapa de fusión ([docs/PLAN-FUSION-ZONAS.md](docs/PLAN-FUSION-ZONAS.md)); ninguna URL cambió al juntarlas. El backend son **8 servicios NestJS y un servidor de tiempo real** detrás de un API Gateway único. En producción corren **en un solo proceso** y se hablan en memoria; en desarrollo, cada uno en su puerto por TCP ([docs/PLAN-MONOLITO.md](docs/PLAN-MONOLITO.md)).
 
 Las automatizaciones no son un botón: `tasks` y `projects` escriben cada hecho en su *outbox*, un publicador lo vuelca en un stream de Redis y `automation` lo consume y evalúa las reglas del proyecto. Diez disparadores —cuatro de barrido y seis reactivos— y seis acciones que escriben por los mismos endpoints que usa la interfaz, con los permisos de quien escribió la regla. Ninguna regla abre una ruta de escritura nueva.
 
@@ -63,7 +63,6 @@ Las automatizaciones no son un botón: `tasks` y `projects` escriben cada hecho 
 flowchart TB
     subgraph Clientes
         Browser["Navegador"]
-        AlexaDevice["Alexa"]
     end
 
     subgraph web["Aplicación web Next.js 16 :4100"]
@@ -81,40 +80,41 @@ flowchart TB
         StripeWH["Stripe Webhooks"]
     end
 
-    subgraph services["Microservicios NestJS — TCP"]
+    subgraph services["Servicios NestJS — en memoria (producción) o TCP (desarrollo)"]
         Cred["credentials :3001\nIdentidad · JWT · Sesiones"]
         Perm["permissions :3002\nRoles globales · Auditoría"]
         ProjS["projects :3003\nProyectos · Boards · Chat · SSE"]
         Task["tasks :3004\nTareas · Checklists · Labels"]
         RepS["reports :3005\nAgregador · Monte Carlo"]
         Asst["assistant :3006\nGemini · Propuestas"]
-        Alex["alexa :3007\nSolo lectura · Voz"]
         Automation["automation :3008\nMotor reactivo · 10 disparadores · 6 acciones"]
         Bill["billing :3009\nFacturación · Pagos · Suscripciones"]
+        Collab["collab :3010\nDocumentos en tiempo real"]
     end
 
     subgraph data["Datos"]
-        PG[("PostgreSQL 16\n8 schemas aislados")]
+        PG[("PostgreSQL 16\n7 schemas aislados")]
         Redis[("Redis 7\nSesiones · Caché · SSE · Stream de hechos")]
     end
 
     Browser --> web
     Guard --> Privado
     GwProxy -->|proxy autenticado| gw
-    AlexaDevice -->|Lambda → voiceToken| gw
-    gw -->|TCP| services
-    Cred & Perm & ProjS & Task & Alex & Asst & Automation & Bill --> PG
+    gw -->|mensajes NestJS| services
+    Cred & Perm & ProjS & Task & Asst & Automation & Bill --> PG
     RepS -.->|"sin BD propia"| Task & ProjS
     Cred & ProjS & Automation --> Redis
     Task & ProjS -.->|"outbox → stream de hechos"| Automation
 ```
 
 > [!NOTE]
-> Los microservicios se comunican con el gateway mediante **TCP nativo de NestJS** (`Transport.TCP`), no Redis pub/sub. Redis se usa exclusivamente para sesiones (`auth:sessions:<userId>`), caché de tableros y el pub/sub de notificaciones SSE.
+> Los servicios se comunican con el gateway mediante **mensajes de NestJS**: en producción, en memoria dentro del mismo proceso (`@praxis/local-transport`); en desarrollo, por TCP nativo. No por Redis pub/sub. Redis se usa exclusivamente para sesiones (`auth:sessions:<userId>`), caché de tableros y el pub/sub de notificaciones SSE.
 
 ## Infraestructura en producción
 
-La plataforma se despliega en **Google Cloud Platform**. Consulta el esquema completo de infraestructura:
+La plataforma se despliega en **Railway** ([docs/deploy/RAILWAY.md](docs/deploy/RAILWAY.md)): dos contenedores, un Postgres y un Redis. El backend es **un solo proceso Node** y se duerme cuando nadie lo usa.
+
+La infraestructura anterior, en **Google Cloud Platform**, queda como legado en `infra/terraform/`:
 
 ![Infraestructura en GCP](docs/assets/infrastructure-google.png)
 <!-- docs/assets/infrastructure-google.png | Ya existe — esquema de la infraestructura cloud en GCP -->
@@ -124,7 +124,7 @@ La plataforma se despliega en **Google Cloud Platform**. Consulta el esquema com
 
 | Componente | Recurso GCP | Detalle |
 | :--- | :--- | :--- |
-| Backend | MIG regional (e2-medium, 1–3 réplicas) | PM2 supervisa los 10 procesos Node.js: el gateway y los 9 microservicios |
+| Backend | MIG regional (e2-medium, 1–3 réplicas) | PM2 supervisaba los procesos Node.js del gateway y los microservicios |
 | Frontend | MIG regional (e2-medium, 1–3 réplicas) | PM2 supervisa **un** proceso Next.js. Fueron ocho hasta la fusión de zonas |
 | Base de datos | Cloud SQL PostgreSQL 16 (IP privada) | Backups 7 días, acceso exclusivo por VPC |
 | Caché/Sesiones | VM e2-micro con Redis 7 | Firewall solo desde el backend |
@@ -145,13 +145,12 @@ La plataforma se despliega en **Google Cloud Platform**. Consulta el esquema com
 | **Frontend** | ![Next.js](https://img.shields.io/badge/Next.js_16-000?style=flat-square&logo=next.js&logoColor=white) ![React](https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black) | Una aplicación con App Router y Server Components |
 | **Estilos** | ![Tailwind](https://img.shields.io/badge/Tailwind_v4-38B2AC?style=flat-square&logo=tailwindcss&logoColor=white) | `@theme static` en CSS, sin `tailwind.config` |
 | **3D / Animación** | ![Three.js](https://img.shields.io/badge/Three.js-000?style=flat-square&logo=three.js&logoColor=white) ![GSAP](https://img.shields.io/badge/GSAP-88CE02?style=flat-square&logoColor=black) | Landing page interactiva de la aplicación web |
-| **Backend** | ![NestJS](https://img.shields.io/badge/NestJS_11-E0234E?style=flat-square&logo=nestjs&logoColor=white) | Gateway REST + 9 microservicios TCP |
-| **ORM** | ![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white) | 8 schemas aislados, migraciones por servicio |
+| **Backend** | ![NestJS](https://img.shields.io/badge/NestJS_11-E0234E?style=flat-square&logo=nestjs&logoColor=white) | Gateway REST + 8 servicios, un proceso en producción |
+| **ORM** | ![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white) | 7 schemas aislados, migraciones por servicio |
 | **Base de datos** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-4169E1?style=flat-square&logo=postgresql&logoColor=white) | Una instancia, schemas separados por dominio |
 | **Caché** | ![Redis](https://img.shields.io/badge/Redis_7-DC382D?style=flat-square&logo=redis&logoColor=white) | Sesiones JWT, caché de boards, SSE pub/sub |
 | **Pagos** | ![Stripe](https://img.shields.io/badge/Stripe-635BFF?style=flat-square&logo=stripe&logoColor=white) | Checkout, portal de cliente, webhooks |
 | **IA** | ![Google Gemini](https://img.shields.io/badge/Gemini-4285F4?style=flat-square&logo=google&logoColor=white) | Asistente conversacional con cuotas y propuestas |
-| **Voz** | ![Alexa](https://img.shields.io/badge/Alexa_Skill-00CAFF?style=flat-square&logo=amazonalexa&logoColor=white) | Consultas de solo lectura vía frase semilla |
 | **Visualización** | ![Recharts](https://img.shields.io/badge/Recharts-22B5BF?style=flat-square) | Gráficas de reportes y flujo de trabajo |
 | **Testing** | ![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=flat-square&logo=playwright&logoColor=white) ![Jest](https://img.shields.io/badge/Jest-C21325?style=flat-square&logo=jest&logoColor=white) | E2E (API + UI) y unit tests |
 | **Calidad** | ![Biome](https://img.shields.io/badge/Biome-60A5FA?style=flat-square&logo=biome&logoColor=white) | Linting y formateo (2 espacios, ancho 100) |
@@ -170,6 +169,7 @@ PRAXIS/
 │   │                           # + auth, api, tokens, hooks, theme
 │   ├── backend/
 │   │   ├── gateway/            # API REST pública (:3000) — JWT, Swagger, Stripe
+│   │   ├── monolith/           # producción: gateway, servicios y collab en un proceso
 │   │   ├── services/
 │   │   │   ├── credentials/    # :3001 — identidad, bcrypt, JWT, sesiones Redis
 │   │   │   ├── permissions/    # :3002 — roles globales, auditoría administrativa
@@ -177,13 +177,14 @@ PRAXIS/
 │   │   │   ├── tasks/          # :3004 — tareas, checklists, labels, adjuntos
 │   │   │   ├── reports/        # :3005 — agregador sin BD, Monte Carlo
 │   │   │   ├── assistant/      # :3006 — Gemini, cuotas, propuestas
-│   │   │   ├── alexa/          # :3007 — solo lectura para skill de voz
 │   │   │   ├── automation/     # :3008 — motor de reglas: hechos → condiciones → acciones
-│   │   │   └── billing/        # :3009 — facturación, pagos, suscripciones
+│   │   │   ├── billing/        # :3009 — facturación, pagos, suscripciones
+│   │   │   └── collab/         # :3010 — documentos en tiempo real (Hocuspocus)
 │   │   └── commons/
 │   │       ├── contracts/      # DTOs y patrones TCP compartidos → dist/
-│   │       └── observability/  # Logger Pino compartido → dist/
-│   └── PraxisSkill/            # Alexa Skill: Lambda, modelo de interacción (es-MX/en-US)
+│   │       ├── observability/  # Logger Pino compartido → dist/
+│   │       ├── domain-events/  # Buzón de salida de hechos de dominio → dist/
+│   │       └── local-transport/# Transporte en proceso y factoría de clientes → dist/
 ├── packages/
 │   └── shared-devtools/        # Configs de tsconfig (base, nestjs, nextjs)
 ├── infra/
@@ -308,7 +309,6 @@ Los `.env` no se versionan. Cada microservicio tiene un `.env.example` con todas
 | `JWT_SECRET` | Gateway, credentials, **cada zona frontend** | **Debe ser idéntico** en los tres puntos |
 | `GATEWAY_URL` | La aplicación web y el gateway | `http://localhost:3000` |
 | `GEMINI_API_KEY` | assistant-service | API key de Google Gemini |
-| `VOICE_JWT_SECRET` | alexa-service | Secreto propio — NO reutilizar `JWT_SECRET` |
 | `STRIPE_SECRET_KEY` | Gateway | Clave privada de Stripe |
 | `GOOGLE_CLIENT_ID` | credentials, web | OAuth 2.0 para login con Google |
 
@@ -372,7 +372,6 @@ pnpm e2e:report       # abre el reporte HTML
 | `09-seguridad` | Timing attacks, inyecciones, rate limits |
 | `10-barrido-de-acceso` | Matriz exhaustiva de permisos por endpoint |
 | `11-jerarquia-admin` | Jerarquía de roles globales |
-| `12-voz` | Frase semilla, `voiceToken`, skill Alexa |
 | `13-integridad-de-tablero` | Consistencia relacional boards/tareas |
 | `14-roles-globales` | Catálogo y asignación de roles de sistema |
 | `15-chat` | Mensajes, hilos, adjuntos y silenciado |

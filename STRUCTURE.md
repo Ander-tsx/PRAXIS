@@ -65,7 +65,7 @@ web/src/
 │   └── api/
 │       ├── gateway/[...path]/route.ts  → el proxy autenticado, uno para todo
 │       ├── webhooks/stripe/route.ts    → 🔴 el webhook. No se toca
-│       └── alexa/[...path]/route.ts    → paso al gateway para la skill de voz
+│       └── doc/                        → documentos compartidos por enlace
 ├── components/{atoms,molecules,organisms,templates}/
 ├── lib/{auth,main,projects,admin}/     → utilidades, agrupadas por sección
 └── proxy.ts                            → el guard único
@@ -102,11 +102,12 @@ barra lateral, el directorio de chats y la conexión SSE.
 > **La lógica de negocio (fetch, estado, validación) vive solo en las pages.**
 > Moléculas y organismos reciben slots `ReactNode` y props.
 
-### `apps/backend/` — un gateway y nueve microservicios
+### `apps/backend/` — un gateway, ocho servicios y el monolito que los junta
 
 ```
 apps/backend/
 ├── gateway/                 → :3000 · la única puerta HTTP pública
+├── monolith/                → en producción: todo lo de aquí en UN proceso
 └── services/
     ├── credentials/         → :3001 · identidad, contraseñas, JWT, sesiones
     ├── permissions/         → :3002 · roles globales y de proyecto, auditoría
@@ -114,13 +115,21 @@ apps/backend/
     ├── tasks/               → :3004 · tareas, checklists, etiquetas, adjuntos
     ├── reports/             → :3005 · agregador. Sin tablas propias
     ├── assistant/           → :3006 · el único que habla con Gemini
-    ├── alexa/               → :3007 · solo lectura, para la skill de voz
     ├── automation/          → :3008 · motor de reglas
-    └── billing/             → :3009 · organizaciones, papeles, asientos y planes
+    ├── billing/             → :3009 · organizaciones, papeles, asientos y planes
+    └── collab/              → :3010 · tiempo real de documentos (Hocuspocus, sin Nest)
 ```
 
-Los servicios **no se hablan por HTTP**: el gateway les habla por **TCP nativo de
-NestJS** (`Transport.TCP`). Redis es para sesiones, caché y el stream de hechos,
+Los servicios **no se hablan por HTTP**, sino con mensajes de NestJS
+(`@MessagePattern` / `ClientProxy.send`). Lo que cambia es el transporte:
+
+- **En producción**, en memoria, porque `monolith/` los arranca a todos en un
+  proceso ([PLAN-MONOLITO](docs/PLAN-MONOLITO.md)).
+- **En desarrollo** (`dev:backend`), por **TCP**, cada uno en su puerto.
+
+Los clientes salen de `clienteDeServicio()` / `opcionesDeCliente()` de
+`@praxis/local-transport`, que elige por `PRAXIS_TRANSPORT`. **No se escribe un
+`Transport.TCP` a mano.** Redis es para sesiones, caché y el stream de hechos,
 no para el transporte entre servicios.
 
 Dentro de un servicio:
@@ -132,7 +141,7 @@ services/<x>/
 │   ├── migrations/          → sus migraciones, independientes
 │   └── seed.ts              → sus datos de arranque
 └── src/
-    ├── main.ts              → arranque del microservicio TCP
+    ├── main.ts              → arranque suelto por TCP (desarrollo); el monolito carga su app.module
     ├── app.module.ts
     ├── <dominio>/           → módulo, controlador (patrones TCP) y servicio
     └── generated/           → cliente Prisma. NO versionado: `pnpm prisma:generate`
@@ -145,15 +154,12 @@ services/<x>/
 | `contracts/` | Los DTOs y los patrones de mensaje TCP. Es **el contrato entre servicios** |
 | `observability/` | El logger Pino compartido |
 | `domain-events/` | El tipo y la validación de un hecho de dominio |
+| `local-transport/` | El transporte en proceso, la factoría de clientes y la señal de reposo |
 
-> Los tres publican `dist/`. Por eso `pnpm build:shared` es obligatorio antes de
+> Los cuatro publican `dist/`. Por eso `pnpm build:shared` es obligatorio antes de
 > arrancar el backend: sin él, los servicios mueren con
 > `Cannot find module '@praxis/contracts'`.
 
-### `apps/PraxisSkill/` — la skill de Alexa
-
-La Lambda, el modelo de interacción (`es-MX` y `en-US`) y la plantilla de
-CloudFormation. Habla con el gateway por `voiceToken`, nunca con la base.
 
 ### `apps/addons/project-dev-stack/`
 

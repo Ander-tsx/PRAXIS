@@ -537,3 +537,17 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
   juntar los microservicios en uno. Si se hace, el mapa de §1 cambia de sitio
   —servicios, rutas TCP—, pero no de fondo, y las decisiones siguen valiendo.
   Una sesión que retome esto **mira primero cómo quedó el backend**.
+- **2026-09-29** — Backend en monolito ([PLAN-MONOLITO](PLAN-MONOLITO.md)).
+  Lo que cambia para este plan:
+  - Los servicios siguen siendo los mismos, con los mismos `@MessagePattern`,
+    pero en producción se hablan en memoria. Las rutas `file:line` de §1 siguen
+    valiendo.
+  - **D3 sale más barato**: las consultas de PRAX a tasks, projects y reports
+    no cruzan ya ninguna red.
+  - **El turno por SSE (D7)** tiene que pasar un `Observable` de varios valores
+    del servicio al gateway. El transporte en proceso lo admite, con una prueba
+    que lo compara contra TCP.
+  - **Toda tarea de fondo nueva** (por ejemplo, un resumen programado) tiene que
+    respetar `enReposo()`, o el backend no vuelve a dormirse.
+  - `proponer_grafico` y `ChartProposalCard` **siguen vivos y sin salida**: se
+    quitan aquí, en F7 y F8.

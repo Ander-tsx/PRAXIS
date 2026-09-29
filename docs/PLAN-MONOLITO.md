@@ -228,7 +228,7 @@ queda**: decide el acceso a PRAX.
 
   ⚠️ **Lo que lo mantiene despierto sin querer:** una pestaña abierta, por los
   latidos del SSE cada 25 s. Eso está bien: alguien lo está usando.
-- [ ] **M-J — Documentación**: `CLAUDE.md` (puertos, comandos, «los 10
+- [x] **M-J — Documentación**: `CLAUDE.md` (puertos, comandos, «los 10
   servicios», trampa 14), `STRUCTURE`, `ESTADO-ACTUAL` y el plan de PRAX
   (§1 cambia de sitio, no de fondo).
 

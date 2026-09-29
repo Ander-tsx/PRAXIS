@@ -9,6 +9,19 @@
 
 ---
 
+> # 🔴 El backend es un proceso, no diez
+>
+> **Actualizado el 2026-09-29.** En producción, el gateway, los ocho servicios y
+> collab corren en **un solo proceso Node** (`apps/backend/monolith`) y se hablan
+> en memoria, con la misma ida y vuelta por JSON que TCP. En desarrollo siguen
+> separados. Alexa se retiró y las rutas `/projects/:id/reports/*` del gateway
+> también: no las llamaba nadie desde que se archivó Análisis. Todo en
+> [PLAN-MONOLITO](../PLAN-MONOLITO.md).
+>
+> Donde este documento dice «el microservicio X responde por TCP en el puerto
+> Y», en producción es «el contexto X del monolito responde en memoria». Los
+> patrones de mensaje y los contratos son los mismos.
+
 > # 🚫 Multi-Zones ya no existe
 >
 > **Actualizado el 2026-09-04.** El frontend es **una sola aplicación Next**,
