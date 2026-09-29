@@ -29,6 +29,17 @@
 > están en el árbol. La etapa viva es **Organizaciones**, y lo que le queda —tres
 > casillas de 73— está en su propio plan, no aquí.
 >
+> **Reverificación del 2026-09-23 (decimosexta vez).** Mismos tres comandos,
+> misma respuesta. **No se re-ejecutó ni R9 ni Enterprise.** Esta vez **no se
+> lanzó `next build`**, a propósito: `next dev` estaba vivo en el 4100 (el dueño
+> probando Scrum desde el móvil) y un build encima le borra el `.next/` —la
+> trampa de CLAUDE.md—, y `main` no tiene código nuevo desde el último build
+> verde (`2267674`, solo documentos). En su lugar, `tsc --noEmit` de `web` sobre
+> el árbol de `feature/scrum-kanban`: verde. ⚠️ Ese árbol tiene **Documentos sin
+> commitear** (15 ficheros modificados y 9 nuevos: migración, controlador,
+> `DocumentView`, e2e `10-documentos`); no se tocó —es trabajo de otra sesión,
+> y decidir si entra es del dueño—.
+>
 > **Reverificación del 2026-09-22 (decimoquinta vez).** Mismos tres comandos,
 > misma respuesta. **No se re-ejecutó ni R9 ni Enterprise.** `next build` de
 > `web` verde (44 páginas). ⚠️ Trampa nueva: el primer `next build` falló con
