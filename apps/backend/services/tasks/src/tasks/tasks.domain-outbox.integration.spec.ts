@@ -28,7 +28,13 @@ function createHarness(
   } = {},
 ) {
   const committed: CommittedWrites = { tasks: [], taskEvents: [], outbox: [] };
-  const redis = { del: jest.fn().mockResolvedValue(undefined) };
+  /* `delByPrefix` es como se invalida el listado del tablero (trampa 26 de
+     CLAUDE.md). Sin él en el doble, once pruebas morían con «is not a
+     function» antes de llegar a lo que comprueban. */
+  const redis = {
+    del: jest.fn().mockResolvedValue(undefined),
+    delByPrefix: jest.fn().mockResolvedValue(undefined),
+  };
   const createdTask = { ...task };
   const movedTask = options.updatedTask ?? {
     ...task,
@@ -146,6 +152,7 @@ describe('TasksService DomainOutbox transaction integration', () => {
 
     expect(committed).toEqual({ tasks: [], taskEvents: [], outbox: [] });
     expect(redis.del).not.toHaveBeenCalled();
+    expect(redis.delByPrefix).not.toHaveBeenCalled();
   });
 
   it('mueve Task, TaskEvent y task.moved.v1 en la misma transacción', async () => {
@@ -195,6 +202,7 @@ describe('TasksService DomainOutbox transaction integration', () => {
 
     expect(committed).toEqual({ tasks: [], taskEvents: [], outbox: [] });
     expect(redis.del).not.toHaveBeenCalled();
+    expect(redis.delByPrefix).not.toHaveBeenCalled();
   });
 
   it('persiste task.due-date-changed.v1 al cambiar realmente la fecha de vencimiento', async () => {
@@ -391,6 +399,7 @@ describe('TasksService DomainOutbox transaction integration', () => {
 
     expect(committed).toEqual({ tasks: [], taskEvents: [], outbox: [] });
     expect(redis.del).not.toHaveBeenCalled();
+    expect(redis.delByPrefix).not.toHaveBeenCalled();
   });
 
   it('asignar responsables conserva hechos individuales y un solo estado final agregado', async () => {
@@ -505,6 +514,7 @@ describe('TasksService DomainOutbox transaction integration', () => {
 
     expect(committed).toEqual({ tasks: [], taskEvents: [], outbox: [] });
     expect(redis.del).not.toHaveBeenCalled();
+    expect(redis.delByPrefix).not.toHaveBeenCalled();
   });
 
   it('rechaza asignar responsables a una tarea de otro proyecto antes de la transacción', async () => {
@@ -514,7 +524,7 @@ describe('TasksService DomainOutbox transaction integration', () => {
         task: { findUnique: async () => task },
         $transaction: transaction,
       } as never,
-      { del: jest.fn() } as never,
+      { del: jest.fn(), delByPrefix: jest.fn() } as never,
       { get: jest.fn() } as never,
     );
     jest.spyOn(service as any, 'assertPermission').mockResolvedValue(undefined);

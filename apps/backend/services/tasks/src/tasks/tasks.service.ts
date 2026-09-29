@@ -628,17 +628,25 @@ export class TasksService {
   }
 
   async findAllTasks(dto: FindTasksDto) {
+    const page = dto.query?.page ?? 1;
+    const limit = dto.query?.limit ?? 50;
+    const skip = (page - 1) * limit;
+
+    /* 🔴 **La página y el tope van en la clave.** No iban: la primera petición
+       fijaba la respuesta para todas las demás durante el minuto de caché. La
+       página 2 de un tablero devolvía la 1, las menciones del chat (tope 100)
+       recibían las 50 del tablero, y descartar un sprint —que pide 10 000 para
+       devolverlas todas al backlog— podía dejar tareas atadas a un sprint que
+       ya no existe. Siguen bajo el prefijo `tasks:board:<id>`, así que el
+       `delByPrefix` de siempre las invalida (trampa 26 de CLAUDE.md). */
     const cacheKey =
       `tasks:board:${dto.boardId}` +
       (dto.columnId ? `:col:${dto.columnId}` : '') +
       (dto.sprintId ? `:sprint:${dto.sprintId}` : '') +
-      (dto.onlyBacklog ? ':backlog' : '');
+      (dto.onlyBacklog ? ':backlog' : '') +
+      `:p${page}:l${limit}`;
     const cached = await this.redis.get(cacheKey);
     if (cached) return cached;
-
-    const page = dto.query?.page ?? 1;
-    const limit = dto.query?.limit ?? 50;
-    const skip = (page - 1) * limit;
 
     const where: any = { boardId: dto.boardId };
     if (dto.columnId) where.columnId = dto.columnId;

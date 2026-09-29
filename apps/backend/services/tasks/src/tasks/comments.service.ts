@@ -100,7 +100,12 @@ export class CommentsService {
    * de siempre, y esta vez la provocó meter los comentarios en el include.
    */
   private async invalidate(taskId: string, boardId: string) {
-    await Promise.all([this.redis.del(`task:${taskId}`), this.redis.del(`tasks:board:${boardId}`)]);
+    /* Por prefijo: el listado del tablero se cachea con sufijos (filtros,
+       página y tope) y un `del` exacto dejaría vivas todas las variantes. */
+    await Promise.all([
+      this.redis.del(`task:${taskId}`),
+      this.redis.delByPrefix(`tasks:board:${boardId}`),
+    ]);
   }
 
   /** La tarea existe y es del proyecto de la ruta. */
