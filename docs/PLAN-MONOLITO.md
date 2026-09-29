@@ -329,3 +329,18 @@ Las sesiones abiertas siguen valiendo, porque `JWT_SECRET` no cambia.
 
   Son fragilidad de las pruebas escritas para `next dev` al correr contra la
   build de producción. Quedan para arreglarse aparte.
+- **2026-09-29, 11:35 UTC** — **`praxis-api` no se dormía, y ya se sabe por qué.**
+  - **En producción el reposo funcionaba**: los sondeos pararon a las 11:15:07,
+    5 minutos después del último uso.
+  - **Pero a las 11:32 la instancia seguía `RUNNING`.** Los logs de red de
+    Railway (`railway logs --network`) lo enseñaron: Postgres callado desde las
+    11:15, y **Redis mandando un keepalive a cada conexión cada 300 s**, que el
+    contenedor contestaba. Es el `tcp-keepalive 300` por defecto de Redis, y un
+    paquete cada 5 minutos no deja llegar nunca a los 10 de silencio.
+  - **Por qué en local no salió:** en Docker Desktop para Mac el proxy de red
+    se interpone y los keepalives mueren ahí sin llegar al proceso. El Redis
+    local también tenía `tcp-keepalive 300`.
+  - **Arreglo**: `monolith/src/redis-sin-sondeo.ts`. El monolito hace
+    `CONFIG SET tcp-keepalive 0` en su Redis al arrancar, y cada despertar es un
+    arranque. Si Railway no deja usar `CONFIG`, se avisa en el log y todo sigue
+    igual, sin dormir.

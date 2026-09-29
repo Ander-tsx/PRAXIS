@@ -337,6 +337,9 @@ importers:
       '@praxis/tasks-service':
         specifier: workspace:*
         version: link:../services/tasks
+      ioredis:
+        specifier: ^5.4.1
+        version: 5.11.1
       pg:
         specifier: ^8.22.0
         version: 8.22.0

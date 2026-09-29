@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 /* Solo el tipo: el valor se carga con `require` después de componer el entorno. */
 import type * as Transporte from '@praxis/local-transport';
 import { componerEntorno, schemasEnUso } from './entorno.js';
+import { quitarSondeoDeRedis } from './redis-sin-sondeo.js';
 
 /**
  * El backend entero en un proceso (docs/PLAN-MONOLITO.md).
@@ -76,6 +77,10 @@ async function arrancar(): Promise<void> {
   console.log(
     `[monolito] ${servicios.length} servicios, collab y gateway en un proceso · ${schemasEnUso()}`,
   );
+
+  /* Sin esto, Redis sondea cada conexión cada 5 minutos y Railway no duerme el
+     servicio nunca (docs/PLAN-MONOLITO.md, M-K). */
+  await quitarSondeoDeRedis(process.env.REDIS_URL);
 
   /*
    * El apagado lo lleva el monolito, no cada contexto. `enableShutdownHooks` en

@@ -23,6 +23,7 @@
     "@praxis/projects-service": "workspace:*",
     "@praxis/reports-service": "workspace:*",
     "@praxis/tasks-service": "workspace:*",
+    "ioredis": "^5.4.1",
     "pg": "^8.22.0",
     "reflect-metadata": "^0.2.2"
   },
