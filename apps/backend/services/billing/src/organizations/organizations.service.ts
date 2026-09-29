@@ -583,7 +583,20 @@ export class OrganizationsService {
 
     const ocupado = await this.prisma.organization.findUnique({ where: { slug: base } });
     if (!ocupado) return base;
-    return `${base}-${randomBytes(2).toString('hex')}`;
+
+    /* 🔴 **Cuatro bytes y comprobando, no dos a ciegas.** Casi todos los
+       espacios personales se llaman «Mi espacio», así que caen todos en
+       `mi-espacio-XXXX`: con dos bytes son 65 536 sufijos, y por la paradoja
+       del cumpleaños la mitad de las veces choca antes de los 300. El choque
+       salía como un P2002 en el `create` y la cuenta **se quedaba sin espacio
+       personal** —el registro lo trataba como aviso y seguía—. Lo destapó la
+       suite e2e, que crea cientos de cuentas. */
+    for (let intento = 0; intento < 5; intento += 1) {
+      const candidato = `${base}-${randomBytes(4).toString('hex')}`;
+      const tomado = await this.prisma.organization.findUnique({ where: { slug: candidato } });
+      if (!tomado) return candidato;
+    }
+    return `${base}-${randomBytes(8).toString('hex')}`;
   }
 
   async renombrar(
