@@ -17,10 +17,12 @@ import type { FunctionDeclaration } from './tools';
  * lenta a un tercero fuera del camino por el que pasa todo lo demás.
  */
 
-/** Un trozo de un turno: texto, una llamada a función, o un archivo. */
-type GeminiPart = {
+/** Un trozo de un turno: texto, una llamada a función, su respuesta, o un archivo. */
+export type GeminiPart = {
   text?: string;
   functionCall?: { name: string; args: Record<string, unknown> };
+  /** Lo que devolvió una consulta, de vuelta al modelo en la misma vuelta (F3). */
+  functionResponse?: { name: string; response: Record<string, unknown> };
   /**
    * Un archivo incrustado en la propia petición.
    *
@@ -35,7 +37,7 @@ type GeminiPart = {
 };
 
 /** Un turno tal y como lo entiende la API. */
-interface GeminiContent {
+export interface GeminiContent {
   role: 'user' | 'model';
   parts: GeminiPart[];
 }
@@ -68,6 +70,24 @@ export interface GeminiReply {
   calls: { name: string; args: Record<string, unknown> }[];
   /** Ausente si Google no lo mandó, cosa que no debería pasar pero no se da por hecha. */
   uso?: UsoDeGemini;
+  /**
+   * Las partes tal cual las devolvió el modelo. El bucle de consultas (F3) las
+   * necesita enteras: la API exige que la siguiente vuelta repita la llamada a
+   * función del modelo antes de su respuesta.
+   */
+  partes: GeminiPart[];
+}
+
+/** Lo que devuelve la API: una respuesta entera, o un trozo de una en streaming. */
+interface TrozoDeGemini {
+  candidates?: { content?: { parts?: GeminiPart[] }; finishReason?: string }[];
+  promptFeedback?: { blockReason?: string };
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    thoughtsTokenCount?: number;
+    cachedContentTokenCount?: number;
+  };
 }
 
 /**
@@ -159,28 +179,36 @@ export class GeminiClient {
    * queda en `MAX_TOKENS` y **el texto llega recortado o vacío**, que es otra de
    * las formas en que salía «no he sabido responder».
    */
-  async chat(params: {
-    system: string;
-    history: { role: string; text: string }[];
-    message: string;
-    tools: FunctionDeclaration[];
-    /** Archivos del turno actual. Los anteriores no se reenvían: ver abajo. */
-    archivos?: GeminiArchivo[];
-    /**
-     * Cuánto puede escribir, cuando 2048 no basta.
-     *
-     * 🔴 **Lo pide la plantilla de proyecto, y era un fallo silencioso
-     * esperando.** Un plan de 4 espacios × 4 tableros × 8 columnas, más 6 roles
-     * con su diccionario de permisos y 12 etiquetas, se pasa del techo por
-     * defecto — y cuando eso ocurre `finishReason` queda en `MAX_TOKENS` y **la
-     * llamada a función llega cortada**: JSON inválido, propuesta descartada al
-     * validarla, y por fuera un asistente que «no ha sabido responder».
-     *
-     * No se sube para todos: el techo también protege de una respuesta que se
-     * va por las ramas, y las conversaciones normales no lo rozan.
-     */
-    maxOutputTokens?: number;
-  }): Promise<GeminiReply> {
+  async chat(
+    params: {
+      system: string;
+      history: { role: string; text: string }[];
+      message: string;
+      tools: FunctionDeclaration[];
+      /** Archivos del turno actual. Los anteriores no se reenvían: ver abajo. */
+      archivos?: GeminiArchivo[];
+      /**
+       * Cuánto puede escribir, cuando 2048 no basta.
+       *
+       * 🔴 **Lo pide la plantilla de proyecto, y era un fallo silencioso
+       * esperando.** Un plan de 4 espacios × 4 tableros × 8 columnas, más 6 roles
+       * con su diccionario de permisos y 12 etiquetas, se pasa del techo por
+       * defecto — y cuando eso ocurre `finishReason` queda en `MAX_TOKENS` y **la
+       * llamada a función llega cortada**: JSON inválido, propuesta descartada al
+       * validarla, y por fuera un asistente que «no ha sabido responder».
+       *
+       * No se sube para todos: el techo también protege de una respuesta que se
+       * va por las ramas, y las conversaciones normales no lo rozan.
+       */
+      maxOutputTokens?: number;
+      /**
+       * Lo que va **después** del mensaje de la persona, dentro del mismo turno: las
+       * llamadas a consultas del modelo y sus respuestas, vuelta a vuelta (F3).
+       */
+      extra?: GeminiContent[];
+    },
+    alTexto?: (delta: string) => void,
+  ): Promise<GeminiReply> {
     /**
      * Un turno son varios intentos, y eso es nuevo.
      *
@@ -194,11 +222,21 @@ export class GeminiClient {
      */
     const modelos = this.modelFallback ? [this.model, this.modelFallback] : [this.model];
     let ultimo: GeminiError | null = null;
+    /* ⚠️ Con streaming, reintentar solo vale **antes** del primer trozo: después,
+       la persona ya ha visto medio párrafo, y repetir la llamada le escribiría
+       otro encima. */
+    let emitido = false;
+    const alTrozo = alTexto
+      ? (delta: string) => {
+          emitido = true;
+          alTexto(delta);
+        }
+      : undefined;
 
     for (const modelo of modelos) {
       for (let intento = 1; intento <= MAX_INTENTOS; intento += 1) {
         try {
-          const respuesta = await this.intentar(modelo, params);
+          const respuesta = await this.intentar(modelo, params, alTrozo);
           if (ultimo) {
             this.log.log(
               `gemini_recuperado modelo=${modelo} intento=${intento} tras=${ultimo.status ?? 'red'}`,
@@ -218,7 +256,7 @@ export class GeminiClient {
           /* Lo que no es transitorio no mejora esperando, ni cambiando de
              modelo: la clave, la cuota y el bloqueo de seguridad son del
              proyecto entero, no de un modelo concreto. */
-          if (!fallo.reintentable) throw fallo;
+          if (!fallo.reintentable || emitido) throw fallo;
           if (intento < MAX_INTENTOS) await this.esperar(esperaDelIntento(intento));
         }
       }
@@ -235,6 +273,7 @@ export class GeminiClient {
   private async intentar(
     modelo: string,
     params: Parameters<GeminiClient['chat']>[0],
+    alTexto?: (delta: string) => void,
   ): Promise<GeminiReply> {
     /**
      * ⚠️ **Los archivos solo van en el turno actual, nunca en el historial.**
@@ -263,6 +302,7 @@ export class GeminiClient {
         parts: [{ text: turno.text }],
       })),
       { role: 'user', parts: partesDelTurno },
+      ...(params.extra ?? []),
     ];
 
     const body: Record<string, unknown> = {
@@ -281,7 +321,8 @@ export class GeminiClient {
       body.tools = [{ functionDeclarations: params.tools }];
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`;
+    const metodo = alTexto ? 'streamGenerateContent?alt=sse' : 'generateContent';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:${metodo}`;
 
     let response: Response;
     try {
@@ -289,7 +330,9 @@ export class GeminiClient {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.apiKey },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        /* En streaming el plazo cubre la respuesta entera, no el primer byte:
+           se le da el doble. */
+        signal: AbortSignal.timeout(alTexto ? TIMEOUT_MS * 2 : TIMEOUT_MS),
       });
     } catch (error) {
       /* Se registra el motivo real —red caída, timeout— y hacia fuera va un
@@ -314,23 +357,74 @@ export class GeminiClient {
       );
     }
 
-    const json = (await response.json()) as {
-      candidates?: { content?: { parts?: GeminiContent['parts'] }; finishReason?: string }[];
-      promptFeedback?: { blockReason?: string };
-      usageMetadata?: {
-        promptTokenCount?: number;
-        candidatesTokenCount?: number;
-        thoughtsTokenCount?: number;
-        cachedContentTokenCount?: number;
-      };
-    };
+    const trozos = alTexto
+      ? await this.leerEnVivo(response, alTexto)
+      : [(await response.json()) as TrozoDeGemini];
+    return this.armarRespuesta(modelo, trozos);
+  }
 
-    const uso: UsoDeGemini | undefined = json.usageMetadata
+  /**
+   * Lee un `streamGenerateContent?alt=sse`: cada evento es un trozo con la misma
+   * forma que una respuesta completa. El texto se va entregando según llega; las
+   * llamadas a función llegan enteras en su trozo.
+   */
+  private async leerEnVivo(
+    response: Response,
+    alTexto: (delta: string) => void,
+  ): Promise<TrozoDeGemini[]> {
+    const trozos: TrozoDeGemini[] = [];
+    const lector = response.body?.getReader();
+    if (!lector) return trozos;
+    const decodificador = new TextDecoder();
+    let pendiente = '';
+    try {
+      for (;;) {
+        const { value, done } = await lector.read();
+        if (done) break;
+        pendiente += decodificador.decode(value, { stream: true });
+        const lineas = pendiente.split('\n');
+        pendiente = lineas.pop() ?? '';
+        for (const linea of lineas) {
+          const limpia = linea.trim();
+          if (!limpia.startsWith('data:')) continue;
+          const trozo = JSON.parse(limpia.slice(5).trim()) as TrozoDeGemini;
+          trozos.push(trozo);
+          for (const parte of trozo.candidates?.[0]?.content?.parts ?? []) {
+            if (parte.text) alTexto(parte.text);
+          }
+        }
+      }
+    } catch (error) {
+      this.log.warn(`gemini_stream_cortado ${(error as Error).message}`);
+      throw new GeminiError(
+        'La respuesta del asistente se cortó. Vuelve a intentarlo.',
+        undefined,
+        true,
+      );
+    }
+    return trozos;
+  }
+
+  /** De uno o varios trozos, la respuesta entera: texto, llamadas, uso y partes. */
+  private armarRespuesta(modelo: string, trozos: TrozoDeGemini[]): GeminiReply {
+    const bloqueo = trozos.find((t) => t.promptFeedback?.blockReason)?.promptFeedback?.blockReason;
+    if (bloqueo) {
+      /* No se reintenta: la misma pregunta va a dar el mismo bloqueo. */
+      this.log.warn(`gemini_bloqueado modelo=${modelo} razon=${bloqueo}`);
+      throw new GeminiError('El asistente ha rechazado la peticion.');
+    }
+
+    const parts: GeminiPart[] = trozos.flatMap((t) => t.candidates?.[0]?.content?.parts ?? []);
+    const finishReason = [...trozos].reverse().find((t) => t.candidates?.[0]?.finishReason)
+      ?.candidates?.[0]?.finishReason;
+    const usageMetadata = [...trozos].reverse().find((t) => t.usageMetadata)?.usageMetadata;
+
+    const uso: UsoDeGemini | undefined = usageMetadata
       ? {
-          entrada: json.usageMetadata.promptTokenCount ?? 0,
-          salida: json.usageMetadata.candidatesTokenCount ?? 0,
-          razonamiento: json.usageMetadata.thoughtsTokenCount ?? 0,
-          cache: json.usageMetadata.cachedContentTokenCount ?? 0,
+          entrada: usageMetadata.promptTokenCount ?? 0,
+          salida: usageMetadata.candidatesTokenCount ?? 0,
+          razonamiento: usageMetadata.thoughtsTokenCount ?? 0,
+          cache: usageMetadata.cachedContentTokenCount ?? 0,
         }
       : undefined;
     if (uso) {
@@ -343,22 +437,13 @@ export class GeminiClient {
       );
     }
 
-    if (json.promptFeedback?.blockReason) {
-      /* No se reintenta: la misma pregunta va a dar el mismo bloqueo. */
-      this.log.warn(`gemini_bloqueado modelo=${modelo} razon=${json.promptFeedback.blockReason}`);
-      throw new GeminiError('El asistente ha rechazado la peticion.');
-    }
-
-    const candidato = json.candidates?.[0];
-    const parts = candidato?.content?.parts ?? [];
-
     /* ⚠️ Un corte por longitud **no es una respuesta vacía**, y confundirlos
        manda a la persona a reintentar algo que va a volver a cortarse. Se
        registra para poder verlo en los logs; el texto que haya llegado se
        devuelve igual, porque medio párrafo útil vale más que nada. */
-    if (candidato?.finishReason && !['STOP', 'MAX_TOKENS'].includes(candidato.finishReason)) {
+    if (finishReason && !['STOP', 'MAX_TOKENS'].includes(finishReason)) {
       this.log.warn(
-        `gemini_corte modelo=${modelo} finishReason=${candidato.finishReason} partes=${parts.length}`,
+        `gemini_corte modelo=${modelo} finishReason=${finishReason} partes=${parts.length}`,
       );
     }
 
@@ -376,6 +461,7 @@ export class GeminiClient {
           name: part.functionCall!.name,
           args: part.functionCall!.args ?? {},
         })),
+      partes: parts,
       ...(uso ? { uso } : {}),
     };
   }

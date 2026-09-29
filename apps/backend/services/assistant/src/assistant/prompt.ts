@@ -70,6 +70,25 @@ interface Regla {
 
 const REGLAS: Regla[] = [
   /**
+   * 0 — Las consultas (F3 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+   *
+   * Con `consultar_*` PRAX puede **mirar** antes de responder, y la tentación del
+   * modelo es la contraria: contestar con lo que tiene delante y rellenar el
+   * resto. Esta regla le dice cuándo mirar, y que diga cuándo algo quedó fuera.
+   * Solo se declaran si hay algo que consultar; la regla vale en los dos modos.
+   */
+  {
+    ambito: 'siempre',
+    texto:
+      'Si tienes herramientas consultar_*, son de SOLO LECTURA y se ejecutan de verdad: ' +
+      'usalas cuando la respuesta dependa de datos que no tienes delante (el detalle de ' +
+      'una tarea, tareas de otro proyecto, un informe) en vez de suponer. No las uses ' +
+      'para lo que ya esta en el contexto. Si una consulta devuelve "omitidas" mayor que ' +
+      'cero, di que viste solo una parte. Si devuelve "error", dilo con tus palabras. ' +
+      'Consultar no cambia nada: para cambiar algo sigues proponiendo.',
+  },
+
+  /**
    * 1 — La única que no se negocia.
    *
    * La versión anterior prohibía «calcular» a secas y salió cara: a «¿qué

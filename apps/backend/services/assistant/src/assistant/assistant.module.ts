@@ -6,6 +6,7 @@ import { AlcanceService } from './alcance.service';
 import { AssistantController } from './assistant.controller';
 import { AssistantService } from './assistant.service';
 import { AttachmentsService } from './attachments.service';
+import { ConsultasService } from './consultas';
 import { ConversationsService } from './conversations.service';
 import { GeminiClient } from './gemini.client';
 import { QuotaService } from './quota.service';
@@ -16,6 +17,7 @@ import { QuotaService } from './quota.service';
   providers: [
     AssistantService,
     AlcanceService,
+    ConsultasService,
     ConversationsService,
     AttachmentsService,
     QuotaService,

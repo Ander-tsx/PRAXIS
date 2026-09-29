@@ -455,6 +455,11 @@ export interface AssistantChatResult {
   reply: string;
   proposals: AssistantProposal[];
   cuota: AssistantQuota;
+  /**
+   * Lo que gastó este turno en tokens, sumando todas las vueltas del bucle de
+   * consultas (F3). `vueltas` son las llamadas al modelo que hizo falta hacer.
+   */
+  uso?: { entrada: number; salida: number; razonamiento: number; cache: number; vueltas: number };
 }
 
 /** Un turno del hilo. Lo reenvía el cliente en cada mensaje; nadie lo guarda. */

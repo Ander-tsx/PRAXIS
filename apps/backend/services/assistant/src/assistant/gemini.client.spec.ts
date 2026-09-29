@@ -60,7 +60,7 @@ describe('GeminiClient — qué se reintenta y qué se cuenta', () => {
       .mockResolvedValueOnce(respuesta(503, 'model overloaded'))
       .mockResolvedValueOnce(respuesta(200, OK));
 
-    await expect(cliente().chat(turno)).resolves.toEqual({ text: 'hola', calls: [] });
+    await expect(cliente().chat(turno)).resolves.toMatchObject({ text: 'hola', calls: [] });
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
@@ -76,7 +76,7 @@ describe('GeminiClient — qué se reintenta y qué se cuenta', () => {
       .mockRejectedValueOnce(new Error('The operation was aborted due to timeout'))
       .mockResolvedValueOnce(respuesta(200, OK));
 
-    await expect(cliente().chat(turno)).resolves.toEqual({ text: 'hola', calls: [] });
+    await expect(cliente().chat(turno)).resolves.toMatchObject({ text: 'hola', calls: [] });
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
@@ -129,5 +129,84 @@ describe('GeminiClient — qué se reintenta y qué se cuenta', () => {
       GeminiError,
     );
     expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  describe('en vivo (F3)', () => {
+    function enVivo(trozos: unknown[]) {
+      const texto = trozos.map((t) => `data: ${JSON.stringify(t)}\r\n\r\n`).join('');
+      const bytes = new TextEncoder().encode(texto);
+      /* Partido a mitad de un evento, que es como llega por la red. */
+      const mitad = Math.floor(bytes.length / 2);
+      const cuerpo = new ReadableStream<Uint8Array>({
+        start(controlador) {
+          controlador.enqueue(bytes.slice(0, mitad));
+          controlador.enqueue(bytes.slice(mitad));
+          controlador.close();
+        },
+      });
+      return { ok: true, status: 200, body: cuerpo } as unknown as Response;
+    }
+
+    it('entrega el texto según llega y devuelve la respuesta entera con su uso', async () => {
+      fetchSpy.mockResolvedValueOnce(
+        enVivo([
+          { candidates: [{ content: { parts: [{ text: 'Ho' }] } }] },
+          { candidates: [{ content: { parts: [{ text: 'la' }] } }] },
+          {
+            candidates: [
+              {
+                content: {
+                  parts: [{ functionCall: { name: 'consultar_tareas', args: { texto: 'x' } } }],
+                },
+                finishReason: 'STOP',
+              },
+            ],
+            usageMetadata: {
+              promptTokenCount: 100,
+              candidatesTokenCount: 7,
+              thoughtsTokenCount: 3,
+            },
+          },
+        ]),
+      );
+      const trozos: string[] = [];
+
+      const r = await cliente().chat(turno, (delta) => trozos.push(delta));
+
+      expect(trozos).toEqual(['Ho', 'la']);
+      expect(r.text).toBe('Hola');
+      expect(r.calls).toEqual([{ name: 'consultar_tareas', args: { texto: 'x' } }]);
+      expect(r.uso).toEqual({ entrada: 100, salida: 7, razonamiento: 3, cache: 0 });
+      expect(r.partes).toHaveLength(3);
+      expect(String(fetchSpy.mock.calls[0][0])).toContain('streamGenerateContent?alt=sse');
+    });
+
+    it('no reintenta si ya había entregado texto: se escribiría encima', async () => {
+      /* El corte llega **después** de que se haya leído el primer trozo: un
+         `error()` en el mismo `start` descartaría lo que estaba en cola. */
+      let lecturas = 0;
+      const cuerpoRoto = new ReadableStream<Uint8Array>({
+        pull(controlador) {
+          lecturas += 1;
+          if (lecturas === 1) {
+            controlador.enqueue(
+              new TextEncoder().encode(
+                `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Me' }] } }] })}\n\n`,
+              ),
+            );
+          } else {
+            controlador.error(new Error('conexión cortada'));
+          }
+        },
+      });
+      fetchSpy.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: cuerpoRoto,
+      } as unknown as Response);
+
+      await expect(cliente().chat(turno, () => {})).rejects.toBeInstanceOf(GeminiError);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
   });
 });

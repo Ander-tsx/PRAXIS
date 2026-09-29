@@ -20,12 +20,18 @@ import {
   validarGrafico,
 } from '@praxis/contracts';
 import { opcionesDeCliente } from '@praxis/local-transport';
-import { firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom } from 'rxjs';
 
 import { bloqueDeArchivo } from './attachment-text';
 import { AttachmentsService } from './attachments.service';
+import {
+  type AmbitoDeConsulta,
+  ConsultasService,
+  HERRAMIENTAS_DE_CONSULTA,
+  esConsulta,
+} from './consultas';
 import { type AmbitoDeOrganizacion, ConversationsService } from './conversations.service';
-import { GeminiClient, GeminiError } from './gemini.client';
+import { GeminiClient, type GeminiContent, GeminiError, type UsoDeGemini } from './gemini.client';
 import { instruccionSinProyecto, systemInstruction } from './prompt';
 import { QuotaService } from './quota.service';
 import { PROPONER_PLANTILLA, instruccionDePlantilla, validarPlantilla } from './template';
@@ -229,6 +235,23 @@ interface Briefing {
  */
 type TareaDelBriefing = NonNullable<Briefing['tareas']>[number];
 
+/** Vueltas de consulta como mucho en un turno, antes de la respuesta final (D2). */
+const MAX_VUELTAS_DE_CONSULTA = 4;
+/**
+ * Tokens de entrada acumulados a partir de los cuales ya no se consulta más (D2).
+ * Cada vuelta reenvía el contexto entero, así que el coste crece con cada una.
+ */
+const PRESUPUESTO_DE_ENTRADA = 120_000;
+
+export type UsoDelTurno = NonNullable<AssistantChatResult['uso']>;
+
+/** Lo que cuenta un turno mientras ocurre (D7). */
+export type EventoDeTurno =
+  | { tipo: 'inicio'; conversationId: string }
+  | { tipo: 'paso'; texto: string }
+  | { tipo: 'texto'; delta: string }
+  | { tipo: 'fin'; resultado: AssistantChatResult };
+
 @Injectable()
 export class AssistantService {
   private readonly log = new Logger(AssistantService.name);
@@ -249,6 +272,7 @@ export class AssistantService {
     private readonly gemini: GeminiClient,
     private readonly conversaciones: ConversationsService,
     private readonly adjuntos: AttachmentsService,
+    private readonly consultas: ConsultasService,
   ) {
     this.reportsClient = ClientProxyFactory.create(opcionesDeCliente('REPORTS', this.config));
   }
@@ -280,6 +304,44 @@ export class AssistantService {
    * cobró — se prefiere eso a un hilo con huecos, que es lo que se lee.
    */
   async chat(payload: ChatPayload): Promise<AssistantChatResult> {
+    return this.turno(payload, () => {});
+  }
+
+  /**
+   * El mismo turno, contado mientras ocurre (D7 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+   *
+   * Emite `inicio` con la conversación, un `paso` por cada consulta, el `texto`
+   * según llega de Gemini y, al final, `fin` con el resultado entero —las
+   * propuestas ya guardadas y con id—. Un fallo sale como error del Observable,
+   * con la misma forma que el de `chat`.
+   *
+   * Es el mismo código que `chat`, no una copia: `chat` es este turno sin nadie
+   * escuchando los eventos.
+   */
+  chatEnVivo(payload: ChatPayload): Observable<EventoDeTurno> {
+    return new Observable<EventoDeTurno>((suscriptor) => {
+      let vivo = true;
+      this.turno(payload, (evento) => {
+        if (vivo) suscriptor.next(evento);
+      })
+        .then((resultado) => {
+          if (!vivo) return;
+          suscriptor.next({ tipo: 'fin', resultado });
+          suscriptor.complete();
+        })
+        .catch((error) => {
+          if (vivo) suscriptor.error(error);
+        });
+      return () => {
+        vivo = false;
+      };
+    });
+  }
+
+  private async turno(
+    payload: ChatPayload,
+    emitir: (evento: EventoDeTurno) => void,
+  ): Promise<AssistantChatResult> {
     const cuotaPrevia = await this.quota.estado(
       payload.userId,
       payload.limiteMensual,
@@ -297,6 +359,7 @@ export class AssistantService {
       payload.conversationId,
       payload.organizationId,
     );
+    emitir({ tipo: 'inicio', conversationId });
     const history = await this.conversaciones.historial(conversationId);
 
     /**
@@ -350,29 +413,144 @@ export class AssistantService {
        —no debería pasar— el prompt omite el bloque en vez de mentir con un id. */
     const quienPregunta = payload.miembros.find((miembro) => miembro.userId === payload.userId);
 
-    let respuesta;
+    const instruccion = briefing
+      ? systemInstruction(
+          briefing,
+          payload.miembros,
+          herramientas.map((herramienta) => herramienta.name),
+          payload.chat ?? [],
+          quienPregunta,
+        )
+      : instruccionSinProyecto(
+          payload.proyectos ?? [],
+          herramientas.map((herramienta) => herramienta.name),
+          quienPregunta,
+        );
+
+    /* Sobre qué se puede consultar (D3). Con foco, ese proyecto; sin foco, los de
+       «Recursos», que ya llegan filtrados por el gateway. Sin ninguno, no se
+       declaran las consultas: una herramienta que siempre responde «no tienes
+       acceso» solo invita al modelo a intentarlo. */
+    const ambito: AmbitoDeConsulta = {
+      foco: payload.projectId,
+      proyectos: payload.projectId
+        ? [
+            {
+              id: payload.projectId,
+              nombre:
+                (briefing as { proyecto?: { nombre?: string } } | null)?.proyecto?.nombre ??
+                'este proyecto',
+            },
+          ]
+        : (payload.proyectos ?? []),
+      nombres: Object.fromEntries(payload.miembros.map((m) => [m.userId, m.nombre])),
+    };
+    const conConsultas = ambito.proyectos.length > 0;
+    const todasLasHerramientas = conConsultas
+      ? [...HERRAMIENTAS_DE_CONSULTA, ...herramientas]
+      : herramientas;
+
+    const uso: UsoDelTurno = { entrada: 0, salida: 0, razonamiento: 0, cache: 0, vueltas: 0 };
+    const sumarUso = (parcial?: UsoDeGemini) => {
+      uso.vueltas += 1;
+      if (!parcial) return;
+      uso.entrada += parcial.entrada;
+      uso.salida += parcial.salida;
+      uso.razonamiento += parcial.razonamiento;
+      uso.cache += parcial.cache;
+    };
+
+    /* El texto de varias vueltas se lee como uno: entre vuelta y vuelta, un
+       párrafo nuevo, y solo si las dos escribieron algo. */
+    let escrito = '';
+    const alTexto = (delta: string) => {
+      if (!delta) return;
+      if (escrito && !escrito.endsWith('\n') && pendienteDeSeparar) {
+        escrito += '\n\n';
+        emitir({ tipo: 'texto', delta: '\n\n' });
+      }
+      pendienteDeSeparar = false;
+      escrito += delta;
+      emitir({ tipo: 'texto', delta });
+    };
+    let pendienteDeSeparar = false;
+
+    const llamadas: { name: string; args: Record<string, unknown> }[] = [];
     let cuota;
     try {
-      respuesta = await this.gemini.chat({
-        system: briefing
-          ? systemInstruction(
-              briefing,
-              payload.miembros,
-              herramientas.map((herramienta) => herramienta.name),
-              payload.chat ?? [],
-              quienPregunta,
-            )
-          : instruccionSinProyecto(
-              payload.proyectos ?? [],
-              herramientas.map((herramienta) => herramienta.name),
-              quienPregunta,
-            ),
-        history,
-        archivos,
-        message: mensajeConArchivos,
-        tools: herramientas,
-        ...(briefing ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
-      });
+      /**
+       * El bucle de consultas (D1 y D2).
+       *
+       * Cada vuelta, el modelo puede pedir consultas `consultar_*`: se ejecutan
+       * aquí, su resultado vuelve en la siguiente, y así hasta que conteste sin
+       * pedir más. Las `proponer_*` **no se ejecutan nunca**: se recogen y se
+       * validan al final, como siempre.
+       *
+       * Topes duros: `MAX_VUELTAS_DE_CONSULTA` y `PRESUPUESTO_DE_ENTRADA`. Al
+       * tocar uno, la última vuelta va **sin consultas** y con una nota que se
+       * lo dice al modelo, para que conteste con lo que tiene y diga qué no
+       * miró. Un tope que no se dice es un recorte mudo.
+       */
+      const extra: GeminiContent[] = [];
+      for (let vuelta = 0; ; vuelta += 1) {
+        const agotado = vuelta >= MAX_VUELTAS_DE_CONSULTA || uso.entrada >= PRESUPUESTO_DE_ENTRADA;
+        const respuesta = await this.gemini.chat(
+          {
+            system: instruccion,
+            history,
+            archivos,
+            message: mensajeConArchivos,
+            tools: agotado ? herramientas : todasLasHerramientas,
+            extra,
+            ...(briefing ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
+          },
+          alTexto,
+        );
+        sumarUso(respuesta.uso);
+        pendienteDeSeparar = true;
+
+        const consultas = respuesta.calls.filter((call) => esConsulta(call.name));
+        llamadas.push(...respuesta.calls.filter((call) => !esConsulta(call.name)));
+        if (consultas.length === 0 || agotado) break;
+
+        extra.push({ role: 'model', parts: respuesta.partes });
+        const devueltas: GeminiContent['parts'] = [];
+        for (const consulta of consultas) {
+          emitir({
+            tipo: 'paso',
+            texto: this.consultas.descripcion(consulta.name, consulta.args, ambito),
+          });
+          devueltas.push({
+            functionResponse: {
+              name: consulta.name,
+              response: await this.consultas.ejecutar(consulta.name, consulta.args, ambito),
+            },
+          });
+        }
+        extra.push({ role: 'user', parts: devueltas });
+
+        const siguienteAgota =
+          vuelta + 1 >= MAX_VUELTAS_DE_CONSULTA || uso.entrada >= PRESUPUESTO_DE_ENTRADA;
+        if (siguienteAgota) {
+          extra.push({
+            role: 'user',
+            parts: [
+              {
+                text:
+                  '[SISTEMA]: Ya no puedes consultar mas en este turno. Responde con lo que ' +
+                  'tienes y di con claridad que parte no llegaste a mirar.',
+              },
+            ],
+          });
+        }
+      }
+
+      if (uso.vueltas > 1) {
+        this.log.log(
+          `prax_bucle vueltas=${uso.vueltas} entrada=${uso.entrada} salida=${uso.salida} ` +
+            `razonamiento=${uso.razonamiento}`,
+        );
+      }
 
       cuota = await this.quota.consumir(
         payload.userId,
@@ -410,6 +588,7 @@ export class AssistantService {
       throw AssistantService.comoRpc(error, { conversationId });
     }
 
+    const respuesta = { calls: llamadas, text: escrito.trim() };
     let validadas = respuesta.calls
       .map((call) =>
         briefing
@@ -457,25 +636,29 @@ export class AssistantService {
           },
         ];
 
-        const segundaRespuesta = await this.gemini.chat({
-          system: briefing
-            ? systemInstruction(
-                briefing,
-                payload.miembros,
-                herramientas.map((herramienta) => herramienta.name),
-                payload.chat ?? [],
-                quienPregunta,
-              )
-            : instruccionSinProyecto(
-                payload.proyectos ?? [],
-                herramientas.map((herramienta) => herramienta.name),
-                quienPregunta,
-              ),
-          history: historyRecuperacion,
-          message: `[SISTEMA INTERNO]: ${feedback.join(' ')}`,
-          tools: herramientas,
-          ...(briefing ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
-        });
+        const segundaRespuesta = await this.gemini.chat(
+          {
+            system: briefing
+              ? systemInstruction(
+                  briefing,
+                  payload.miembros,
+                  herramientas.map((herramienta) => herramienta.name),
+                  payload.chat ?? [],
+                  quienPregunta,
+                )
+              : instruccionSinProyecto(
+                  payload.proyectos ?? [],
+                  herramientas.map((herramienta) => herramienta.name),
+                  quienPregunta,
+                ),
+            history: historyRecuperacion,
+            message: `[SISTEMA INTERNO]: ${feedback.join(' ')}`,
+            tools: herramientas,
+            ...(briefing ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
+          },
+          alTexto,
+        );
+        sumarUso(segundaRespuesta.uso);
 
         const nuevasValidadas = segundaRespuesta.calls
           .map((call) =>
@@ -528,6 +711,7 @@ export class AssistantService {
       reply,
       proposals: proposals as unknown as AssistantProposal[],
       cuota,
+      uso,
     };
   }
 

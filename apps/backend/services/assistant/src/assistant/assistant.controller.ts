@@ -1,5 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
+import { catchError, throwError } from 'rxjs';
 
 import { type Alcance, AlcanceService } from './alcance.service';
 import { AssistantService } from './assistant.service';
@@ -58,6 +59,18 @@ export class AssistantController {
          que es el borde del servicio. */
       throw AssistantService.comoRpc(error);
     }
+  }
+
+  /**
+   * El mismo turno, emitiendo eventos según ocurre (D7): `inicio`, `paso`,
+   * `texto` y `fin`. Varios valores por una sola petición: por TCP y por el
+   * transporte en proceso, igual.
+   */
+  @MessagePattern({ cmd: 'assistant_chat_vivo' })
+  chatEnVivo(@Payload() dto: Parameters<AssistantService['chatEnVivo']>[0]) {
+    return this.assistant
+      .chatEnVivo(dto)
+      .pipe(catchError((error) => throwError(() => AssistantService.comoRpc(error))));
   }
 
   @MessagePattern({ cmd: 'assistant_quota' })
