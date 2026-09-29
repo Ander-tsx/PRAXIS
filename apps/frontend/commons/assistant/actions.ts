@@ -24,6 +24,7 @@ import type {
   TemplateResult,
   Workspace,
 } from '../api/domain';
+import { PRAX_TIMEOUT_MS } from '../api/timeout';
 import { loadPrivateChrome } from '../auth/nav';
 import { getSession } from '../auth/session';
 import type { QuotaExceededDetails } from '../billing/planes';
@@ -217,18 +218,22 @@ export async function preguntarAction(
        proyecto, que es lo que no se puede falsificar. */
     const organizationId = projectId ? null : (await loadPrivateChrome()).organizacionActivaId;
 
-    const resultado = await api.post<AssistantChatResult>(ruta, {
-      message: texto,
-      ...(conversationId ? { conversationId } : {}),
-      ...(organizationId ? { organizationId } : {}),
-      /* 🔴 **Solo los ids, nunca los bytes.** Esto viaja por una Server Action,
+    const resultado = await api.post<AssistantChatResult>(
+      ruta,
+      {
+        message: texto,
+        ...(conversationId ? { conversationId } : {}),
+        ...(organizationId ? { organizationId } : {}),
+        /* 🔴 **Solo los ids, nunca los bytes.** Esto viaja por una Server Action,
          cuyo cuerpo está topado en 1 MB: con el archivo dentro, cualquier foto
          de teléfono moría con un «Body exceeded 1 MB limit» de Next, sin
          traducir y sin decir qué archivo. Los bytes ya se subieron aparte.
 
          Y solo si los hay: un campo de más es un 400 (CLAUDE.md). */
-      ...(attachmentIds && attachmentIds.length > 0 ? { attachmentIds } : {}),
-    });
+        ...(attachmentIds && attachmentIds.length > 0 ? { attachmentIds } : {}),
+      },
+      { plazoMs: PRAX_TIMEOUT_MS },
+    );
 
     /* Contra el `data`, no contra el status: un 200 con el cuerpo vacío es la
        forma en que este backend ha fallado antes. */

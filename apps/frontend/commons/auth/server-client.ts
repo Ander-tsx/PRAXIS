@@ -32,17 +32,29 @@ import { SESSION_COOKIE } from './cookies';
  * llegamos aquí, `cookies()` ya devuelve el token bueno.
  */
 
+/**
+ * Las opciones de una petición: las de `fetch` y, además, cuánto esperar.
+ *
+ * `plazoMs` existe para las pocas rutas que de verdad tardan. La de siempre,
+ * 15 s (`REQUEST_TIMEOUT_MS`), corta un cuelgue; el turno de PRAX no es un
+ * cuelgue cuando pasa de 15 s: es Gemini pensando. Con el plazo común, el
+ * navegador pintaba un error mientras el backend terminaba, cobraba el mensaje
+ * y guardaba una respuesta que solo aparecía al recargar
+ * (docs/PLAN-PRAX-SEMIAGENTICO.md §1.3).
+ */
+export type OpcionesDePeticion = RequestInit & { plazoMs?: number };
+
 export interface ServerApiClientOptions {
   /** Por defecto: `process.env.GATEWAY_URL` o http://localhost:3000 */
   gatewayUrl?: string;
 }
 
 export interface ServerApiClient {
-  get<T>(path: string, init?: RequestInit): Promise<T>;
-  post<T>(path: string, body?: unknown, init?: RequestInit): Promise<T>;
-  put<T>(path: string, body?: unknown, init?: RequestInit): Promise<T>;
-  patch<T>(path: string, body?: unknown, init?: RequestInit): Promise<T>;
-  delete<T>(path: string, body?: unknown, init?: RequestInit): Promise<T>;
+  get<T>(path: string, init?: OpcionesDePeticion): Promise<T>;
+  post<T>(path: string, body?: unknown, init?: OpcionesDePeticion): Promise<T>;
+  put<T>(path: string, body?: unknown, init?: OpcionesDePeticion): Promise<T>;
+  patch<T>(path: string, body?: unknown, init?: OpcionesDePeticion): Promise<T>;
+  delete<T>(path: string, body?: unknown, init?: OpcionesDePeticion): Promise<T>;
   /**
    * Envía un `FormData` tal cual, para subir archivos.
    *
@@ -65,8 +77,9 @@ export function createServerApiClient(options: ServerApiClientOptions = {}): Ser
     method: string,
     path: string,
     body?: unknown,
-    init?: RequestInit,
+    opciones?: OpcionesDePeticion,
   ): Promise<T> {
+    const { plazoMs, ...init } = opciones ?? {};
     const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_COOKIE)?.value;
 
@@ -85,7 +98,7 @@ export function createServerApiClient(options: ServerApiClientOptions = {}): Ser
         headers: {
           Authorization: `Bearer ${token}`,
           ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-          ...init?.headers,
+          ...init.headers,
         },
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
         // Datos de sesión: nunca se cachean entre peticiones de usuarios distintos.
@@ -93,7 +106,7 @@ export function createServerApiClient(options: ServerApiClientOptions = {}): Ser
         /* Sin esto, una conexión colgada deja el render de la página sin
            terminar, y con él la respuesta de la Server Action que lo provocó:
            el botón se queda cargando para siempre. Ver `api/timeout.ts`. */
-        signal: timeoutSignal(init?.signal),
+        signal: timeoutSignal(init.signal, plazoMs),
       });
     } catch (error) {
       if (isTimeout(error)) throw timeoutError();

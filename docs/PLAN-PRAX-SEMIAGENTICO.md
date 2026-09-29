@@ -477,7 +477,7 @@ regla. `ActionContext` pasa a llevar la regla.
 Cada fase cierra con `pnpm test`, `e2e:regresion` verde y su commit. Las fases
 que tocan esquema llevan migración (`prisma:deploy`, **nunca `reset`**).
 
-- [ ] **F0 — Parche y medición.**
+- [x] **F0 — Parche y medición.** Ver el registro del 2026-09-29 (noche).
   - `preguntarAction` sin el corte de 15 s: plazo propio de 120 s, hasta que
     F3 lo sustituya por SSE.
   - Reproducir «no responde» con el stack arriba para confirmar la hipótesis
@@ -631,3 +631,25 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
     respetar `enReposo()`, o el backend no vuelve a dormirse.
   - `proponer_grafico` y `ChartProposalCard` **siguen vivos y sin salida**: se
     quitan aquí, en F7 y F8.
+- **2026-09-29 (noche)** — Sesión nocturna autónoma. El dueño del producto
+  pidió trabajar sin preguntas y con todo en local; lo que el plan dejaba para
+  discutir lo decide la sesión, anotado aquí.
+  - **F0 cerrada.**
+    - **El corte de 15 s**: el cliente de servidor acepta `plazoMs` por
+      petición, y el turno y el borrador de plantilla usan `PRAX_TIMEOUT_MS`
+      (120 s) hasta que F3 los pase a SSE.
+    - **Tokens reales**: `gemini.client.ts` lee `usageMetadata` y escribe una
+      línea `gemini_uso` por llamada (entrada, salida, razonamiento y caché).
+      `GeminiReply.uso` queda listo para F4.
+    - **`medir-prompt`** da los tokens reales con `:countTokens` si hay clave.
+      Probado contra la API: 200.
+  - **Hipótesis 1 descartada en producción.** La clave de Gemini de
+    `praxis-api` responde 200.
+  - 🔴 **La clave del `.env` local está muerta.** `GEMINI_API_KEY` de
+    assistant-service devuelve **401** en `generateContent` y en `countTokens`.
+    Es otra clave que la de producción (mismo formato `AQ.A…`, otro hash).
+    **En local, PRAX no puede hablar con Gemini** hasta que el dueño ponga una
+    clave de desarrollo. La de producción no se copia: su cuota es la de los
+    usuarios reales. Las fases siguientes se prueban con Gemini simulado.
+  - **Sin cifras de D8 todavía.** Salen de `gemini_uso` en cuanto esto llegue a
+    producción, o de una clave local que funcione.

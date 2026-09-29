@@ -22,12 +22,22 @@
  * pnpm --filter @praxis/assistant-service medir-prompt <projectId> [projectId…]
  * ```
  *
- * ⚠️ **Los tokens son una estimación de servilleta** (4 caracteres ≈ 1 token).
- * Sirve para comparar antes y después de un cambio, que es para lo que está; el
- * número exacto lo da el contador del proveedor.
+ * Los tokens salen de dos formas:
  *
- * ⚠️ Y **no incluye ni el historial ni los adjuntos**, que dependen de la
+ * - **Estimados**, a 4 caracteres por token. Sirven para comparar las partes
+ *   entre sí sin gastar nada.
+ * - **Reales**, con `:countTokens` de Gemini, si hay `GEMINI_API_KEY` en el
+ *   entorno. Contar no cuesta cuota y es el número que se cobra de verdad, con
+ *   el tokenizador de verdad: el español no sale a 4 caracteres por token.
+ *
+ * ⚠️ **No incluye ni el historial ni los adjuntos**, que dependen de cada
  * conversación: mide el suelo de cada turno, que es la parte que se paga siempre.
+ * Lo que cuesta un turno entero, historial incluido, sale en el log de
+ * assistant-service: una línea `gemini_uso` por llamada, con entrada, salida,
+ * razonamiento y caché (F0 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+ *
+ * ⚠️ Habla con reports-service por **TCP**, así que necesita el backend en
+ * procesos separados (`dev:backend` o `start:backend:separado`), no el monolito.
  */
 import { ClientProxyFactory, Transport } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
@@ -36,6 +46,37 @@ import { instruccionSinProyecto, systemInstruction } from '../src/assistant/prom
 import { herramientasPara, herramientasSinProyecto } from '../src/assistant/tools';
 
 const tk = (n: number) => Math.round(n / 4);
+
+/**
+ * Los tokens de verdad de un prompt, con el contador de Gemini. `null` si no hay
+ * clave o el contador falla: la estimación sigue sirviendo para comparar.
+ */
+async function tokensReales(system: string, tools: unknown[]): Promise<number | null> {
+  const clave = process.env.GEMINI_API_KEY;
+  if (!clave) return null;
+  const modelo = process.env.GEMINI_MODEL ?? 'gemini-flash-latest';
+  const respuesta = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:countTokens`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': clave },
+      body: JSON.stringify({
+        generateContentRequest: {
+          model: `models/${modelo}`,
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: 'user', parts: [{ text: '.' }] }],
+          ...(tools.length > 0 ? { tools: [{ functionDeclarations: tools }] } : {}),
+        },
+      }),
+    },
+  ).catch(() => null);
+  if (!respuesta?.ok) return null;
+  const json = (await respuesta.json()) as { totalTokens?: number };
+  return json.totalTokens ?? null;
+}
+
+const real = (n: number | null) =>
+  n === null ? '  (sin GEMINI_API_KEY: solo estimado)' : `  → ${n} tokens reales`;
 const fila = (etiqueta: string, chars: number, sangria = 2) =>
   `${' '.repeat(sangria)}${etiqueta.padEnd(32 - sangria)} ${String(chars).padStart(7)} chars  ~${String(tk(chars)).padStart(6)} tokens`;
 
@@ -83,6 +124,14 @@ async function main() {
     console.log(fila('· briefing', conBriefing - andamiaje, 4));
     console.log(fila('declaracion de herramientas', herramientasJson));
     console.log(fila('TOTAL por turno (suelo)', conBriefing + herramientasJson));
+    console.log(
+      real(
+        await tokensReales(
+          systemInstruction(briefing, [], herramientas, [], undefined),
+          herramientasPara(TODO_PERMITIDO),
+        ),
+      ),
+    );
 
     console.log('  --- dentro del briefing ---');
     Object.entries(briefing ?? {})
@@ -102,6 +151,18 @@ async function main() {
   console.log(fila('instruccion de sistema', sinFoco));
   console.log(fila('declaracion de herramientas', herramientasSinFoco));
   console.log(fila('TOTAL por turno (suelo)', sinFoco + herramientasSinFoco));
+  console.log(
+    real(
+      await tokensReales(
+        instruccionSinProyecto(
+          [{ id: 'x', nombre: 'Un proyecto' }],
+          herramientasSinProyecto().map((h) => h.name),
+          undefined,
+        ),
+        herramientasSinProyecto(),
+      ),
+    ),
+  );
 
   process.exit(0);
 }

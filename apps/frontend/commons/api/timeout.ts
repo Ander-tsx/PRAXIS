@@ -53,6 +53,18 @@ export const REQUEST_TIMEOUT_MS = 15_000;
 export const UPLOAD_TIMEOUT_MS = 60_000;
 
 /**
+ * El plazo de un turno de PRAX, que tampoco es una consulta.
+ *
+ * Gemini con un briefing grande tarda más de 15 s sin estar colgado, y el
+ * cliente de Gemini reintenta hasta tres veces lo que falla de forma
+ * transitoria. Con el plazo común, el navegador pintaba un error mientras el
+ * backend terminaba, cobraba el mensaje y guardaba la respuesta: la persona la
+ * veía solo al recargar. Es la causa más probable de «PRAX no responde»
+ * (docs/PLAN-PRAX-SEMIAGENTICO.md §1.3). Lo sustituye el turno por SSE (F3).
+ */
+export const PRAX_TIMEOUT_MS = 120_000;
+
+/**
  * El error de un plazo agotado, en el mismo formato que el resto.
  *
  * 504 y no 503: `BAD_GATEWAY` con 503 ya significa «no se pudo conectar», y son

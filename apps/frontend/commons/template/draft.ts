@@ -1,6 +1,7 @@
 import type { ProjectTemplate, TemplateDraftResult, TemplateDraftState } from '../api/domain';
 import { TEMPLATE_BRIEF_MAX, TEMPLATE_BRIEF_MIN } from '../api/domain';
 import { ApiError } from '../api/envelope';
+import { PRAX_TIMEOUT_MS } from '../api/timeout';
 import { createServerApiClient } from '../auth/server-client';
 import { QUOTA_EXCEEDED_CODE, detallesDeCuota } from '../billing/planes';
 
@@ -80,6 +81,7 @@ export async function pedirBorrador(
            `NOT_IN_ORG` si no es tuya — es un filtro, no una llave. */
         ...(organizationId ? { organizationId } : {}),
       },
+      { plazoMs: PRAX_TIMEOUT_MS },
     );
 
     /* Se confirma contra el `data`, no contra el status: un 200 con una

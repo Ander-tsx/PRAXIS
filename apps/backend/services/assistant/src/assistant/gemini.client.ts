@@ -47,9 +47,27 @@ export interface GeminiArchivo {
   data: string;
 }
 
+/**
+ * Los tokens de una llamada, tal y como los cuenta Google.
+ *
+ * Hasta F0 de docs/PLAN-PRAX-SEMIAGENTICO.md no se leían: el coste de PRAX solo
+ * se podía estimar a 4 caracteres por token, y el script de medida no veía ni
+ * el historial ni los adjuntos. `razonamiento` son los tokens que el modelo
+ * piensa antes de contestar: se cobran como salida aunque no se vean.
+ */
+export interface UsoDeGemini {
+  entrada: number;
+  salida: number;
+  razonamiento: number;
+  /** La parte de `entrada` que salió de caché, más barata. */
+  cache: number;
+}
+
 export interface GeminiReply {
   text: string;
   calls: { name: string; args: Record<string, unknown> }[];
+  /** Ausente si Google no lo mandó, cosa que no debería pasar pero no se da por hecha. */
+  uso?: UsoDeGemini;
 }
 
 /**
@@ -299,7 +317,31 @@ export class GeminiClient {
     const json = (await response.json()) as {
       candidates?: { content?: { parts?: GeminiContent['parts'] }; finishReason?: string }[];
       promptFeedback?: { blockReason?: string };
+      usageMetadata?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        thoughtsTokenCount?: number;
+        cachedContentTokenCount?: number;
+      };
     };
+
+    const uso: UsoDeGemini | undefined = json.usageMetadata
+      ? {
+          entrada: json.usageMetadata.promptTokenCount ?? 0,
+          salida: json.usageMetadata.candidatesTokenCount ?? 0,
+          razonamiento: json.usageMetadata.thoughtsTokenCount ?? 0,
+          cache: json.usageMetadata.cachedContentTokenCount ?? 0,
+        }
+      : undefined;
+    if (uso) {
+      /* Una línea por llamada, con la forma de las demás de este cliente: es lo
+         que permite sacar el coste real de un turno de los logs mientras no
+         exista el contador por tokens (F4). */
+      this.log.log(
+        `gemini_uso modelo=${modelo} entrada=${uso.entrada} salida=${uso.salida} ` +
+          `razonamiento=${uso.razonamiento} cache=${uso.cache}`,
+      );
+    }
 
     if (json.promptFeedback?.blockReason) {
       /* No se reintenta: la misma pregunta va a dar el mismo bloqueo. */
@@ -334,6 +376,7 @@ export class GeminiClient {
           name: part.functionCall!.name,
           args: part.functionCall!.args ?? {},
         })),
+      ...(uso ? { uso } : {}),
     };
   }
 
