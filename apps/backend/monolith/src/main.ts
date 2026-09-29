@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import type { INestApplication, INestMicroservice } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+/* Solo el tipo: el valor se carga con `require` después de componer el entorno. */
+import type * as Transporte from '@praxis/local-transport';
 import { componerEntorno, schemasEnUso } from './entorno.js';
 
 /**
@@ -33,9 +35,7 @@ const SERVICIOS = [
 ] as const;
 
 async function arrancar(): Promise<void> {
-  const { LocalClient, LocalServer } = require('@praxis/local-transport') as typeof import(
-    '@praxis/local-transport',
-  );
+  const { LocalClient, LocalServer } = require('@praxis/local-transport') as typeof Transporte;
 
   const servicios: { nombre: string; app: INestMicroservice }[] = [];
   for (const { nombre, puerto } of SERVICIOS) {
