@@ -27,7 +27,7 @@ export function AnimatedSearchButton({
         onClick={() => setAbierta(!abierta)}
         aria-label="Buscar"
         title="Buscar"
-        className="flex h-8 w-8 shrink-0 items-center justify-center text-white transition-colors hover:text-text-primary"
+        className="flex h-8 w-8 shrink-0 items-center justify-center text-text-secondary transition-colors hover:text-text-primary"
       >
         {abierta ? (
           <svg
@@ -65,7 +65,7 @@ export function AnimatedSearchButton({
           if (e.key === 'Escape') setAbierta(false);
         }}
         placeholder="Buscar..."
-        className={`flex-1 bg-transparent pr-3 font-sans text-xs text-text-primary outline-none placeholder:text-white transition-opacity duration-200 ${abierta ? 'opacity-100' : 'opacity-0'}`}
+        className={`flex-1 bg-transparent pr-3 font-sans text-xs text-text-primary outline-none placeholder:text-text-secondary transition-opacity duration-200 ${abierta ? 'opacity-100' : 'opacity-0'}`}
       />
     </div>
   );

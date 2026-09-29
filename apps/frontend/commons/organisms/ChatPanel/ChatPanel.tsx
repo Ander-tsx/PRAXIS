@@ -1738,7 +1738,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     type="button"
                     onClick={cargarHistorial}
                     disabled={cargandoHistorial}
-                    className="cursor-pointer rounded-full border border-border px-3 py-1 font-sans text-xs text-white transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                    className="cursor-pointer rounded-full border border-border px-3 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {cargandoHistorial ? 'Cargando…' : 'Ver mensajes anteriores'}
                   </button>
@@ -1768,65 +1768,81 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                       />
                     </svg>
                   </span>
-                  <p className="font-sans text-sm text-white">{vacio}</p>
+                  <p className="font-sans text-sm text-text-secondary">{vacio}</p>
                 </div>
               ) : (
                 mensajes.map((mensaje, indice) => {
                   const anterior = mensajes[indice - 1];
                   const separador = etiquetaDeDia(mensaje.createdAt, anterior?.createdAt);
+                  /* Un bloque es la misma persona, el mismo día y sin más de
+                     `CORTE_DE_BLOQUE_MS` de silencio. La constante estaba
+                     escrita y no la usaba nadie: se agrupaba sin mirar la hora.
+                     Un aviso de regla nunca forma bloque —no es algo que esa
+                     persona dijera— ni lo continúa. */
+                  const continued =
+                    !separador &&
+                    anterior?.authorId === mensaje.authorId &&
+                    anterior.origin !== 'AUTOMATION' &&
+                    mensaje.origin !== 'AUTOMATION' &&
+                    Date.parse(mensaje.createdAt) - Date.parse(anterior.createdAt) <
+                      CORTE_DE_BLOQUE_MS;
 
                   return (
                     <div key={mensaje.id} data-msg-id={mensaje.id}>
                       {separador && (
-                        <div className="my-3 flex items-center gap-4 text-white0">
+                        <div className="my-3 flex items-center gap-4 text-text-disabled">
                           <CurvedLine />
-                          <span className="font-sans text-[11px] uppercase tracking-wide font-medium text-white">
+                          <span className="font-sans text-[11px] uppercase tracking-wide font-medium text-text-secondary">
                             {separador}
                           </span>
                           <CurvedLine />
                         </div>
                       )}
 
-                      <MessageBubble
-                        message={mensaje}
-                        author={directorio.perfiles.get(mensaje.authorId)}
-                        mine={mensaje.authorId === currentUserId}
-                        continued={!separador && anterior?.authorId === mensaje.authorId}
-                        canDelete={mensaje.authorId === currentUserId}
-                        canReact={canWrite}
-                        canFijar={canWrite}
-                        currentUserId={currentUserId}
-                        hrefDePersona={hrefDePersona?.(mensaje.authorId) ?? null}
-                        {...(hrefDeRef ? { hrefDeRef } : {})}
-                        /* Mismo origen que la aplicación: el proxy de la zona pone
+                      {mensaje.origin === 'AUTOMATION' ? (
+                        <AvisoDeRegla mensaje={mensaje} />
+                      ) : (
+                        <MessageBubble
+                          message={mensaje}
+                          author={directorio.perfiles.get(mensaje.authorId)}
+                          mine={mensaje.authorId === currentUserId}
+                          continued={continued}
+                          canDelete={mensaje.authorId === currentUserId}
+                          canReact={canWrite}
+                          canFijar={canWrite}
+                          currentUserId={currentUserId}
+                          hrefDePersona={hrefDePersona?.(mensaje.authorId) ?? null}
+                          {...(hrefDeRef ? { hrefDeRef } : {})}
+                          /* Mismo origen que la aplicación: el proxy de la zona pone
                        la cabecera de autorización y la cookie viaja sola. */
-                        hrefDeAdjunto={(id) =>
-                          `${gatewayPath}${rutaCanal}/attachments/${id}/content`
-                        }
-                        gatewayPath={gatewayPath}
-                        scrollerRef={scrollerRef}
-                        permiteMenciones={permiteMenciones}
-                        sugerencias={sugerencias}
-                        onPedirSugerencias={() => void pedirSugerencias()}
-                        vistoPor={lectoresPorMensaje.get(mensaje.id) ?? []}
-                        cuantosPuedenVer={participantes}
-                        onResponder={(mensaje) => {
-                          setEditando(null);
-                          setRespondiendo(mensaje);
-                        }}
-                        onReaccionar={reaccionar}
-                        onFijar={fijar}
-                        onPedirEdicion={pedirEdicion}
-                        editandose={editando?.id === mensaje.id}
-                        onBorrar={borrar}
-                        onAbrirHilo={(mensaje) => void abrirHilo(mensaje)}
-                        hiloConNovedad={hiloTieneNovedad(mensaje.id, mensaje._count.replies)}
-                        nombreDeAutor={nombreDeAutor}
-                        isProjectChat={rutaCanal.includes('/projects')}
-                        {...(acciones.previewDeLink
-                          ? { previewDeLink: acciones.previewDeLink }
-                          : {})}
-                      />
+                          hrefDeAdjunto={(id) =>
+                            `${gatewayPath}${rutaCanal}/attachments/${id}/content`
+                          }
+                          gatewayPath={gatewayPath}
+                          scrollerRef={scrollerRef}
+                          permiteMenciones={permiteMenciones}
+                          sugerencias={sugerencias}
+                          onPedirSugerencias={() => void pedirSugerencias()}
+                          vistoPor={lectoresPorMensaje.get(mensaje.id) ?? []}
+                          cuantosPuedenVer={participantes}
+                          onResponder={(mensaje) => {
+                            setEditando(null);
+                            setRespondiendo(mensaje);
+                          }}
+                          onReaccionar={reaccionar}
+                          onFijar={fijar}
+                          onPedirEdicion={pedirEdicion}
+                          editandose={editando?.id === mensaje.id}
+                          onBorrar={borrar}
+                          onAbrirHilo={(mensaje) => void abrirHilo(mensaje)}
+                          hiloConNovedad={hiloTieneNovedad(mensaje.id, mensaje._count.replies)}
+                          nombreDeAutor={nombreDeAutor}
+                          isProjectChat={rutaCanal.includes('/projects')}
+                          {...(acciones.previewDeLink
+                            ? { previewDeLink: acciones.previewDeLink }
+                            : {})}
+                        />
+                      )}
                     </div>
                   );
                 })
@@ -1846,7 +1862,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 }}
               >
                 <svg
-                  className="h-4 w-4 text-white"
+                  className="h-4 w-4 text-text-secondary"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -1864,7 +1880,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             {busquedaAbierta &&
               (errorBusqueda || (resultados !== null && resultados.length === 0)) && (
                 <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 bg-[#191919]/90 backdrop-blur-sm">
-                  <p className="font-sans text-sm text-white">
+                  <p className="font-sans text-sm text-text-secondary">
                     {errorBusqueda ? errorBusqueda : `Nada que coincida con «${terminoBuscado}».`}
                   </p>
                   <button
@@ -1950,7 +1966,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                             >
                               Respondiendo a {nombreDeAutor(respondiendo.authorId)}
                             </span>
-                            <span className="line-clamp-1 font-sans text-xs text-white">
+                            <span className="line-clamp-1 font-sans text-xs text-text-secondary">
                               <AttachmentPreview mensaje={respondiendo} />
                             </span>
                           </span>
@@ -1958,7 +1974,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                             type="button"
                             onClick={() => setRespondiendo(null)}
                             aria-label="Dejar de responder"
-                            className="shrink-0 cursor-pointer rounded px-1 font-sans text-xs text-white hover:text-text-primary"
+                            className="shrink-0 cursor-pointer rounded px-1 font-sans text-xs text-text-secondary hover:text-text-primary"
                           >
                             ✕
                           </button>
@@ -1969,7 +1985,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             </div>
           ) : (
             <p
-              className="rounded-lg border border-border px-3 py-2.5 font-sans text-xs text-white"
+              className="rounded-lg border border-border px-3 py-2.5 font-sans text-xs text-text-secondary"
               style={{ background: alpha(colors.overlay, 12) }}
             >
               {motivoSinEscribir ?? 'Puedes leer la conversación, pero no escribir en ella.'}
@@ -2087,6 +2103,44 @@ function mismoDia(a: Date, b: Date): boolean {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
   );
+}
+
+/**
+ * Lo que publicó una regla, como **divisor** y no como mensaje (D14 de
+ * docs/PLAN-PRAX-SEMIAGENTICO.md).
+ *
+ * En la base es de quien creó la regla —alguien tiene que firmarlo—, y
+ * pintarlo como su burbuja decía que esa persona lo había escrito a mano: lo
+ * que vio el dueño del producto al probarlo. Aquí sale centrado, entre dos
+ * líneas punteadas, con el nombre de la regla, que va copiado en `originMeta`
+ * y sobrevive a que la borren.
+ */
+function AvisoDeRegla({ mensaje }: { mensaje: ChatMessage }) {
+  const regla = mensaje.originMeta?.ruleName;
+  return (
+    <div className="my-3 flex items-center gap-3" data-origen="automatizacion">
+      <span className="h-px flex-1 border-t border-dashed border-border" aria-hidden="true" />
+      <div className="flex max-w-[80%] flex-col items-center gap-0.5 rounded-full border border-border px-4 py-1.5 text-center">
+        <span className="font-sans text-xs text-text-secondary">
+          <span aria-hidden="true">⚡ </span>
+          {regla ? `Regla «${regla}»` : 'Una automatización'}
+          <span className="ml-2 text-[10px]">{horaCorta(mensaje.createdAt)}</span>
+        </span>
+        {mensaje.deletedAt ? (
+          <span className="font-sans text-xs italic text-text-secondary">Aviso eliminado</span>
+        ) : (
+          <span className="whitespace-pre-wrap font-sans text-sm text-text-primary">
+            {mensaje.body}
+          </span>
+        )}
+      </div>
+      <span className="h-px flex-1 border-t border-dashed border-border" aria-hidden="true" />
+    </div>
+  );
+}
+
+function horaCorta(iso: string): string {
+  return new Date(iso).toLocaleTimeString('es', { hour: 'numeric', minute: '2-digit' });
 }
 
 function CurvedLine() {

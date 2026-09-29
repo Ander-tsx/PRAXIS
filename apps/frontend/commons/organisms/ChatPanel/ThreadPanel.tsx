@@ -179,7 +179,7 @@ export function ThreadPanel({
       <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
         <div className="min-w-0">
           <h4 className="font-display text-base text-text-primary">Hilo</h4>
-          <p className="truncate font-sans text-xs text-white">
+          <p className="truncate font-sans text-xs text-text-secondary">
             {cargando
               ? 'Cargando…'
               : replies.length > 0
@@ -191,7 +191,7 @@ export function ThreadPanel({
           type="button"
           onClick={onCerrar}
           aria-label="Cerrar el hilo"
-          className="cursor-pointer rounded-lg p-1.5 text-white transition-colors hover:bg-surface hover:text-text-primary"
+          className="cursor-pointer rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
         >
           <svg
             className="h-4 w-4"
@@ -314,7 +314,7 @@ export function ThreadPanel({
           />
         </div>
       ) : (
-        <p className="shrink-0 border-t border-border px-4 py-3 font-sans text-xs text-white">
+        <p className="shrink-0 border-t border-border px-4 py-3 font-sans text-xs text-text-secondary">
           {motivoSinEscribir ?? 'Puedes leer el hilo, pero no escribir en él.'}
         </p>
       )}

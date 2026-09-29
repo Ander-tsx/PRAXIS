@@ -715,7 +715,7 @@ export function MessageBubble({
               <span className="font-display font-medium text-sm text-text-primary">
                 {mine ? 'Tú' : nombre}
               </span>
-              <span className="font-sans text-[10px] text-white0">
+              <span className="font-sans text-[10px] text-text-secondary">
                 {soloHora(message.createdAt)}
               </span>
             </span>
@@ -726,7 +726,7 @@ export function MessageBubble({
             style={{ background: alpha(colors.textSecondary, 10) }}
           >
             <svg
-              className="h-3.5 w-3.5 shrink-0 text-white"
+              className="h-3.5 w-3.5 shrink-0 text-text-secondary"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -736,8 +736,10 @@ export function MessageBubble({
               <circle cx="12" cy="12" r="9" />
               <path strokeLinecap="round" d="M5.6 5.6l12.8 12.8" />
             </svg>
-            <span className="font-sans text-xs italic text-white">Mensaje eliminado</span>
-            <span className="font-sans text-[11px] text-white">{soloHora(message.createdAt)}</span>
+            <span className="font-sans text-xs italic text-text-secondary">Mensaje eliminado</span>
+            <span className="font-sans text-[11px] text-text-secondary">
+              {soloHora(message.createdAt)}
+            </span>
           </div>
         </div>
       </article>
@@ -932,7 +934,7 @@ export function MessageBubble({
               >
                 {nombreDeAutor(message.replyTo.authorId)}
               </span>
-              <span className="line-clamp-2 font-sans text-xs text-white">
+              <span className="line-clamp-2 font-sans text-xs text-text-secondary">
                 <AttachmentPreview mensaje={message.replyTo} />
               </span>
             </div>
@@ -1059,10 +1061,21 @@ export function MessageBubble({
            * la burbuja ya separa lo suficiente.
            */}
           <span
-            className={`-mb-0.5 mt-1 flex items-center gap-1.5 font-sans text-[10px] leading-none text-white ${
+            className={`-mb-0.5 mt-1 flex items-center gap-1.5 font-sans text-[10px] leading-none text-text-secondary ${
               mine ? 'justify-end' : 'justify-start'
             }`}
           >
+            {/* D13 de PLAN-PRAX-SEMIAGENTICO: lo mandó esta persona, aceptando
+                una propuesta de PRAX. Sigue siendo suyo; la marca dice cómo se
+                escribió. */}
+            {message.origin === 'ASSISTANT' && (
+              <span
+                title="Lo propuso PRAX y esta persona lo aceptó y lo envió"
+                className="rounded-full border border-border px-1.5 py-px"
+              >
+                con PRAX
+              </span>
+            )}
             {editado && (
               <span title="Mensaje editado" className="uppercase tracking-wide">
                 editado
@@ -1241,7 +1254,7 @@ export function MessageBubble({
                      * quitarlo. Viviendo dentro se va con el menú.
                      */
                     <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto px-3 py-1.5">
-                      <span className="font-sans text-[10px] uppercase tracking-wide text-white">
+                      <span className="font-sans text-[10px] uppercase tracking-wide text-text-secondary">
                         Visto por
                       </span>
                       {vistoPor.map((userId) => (
@@ -1262,14 +1275,14 @@ export function MessageBubble({
                      * encuentra ahí lo que esperaba y para.
                      */
                     <div className="flex flex-col gap-2 px-3 py-2">
-                      <span className="font-sans text-xs text-white">
+                      <span className="font-sans text-xs text-text-secondary">
                         ¿Eliminar este mensaje? No se puede deshacer.
                       </span>
                       <span className="flex items-center justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => setConfirmandoBorrado(false)}
-                          className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-white transition-colors hover:text-text-primary"
+                          className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
                         >
                           Cancelar
                         </button>
@@ -1493,7 +1506,7 @@ export function MessageBubble({
                   <button
                     type="button"
                     onClick={() => setConfirmandoBorrado(false)}
-                    className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-sm text-white"
+                    className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-sm text-text-secondary"
                   >
                     No
                   </button>
@@ -1915,7 +1928,7 @@ function AttachmentCard({
       style={{ background: alpha(colors.border, 22) }}
     >
       <span
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-sans text-[9px] font-semibold uppercase text-white"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-sans text-[9px] font-semibold uppercase text-text-primary"
         style={{ background: alpha(colors.border, 45) }}
       >
         {extension(adjunto.filename)}
@@ -1924,12 +1937,12 @@ function AttachmentCard({
         <span className="block truncate font-sans text-xs font-medium text-text-primary">
           {adjunto.filename}
         </span>
-        <span className="block font-sans text-[10px] text-white">
+        <span className="block font-sans text-[10px] text-text-secondary">
           {esPdf ? 'Ver en otra pestaña' : 'Descargar'} · {formatBytes(adjunto.size)}
         </span>
       </span>
       <svg
-        className="h-3.5 w-3.5 shrink-0 text-white"
+        className="h-3.5 w-3.5 shrink-0 text-text-secondary"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -2342,11 +2355,11 @@ function LinkPreviewCard({ preview, mine }: { preview: LinkPreview; mine: boolea
           {preview.title}
         </span>
         {preview.description && (
-          <span className="line-clamp-2 font-sans text-[11px] text-white">
+          <span className="line-clamp-2 font-sans text-[11px] text-text-secondary">
             {preview.description}
           </span>
         )}
-        <span className="line-clamp-1 font-sans text-[10px] text-white">
+        <span className="line-clamp-1 font-sans text-[10px] text-text-secondary">
           {dominioDe(preview.url)}
         </span>
       </span>

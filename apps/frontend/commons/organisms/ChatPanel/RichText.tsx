@@ -159,7 +159,7 @@ export function renderMarkdown(texto: string): ReactNode[] {
       nodos.push(
         <code
           key={nodos.length}
-          className="rounded bg-surface-elevated px-1 py-0.5 font-mono text-[0.85em] text-white"
+          className="rounded bg-surface-elevated px-1 py-0.5 font-mono text-[0.85em] text-text-primary"
         >
           {contenidoCodigo}
         </code>,
@@ -180,7 +180,7 @@ export function renderMarkdown(texto: string): ReactNode[] {
       /* Una viñeta `- ` o `* ` al principio de una línea. El salto lo conserva
          `whitespace-pre-wrap`; aquí solo se pinta el marcador. */
       nodos.push(
-        <span key={nodos.length} aria-hidden="true" className="text-white">
+        <span key={nodos.length} aria-hidden="true" className="text-text-secondary">
           •
         </span>,
         ' ',
