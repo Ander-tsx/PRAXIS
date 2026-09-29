@@ -1,4 +1,5 @@
 import { ClientProxy, type ReadPacket, type WritePacket } from '@nestjs/microservices';
+import { marcarActividad } from './actividad';
 import { buscar } from './bus';
 import { copiaJson } from './json';
 
@@ -39,6 +40,9 @@ export class LocalClient extends ClientProxy {
   }
 
   protected publish(packet: ReadPacket, callback: (packet: WritePacket) => void): () => void {
+    /* Cada mensaje entre servicios es uso real del sistema: es lo que mantiene
+       despiertas las tareas de fondo (ver actividad.ts). */
+    marcarActividad();
     let cancelado = false;
     const alResponder = (respuesta: WritePacket) => {
       if (!cancelado) callback(respuesta);

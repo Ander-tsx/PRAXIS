@@ -176,7 +176,8 @@ queda**: decide el acceso a PRAX.
   con `exec node`. `docs/deploy/RAILWAY.md` actualizado.
   ⚠️ **Desplegar es fusionar a `main`**, y eso lo decide el dueño del producto.
 - [ ] **M-I — Lo muerto de `reports`** (M10).
-- [ ] **M-K — Que `praxis-api` se pueda dormir** (opcional, medir antes).
+- [x] **M-K — Que `praxis-api` se pueda dormir**. El dueño del producto lo pidió
+  expresamente (2026-09-29): «en horas nocturnas salvará dinero, +8 h».
   `sleepApplication` **ya está activado** en Railway, y el servicio no se duerme
   nunca. Railway lo duerme tras 10 minutos sin tráfico saliente, y el backend
   habla con Postgres y Redis cada pocos segundos aunque no haya nadie:
@@ -188,12 +189,33 @@ queda**: decide el acceso a PRAX.
     líneas al día sin que pase nada;
   - la suscripción pub/sub del gateway.
 
-  Si esas tareas se detienen sin peticiones y reanudan con la primera, el coste
-  en reposo baja casi a cero. Los hechos de dominio esperan en el stream de Redis
-  y se procesan al despertar.
-  ⚠️ **Contra:** la primera petición tras dormir tarda lo que tarda en arrancar
-  el proceso, y una automatización con fecha no salta mientras duerme. Se decide
-  con números.
+  **Hecho así.** `@praxis/local-transport/src/actividad.ts` guarda cuándo pasó
+  el último mensaje entre servicios. Cada `LocalClient.publish` cuenta, y toda
+  petición de usuario y toda edición de collab cruza al menos uno.
+  - Tras `PRAXIS_REPOSO_MS` sin mensajes (5 min por defecto), los dos sondeos
+    se saltan sus vueltas.
+  - El primer mensaje los reanuda con una pasada inmediata.
+  - Solo en el monolito: con procesos separados, `enReposo()` es siempre
+    `false`.
+
+  **Medido en local** con un reposo de 20 s:
+  - los sondeos se detienen;
+  - un login los despierta en el acto;
+  - **0 bytes salientes del proceso en 60 s de reposo** (`nettop`).
+
+  Railway lo dormirá unos 15 min después del último uso: 5 de reposo más 10 sin
+  tráfico.
+
+  **Ninguna automatización depende de la hora.** Las de barrido, como «una tarea
+  está vencida», solo corren al pulsar «revisar» (`reviewProject(…,
+  'manual')`), y no hay ningún cron. Las reactivas esperan en el stream de
+  Redis y se procesan al despertar.
+
+  ⚠️ **El precio:** la primera petición tras dormir espera a que arranque el
+  contenedor, unos segundos.
+
+  ⚠️ **Lo que lo mantiene despierto sin querer:** una pestaña abierta, por los
+  latidos del SSE cada 25 s. Eso está bien: alguien lo está usando.
 - [ ] **M-J — Documentación**: `CLAUDE.md` (puertos, comandos, «los 10
   servicios», trampa 14), `STRUCTURE`, `ESTADO-ACTUAL` y el plan de PRAX
   (§1 cambia de sitio, no de fondo).
