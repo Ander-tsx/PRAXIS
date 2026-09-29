@@ -1,5 +1,7 @@
 'use client';
 
+import { Zap } from 'lucide-react';
+
 import {
   type ReactNode,
   forwardRef,
@@ -12,10 +14,10 @@ import {
   useState,
 } from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
+import { PRAX_REF_ID } from '../../api/chat-refs';
 import { createApiClient } from '../../api/client';
 import type { Directory } from '../../api/directory';
 import { personName } from '../../api/directory';
-import { PRAX_REF_ID } from '../../api/chat-refs';
 import type { ChatAttachment, ChatMessage, ChatMessagePage } from '../../api/domain';
 import { personLabel } from '../../api/domain';
 import type { LinkPreview } from '../../api/link-preview';
@@ -2136,23 +2138,31 @@ function mismoDia(a: Date, b: Date): boolean {
 function AvisoDeRegla({ mensaje }: { mensaje: ChatMessage }) {
   const regla = mensaje.originMeta?.ruleName;
   return (
-    <div className="my-3 flex items-center gap-3" data-origen="automatizacion">
-      <span className="h-px flex-1 border-t border-dashed border-border" aria-hidden="true" />
-      <div className="flex max-w-[80%] flex-col items-center gap-0.5 rounded-full border border-border px-4 py-1.5 text-center">
-        <span className="font-sans text-xs text-text-secondary">
-          <span aria-hidden="true">⚡ </span>
-          {regla ? `Regla «${regla}»` : 'Una automatización'}
-          <span className="ml-2 text-[10px]">{horaCorta(mensaje.createdAt)}</span>
-        </span>
-        {mensaje.deletedAt ? (
-          <span className="font-sans text-xs italic text-text-secondary">Aviso eliminado</span>
-        ) : (
-          <span className="whitespace-pre-wrap font-sans text-sm text-text-primary">
-            {mensaje.body}
-          </span>
-        )}
-      </div>
-      <span className="h-px flex-1 border-t border-dashed border-border" aria-hidden="true" />
+    /* Una línea fina, en el amarillo de acento: es un aviso del sistema, no
+       alguien hablando. El nombre de la regla y la hora van en el `title`
+       para no cargar la línea; el texto, recortado a una. */
+    <div
+      className="my-2 flex items-center gap-2"
+      data-origen="automatizacion"
+      title={`${regla ? `Regla «${regla}»` : 'Automatización'} · ${horaCorta(mensaje.createdAt)}`}
+    >
+      <span
+        className="h-px flex-1"
+        style={{ background: alpha(colors.warning, 30) }}
+        aria-hidden="true"
+      />
+      <span
+        className="flex min-w-0 max-w-[75%] items-center gap-1.5 rounded-full px-2.5 py-0.5 font-sans text-[11px]"
+        style={{ color: colors.warning, background: alpha(colors.warning, 10) }}
+      >
+        <Zap className="h-3 w-3 shrink-0" aria-hidden="true" />
+        <span className="truncate">{mensaje.deletedAt ? 'Aviso eliminado' : mensaje.body}</span>
+      </span>
+      <span
+        className="h-px flex-1"
+        style={{ background: alpha(colors.warning, 30) }}
+        aria-hidden="true"
+      />
     </div>
   );
 }

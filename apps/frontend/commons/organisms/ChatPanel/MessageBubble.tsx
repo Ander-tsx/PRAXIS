@@ -1111,7 +1111,12 @@ export function MessageBubble({
             {message.origin === 'ASSISTANT' && !dePrax && (
               <span
                 title="Lo propuso PRAX y esta persona lo aceptó y lo envió"
-                className="rounded-full border border-border px-1.5 py-px"
+                className="rounded-full px-1.5 py-px font-semibold"
+                style={{
+                  color: colors.primary,
+                  background: alpha(colors.primary, 16),
+                  boxShadow: `inset 0 0 0 1px ${alpha(colors.primary, 40)}`,
+                }}
               >
                 con PRAX
               </span>
