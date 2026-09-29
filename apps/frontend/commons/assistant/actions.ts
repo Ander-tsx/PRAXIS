@@ -1066,3 +1066,41 @@ function toIsoDueDate(value: string): string {
   const [year = 0, month = 1, day = 1] = value.split('-').map(Number);
   return new Date(year, month - 1, day, 23, 59, 59).toISOString();
 }
+
+/**
+ * «Recursos»: qué proyectos puede consultar PRAX en la organización activa (D5
+ * de docs/PLAN-PRAX-SEMIAGENTICO.md). Se guarda en el servidor, por persona y
+ * organización; antes vivía en `localStorage` y no llegaba nunca al backend.
+ */
+export interface AlcanceDePrax {
+  organizationId: string | null;
+  modo: 'ALL' | 'SELECTED';
+  proyectos: { id: string; nombre: string; incluido: boolean }[];
+}
+
+export async function alcanceAction(): Promise<AlcanceDePrax | null> {
+  const api = await requireApi();
+  if (!api) return null;
+  return api.get<AlcanceDePrax>(`/me/assistant/scope${await conOrganizacion()}`);
+}
+
+export async function guardarAlcanceAction(
+  modo: 'ALL' | 'SELECTED',
+  projectIds: string[],
+): Promise<{ alcance: AlcanceDePrax | null; error: string | null }> {
+  const api = await requireApi();
+  if (!api) return { alcance: null, error: 'Tu sesión ha caducado.' };
+  const { organizacionActivaId } = await loadPrivateChrome();
+  try {
+    const alcance = await api.put<AlcanceDePrax>('/me/assistant/scope', {
+      ...(organizacionActivaId ? { organizationId: organizacionActivaId } : {}),
+      modo,
+      projectIds: modo === 'SELECTED' ? projectIds : [],
+    });
+    /* Contra el `data`: un 200 sin alcance no es un guardado. */
+    if (!alcance?.modo) return { alcance: null, error: 'El servidor no guardó los recursos.' };
+    return { alcance, error: null };
+  } catch (error) {
+    return { alcance: null, error: describe(error, 'No se han podido guardar los recursos.') };
+  }
+}

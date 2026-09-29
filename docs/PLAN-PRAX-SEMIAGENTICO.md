@@ -494,7 +494,7 @@ que tocan esquema llevan migración (`prisma:deploy`, **nunca `reset`**).
   - `/assistant` pide los proyectos de la activa; `PraxScreen` pasa la
     organización.
   - e2e: dos organizaciones, PRAX no ve la otra.
-- [ ] **F2 — Recursos de verdad** (D5, O6).
+- [x] **F2 — Recursos de verdad** (D5, O6). Ver el registro.
   - `AssistantScope` y rutas `GET`/`PUT /me/assistant/scope`, con la
     organización validada.
   - `ComposerControls` lee y escribe el servidor, sin `localStorage`, `any` ni
@@ -676,3 +676,23 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
     - **La comprobación de O3 solo corre si el cliente manda `organizationId`.**
       Así un cliente sin actualizar no se queda sin PRAX. El nuestro la manda
       siempre, desde `loadPrivateChrome()` (trampa 21).
+  - **F2 cerrada.**
+    - **Backend**: tabla `assistant_scopes` (`AssistantScope`), por persona y
+      organización, y rutas `GET` y `PUT /me/assistant/scope`.
+      - Al guardar, el gateway comprueba cada proyecto marcado: tiene que ser de
+        la organización activa y visible con `canViewReports`, o 400.
+      - Al leer, vuelve a cruzar lo guardado con lo visible **hoy**: a alguien
+        le pueden sacar de un proyecto después de marcarlo.
+    - **El turno sin foco** solo ofrece a PRAX los proyectos del alcance. Si
+      leer el alcance falla, vale «todo» y se registra: PRAX con más contexto
+      del elegido es mejor que PRAX mudo.
+    - **Interfaz**: `RecursosMenu` sustituye al armazón de `localStorage`, con
+      guardado optimista que vuelve atrás y explica si el servidor dice que no.
+    - **Retirados**: el selector de modelo, el modo «Auto» y los servidores
+      MCP, marcados «Pronto» y sin hacer nada.
+    - **Pruebas**: e2e `21-prax-recursos` (6 casos) y una captura comprobada a
+      ojo en local.
+  - **Decidido esta noche, D5 matizado:** el proyecto **con foco cuenta
+    siempre**, esté marcado o no. Se abrió a propósito; «Recursos» gobierna qué
+    más puede consultar PRAX, y eso importa de verdad cuando existan las
+    consultas (F3).

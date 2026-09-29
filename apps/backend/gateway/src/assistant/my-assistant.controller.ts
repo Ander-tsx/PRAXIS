@@ -12,6 +12,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   Request,
   Res,
@@ -33,6 +34,7 @@ import {
   ASSISTANT_ATTACHMENT_ALLOWED_MIME,
   ASSISTANT_ATTACHMENT_MAX_BYTES,
   AssistantChatBodyDto,
+  AssistantScopeBodyDto,
   ProjectDraftBodyDto,
   RenameConversationBodyDto,
   ResolveProposalBodyDto,
@@ -148,8 +150,10 @@ export class MyAssistantController {
        ajena aunque luego no se usara. */
     const organizationId = await this.cuotas.organizacionElegida(userId, body.organizationId);
 
-    const [proyectos, quien, ia] = await Promise.all([
-      this.proyectosQuePuedeAbrir(userId, organizationId),
+    const [alcance, quien, ia] = await Promise.all([
+      /* Solo los que la persona dejó en «Recursos» (D5). Con «todo», todos los
+         que puede ver en la organización activa. */
+      this.alcanceVigente(userId, organizationId),
       this.nombreDe(userId),
       /* `iaDe` y no `limiteDeIa`: esta ruta **gasta** cuota, así que puede
          acabar en un 402 que tiene que decir qué plan puso ese tope. Los dos
@@ -174,7 +178,9 @@ export class MyAssistantController {
           /* Solo quien pregunta: es lo único que se puede saber sin proyecto, y
              es lo que el prompt necesita para llamarle por su nombre. */
           miembros: quien ? [quien] : [],
-          proyectos,
+          proyectos: alcance.proyectos
+            .filter((proyecto) => proyecto.incluido)
+            .map(({ id, nombre }) => ({ id, nombre })),
           /* El tope de su plan. Ver la nota de la ruta de proyecto: quien cuenta
              es assistant-service, quien sabe cuánto da el plan es billing. El
              `planTier` va solo para poder nombrarlo si se agota. */
@@ -260,6 +266,106 @@ export class MyAssistantController {
     });
 
     return (pagina?.items ?? []).map((proyecto) => ({ id: proyecto.id, nombre: proyecto.name }));
+  }
+
+  /**
+   * «Recursos» tal y como valen **ahora** (D5).
+   *
+   * La elección se guarda en assistant-service; qué proyectos existen y cuáles
+   * puede ver la persona se mira aquí, en cada llamada. Una lista guardada no es
+   * un permiso: a alguien le pueden sacar de un proyecto después de marcarlo, y
+   * entonces ese proyecto simplemente deja de salir.
+   *
+   * Si leer la elección falla, vale «todo»: PRAX con más contexto del elegido es
+   * mejor que PRAX sin poder contestar, y los permisos siguen siendo los de
+   * siempre.
+   */
+  private async alcanceVigente(userId: string, organizationId: string | null) {
+    const [candidatos, guardado] = await Promise.all([
+      this.proyectosQuePuedeAbrir(userId, organizationId),
+      organizationId
+        ? firstValueFrom(
+            this.assistantClient.send<{ modo: 'ALL' | 'SELECTED'; projectIds: string[] }>(
+              { cmd: 'assistant_scope_get' },
+              { userId, organizationId },
+            ),
+          ).catch((error: unknown) => {
+            this.log.warn(
+              `prax_alcance_ilegible userId=${userId} organizationId=${organizationId}: ${(error as Error)?.message ?? error}`,
+            );
+            return { modo: 'ALL' as const, projectIds: [] };
+          })
+        : Promise.resolve({ modo: 'ALL' as const, projectIds: [] as string[] }),
+    ]);
+
+    const marcados = new Set(guardado.projectIds);
+    return {
+      organizationId,
+      modo: guardado.modo,
+      proyectos: candidatos.map((proyecto) => ({
+        ...proyecto,
+        incluido: guardado.modo === 'ALL' || marcados.has(proyecto.id),
+      })),
+    };
+  }
+
+  /**
+   * «Recursos» de la organización activa: los proyectos que PRAX podría
+   * consultar y cuáles tiene marcados (D5 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+   */
+  @Get('scope')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Qué proyectos puede consultar PRAX en la organización activa' })
+  async alcance(
+    @Request() req: Express.Request,
+    @Query('organizationId', new ParseUUIDPipe({ optional: true })) organizationId?: string,
+  ) {
+    const userId = req.user!.userId;
+    const organizacion = await this.cuotas.organizacionElegida(userId, organizationId);
+    return this.alcanceVigente(userId, organizacion);
+  }
+
+  /**
+   * Guardar «Recursos».
+   *
+   * 🔴 **Cada proyecto marcado se comprueba aquí**: tiene que ser de la
+   * organización activa y visible con `canViewReports`. Sin esto, escribir el id
+   * de un proyecto ajeno en el cuerpo lo metería en el contexto de PRAX.
+   */
+  @Put('scope')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Elegir qué proyectos puede consultar PRAX' })
+  @ApiResponse({ status: 400, description: 'Un proyecto no es de esta organización o no lo ves' })
+  async guardarAlcance(@Request() req: Express.Request, @Body() body: AssistantScopeBodyDto) {
+    const userId = req.user!.userId;
+    const organizacion = await this.cuotas.organizacionElegida(userId, body.organizationId);
+    if (!organizacion) {
+      throw new BadRequestException('No hay ninguna organización a la que atar estos recursos.');
+    }
+
+    if (body.modo === 'SELECTED') {
+      const visibles = new Set(
+        (await this.proyectosQuePuedeAbrir(userId, organizacion)).map((proyecto) => proyecto.id),
+      );
+      const ajenos = body.projectIds.filter((id) => !visibles.has(id));
+      if (ajenos.length > 0) {
+        throw new BadRequestException(
+          'Alguno de esos proyectos no es de esta organización o no puedes hablar de él con PRAX.',
+        );
+      }
+    }
+
+    await firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_scope_set' },
+        {
+          userId,
+          organizationId: organizacion,
+          alcance: { modo: body.modo, projectIds: body.projectIds },
+        },
+      ),
+    );
+    return this.alcanceVigente(userId, organizacion);
   }
 
   /** Quién pregunta, para que PRAX no le hable en UUID. */

@@ -127,6 +127,33 @@ model Conversation {
   @@map("assistant_conversations")
 }
 
+/// Qué proyectos puede consultar PRAX, por persona y organización
+/// (D5 de docs/PLAN-PRAX-SEMIAGENTICO.md): el apartado «Recursos».
+///
+/// Sin fila, `ALL`: todos los proyectos de la organización que la persona puede
+/// ver con `canViewReports`. `projectIds` solo cuenta con `SELECTED`, y el gateway
+/// lo vuelve a filtrar en cada turno contra la organización y los permisos de
+/// ese momento: a alguien le pueden sacar de un proyecto después de marcarlo, y
+/// una lista guardada no es un permiso.
+model AssistantScope {
+  userId         String
+  organizationId String
+  mode           AssistantScopeMode @default(ALL)
+  projectIds     String[]
+  updatedAt      DateTime           @updatedAt
+
+  @@id([userId, organizationId])
+  @@schema("assistant")
+  @@map("assistant_scopes")
+}
+
+enum AssistantScopeMode {
+  ALL
+  SELECTED
+
+  @@schema("assistant")
+}
+
 enum MessageRole {
   USER
   MODEL

@@ -1,6 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
+import { type Alcance, AlcanceService } from './alcance.service';
 import { AssistantService } from './assistant.service';
 import { AttachmentsService } from './attachments.service';
 import type { AmbitoDeOrganizacion } from './conversations.service';
@@ -22,7 +23,19 @@ export class AssistantController {
   constructor(
     private readonly assistant: AssistantService,
     private readonly adjuntos: AttachmentsService,
+    private readonly alcance: AlcanceService,
   ) {}
+
+  /** «Recursos» de una persona en una organización (D5). La validación es del gateway. */
+  @MessagePattern({ cmd: 'assistant_scope_get' })
+  leerAlcance(@Payload() dto: { userId: string; organizationId: string }) {
+    return this.alcance.leer(dto.userId, dto.organizationId);
+  }
+
+  @MessagePattern({ cmd: 'assistant_scope_set' })
+  guardarAlcance(@Payload() dto: { userId: string; organizationId: string; alcance: Alcance }) {
+    return this.alcance.guardar(dto.userId, dto.organizationId, dto.alcance);
+  }
 
   @MessagePattern({ cmd: 'assistant_chat' })
   async chat(

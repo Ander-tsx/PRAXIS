@@ -18,7 +18,10 @@ import { comoBearer, crearProyecto, data, error, nombreUnico, registrar } from '
 async function conversationIdDe(respuesta: APIResponse): Promise<string> {
   const sobre = await respuesta.json();
   const id = sobre.success ? sobre.data?.conversationId : sobre.error?.details?.conversationId;
-  expect(id, `El turno tenía que dejar una conversación: ${JSON.stringify(sobre).slice(0, 300)}`).toBeTruthy();
+  expect(
+    id,
+    `El turno tenía que dejar una conversación: ${JSON.stringify(sobre).slice(0, 300)}`,
+  ).toBeTruthy();
   return id;
 }
 
@@ -136,9 +139,12 @@ test.describe('PRAX y la organización activa', () => {
     const m = await montar(request);
     const otra = await registrar(request);
 
-    const respuesta = await request.get(`/api/me/assistant/conversations?organizationId=${m.equipo}`, {
-      headers: comoBearer(otra.accessToken),
-    });
+    const respuesta = await request.get(
+      `/api/me/assistant/conversations?organizationId=${m.equipo}`,
+      {
+        headers: comoBearer(otra.accessToken),
+      },
+    );
 
     expect(respuesta.status()).toBe(403);
     expect((await error(respuesta)).code).toBe('NOT_IN_ORG');

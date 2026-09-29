@@ -38,7 +38,7 @@ import { alpha, colors } from '../../tokens';
 import { useDock } from '../AppLayout/DockPanel';
 import { usePrax } from '../AppLayout/PraxContext';
 import { AmpliarPlan } from './AmpliarPlan';
-import { AjustesMenu, ModeloSelector } from './ComposerControls';
+import { RecursosMenu } from './ComposerControls';
 import { ConversationHistory } from './ConversationHistory';
 import { FlujoDePensamiento } from './FlujoDePensamiento';
 import { ModelText } from './ModelText';
@@ -1707,10 +1707,7 @@ export function AssistantChat({
                       onEtiquetarPersona={() => insertarEnCampo('@')}
                     />
 
-                    <AjustesMenu
-                      gatewayPath={gatewayPath}
-                      organizacionActivaId={organizacionActivaId ?? null}
-                    />
+                    <RecursosMenu organizacionActivaId={organizacionActivaId ?? null} />
 
                     {/* Escondido: lo abre el menú «+». Las extensiones además de
                         los tipos, porque algunos selectores no reconocen
@@ -1726,8 +1723,6 @@ export function AssistantChat({
                     />
 
                     <div className="flex-1" />
-
-                    <ModeloSelector />
 
                     <button
                       type="submit"

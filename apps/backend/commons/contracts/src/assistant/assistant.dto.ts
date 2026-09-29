@@ -337,6 +337,34 @@ export class AssistantChatBodyDto {
   organizationId?: string;
 }
 
+/** Cuántos proyectos caben en «Recursos». El mismo tope que la lista que se ofrece. */
+export const ASSISTANT_SCOPE_MAX_PROJECTS = 100;
+
+/**
+ * Guardar «Recursos»: qué proyectos puede consultar PRAX en una organización
+ * (D5 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+ *
+ * `organizationId` es la activa; el gateway comprueba la pertenencia. Con `ALL`,
+ * `projectIds` se ignora; con `SELECTED`, cada id tiene que ser de esa
+ * organización y visible con `canViewReports`, o es un 400.
+ */
+export class AssistantScopeBodyDto {
+  @ApiPropertyOptional({ description: 'Organización activa. Sin ella, la personal' })
+  @IsOptional()
+  @IsUUID('4')
+  organizationId?: string;
+
+  @ApiProperty({ enum: ['ALL', 'SELECTED'] })
+  @IsIn(['ALL', 'SELECTED'])
+  modo: 'ALL' | 'SELECTED';
+
+  @ApiProperty({ type: [String], maxItems: ASSISTANT_SCOPE_MAX_PROJECTS })
+  @IsArray()
+  @ArrayMaxSize(ASSISTANT_SCOPE_MAX_PROJECTS)
+  @IsUUID('4', { each: true })
+  projectIds: string[];
+}
+
 /** Renombrar una conversación. */
 export class RenameConversationBodyDto {
   @ApiProperty({ minLength: 1, maxLength: 60 })

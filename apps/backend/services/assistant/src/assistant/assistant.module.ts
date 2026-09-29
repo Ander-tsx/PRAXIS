@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { PrismaModule } from '../prisma/prisma.module';
 import { BlobStorageModule } from '../storage/blob-storage.module';
+import { AlcanceService } from './alcance.service';
 import { AssistantController } from './assistant.controller';
 import { AssistantService } from './assistant.service';
 import { AttachmentsService } from './attachments.service';
@@ -14,6 +15,7 @@ import { QuotaService } from './quota.service';
   controllers: [AssistantController],
   providers: [
     AssistantService,
+    AlcanceService,
     ConversationsService,
     AttachmentsService,
     QuotaService,
