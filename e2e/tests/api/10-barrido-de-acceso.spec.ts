@@ -63,14 +63,8 @@ function rutasDeProyecto(r: Recurso) {
     { m: 'GET', ruta: `/api/tasks/${r.tareaId}` },
     { m: 'GET', ruta: `/api/tasks/${r.tareaId}/comments` },
     { m: 'GET', ruta: `/api/tasks/${r.tareaId}/attachments` },
-    // ── Informes ───────────────────────────────────────────────────────────
-    { m: 'GET', ruta: `/api/projects/${r.proyectoId}/reports/snapshot` },
-    { m: 'GET', ruta: `/api/projects/${r.proyectoId}/reports/flow` },
-    { m: 'GET', ruta: `/api/projects/${r.proyectoId}/reports/cycle-time` },
-    { m: 'GET', ruta: `/api/projects/${r.proyectoId}/reports/forecast` },
-    { m: 'GET', ruta: `/api/projects/${r.proyectoId}/reports/weekly` },
-    { m: 'GET', ruta: `/api/projects/${r.proyectoId}/reports/blocked` },
-    { m: 'GET', ruta: `/api/projects/${r.proyectoId}/reports/people` },
+    // ── Asistente (las rutas de informes se retiraron con Análisis) ─────────
+    { m: 'GET', ruta: `/api/projects/${r.proyectoId}/assistant/quota` },
     // ── Escritura ──────────────────────────────────────────────────────────
     { m: 'PATCH', ruta: `/api/projects/${r.proyectoId}`, cuerpo: { name: 'Secuestrado' } },
     { m: 'DELETE', ruta: `/api/projects/${r.proyectoId}` },
@@ -143,16 +137,17 @@ function rutasDeProyecto(r: Recurso) {
 /**
  * Lo que una miembro con **solo** `canViewProject` debe poder leer.
  *
- * ⚠️ **Los informes no entran, y no es un descuido.** Las siete rutas de
- * `/reports/*` exigen `canViewReports`, que es un permiso aparte: los números de
- * un proyecto —quién cierra cuánto, quién va lento— no son lo mismo que ver el
- * tablero. Lo mismo con `/invitations`, que pide `canManageMembers`.
+ * ⚠️ **El asistente no entra, y no es un descuido.** `/assistant/*` exige
+ * `canViewReports`, que es un permiso aparte: PRAX lee los números del
+ * proyecto —quién cierra cuánto, quién va lento—, y eso no es lo mismo que ver
+ * el tablero. Lo mismo con `/invitations`, que pide `canManageMembers`.
  *
- * El barrido lo destapó por su cuenta: al no distinguirlos daba siete «lecturas
- * negadas» que parecían un fallo y eran la regla funcionando.
+ * El barrido lo destapó por su cuenta con las siete rutas de `/reports/*`, que
+ * se retiraron con la página de Análisis: al no distinguirlas daba siete
+ * «lecturas negadas» que parecían un fallo y eran la regla funcionando.
  */
 const SON_LECTURA = (ruta: string, metodo: string) =>
-  metodo === 'GET' && !ruta.includes('/invitations') && !ruta.includes('/reports/');
+  metodo === 'GET' && !ruta.includes('/invitations') && !ruta.includes('/assistant/');
 
 async function montarRecurso(request: Parameters<typeof crearMundo>[0]): Promise<{
   recurso: Recurso;

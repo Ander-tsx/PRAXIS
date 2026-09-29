@@ -17,7 +17,6 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { PresenceModule } from './presence/presence.module';
 import { ProjectsModule } from './projects/projects.module';
-import { ReportsModule } from './reports/reports.module';
 import { TasksModule } from './tasks/tasks.module';
 import { UserModule } from './users/user.module';
 
@@ -73,7 +72,6 @@ import { UserModule } from './users/user.module';
     ProjectsModule,
     TasksModule,
     NotificationsModule,
-    ReportsModule,
     AssistantModule,
     AutomationModule,
     AdminModule,

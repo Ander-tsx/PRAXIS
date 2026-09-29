@@ -14,7 +14,7 @@ import { MyAssistantController } from './my-assistant.controller';
  * el controlador *y* `ProjectPermissionGuard`; `TASKS_SERVICE` solo el guard,
  * que se aplica aquí y los inyecta por su cuenta. Sin los dos en el módulo,
  * Nest no puede construir el guard y el fallo aparece **al arrancar**, no al
- * llamar a la ruta. Mismo motivo que en `reports.module.ts`.
+ * llamar a la ruta.
  */
 @Module({
   imports: [

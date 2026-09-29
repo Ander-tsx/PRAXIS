@@ -175,7 +175,19 @@ queda**: decide el acceso a PRAX.
 - [x] **M-H — Imagen y Railway** (falta probar la imagen) (M7): Dockerfile sin pm2 y `start-backend.sh`
   con `exec node`. `docs/deploy/RAILWAY.md` actualizado.
   ⚠️ **Desplegar es fusionar a `main`**, y eso lo decide el dueño del producto.
-- [ ] **M-I — Lo muerto de `reports`** (M10).
+- [x] **M-I — Lo muerto de `reports`** (M10).
+  - **Fuera**: las 11 rutas del gateway más `portfolio` y `layout`, el módulo
+    `report-layouts` de projects, su DTO y `QuickAccess`.
+  - **Pruebas**: las e2e que probaban `canViewReports` con `/reports/snapshot`
+    ahora lo prueban con `/assistant/quota`. El permiso sigue vivo, porque
+    decide quién habla con PRAX de un proyecto.
+  - **Dos cambios de alcance**:
+    - La **tabla `ReportLayout` se queda**. No se pudo ver qué hay en
+      producción (`praxis-db` no tiene URL pública) y no se borran datos sin
+      mirarlos. Su modelo lleva la nota; el `DROP` es una migración aparte.
+    - **`proponer_grafico` y su tarjeta pasan al plan de PRAX**, que reescribe
+      las propuestas en F7/F8. Quitarlos aquí sería tocar dos veces los mismos
+      archivos.
 - [x] **M-K — Que `praxis-api` se pueda dormir**. El dueño del producto lo pidió
   expresamente (2026-09-29): «en horas nocturnas salvará dinero, +8 h».
   `sleepApplication` **ya está activado** en Railway, y el servicio no se duerme
