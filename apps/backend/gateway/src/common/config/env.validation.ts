@@ -54,20 +54,12 @@ export const envValidationSchema = Joi.object({
   TASKS_SERVICE_HOST: Joi.string().default('localhost'),
   TASKS_SERVICE_PORT: Joi.number().default(3004),
 
-  // reports-service — TCP 3005
-  REPORTS_SERVICE_HOST: Joi.string().default('localhost'),
-  REPORTS_SERVICE_PORT: Joi.number().default(3005),
-
   // assistant-service — TCP 3006
   //
   // ⚠️ La clave de Gemini NO va aquí: vive solo en el .env de assistant-service.
   // El gateway sigue siendo un router y no habla con ningún tercero.
   ASSISTANT_SERVICE_HOST: Joi.string().default('localhost'),
   ASSISTANT_SERVICE_PORT: Joi.number().default(3006),
-
-  // alexa-service (capa de voz, solo lectura) — TCP 3007
-  ALEXA_SERVICE_HOST: Joi.string().default('localhost'),
-  ALEXA_SERVICE_PORT: Joi.number().default(3007),
 
   // automation-service — TCP 3008. El cliente no se usa hasta bloques posteriores.
   AUTOMATION_SERVICE_HOST: Joi.string().default('localhost'),

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ClientsModule } from '@nestjs/microservices';
+import { clienteDeServicio } from '@praxis/local-transport';
 import { AuthModule } from '../auth/auth.module';
 import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
 import { ProjectsModule } from '../projects/projects.module';
@@ -27,13 +27,12 @@ import { AdminUsersController } from './admin-users.controller';
  * reactivaría a sí mismo. Las de aquí tienen otras reglas —solo hacia abajo,
  * nunca sobre uno mismo, motivo obligatorio— y viven en otro sitio.
  *
- * ## Los tres servicios que necesita
+ * ## Los servicios que necesita
  *
- * Este módulo cruza datos de tres sitios, y es lo normal en el gateway: las
- * cuentas están en credentials, los roles en permissions y las sesiones de voz en
- * alexa. `AuthModule` aporta `CREDENTIALS_SERVICE` (y el `JwtGuard`),
- * `GlobalRolesModule` aporta `PERMISSIONS_SERVICE` y los helpers de jerarquía, y
- * `ALEXA_SERVICE` se registra aquí porque `AlexaModule` no lo exporta.
+ * Este módulo cruza datos de varios sitios, y es lo normal en el gateway: las
+ * cuentas están en credentials y los roles en permissions. `AuthModule` aporta
+ * `CREDENTIALS_SERVICE` (y el `JwtGuard`) y `GlobalRolesModule` aporta
+ * `PERMISSIONS_SERVICE` y los helpers de jerarquía.
  */
 @Module({
   imports: [
@@ -44,59 +43,13 @@ import { AdminUsersController } from './admin-users.controller';
        `DELETE` del dueño, y es el mismo código. */
     ProjectsModule,
     ClientsModule.registerAsync([
-      {
-        name: 'ALEXA_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('ALEXA_SERVICE_HOST'),
-            port: config.get<number>('ALEXA_SERVICE_PORT'),
-          },
-        }),
-      },
-      {
-        name: 'PROJECTS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('PROJECTS_SERVICE_HOST'),
-            port: config.get<number>('PROJECTS_SERVICE_PORT'),
-          },
-        }),
-      },
+      clienteDeServicio('PROJECTS'),
       /* Para la pantalla de organizaciones de plataforma. Solo lectura: el rol
          global lo comprueba el guard, no billing-service. */
-      {
-        name: 'BILLING_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('BILLING_SERVICE_HOST'),
-            port: config.get<number>('BILLING_SERVICE_PORT'),
-          },
-        }),
-      },
+      clienteDeServicio('BILLING'),
       /* El plan del asistente vive en assistant-service, con su propia tabla de
-         suscripciones. Se registra aquí por lo mismo que ALEXA: su módulo no lo
-         exporta. */
-      {
-        name: 'ASSISTANT_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('ASSISTANT_SERVICE_HOST'),
-            port: config.get<number>('ASSISTANT_SERVICE_PORT'),
-          },
-        }),
-      },
+         suscripciones. Se registra aquí porque su módulo no lo exporta. */
+      clienteDeServicio('ASSISTANT'),
     ]),
   ],
   controllers: [

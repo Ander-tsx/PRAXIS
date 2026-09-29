@@ -70,7 +70,7 @@ export class TasksController {
     return this.tasksService.findMyTasks(dto);
   }
 
-  /** Tareas de todo un proyecto (útil para alexa / asistente de voz) */
+  /** Tareas de todo un proyecto, sin paginar: automatizaciones y purgas. */
   @MessagePattern({ cmd: 'task_find_by_project' })
   findByProject(@Payload() dto: FindTasksByProjectDto) {
     return this.tasksService.findTasksByProject(dto);

@@ -97,6 +97,52 @@
 > la sesión entera en probar un negativo en vez de tocar lo que sí está
 > abierto.
 >
+> **Reverificación del 2026-09-26 (decimonovena vez).** Mismos tres comandos,
+> misma respuesta: `99b2f6d` sigue ancestro de `main`, `report_column_time` en
+> los dos controladores, `billing/src` conserva `organizations/` y
+> `subscriptions/`, y no existe `apps/frontend/reports-front`. Árbol limpio al
+> empezar salvo un archivo suelto sin seguimiento —`prisma:generate`, el log de
+> un `pnpm prisma:generate` que alguien redirigió por error a un fichero con ese
+> nombre literal— que se borró por no ser trabajo de nadie. Rama activa:
+> `feature/scrum-kanban`, no `main`. **No se re-ejecutó ni R9 ni Enterprise**: el
+> prompt de arranque sigue sin mencionar Scrum+Documentos ni Organizaciones, que
+> son las etapas vivas de verdad. Esta es la tercera vez que se deja escrito que
+> el prompt debe retirarse o apuntar a la etapa viva — cada repetición gasta la
+> sesión entera demostrando un negativo.
+>
+> **Reverificación del 2026-09-27 (vigésima vez).** Mismos tres comandos,
+> misma respuesta, esta vez con la ancestría comprobada por commit y no solo
+> por texto: `461ddd10`/`b35661da`/`963f1d87`/`478bce0d`/`5e76f80c` (R9.1 a R9.4
+> y su corrección de lectura) son ancestros de `main` y de `HEAD`
+> (`feature/scrum-kanban`); `feature/enterprise-cuotas` también es ancestro de
+> `main`. **No se re-ejecutó ni R9 ni Enterprise.** No se toca la cabecera del
+> documento porque ya dice exactamente esto desde arriba —«Este plan está
+> cerrado. No se retoma por aquí»— con nombres de commit y todo: el problema
+> nunca fue que el documento callara, es que el prompt de arranque no lo lee.
+> **Cuarta vez que se deja escrito**: esa plantilla vive fuera de este
+> repositorio y ninguna edición aquí la corrige; alguien con acceso a ella
+> tiene que retirarla o apuntarla a [PLAN-SCRUM-KANBAN.md](../../PLAN-SCRUM-KANBAN.md)
+> y [PLAN-ORGANIZACION-ACTIVA.md](../../PLAN-ORGANIZACION-ACTIVA.md), que son
+> las etapas vivas. Lo único abierto que no pide navegador ni decisión del
+> dueño y que se podría tocar en frío: la revisión uno a uno de
+> `useExhaustiveDependencies` en la auditoría de organización/chat/móvil
+> (línea 646 de `docs/AUDITORIA-ORGANIZACION-CHAT-MOVIL.md`) — no se abordó
+> hoy por ir fuera del encargo que pedía esta sesión.
+>
+> **Reverificación del 2026-09-28 (vigesimoprimera vez).** Mismos tres
+> comandos, misma respuesta: `99b2f6d` ancestro de `main` y de `HEAD`
+> (`feature/scrum-kanban`), `report_column_time` en los dos controladores,
+> `billing/src` con `organizations/` y `subscriptions/`. **No se re-ejecutó ni
+> R9 ni Enterprise.** Lo único nuevo es de la máquina, no del código: **el
+> repositorio estaba sin `node_modules`**, ni en la raíz ni en `web`. Un `npx
+> next build` en ese estado no falla por falta de Next: `npx` descarga un
+> `next` suelto, arranca, y Turbopack muere con «Could not find the Next.js
+> package (next/package.json)» — parece un fallo de configuración del
+> monorepo y no lo es. Se arregló con `pnpm install --frozen-lockfile` +
+> `pnpm build:shared`, y `pnpm --filter @praxis/web build` salió verde. Para
+> compilar `web`, el filtro de pnpm, nunca `npx`: con dependencias instaladas
+> da igual, sin ellas el primero dice la verdad y el segundo despista.
+>
 > **Reverificación del 2026-09-25 (decimoctava vez).** Mismos tres comandos,
 > misma respuesta; árbol limpio en `feature/scrum-kanban`. No se re-ejecutó ni
 > R9 ni Enterprise, y **no se lanzó `next build`**: `next dev` vivo en el 4100

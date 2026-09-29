@@ -63,8 +63,8 @@ const nextConfig: NextConfig = {
    * URL cambió: esta aplicación no tiene `basePath`, así que un segmento
    * llamado `projects` se sirve donde antes se reescribía.
    *
-   * ⚠️ **Las rutas de voz (`/api/alexa/*`) nunca estuvieron aquí, y no deben
-   * volver.** Next evalúa `rewrites()` al **construir** y guarda el destino ya
+   * ⚠️ **Una ruta que vaya al gateway no se pone aquí.** Next evalúa
+   * `rewrites()` al **construir** y guarda el destino ya
    * resuelto en `routes-manifest.json`: con `GATEWAY_URL` de relleno durante el
    * build, el destino queda cocido como `http://localhost:3000` y en producción
    * responde 500 pese a que el proceso tiene la variable correcta. Los rewrites
@@ -72,8 +72,8 @@ const nextConfig: NextConfig = {
    * máquina, así que `localhost:410x` también era cierto en producción—; el
    * gateway está en otra máquina y no tenía esa suerte.
    *
-   * Viven en `src/app/api/alexa/[...path]/route.ts`, que lee la variable en
-   * cada petición.
+   * Va en un route handler que lea la variable en cada petición, como
+   * `src/app/api/gateway/[...path]` y `src/app/api/webhooks/stripe`.
    */
 
   /**

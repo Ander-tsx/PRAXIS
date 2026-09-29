@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InitialDomainEvent, isInitialDomainEvent } from '@praxis/contracts';
+import { alReanudar, enReposo } from '@praxis/local-transport';
 import { AutomationEngineService } from '../executions/direct-execution';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService, StreamEntry } from '../redis/redis.service';
@@ -46,6 +47,7 @@ export class InboundEventConsumer implements OnModuleInit, OnModuleDestroy {
   /** Días que se conserva un hecho ya atendido. Ver `purgarAtendidos`. */
   private readonly retentionDays: number;
   private timer?: NodeJS.Timeout;
+  private dejarDeEsperar?: () => void;
   private consuming = false;
   private claimStartId = '0-0';
   private lastMetrics: InboundEventConsumerStats = {
@@ -78,11 +80,19 @@ export class InboundEventConsumer implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     void this.consumeOnce();
-    this.timer = setInterval(() => void this.consumeOnce(), this.pollIntervalMs);
+    /* En reposo no se consulta nada: cada vuelta toca Redis y Postgres, y con
+       ese tráfico Railway no duerme el contenedor (docs/PLAN-MONOLITO.md, M-K).
+       Los hechos que lleguen mientras tanto esperan en el stream; al reanudar
+       se hace una pasada en el acto. */
+    this.timer = setInterval(() => {
+      if (!enReposo()) void this.consumeOnce();
+    }, this.pollIntervalMs);
+    this.dejarDeEsperar = alReanudar(() => void this.consumeOnce());
   }
 
   onModuleDestroy() {
     if (this.timer) clearInterval(this.timer);
+    this.dejarDeEsperar?.();
   }
 
   getMetrics(): InboundEventConsumerStats {

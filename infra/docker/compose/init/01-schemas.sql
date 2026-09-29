@@ -4,4 +4,3 @@
 -- tasks) los crea Prisma al aplicar las migraciones, gracias a la propiedad
 -- `schemas` del datasource. No hace falta declararlos aquí.
 
-CREATE SCHEMA IF NOT EXISTS alexa;

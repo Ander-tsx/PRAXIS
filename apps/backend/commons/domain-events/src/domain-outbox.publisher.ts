@@ -1,5 +1,6 @@
 import { Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
+import { alReanudar, enReposo } from '@praxis/local-transport';
 
 /**
  * El publicador del buzón de salida, una sola vez.
@@ -101,6 +102,7 @@ export abstract class DomainOutboxPublisher implements OnModuleInit, OnModuleDes
   private readonly pollIntervalMs: number;
   private readonly retentionDays: number;
   private timer?: NodeJS.Timeout;
+  private dejarDeEsperar?: () => void;
   private publishing = false;
   private lastMetrics: DomainOutboxPublishStats = {
     pending: 0,
@@ -127,11 +129,19 @@ export abstract class DomainOutboxPublisher implements OnModuleInit, OnModuleDes
 
   onModuleInit() {
     void this.publishPending();
-    this.timer = setInterval(() => void this.publishPending(), this.pollIntervalMs);
+    /* En reposo no se consulta nada: cada consulta es tráfico saliente, y con
+       tráfico Railway no duerme el contenedor (docs/PLAN-MONOLITO.md, M-K). Lo
+       que se escribió antes del reposo ya salió: el plazo es de minutos y esto
+       pasa cada pocos segundos. */
+    this.timer = setInterval(() => {
+      if (!enReposo()) void this.publishPending();
+    }, this.pollIntervalMs);
+    this.dejarDeEsperar = alReanudar(() => void this.publishPending());
   }
 
   onModuleDestroy() {
     if (this.timer) clearInterval(this.timer);
+    this.dejarDeEsperar?.();
   }
 
   getMetrics(): DomainOutboxPublishStats {

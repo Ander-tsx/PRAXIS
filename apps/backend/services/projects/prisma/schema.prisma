@@ -884,6 +884,12 @@ model ChatReaction {
 ///
 /// No hay clave foránea hacia el usuario: vive en credentials-service, bajo otro
 /// dueño. Ahí sí se aplica la regla de siempre.
+///
+/// 🚫 **Sin uso desde 2026-09-29** (docs/PLAN-MONOLITO.md, M10). La página de
+/// Análisis se archivó y con ella se fueron las rutas que leían y guardaban el
+/// lienzo. La tabla **no se borra todavía**: no se pudo comprobar qué hay en
+/// producción, y borrar datos sin verlos no se hace. Un `DROP` es una migración
+/// aparte, después de mirarlo.
 model ReportLayout {
   userId    String
   projectId String

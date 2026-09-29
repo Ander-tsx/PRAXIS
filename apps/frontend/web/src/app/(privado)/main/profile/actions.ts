@@ -8,8 +8,8 @@ import { revalidatePath } from 'next/cache';
  * Acciones de **tu cuenta**: presencia, foto y borrado.
  *
  * Viven aquí y no en `settings/actions.ts` porque la pantalla es otra: en
- * Configuración quedan los ajustes que se consultan —apariencia, facturación,
- * Alexa— y aquí lo que eres tú. La de nombre y apellidos sigue en Configuración
+ * Configuración quedan los ajustes que se consultan —apariencia y facturación—
+ * y aquí lo que eres tú. La de nombre y apellidos sigue en Configuración
  * y la reutiliza esta pantalla: es la misma escritura y no tiene sentido
  * duplicarla.
  *

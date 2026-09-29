@@ -122,17 +122,6 @@ export const BACKEND_SERVICES = [
     descripcion: 'Asistente de IA (Gemini)',
   },
   {
-    key: 'alexa',
-    pkg: '@praxis/alexa-service',
-    dir: 'apps/backend/services/alexa',
-    port: 3007,
-    protocolo: 'TCP',
-    prisma: true,
-    seedOrder: null,
-    color: 91,
-    descripcion: 'Praxis Voice · vinculación y consultas',
-  },
-  {
     key: 'automation',
     pkg: '@praxis/automation-service',
     dir: 'apps/backend/services/automation',
@@ -228,24 +217,24 @@ export const ALL_SERVICES = [...BACKEND_SERVICES, ...FRONTEND_APPS];
  * Presets, porque nadie quiere marcar ocho casillas cada mañana.
  *
  * «Mínimo» es la respuesta a «solo quiero entrar y mirar un tablero»: sin
- * assistant (Gemini cuesta dinero), sin alexa y sin reports.
+ * assistant (Gemini cuesta dinero) y sin reports.
  */
 export const PRESETS = [
   {
     key: 'todo',
-    nombre: 'Todo — los 9 servicios y el frontend',
+    nombre: 'Todo — los 8 servicios y el frontend',
     backend: BACKEND_SERVICES.map((s) => s.key),
     frontend: true,
   },
   {
     key: 'minimo',
-    nombre: 'Mínimo — entrar y usar la app (sin IA, voz ni análisis)',
+    nombre: 'Mínimo — entrar y usar la app (sin IA ni análisis)',
     backend: ['gateway', 'credentials', 'permissions', 'projects', 'tasks'],
     frontend: true,
   },
   {
     key: 'backend',
-    nombre: 'Solo backend — los 9 servicios, sin frontend',
+    nombre: 'Solo backend — los 8 servicios, sin frontend',
     backend: BACKEND_SERVICES.map((s) => s.key),
     frontend: false,
   },

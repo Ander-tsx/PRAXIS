@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ClientProxy, ClientProxyFactory, RpcException, Transport } from '@nestjs/microservices';
+import { ClientProxy, ClientProxyFactory, RpcException } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 
 import { TaskDomainOutboxFactory } from '../domain-events/task-domain-outbox.factory';
@@ -26,6 +26,7 @@ import {
   ToggleChecklistDto,
   UpdateTaskDto,
 } from '@praxis/contracts';
+import { opcionesDeCliente } from '@praxis/local-transport';
 
 const TASK_CACHE_TTL = 120; // 2 min individual task
 const BOARD_TASKS_TTL = 60; // 1 min board tasks list
@@ -106,13 +107,7 @@ export class TasksService {
     private readonly redis: RedisService,
     private readonly config: ConfigService,
   ) {
-    this.projectsClient = ClientProxyFactory.create({
-      transport: Transport.TCP,
-      options: {
-        host: this.config.get<string>('PROJECTS_SERVICE_HOST', 'localhost'),
-        port: this.config.get<number>('PROJECTS_SERVICE_PORT', 3003),
-      },
-    });
+    this.projectsClient = ClientProxyFactory.create(opcionesDeCliente('PROJECTS', this.config));
   }
 
   // ─── Permission guard ─────────────────────────────────────────────────────
@@ -866,7 +861,7 @@ export class TasksService {
     return { items, total };
   }
 
-  /** Resuelve todas las tareas de un proyecto (para alexa) */
+  /** Resuelve todas las tareas de un proyecto, sin paginar. */
   async findTasksByProject(dto: FindTasksByProjectDto) {
     const cacheKey = `tasks:project:${dto.projectId}`;
     const cached = await this.redis.get(cacheKey);

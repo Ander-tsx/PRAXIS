@@ -26,7 +26,10 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | [docs/PLAN-SCRUM-KANBAN.md](docs/PLAN-SCRUM-KANBAN.md) | **Etapa en revisión** (rama `feature/scrum-kanban`, 2026-09-23) — Scrum como **capa encima** del Kanban: `Board.scrumEnabled`, sprints, backlog, estimación, burndown, WIP blando y capacidad para PRAX. Veinte decisiones (D1–D20; D17–D20 sustituyen a D14–D16 tras la auditoría del 2026-09-24, que está al final con casilla por hallazgo) y el registro de cada fase. **Se sigue estrictamente**: una sesión que retome esto empieza leyéndolo entero |
 | [docs/PLAN-DOCUMENTOS.md](docs/PLAN-DOCUMENTOS.md) | Documentos dentro de los Espacios. **Etapa 2 entregada** (2026-09-25): editor en bloques (TipTap) **en tiempo real** (`collab-service`, Hocuspocus, puerto 3010), guardado como Yjs + copia en Markdown, compartir como Google Docs (`/d/<id>`), imágenes, versiones y documentos vinculados a tareas. Decisiones E1–E11 y sus trampas |
 | [docs/PLAN-FUSION-ZONAS.md](docs/PLAN-FUSION-ZONAS.md) | **Etapa cerrada** (2026-09-04, rama `feature/fusion-zonas`) — Multi-Zones fusionado en una sola aplicación. Por qué nacieron las zonas (un requisito de una materia, no una decisión de arquitectura), por qué no se sostenían —las 8 apps corrían en **un solo contenedor**, todo el coste y ningún beneficio— y cómo se hizo: ocho decisiones, seis invariantes y doce pasos (F0–F11), **ninguna URL cambiada**. Se conserva por el registro: cada paso anota qué trampa apareció, y varias no dan error —`revalidatePath` sin prefijo, `projectPath()`, un `redirect()` bajo un layout que ya hace streaming— |
-| [docs/frontend/PLAN-PRAX-AGENTICO.md](docs/frontend/PLAN-PRAX-AGENTICO.md) | **Etapa por empezar** (2026-09-25). Dos cosas sin tocar todavía: por qué PRAX no responde desde la migración a organizaciones (diagnóstico en frío, sin reproducir — tres hipótesis con `file:line`, nada confirmado) y la idea de un modelo barato de decisión («jev», sin verificar qué modelo es) delante del modelo real para recortar contexto. Incluye por qué «volver agéntico» a PRAX no puede chocar con «el asistente propone; nunca ejecuta» sin decidirlo antes |
+| [docs/PLAN-MONOLITO.md](docs/PLAN-MONOLITO.md) | **Etapa en curso** (2026-09-29): el backend pasa de once procesos a **uno**. La RAM de `praxis-api` era ~90% de la factura de Railway y no era un leak, sino el coste fijo de once V8 en reposo: 1.335 MB frente a 189. Transporte en proceso con la semántica exacta de TCP, fuera Alexa y las rutas muertas de Análisis, y un reposo que deja dormir al contenedor. Diez decisiones, el orden y cómo se despliega. **Va antes que el de PRAX** |
+| [docs/PLAN-PRAX-SEMIAGENTICO.md](docs/PLAN-PRAX-SEMIAGENTICO.md) | **Etapa abierta** (2026-09-29, rama `feature/prax-semiagentico`) — refactor de PRAX, frontend y **backend** por encargo: bucle de consultas de solo lectura (**sigue proponiendo, nunca ejecuta**), turno por SSE, «Recursos» guardado en servidor y atado a la organización activa, cobro en tokens ponderados, Jev como router opcional detrás de un interruptor, `ChatMessage.origin`, @PRAX en el chat grupal y el rediseño de ambos chats. Diecisiete decisiones (D1–D17), seis invariantes y once fases. ⚠️ Destapa que **el corte de 15 s del cliente** es la causa más probable de «PRAX no responde». **Se sigue estrictamente** |
+| [docs/PRAX-MCP-SEGUNDA-ITERACION.md](docs/PRAX-MCP-SEGUNDA-ITERACION.md) | Nota interna, sin decidir: Praxis como servidor MCP (Claude usando Praxis) frente a PRAX como cliente MCP. Qué falta —OAuth, sobre todo— y qué choca con «propone; nunca ejecuta» |
+| [docs/frontend/PLAN-PRAX-AGENTICO.md](docs/frontend/PLAN-PRAX-AGENTICO.md) | 🚫 **Sustituido** por el de arriba. Se conserva por el diagnóstico en frío y la ficha de Jev. Era: **etapa por empezar** (2026-09-25). Dos cosas sin tocar todavía: por qué PRAX no responde desde la migración a organizaciones (diagnóstico en frío, sin reproducir — tres hipótesis con `file:line`, nada confirmado) y la idea de un modelo barato de decisión («jev», sin verificar qué modelo es) delante del modelo real para recortar contexto. Incluye por qué «volver agéntico» a PRAX no puede chocar con «el asistente propone; nunca ejecuta» sin decidirlo antes |
 | [kyloo-design/SKILL.md](kyloo-design/SKILL.md) | **Antes de tocar cualquier pantalla.** Cómo se componen: filas en vez de tarjetas, tipografía como jerarquía, activo por tono. ⚠️ **Su paleta, sus radios y sus fuentes están revertidos** (`3fa9b87`) y no se reaplican sin pedirlo — lee el aviso de su cabecera. §13 es la de dentro de la aplicación |
 | [STRUCTURE.md](STRUCTURE.md) | Dónde va cada archivo nuevo |
 | [docs/backend/permissions.md](docs/backend/permissions.md) | Modelo de permisos de dos capas |
@@ -156,9 +159,13 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
 13. ⚠️ **Los latidos de 25 s del SSE no son la latencia.** Son un byte por una
     conexión en silencio para que ningún intermediario la cierre —el balanceador
     corta a los 60 s—. Lo que hay que enviar se envía en el momento.
-14. ⚠️ **`CHAT_MESSAGE` viaja por el flujo de avisos pero NO es un
-    `NotificationType`** y no deja fila en la bandeja: cincuenta mensajes serían
-    cincuenta avisos por persona. Trata el `type` del flujo como texto libre.
+14. ⚠️ **Un mensaje de chat viaja en vivo como `chat.mensaje`, no como
+    aviso.** Antes se colaba por el canal de avisos con un `type: 'CHAT_MESSAGE'`
+    de texto libre; ese sobre ya no existe. Los eventos en vivo llevan `tipo`
+    en la raíz, con una unión cerrada en `commons/realtime/tipos.ts`, y un
+    mensaje **no deja fila en la bandeja**: cincuenta mensajes serían cincuenta
+    avisos por persona. `CHAT_EVENT_TYPE` en `chat.service.ts` es un resto
+    muerto.
 
 15. 🔴 **Registrarse ya no abre sesión, y hay que confirmar el correo antes de
     entrar.** `POST /auth/register` devuelve `{ userId, email,
@@ -413,7 +420,16 @@ sobre una lista que alguien le cortó por detrás.
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · **collab 3010 (WebSocket, lo abre el navegador directo)** · **el frontend, 4100, en un solo proceso**.
+**Puertos:** gateway 3000 · microservicios TCP (solo en desarrollo, ver abajo): credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, **automation 3008**, **billing 3009** · **collab 3010 (WebSocket)** · **el frontend, 4100, en un solo proceso**. El 3007 quedó libre: Alexa se retiró (2026-09-29) y no vuelve.
+
+🔴 **En producción el backend es UN proceso, no diez** ([PLAN-MONOLITO](docs/PLAN-MONOLITO.md)). `apps/backend/monolith` arranca el gateway, los ocho servicios y collab juntos, y se hablan en memoria por `@praxis/local-transport` (`PRAXIS_TRANSPORT=local`). En desarrollo, `dev:backend` sigue levantándolos por separado y por TCP. Lo que muerde:
+
+- **Todo lo que cruza entre servicios pasa por JSON, en los dos transportes.** Un `Date` llega como cadena, igual que por el socket. El transporte en proceso lo copia a propósito, y sus pruebas lo comparan contra TCP de verdad. No lo «optimices».
+- **Cada servicio lee `<SERVICIO>_DATABASE_URL`** y solo cae a `DATABASE_URL` en desarrollo. En el monolito, el `DATABASE_URL` genérico apunta a un sitio que no conecta: un servicio sin su URL propia falla al arrancar en vez de escribir en el schema de otro.
+- **Un servicio nuevo se añade en tres sitios**, y olvidar cualquiera no da error hasta producción: `SERVICIOS` en `monolith/src/main.ts`, `SCHEMAS` en `monolith/src/entorno.ts` si tiene Prisma, y `migrar.sh`.
+- **El `ValidationPipe` de los servicios no valida los mensajes entre servicios**, ni antes ni ahora. Activarlo es una auditoría aparte, no un cambio de una línea.
+- **En reposo, los sondeos se paran.** Tras 5 minutos sin mensajes entre servicios (`PRAXIS_REPOSO_MS`), el buzón de salida y el consumidor de automatizaciones dejan de consultar Redis y Postgres, y Railway puede dormir el contenedor. Una tarea de fondo nueva tiene que respetar `enReposo()` y `alReanudar()`, o el backend no vuelve a dormirse nunca.
+- 🍎 **Formatear con Biome antes de compilar, no después.** Biome partió un `typeof import('…')` en varias líneas con una coma final, y TypeScript lo leyó como atributos de importación: la imagen de Docker no compilaba y en local sí, porque el `dist/` era de antes de formatear.
 
 ⚠️ **`collab-service` es el único servicio al que conecta el navegador sin
 pasar por el gateway** (`docs/PLAN-DOCUMENTOS.md`, E3). Solo acepta billetes de
@@ -498,7 +514,7 @@ pnpm build:shared         # contracts + observability
 pnpm prisma:generate      # los 7 servicios con Prisma
 pnpm prisma:deploy        # aplica migraciones sin tocar los datos
 pnpm prisma:seed          # 5 seeds, en su orden de dependencia
-pnpm dev:backend          # gateway + los 9 microservicios
+pnpm dev:backend          # gateway + los 8 servicios, cada uno en su proceso (TCP)
 pnpm dev:frontend         # las 6 zonas
 ```
 
@@ -510,8 +526,8 @@ la suite: desaparecen y ya. Para verificar, se corre el stack **construido**:
 
 ```bash
 pnpm build:frontend       # las zonas, --concurrency=1: importa el pico
-pnpm --filter "@praxis/gateway" --filter "@praxis/*-service" run build
-pnpm start:backend        # los 10, desde dist/   → ~315 MB en total
+pnpm build:backend        # el monolito y todo lo que importa
+pnpm start:backend        # el monolito, un proceso → ~190 MB (1.335 MB eran los once separados)
 pnpm start:frontend       # las zonas, desde .next/ → ~580 MB en total
 ```
 

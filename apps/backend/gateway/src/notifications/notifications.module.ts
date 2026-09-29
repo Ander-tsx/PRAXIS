@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ClientsModule } from '@nestjs/microservices';
+import { clienteDeServicio } from '@praxis/local-transport';
 import { AuthModule } from '../auth/auth.module';
 import { MyNotificationsController } from './my-notifications.controller';
 import { NotificationsStreamService } from './notifications-stream.service';
@@ -19,32 +19,7 @@ import { NotificationsStreamService } from './notifications-stream.service';
 @Module({
   imports: [
     AuthModule,
-    ClientsModule.registerAsync([
-      {
-        name: 'PROJECTS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('PROJECTS_SERVICE_HOST'),
-            port: config.get<number>('PROJECTS_SERVICE_PORT'),
-          },
-        }),
-      },
-      {
-        name: 'CREDENTIALS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('CREDENTIALS_SERVICE_HOST'),
-            port: config.get<number>('CREDENTIALS_SERVICE_PORT'),
-          },
-        }),
-      },
-    ]),
+    ClientsModule.registerAsync([clienteDeServicio('PROJECTS'), clienteDeServicio('CREDENTIALS')]),
   ],
   controllers: [MyNotificationsController],
   providers: [NotificationsStreamService],

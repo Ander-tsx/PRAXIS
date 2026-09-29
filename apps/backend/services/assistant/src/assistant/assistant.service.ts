@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ClientProxy, ClientProxyFactory, RpcException, Transport } from '@nestjs/microservices';
+import { ClientProxy, ClientProxyFactory, RpcException } from '@nestjs/microservices';
 import {
   ASSISTANT_ATTACHMENT_MAX_BYTES,
   ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE,
@@ -19,6 +19,7 @@ import {
   type ReportMetric,
   validarGrafico,
 } from '@praxis/contracts';
+import { opcionesDeCliente } from '@praxis/local-transport';
 import { firstValueFrom } from 'rxjs';
 
 import { bloqueDeArchivo } from './attachment-text';
@@ -249,13 +250,7 @@ export class AssistantService {
     private readonly conversaciones: ConversationsService,
     private readonly adjuntos: AttachmentsService,
   ) {
-    this.reportsClient = ClientProxyFactory.create({
-      transport: Transport.TCP,
-      options: {
-        host: this.config.get<string>('REPORTS_SERVICE_HOST'),
-        port: this.config.get<number>('REPORTS_SERVICE_PORT'),
-      },
-    });
+    this.reportsClient = ClientProxyFactory.create(opcionesDeCliente('REPORTS', this.config));
   }
 
   /** Cuánto lleva gastado. Lo pide la página al cargar, para pintar el contador. */

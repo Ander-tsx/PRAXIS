@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { fetchAlGateway } from '../api/despertar';
 import { ApiError, unwrapEnvelope } from '../api/envelope';
 import { UPLOAD_TIMEOUT_MS, isTimeout, timeoutError, timeoutSignal } from '../api/timeout';
 import { SESSION_COOKIE } from './cookies';
@@ -78,7 +79,7 @@ export function createServerApiClient(options: ServerApiClientOptions = {}): Ser
     let response: Response;
 
     try {
-      response = await fetch(`${gatewayUrl}/api${normalized}`, {
+      response = await fetchAlGateway(`${gatewayUrl}/api${normalized}`, {
         ...init,
         method,
         headers: {
@@ -114,7 +115,7 @@ export function createServerApiClient(options: ServerApiClientOptions = {}): Ser
 
     let response: Response;
     try {
-      response = await fetch(`${gatewayUrl}/api${normalized}`, {
+      response = await fetchAlGateway(`${gatewayUrl}/api${normalized}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: form,

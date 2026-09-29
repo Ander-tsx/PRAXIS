@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
+import { ClientProxy, ClientProxyFactory } from '@nestjs/microservices';
 import { type ReportFilters, claveDeFiltros, leerCruce } from '@praxis/contracts';
+import { opcionesDeCliente } from '@praxis/local-transport';
 import { firstValueFrom } from 'rxjs';
 
 import { RedisService } from '../redis/redis.service';
@@ -45,20 +46,8 @@ export class ReportsService {
     private readonly config: ConfigService,
     private readonly redis: RedisService,
   ) {
-    this.tasksClient = ClientProxyFactory.create({
-      transport: Transport.TCP,
-      options: {
-        host: this.config.get<string>('TASKS_SERVICE_HOST'),
-        port: this.config.get<number>('TASKS_SERVICE_PORT'),
-      },
-    });
-    this.projectsClient = ClientProxyFactory.create({
-      transport: Transport.TCP,
-      options: {
-        host: this.config.get<string>('PROJECTS_SERVICE_HOST'),
-        port: this.config.get<number>('PROJECTS_SERVICE_PORT'),
-      },
-    });
+    this.tasksClient = ClientProxyFactory.create(opcionesDeCliente('TASKS', this.config));
+    this.projectsClient = ClientProxyFactory.create(opcionesDeCliente('PROJECTS', this.config));
   }
 
   private ask<T>(client: ClientProxy, cmd: string, payload: unknown): Promise<T> {

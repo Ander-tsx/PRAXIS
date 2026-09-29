@@ -1,25 +1,15 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ClientsModule } from '@nestjs/microservices';
+import { clienteDeServicio } from '@praxis/local-transport';
 import { AuthController } from './auth.controller';
 import { JwtGuard } from './jwt.guard';
 
 @Module({
   imports: [
     ClientsModule.registerAsync([
-      {
-        name: 'CREDENTIALS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('CREDENTIALS_SERVICE_HOST'),
-            port: config.get<number>('CREDENTIALS_SERVICE_PORT'),
-          },
-        }),
-      },
+      clienteDeServicio('CREDENTIALS'),
       /**
        * Solo para crear el espacio personal al registrarse.
        *
@@ -28,18 +18,7 @@ import { JwtGuard } from './jwt.guard';
        * resuelve el cliente en el módulo que lo declara, y declararlo dos veces
        * no cuesta nada — es la misma configuración leída del mismo `.env`.
        */
-      {
-        name: 'BILLING_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('BILLING_SERVICE_HOST'),
-            port: config.get<number>('BILLING_SERVICE_PORT'),
-          },
-        }),
-      },
+      clienteDeServicio('BILLING'),
     ]),
 
     JwtModule.registerAsync({

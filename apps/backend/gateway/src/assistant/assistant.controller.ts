@@ -325,8 +325,8 @@ export class AssistantController {
      * necesita saber quién es quién. Un equipo de veinte eran veinte idas y
      * vueltas para construir un dato que se usa entero o no se usa.
      *
-     * `user_find_by_ids` ya existía —lo usan el panel de administración y
-     * alexa-service— y resuelve los mismos perfiles de un golpe.
+     * `user_find_by_ids` ya existía —lo usa el panel de administración— y
+     * resuelve los mismos perfiles de un golpe.
      */
     const perfiles = await firstValueFrom(
       this.credentialsClient.send<{ id: string; firstName?: string; lastName?: string }[]>(

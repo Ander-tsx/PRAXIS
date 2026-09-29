@@ -1,0 +1,33 @@
+{
+  "name": "@praxis/monolith",
+  "version": "0.0.1",
+  "private": true,
+  "description": "El backend entero en un proceso: el gateway, los servicios y collab, hablándose en memoria.",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start:prod": "node --max-old-space-size=512 dist/main.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.1",
+    "@nestjs/core": "^11.0.1",
+    "@nestjs/microservices": "^11.0.1",
+    "@praxis/assistant-service": "workspace:*",
+    "@praxis/automation-service": "workspace:*",
+    "@praxis/billing-service": "workspace:*",
+    "@praxis/collab-service": "workspace:*",
+    "@praxis/credentials-service": "workspace:*",
+    "@praxis/gateway": "workspace:*",
+    "@praxis/local-transport": "workspace:*",
+    "@praxis/permissions-service": "workspace:*",
+    "@praxis/projects-service": "workspace:*",
+    "@praxis/reports-service": "workspace:*",
+    "@praxis/tasks-service": "workspace:*",
+    "pg": "^8.22.0",
+    "reflect-metadata": "^0.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.7.3"
+  }
+}

@@ -20,7 +20,7 @@ export const metadata: Metadata = {
  * en cualquier otra herramienta, así que ahí es donde está ahora todo:
  * identidad, sesión y el final del camino.
  *
- * En Configuración se quedan los **ajustes**: apariencia, facturación y Alexa.
+ * En Configuración se quedan los **ajustes**: apariencia y facturación.
  * La diferencia que separa una pantalla de la otra es «quién eres» contra «cómo
  * se comporta la aplicación».
  *

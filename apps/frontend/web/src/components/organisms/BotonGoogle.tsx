@@ -75,6 +75,49 @@ export function BotonGoogle({ clientId, onCredencial, deshabilitado = false }: B
     if (!clientId) return;
 
     let cancelado = false;
+    let inicializado = false;
+    let anchoPintado = -1;
+
+    /**
+     * Repinta el botón con el ancho actual del contenedor.
+     *
+     * ⚠️ Google lo topa en 400 px y **exige un número**, no un porcentaje: no
+     * hay forma de decirle «el 100%». Por eso se mide en píxeles aquí en vez
+     * de resolverlo con CSS. `renderButton` vuelve a montar el iframe cada vez
+     * que se llama, así que repintar en cada cambio de ancho (en vez de medir
+     * una sola vez al cargar el script) es lo que mantiene el botón alineado
+     * con los inputs de arriba tras un resize, un cambio de breakpoint o un
+     * reflow por fuente tardía.
+     */
+    function pintar() {
+      const google = (window as unknown as { google?: GoogleAccounts }).google;
+      if (!google || cancelado || !contenedor.current || !inicializado) return;
+
+      const ancho = Math.min(contenedor.current.offsetWidth || 320, 400);
+      if (ancho === anchoPintado) return;
+      anchoPintado = ancho;
+
+      /**
+       * El tema se lee del `data-theme` que cada zona estampa en el `<html>`.
+       *
+       * Sin esto el botón sale siempre en `outline` —fondo blanco y borde gris—
+       * que sobre el tema oscuro del sistema aparece como un recuadro claro
+       * pegado en medio del formulario. `filled_black` es la variante que
+       * Google publica justo para fondos oscuros.
+       */
+      const oscuro = document.documentElement.dataset.theme !== 'light';
+
+      google.accounts.id.renderButton(contenedor.current, {
+        type: 'standard',
+        theme: oscuro ? 'filled_black' : 'outline',
+        /* `large` son 40 px de alto: exactamente los `h-10` del átomo Button. */
+        size: 'large',
+        text: 'continue_with',
+        shape: 'rectangular',
+        width: ancho,
+        locale: 'es',
+      });
+    }
 
     function montar() {
       const google = (window as unknown as { google?: GoogleAccounts }).google;
@@ -90,36 +133,8 @@ export function BotonGoogle({ clientId, onCredencial, deshabilitado = false }: B
         auto_select: false,
       });
 
-      /**
-       * El tema se lee del `data-theme` que cada zona estampa en el `<html>`.
-       *
-       * Sin esto el botón sale siempre en `outline` —fondo blanco y borde gris—
-       * que sobre el tema oscuro del sistema aparece como un recuadro claro
-       * pegado en medio del formulario. `filled_black` es la variante que
-       * Google publica justo para fondos oscuros.
-       */
-      const oscuro = document.documentElement.dataset.theme !== 'light';
-
-      /**
-       * El ancho se mide del contenedor para que coincida con el botón de
-       * enviar, que es `fullWidth`.
-       *
-       * ⚠️ Google lo topa en 400 px y **exige un número**, no un porcentaje: no
-       * hay forma de decirle «el 100%». Por eso se mide en píxeles aquí en vez
-       * de resolverlo con CSS.
-       */
-      const ancho = Math.min(contenedor.current.offsetWidth || 320, 400);
-
-      google.accounts.id.renderButton(contenedor.current, {
-        type: 'standard',
-        theme: oscuro ? 'filled_black' : 'outline',
-        /* `large` son 40 px de alto: exactamente los `h-10` del átomo Button. */
-        size: 'large',
-        text: 'continue_with',
-        shape: 'rectangular',
-        width: ancho,
-        locale: 'es',
-      });
+      inicializado = true;
+      pintar();
     }
 
     /* El script puede estar ya cargado si se navega entre login y registro sin
@@ -128,20 +143,25 @@ export function BotonGoogle({ clientId, onCredencial, deshabilitado = false }: B
 
     if (existente) {
       montar();
-      return () => {
-        cancelado = true;
-      };
+    } else {
+      const script = document.createElement('script');
+      script.src = URL_SCRIPT;
+      script.async = true;
+      script.defer = true;
+      script.onload = montar;
+      document.head.appendChild(script);
     }
 
-    const script = document.createElement('script');
-    script.src = URL_SCRIPT;
-    script.async = true;
-    script.defer = true;
-    script.onload = montar;
-    document.head.appendChild(script);
+    /* Repinta ante cualquier cambio real de ancho del contenedor: resize de
+       ventana, cambio de breakpoint, o reflow por fuente que termina de
+       cargar. Sin esto el botón se queda con el ancho medido en el primer
+       render y se desalinea de los inputs. */
+    const observador = new ResizeObserver(() => pintar());
+    if (contenedor.current) observador.observe(contenedor.current);
 
     return () => {
       cancelado = true;
+      observador.disconnect();
     };
   }, [clientId]);
 

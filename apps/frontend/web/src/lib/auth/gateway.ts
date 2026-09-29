@@ -1,4 +1,5 @@
 import { ApiError, type AuthTokens, isAuthTokens, unwrapEnvelope } from '@praxis/commons/api';
+import { fetchAlGateway } from '@praxis/commons/api/despertar';
 
 const GATEWAY_URL = process.env.GATEWAY_URL ?? 'http://localhost:3000';
 
@@ -10,7 +11,7 @@ export async function gatewayPost<T>(path: string, body: unknown): Promise<T> {
   let response: Response;
 
   try {
-    response = await fetch(`${GATEWAY_URL}/api${path}`, {
+    response = await fetchAlGateway(`${GATEWAY_URL}/api${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

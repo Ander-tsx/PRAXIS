@@ -1,4 +1,5 @@
 import { REFRESH_COOKIE, SESSION_COOKIE, clearSessionCookies } from '@/lib/auth/session-cookie';
+import { fetchAlGateway } from '@praxis/commons/api/despertar';
 import { type NextRequest, NextResponse } from 'next/server';
 
 const GATEWAY_URL = process.env.GATEWAY_URL ?? 'http://localhost:3000';
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
        * Se sigue borrando la cookie pase lo que pase —quien pide salir, sale—,
        * pero el fallo deja de ser invisible.
        */
-      const respuesta = await fetch(`${GATEWAY_URL}/api/auth/logout`, {
+      const respuesta = await fetchAlGateway(`${GATEWAY_URL}/api/auth/logout`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         /**

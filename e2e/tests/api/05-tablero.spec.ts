@@ -219,19 +219,21 @@ test.describe('Tablero', () => {
     expect(respuesta.status()).toBe(201);
   });
 
-  test('los informes exigen canViewReports', async ({ request }) => {
+  test('el asistente exige canViewReports', async ({ request }) => {
     const mundo = await crearMundo(request);
     const lectora = await registrar(request);
 
     await darDeAlta(request, mundo, lectora, { canViewProject: true });
 
-    const sinPermiso = await request.get(`/api/projects/${mundo.proyecto.id}/reports/snapshot`, {
+    /* Las rutas de informes se retiraron con la página de Análisis; el permiso
+       sigue vivo porque decide quién habla con PRAX sobre el proyecto. */
+    const sinPermiso = await request.get(`/api/projects/${mundo.proyecto.id}/assistant/quota`, {
       headers: comoBearer(lectora.accessToken),
     });
-    expect(sinPermiso.status(), 'Las siete rutas de informes piden canViewReports').toBe(403);
+    expect(sinPermiso.status(), 'Hablar con PRAX de un proyecto pide canViewReports').toBe(403);
 
     /* El dueño sí, siempre: tiene acceso total sin pasar por roles. */
-    const comoDuenno = await request.get(`/api/projects/${mundo.proyecto.id}/reports/snapshot`, {
+    const comoDuenno = await request.get(`/api/projects/${mundo.proyecto.id}/assistant/quota`, {
       headers: comoBearer(mundo.duenno.accessToken),
     });
     expect(comoDuenno.status()).toBe(200);
