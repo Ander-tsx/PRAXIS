@@ -61,7 +61,11 @@ model AssistantUsage {
   /// igual para todos los casos.
   organizationId String @default("")
   period String
+  /// Turnos del mes. Ya no decide nada: se conserva como estadística.
   used   Int    @default(0)
+  /// **Tokens PRAX** del mes (D8 de docs/PLAN-PRAX-SEMIAGENTICO.md): lo que se
+  /// compara contra el tope del plan desde 2026-09-29. Ver `tokensPrax()`.
+  tokens Int    @default(0)
 
   @@unique([userId, organizationId, period])
   @@index([period])
@@ -175,6 +179,11 @@ model Message {
   /// propuestas parecerían del último. Es también lo que permite pintar la marca
   /// de «ahora hablando de X» en el sitio exacto donde ocurrió.
   projectId      String?
+  /// Lo que costó esta respuesta, solo en los mensajes del modelo (D9):
+  /// `{ entrada, salida, razonamiento, cache, vueltas, contexto, tokensPrax }`.
+  /// `contexto` es la entrada de la **primera** vuelta, lo que reenviará el
+  /// siguiente turno: es lo que dispara el aviso de conversación larga.
+  uso            Json?
   proposals      Proposal[]
   attachments    Attachment[]
   createdAt      DateTime     @default(now())

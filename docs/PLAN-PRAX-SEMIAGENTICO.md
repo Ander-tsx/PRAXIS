@@ -509,7 +509,7 @@ que tocan esquema llevan migración (`prisma:deploy`, **nunca `reset`**).
   - Eventos `paso`, `texto`, `propuesta`, `uso` y `fin`.
   - `FlujoDePensamiento` real.
   - Fuera las variantes muertas `panel` y `cajon`.
-- [ ] **F4 — Tokens PRAX** (D8, D9).
+- [x] **F4 — Tokens PRAX** (D8, D9). Ver el registro.
   - Migración de `AssistantUsage`; `iaTokensMensualesPorPersona` en
     `plans.ts`, aplicada en el mismo commit.
   - Consumo por turno y por conversación en la interfaz.
@@ -724,3 +724,28 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
     - **Queda para F8**: el texto en vivo ya sale sin burbuja, pero el mensaje
       final todavía se pinta en la burbuja de antes. Las variantes muertas
       `panel` y `cajon` siguen ahí; se quitan con el rediseño.
+  - **F4 cerrada.**
+    - **La unidad**: `tokensPrax()` en `contracts/assistant` es la única
+      función que convierte el uso de Gemini en tokens PRAX (entrada ×1, caché
+      ×0,25, salida y razonamiento ×8), y la usan el servicio que cobra y la
+      pantalla.
+    - **El contador**: `AssistantUsage.tokens` es lo que se compara contra
+      `iaTokensMensualesPorPersona`. `used` queda como estadística.
+    - **Qué se cobra**: lo que costó el bucle entero. El turno de recuperación
+      se registra en el uso del mensaje, pero no se cobra.
+    - **Cifras por plan, provisionales** (decididas esta noche): los mensajes
+      de antes × ~20 mil tokens PRAX, redondeados. Gratis 250 mil, Pro 1,5 M,
+      Equipo 2 M, Negocio 6 M y Enterprise 20 M. Se recalibran con
+      `gemini_uso` de producción en cuanto haya datos.
+    - **D9**:
+      - cada respuesta guarda su uso (`Message.uso`) y lo enseña debajo;
+      - la conversación enseña su total y lo que queda del mes;
+      - cuando el `contexto` del último turno pasa de 30 mil tokens, un aviso
+        con «Empezar una nueva» sustituye esa línea.
+    - **Planes**: el catálogo dice «Tokens PRAX / mes por persona» y explica
+      qué son. `AmpliarPlan` y el 402 hablan de tokens.
+    - **Prueba en la interfaz**: con el Gemini falso declarando 35 mil de
+      entrada salieron «71 mil tokens PRAX · consultó 1 vez» y el aviso.
+    - **Pendiente, a propósito:** el corte del historial a 12 mensajes todavía
+      no se le dice al modelo (D9, segunda mitad). Va con F5, que es donde se
+      decide qué contexto entra.

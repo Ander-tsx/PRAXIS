@@ -178,5 +178,6 @@ export async function preguntarEnVivo(
     topeAgotado: null,
     conversationId: resultado.conversationId ?? conversationId,
     error: null,
+    ...(resultado.uso ? { uso: resultado.uso } : {}),
   };
 }

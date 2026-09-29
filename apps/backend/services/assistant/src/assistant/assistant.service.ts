@@ -17,6 +17,7 @@ import {
   QuotaKind,
   type ReportChartShape,
   type ReportMetric,
+  tokensPrax,
   validarGrafico,
 } from '@praxis/contracts';
 import { opcionesDeCliente } from '@praxis/local-transport';
@@ -450,10 +451,19 @@ export class AssistantService {
       ? [...HERRAMIENTAS_DE_CONSULTA, ...herramientas]
       : herramientas;
 
-    const uso: UsoDelTurno = { entrada: 0, salida: 0, razonamiento: 0, cache: 0, vueltas: 0 };
+    const uso: UsoDelTurno = {
+      entrada: 0,
+      salida: 0,
+      razonamiento: 0,
+      cache: 0,
+      vueltas: 0,
+      contexto: 0,
+      tokensPrax: 0,
+    };
     const sumarUso = (parcial?: UsoDeGemini) => {
       uso.vueltas += 1;
       if (!parcial) return;
+      if (uso.vueltas === 1) uso.contexto = parcial.entrada;
       uso.entrada += parcial.entrada;
       uso.salida += parcial.salida;
       uso.razonamiento += parcial.razonamiento;
@@ -552,10 +562,14 @@ export class AssistantService {
         );
       }
 
+      /* Se cobra lo que se gastó de verdad, en tokens PRAX (D8). Antes del turno
+         de recuperación, que no se cobra: es culpa nuestra, no de quien pregunta. */
+      uso.tokensPrax = tokensPrax(uso);
       cuota = await this.quota.consumir(
         payload.userId,
         payload.limiteMensual,
         payload.organizationId,
+        uso.tokensPrax,
       );
     } catch (error) {
       if (error instanceof RpcException) {
@@ -699,6 +713,7 @@ export class AssistantService {
       pregunta: payload.message,
       respuesta: reply,
       proposals: validadas,
+      uso,
       userId: payload.userId,
       /* Los que de verdad llegaron a leerse: uno cuyo blob se hubiera perdido no
          sale de `paraElTurno`, y atarlo al mensaje pondría en la burbuja un
@@ -789,6 +804,7 @@ export class AssistantService {
       payload.userId,
       payload.limiteMensual,
       payload.organizationId,
+      respuesta.uso ? tokensPrax(respuesta.uso) : 0,
     );
 
     /**
@@ -1689,7 +1705,7 @@ function cuotaAgotada(cuota: AssistantQuota, planTier?: string | null): RpcExcep
     statusCode: 402,
     code: QUOTA_EXCEEDED_CODE,
     message:
-      `Has gastado los ${cuota.limite} mensajes de este mes. ` +
+      `Has gastado los ${cuota.limite.toLocaleString('es')} tokens PRAX de este mes. ` +
       'Vuelven el día 1 del mes que viene.',
     details: { ...detalle, cuota },
   });

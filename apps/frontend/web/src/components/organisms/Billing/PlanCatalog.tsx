@@ -1,3 +1,4 @@
+import { formatearTokens } from '@praxis/commons/api/assistant';
 import type {
   BillingSummary,
   PlanSpec,
@@ -107,8 +108,14 @@ export function PlanCatalog({
               { label: 'Asientos (máximo)', valor: (p: PlanSpec) => tope(p.quotas.asientos) },
               { label: 'Proyectos', valor: (p: PlanSpec) => tope(p.quotas.proyectos) },
               {
-                label: 'Consultas a PRAX / mes',
-                valor: (p: PlanSpec) => tope(p.quotas.iaMensualPorPersona),
+                /* Tokens PRAX por persona (D8 de docs/PLAN-PRAX-SEMIAGENTICO.md): un
+                   mensaje ya no cuesta lo mismo que otro desde que PRAX consulta
+                   antes de responder. La explicación va debajo de la tabla. */
+                label: 'Tokens PRAX / mes por persona',
+                valor: (p: PlanSpec) =>
+                  p.quotas.iaTokensMensualesPorPersona === null
+                    ? 'Ilimitado'
+                    : formatearTokens(p.quotas.iaTokensMensualesPorPersona),
               },
               {
                 label: 'Automatizaciones por proyecto',
@@ -170,6 +177,16 @@ export function PlanCatalog({
           </tfoot>
         </table>
       </div>
+
+      {/* Qué es un token PRAX, dicho donde se compra (D8). Sin esto la fila de la
+          tabla es un número que nadie sabe traducir a «cuánto puedo usarlo». */}
+      <p className="max-w-3xl font-sans text-xs text-white/40">
+        <strong className="text-white/60">Tokens PRAX:</strong> lo que gasta el asistente, medido
+        como lo cobra el modelo. Lo que PRAX lee cuenta una vez; lo que escribe, ocho, porque cuesta
+        ocho veces más. Una pregunta corta sobre un proyecto ronda los 15-20 mil; consultar varios
+        proyectos o mantener una conversación muy larga gasta más, y PRAX te avisa cuando seguirla
+        sale caro. Cada persona tiene su cuota entera dentro de la organización.
+      </p>
 
       <p className="max-w-3xl font-sans text-xs text-white/40">
         Todos los planes de pago se cobran <strong className="text-white/60">por asiento</strong> y
@@ -233,7 +250,7 @@ const REBASADO: Record<QuotaExcedida['kind'], (excedida: QuotaExcedida) => strin
   almacenamiento: (e) =>
     `Los adjuntos ocupan ${e.actual} MB y el plan da ${e.tope}. Los archivos siguen ahí y se descargan; no se puede subir otro.`,
   ia_mensual: (e) =>
-    `Llevas ${e.actual} mensajes a PRAX este mes y el plan da ${e.tope}. El contador vuelve a cero el día 1.`,
+    `Llevas ${formatearTokens(e.actual)} tokens PRAX este mes y el plan da ${formatearTokens(e.tope)}. El contador vuelve a cero el día 1.`,
   /* Los dos que no pueden llegar aquí, y por qué. El `Record` los exige
      completos, y dejarlos con una cadena vacía sería una línea en blanco el
      día que alguno sí llegue. */
@@ -283,7 +300,7 @@ function TopesRebasados({ excedidas }: { excedidas: QuotaExcedida[] }) {
 
 /** El consumo del mes en curso: una línea, con el estado si no es «al día». */
 function TuConsumo({ resumen }: { resumen: BillingSummary }) {
-  const topeIa = resumen.quotas.iaMensualPorPersona;
+  const topeIa = resumen.quotas.iaTokensMensualesPorPersona;
 
   return (
     <div className="flex flex-col gap-1 border-b border-white/[0.08] pb-5">
@@ -296,9 +313,11 @@ function TuConsumo({ resumen }: { resumen: BillingSummary }) {
         )}
       </div>
       <p className="font-sans text-sm text-white/60">
-        <span className="tabular-nums text-white">{resumen.uso.iaMensual}</span> de{' '}
-        <span className="tabular-nums text-white">{topeIa === null ? 'ilimitados' : topeIa}</span>{' '}
-        mensajes a PRAX. Se reinician el {fechaCorta(resumen.iaReiniciaEn)}.
+        <span className="tabular-nums text-white">{formatearTokens(resumen.uso.iaMensual)}</span> de{' '}
+        <span className="tabular-nums text-white">
+          {topeIa === null ? 'ilimitados' : formatearTokens(topeIa)}
+        </span>{' '}
+        tokens PRAX. Se reinician el {fechaCorta(resumen.iaReiniciaEn)}.
       </p>
     </div>
   );

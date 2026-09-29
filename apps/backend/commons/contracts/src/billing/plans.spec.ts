@@ -165,7 +165,7 @@ describe('cuotas de un plan', () => {
          mover cualquiera de los dos números —y la tentación de subir la IA de un
          plan pequeño es real, ya pasó una vez— esto salta. */
       const techo = (plan: (typeof PLAN_LIST)[number]): number => {
-        const porPersona = plan.quotas.iaMensualPorPersona;
+        const porPersona = plan.quotas.iaTokensMensualesPorPersona;
         const asientos = plan.quotas.asientos;
         if (porPersona === SIN_TOPE || asientos === SIN_TOPE) return Number.POSITIVE_INFINITY;
         return porPersona * asientos;

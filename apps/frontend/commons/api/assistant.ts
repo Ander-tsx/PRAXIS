@@ -429,6 +429,8 @@ export interface StoredMessage {
    * citan documentos de los que ya no queda nada.
    */
   attachments?: AssistantAttachment[];
+  /** Lo que costó esta respuesta de PRAX (D9). Ausente en las de antes. */
+  uso?: UsoDelTurno;
 }
 
 export interface FullConversation {
@@ -459,7 +461,7 @@ export interface AssistantChatResult {
    * Lo que gastó este turno en tokens, sumando todas las vueltas del bucle de
    * consultas (F3). `vueltas` son las llamadas al modelo que hizo falta hacer.
    */
-  uso?: { entrada: number; salida: number; razonamiento: number; cache: number; vueltas: number };
+  uso?: UsoDelTurno;
 }
 
 /** Un turno del hilo. Lo reenvía el cliente en cada mensaje; nadie lo guarda. */
@@ -571,4 +573,33 @@ export function formatoReinicio(iso: string): string {
   const fecha = new Date(iso);
   if (Number.isNaN(fecha.getTime())) return 'el día 1 del mes que viene';
   return new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long' }).format(fecha);
+}
+
+/** Lo que costó un turno de PRAX (D8 y D9 de docs/PLAN-PRAX-SEMIAGENTICO.md). */
+export interface UsoDelTurno {
+  entrada: number;
+  salida: number;
+  razonamiento: number;
+  cache: number;
+  vueltas: number;
+  /** La entrada de la primera vuelta: lo que reenviará el siguiente turno (D9). */
+  contexto: number;
+  /** Lo que se cobró, en tokens PRAX (D8). Sin el turno de recuperación. */
+  tokensPrax: number;
+}
+
+/**
+ * Cuánta entrada tiene que reenviar el siguiente turno para que avisemos de que
+ * seguir la conversación sale caro (D9). Treinta mil tokens son unas 20 páginas
+ * de texto reenviadas en cada mensaje.
+ */
+export const PRAX_CONTEXTO_LARGO = 30_000;
+
+/** «850», «12,3 mil», «1,5 M»: los tokens PRAX para leerlos de un vistazo. */
+export function formatearTokens(n: number): string {
+  if (n < 1000) return String(Math.round(n));
+  if (n < 1_000_000) {
+    return `${(n / 1000).toLocaleString('es', { maximumFractionDigits: n < 10_000 ? 1 : 0 })} mil`;
+  }
+  return `${(n / 1_000_000).toLocaleString('es', { maximumFractionDigits: 1 })} M`;
 }

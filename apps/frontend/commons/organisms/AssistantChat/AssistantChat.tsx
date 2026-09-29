@@ -10,8 +10,11 @@ import {
   type AssistantProposal,
   type AssistantQuota,
   type ConversationSummary,
+  PRAX_CONTEXTO_LARGO,
+  type UsoDelTurno,
   assistantAttachmentHref,
   esImagenDeAsistente,
+  formatearTokens,
   formatoReinicio,
   isAssignmentProposal,
   isBoardProposal,
@@ -93,6 +96,8 @@ interface Mensaje {
    * verdad no pasó nada.
    */
   degradado?: boolean;
+  /** Solo en los del asistente: lo que costó en tokens PRAX (D9). */
+  uso?: UsoDelTurno;
 }
 
 export interface AssistantChatProps {
@@ -642,6 +647,7 @@ export function AssistantChat({
         /* Condicional y no `?? []`: con `exactOptionalPropertyTypes`, asignar
            `undefined` a un campo opcional es un error de tipos. */
         ...(mensaje.attachments ? { attachments: mensaje.attachments } : {}),
+        ...(mensaje.uso ? { uso: mensaje.uso } : {}),
       })),
     );
 
@@ -868,6 +874,7 @@ export function AssistantChat({
         role: 'model',
         text: respuesta.reply as string,
         proposals: respuesta.proposals,
+        ...(respuesta.uso ? { uso: respuesta.uso } : {}),
       },
     ]);
   }
@@ -1255,6 +1262,15 @@ export function AssistantChat({
                       }
                       reintentando={pendiente}
                     />
+                    {mensaje.role === 'model' && mensaje.uso && (
+                      /* Lo que costó esta respuesta (D9). Discreto: está para quien lo
+                         busque, no para distraer de lo que dijo. */
+                      <p className="-mt-1 font-sans text-[11px] text-text-disabled tabular-nums">
+                        {formatearTokens(mensaje.uso.tokensPrax)} tokens PRAX
+                        {mensaje.uso.vueltas > 1 &&
+                          ` · consultó ${mensaje.uso.vueltas - 1} ${mensaje.uso.vueltas === 2 ? 'vez' : 'veces'}`}
+                      </p>
+                    )}
 
                     {(mensaje.proposals ?? []).length > 0 && (
                       /* Cuántas quedan sin decidir lo lleva el propio grupo: cada
@@ -1626,6 +1642,15 @@ export function AssistantChat({
                   enviar(texto);
                 }}
               >
+                <ConsumoDeLaConversacion
+                  mensajes={mensajes}
+                  cuota={cuota}
+                  onNueva={() => {
+                    setConversationId(null);
+                    setMensajes([]);
+                    setError(null);
+                  }}
+                />
                 <label htmlFor={campoId} className="sr-only">
                   Pregunta al asistente
                 </label>
@@ -1804,22 +1829,57 @@ export function AssistantChat({
   );
 }
 
-function ContadorCuota({ cuota }: { cuota: AssistantQuota }) {
-  const quedan = Math.max(0, cuota.limite - cuota.usados);
-  const apurado = quedan <= Math.max(3, Math.round(cuota.limite * 0.1));
+/**
+ * Lo que cuesta esta conversación, y el aviso de cuando sale cara seguirla (D9
+ * de docs/PLAN-PRAX-SEMIAGENTICO.md).
+ *
+ * Cada turno reenvía el hilo entero al modelo: una conversación larga no cuesta
+ * más una vez, cuesta más **en cada mensaje**. Por eso el aviso mira el
+ * `contexto` del último turno —lo que reenviará el siguiente— y no el total
+ * gastado, y ofrece lo único que lo arregla: empezar una nueva.
+ */
+function ConsumoDeLaConversacion({
+  mensajes,
+  cuota,
+  onNueva,
+}: {
+  mensajes: Mensaje[];
+  cuota: AssistantQuota | null;
+  onNueva: () => void;
+}) {
+  const conUso = mensajes.filter((m) => m.role === 'model' && m.uso);
+  if (conUso.length === 0) return null;
+  const gastado = conUso.reduce((total, m) => total + (m.uso?.tokensPrax ?? 0), 0);
+  const contexto = conUso[conUso.length - 1].uso?.contexto ?? 0;
+  const quedan = cuota ? Math.max(0, cuota.limite - cuota.usados) : null;
+
+  if (contexto >= PRAX_CONTEXTO_LARGO) {
+    return (
+      <div
+        role="status"
+        className="flex items-center gap-3 rounded-xl border border-warning/40 bg-warning-muted px-3 py-2 font-sans text-xs text-text-primary"
+      >
+        <span className="min-w-0 flex-1">
+          Esta conversación ya es larga: cada mensaje reenvía unos{' '}
+          <strong className="tabular-nums">{formatearTokens(contexto)}</strong> tokens de contexto.
+          Seguirla gasta mucho más que empezar una nueva.
+        </span>
+        <button
+          type="button"
+          onClick={onNueva}
+          className="shrink-0 rounded-lg border border-border px-2.5 py-1 font-medium text-text-primary transition-colors hover:bg-surface-elevated"
+        >
+          Empezar una nueva
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex shrink-0 flex-col items-end">
-      <span
-        className="font-display text-lg leading-none tabular-nums"
-        style={{ color: apurado ? colors.warning : colors.textSecondary }}
-      >
-        {cuota.usados} / {cuota.limite}
-      </span>
-      <span className="font-sans text-[11px] uppercase tracking-wider text-white">
-        mensajes este mes
-      </span>
-    </div>
+    <p className="px-1 font-sans text-[11px] text-text-secondary tabular-nums">
+      Esta conversación: {formatearTokens(gastado)} tokens PRAX
+      {quedan !== null && <> · te quedan {formatearTokens(quedan)} este mes</>}
+    </p>
   );
 }
 

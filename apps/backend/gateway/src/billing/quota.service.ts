@@ -873,7 +873,7 @@ export class QuotaService {
    */
   async limiteDeIa(userId: string, organizationId?: string | null): Promise<number | null> {
     const plan = await this.planDe(userId, organizationId);
-    return plan.quotas.iaMensualPorPersona;
+    return plan.quotas.iaTokensMensualesPorPersona;
   }
 
   /**
@@ -899,7 +899,7 @@ export class QuotaService {
        negaría contra otro. */
     return {
       tier: plan.tier,
-      limite: plan.quotas.iaMensualPorPersona,
+      limite: plan.quotas.iaTokensMensualesPorPersona,
       organizationId: plan.organizationId,
     };
   }

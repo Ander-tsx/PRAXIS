@@ -176,7 +176,20 @@ export interface PlanQuotas {
    */
   proyectos: Tope;
   /**
-   * Mensajes al asistente **por persona, por organización y por mes natural**.
+   * **Tokens PRAX** del asistente **por persona, por organización y por mes
+   * natural** (D8 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+   *
+   * ## Por qué tokens y no mensajes
+   *
+   * Con PRAX semi-agéntico un mensaje ya no cuesta lo mismo que otro: uno que
+   * consulta tres veces antes de responder lee el contexto cuatro veces, y una
+   * conversación larga reenvía todo su historial en cada turno. Contar mensajes
+   * cobraba igual un «hola» que un informe de tres proyectos.
+   *
+   * Un **token PRAX** pondera cada token por lo que cuesta de verdad en Gemini
+   * Flash: los de entrada valen 1, los que salen de caché 0,25 y los que el
+   * modelo escribe —texto y razonamiento— 8. Ver `tokensPrax()` en
+   * `contracts/assistant`.
    *
    * ⚠️ **Por persona y no agregado al equipo.** Se consideró un tope de equipo y
    * se descartó: un límite así se agota por lo que hizo otro, a media tarde, sin
@@ -196,7 +209,7 @@ export interface PlanQuotas {
    * y es lo mismo que hacen los productos que cobran por espacio de trabajo. Lo
    * que acota la multiplicación es `MAX_ORGANIZACIONES_PROPIAS`, no este número.
    */
-  iaMensualPorPersona: Tope;
+  iaTokensMensualesPorPersona: Tope;
   /** Reglas de automatización activas en un proyecto. Las pausadas no cuentan. */
   automatizacionesPorProyecto: Tope;
   /** Lo que suman los adjuntos de la organización, en megabytes. */
@@ -261,10 +274,13 @@ export interface PlanSpec {
  * cuentas están en las letras pequeñas»*. Están puestos para que **nadie los
  * toque en un uso normal** y para que existan de verdad cuando alguien empuja.
  *
- * ⚠️ **`FREE.iaMensualPorPersona` es 13 porque ya lo era.** Es el mismo número
- * que sigue vivo como `ASSISTANT_LIMITE_POR_DEFECTO` —la red de abajo del
- * servicio, para quien lo llame por TCP sin pasar por el gateway—; bajarlo aquí
- * sería recortarle la cuota a gente que ya la tiene.
+ * ⚠️ **Los topes de IA son tokens PRAX desde 2026-09-29, y son provisionales.**
+ * Salen de los mensajes que daba cada plan multiplicados por ~20.000 tokens PRAX
+ * por turno —un turno con briefing ronda 10-15 mil de entrada y unos cientos de
+ * salida, que a ×8 pesan—, redondeados. Se recalibran con las líneas
+ * `gemini_uso` de producción (F0 del plan de PRAX). `FREE` sigue siendo el mismo
+ * orden de magnitud que sus 13 mensajes, y `ASSISTANT_LIMITE_POR_DEFECTO` —la red
+ * de abajo del servicio— es ese mismo número.
  *
  * ⚠️ **`FREE` da 3 asientos y 3 proyectos** porque el plan gratuito tiene que
  * seguir sirviendo para lo que sirve hoy: una persona y un par de amigos con sus
@@ -279,7 +295,7 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     quotas: {
       asientos: 3,
       proyectos: 3,
-      iaMensualPorPersona: 13,
+      iaTokensMensualesPorPersona: 250_000,
       automatizacionesPorProyecto: 3,
       almacenamientoOrgMb: 200,
       historialAnalisisDias: 90,
@@ -314,7 +330,7 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
        * y sigue por debajo de los 100 de Equipo. Lo que separa a Pro de Equipo
        * es el precio y el tamaño, no un cruce en un eje.
        */
-      iaMensualPorPersona: 75,
+      iaTokensMensualesPorPersona: 1_500_000,
       automatizacionesPorProyecto: 10,
       almacenamientoOrgMb: 2_048,
       /* El punto medio real: 90 días no llegan a un trimestre cerrado y 365 es
@@ -341,7 +357,7 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     quotas: {
       asientos: 15,
       proyectos: 25,
-      iaMensualPorPersona: 100,
+      iaTokensMensualesPorPersona: 2_000_000,
       automatizacionesPorProyecto: 25,
       almacenamientoOrgMb: 10_240,
       historialAnalisisDias: 365,
@@ -359,7 +375,7 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     quotas: {
       asientos: 100,
       proyectos: 150,
-      iaMensualPorPersona: 300,
+      iaTokensMensualesPorPersona: 6_000_000,
       automatizacionesPorProyecto: SIN_TOPE,
       almacenamientoOrgMb: 102_400,
       historialAnalisisDias: SIN_TOPE,
@@ -377,7 +393,7 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     quotas: {
       asientos: SIN_TOPE,
       proyectos: SIN_TOPE,
-      iaMensualPorPersona: 1000,
+      iaTokensMensualesPorPersona: 20_000_000,
       automatizacionesPorProyecto: SIN_TOPE,
       almacenamientoOrgMb: SIN_TOPE,
       historialAnalisisDias: SIN_TOPE,

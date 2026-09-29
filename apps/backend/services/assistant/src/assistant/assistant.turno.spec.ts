@@ -67,7 +67,7 @@ function montar(respuestas: GeminiReply[]) {
     adjuntos as any,
     consultas as any,
   );
-  return { servicio, gemini, consultas, llamadas, conversaciones };
+  return { servicio, gemini, consultas, llamadas, conversaciones, quota };
 }
 
 const payload = {
@@ -125,7 +125,12 @@ describe('El turno de PRAX: bucle de consultas', () => {
       razonamiento: 20,
       cache: 0,
       vueltas: 2,
+      contexto: 1000,
+      /* 2000 de entrada ×1 + (100 + 20) de salida ×8. */
+      tokensPrax: 2960,
     });
+    /* Y eso es lo que se cobra: tokens PRAX, no «un mensaje». */
+    expect(m.quota.consumir).toHaveBeenCalledWith('u1', undefined, 'org-1', 2960);
   });
 
   it('🔴 un modelo que no deja de consultar se corta, y la última vuelta va sin consultas', async () => {

@@ -151,6 +151,9 @@ export class ConversationsService {
            nunca archivos. Y los anteriores a que se guardaran vienen vacíos —
            entonces viajaban con la pregunta y se descartaban. */
         attachments: mensaje.attachments,
+        /* Lo que costó cada respuesta de PRAX (D9). Solo en las del modelo, y
+           solo desde que se guarda. */
+        ...(mensaje.uso ? { uso: mensaje.uso } : {}),
       })),
     };
   }
@@ -365,6 +368,8 @@ export class ConversationsService {
     projectId: string | null;
     pregunta: string;
     respuesta: string;
+    /** Lo que costó la respuesta (D9). Se guarda en el mensaje del modelo. */
+    uso?: Record<string, number>;
     proposals: { tool: string; args: Record<string, unknown> }[];
     /** Quién pregunta. Solo se usa para no reclamar borradores de otra persona. */
     userId: string;
@@ -403,6 +408,7 @@ export class ConversationsService {
           projectId,
           role: 'MODEL',
           text: respuesta,
+          ...(params.uso ? { uso: params.uso } : {}),
           proposals: {
             create: proposals.map((propuesta) => ({
               tool: propuesta.tool,

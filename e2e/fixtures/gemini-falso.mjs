@@ -50,7 +50,13 @@ function guion(peticion) {
   );
 }
 
-const USO = { promptTokenCount: 1200, candidatesTokenCount: 40, thoughtsTokenCount: 0 };
+/* La entrada que declara cada respuesta. Súbela (GEMINI_FALSO_ENTRADA=35000) para
+   ver el aviso de conversación larga (D9) sin escribir cien mensajes. */
+const USO = {
+  promptTokenCount: Number(process.env.GEMINI_FALSO_ENTRADA ?? 1200),
+  candidatesTokenCount: 40,
+  thoughtsTokenCount: 0,
+};
 
 createServer((req, res) => {
   let cuerpo = '';

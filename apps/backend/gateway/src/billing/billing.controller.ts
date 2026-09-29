@@ -114,7 +114,7 @@ export class BillingController {
 
     const [proyectos, ia, organizaciones, cliente, bytes] = await Promise.all([
       this.proyectosDeLaOrganizacion(organizationId),
-      this.cuotaDeIa(userId, plan.quotas.iaMensualPorPersona, organizationId),
+      this.cuotaDeIa(userId, plan.quotas.iaTokensMensualesPorPersona, organizationId),
       this.organizaciones(userId),
       this.cliente(userId),
       /* La única cifra que puede faltar. Cuesta dos viajes TCP y no vale la pena
@@ -589,7 +589,7 @@ export function excedidasDe(
    * quita nada de lo que ya escribió, pero no puede mandar otro hasta el día 1,
    * y sin esto el 402 le llegaría sin ninguna pantalla que lo hubiera avisado.
    */
-  mirar(QuotaKind.IA_MENSUAL, quotas.iaMensualPorPersona, uso.iaMensual);
+  mirar(QuotaKind.IA_MENSUAL, quotas.iaTokensMensualesPorPersona, uso.iaMensual);
 
   return excedidas;
 }

@@ -107,7 +107,8 @@ export interface PlanQuotas {
   /** Proyectos **de la organización**, no de la persona. Los borrados no cuentan. */
   proyectos: Tope;
   /** Mensajes al asistente por persona, **por organización** y por mes natural. */
-  iaMensualPorPersona: Tope;
+  /** Tokens PRAX por persona y mes (D8). Ver `tokensPrax` en los contratos. */
+  iaTokensMensualesPorPersona: Tope;
   automatizacionesPorProyecto: Tope;
   /** Lo que suman los adjuntos de la organización, en megabytes. */
   almacenamientoOrgMb: Tope;

@@ -10,6 +10,24 @@
 
 ---
 
+> 🔁 **La cuota de IA se mide en tokens PRAX desde el 2026-09-29**, no en
+> mensajes (D8 de [PLAN-PRAX-SEMIAGENTICO](PLAN-PRAX-SEMIAGENTICO.md)).
+> `iaMensualPorPersona` pasó a ser `iaTokensMensualesPorPersona`:
+>
+> | Plan | Tokens PRAX al mes |
+> |---|---|
+> | Gratis | 250 mil |
+> | Pro | 1,5 M |
+> | Equipo | 2 M |
+> | Negocio | 6 M |
+> | Enterprise | 20 M |
+>
+> La clave del contador sigue siendo `(persona, organización, mes)`, y la
+> respuesta de abajo sigue valiendo: **personal, una cuota entera por
+> miembro**. Las cifras son **provisionales**, estimadas a ~20 mil tokens PRAX
+> por turno, y se recalibran con las líneas `gemini_uso` de producción. Donde
+> este documento dice «mensajes», léase tokens PRAX.
+
 ## La pregunta que abrió la auditoría, contestada primero
 
 > *Las consultas de PRAX que obtienes dentro de una organización, ¿son

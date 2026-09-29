@@ -77,11 +77,12 @@ describe('excedidasDe', () => {
   it('marca la IA del mes en curso tras una bajada de plan', () => {
     const excedidas = excedidasDe(
       PLANS[PlanTier.FREE].quotas,
-      { ...sinNada, iaMensual: 200 },
+      /* Tokens PRAX desde 2026-09-29: el gratuito da 250.000 al mes. */
+      { ...sinNada, iaMensual: 400_000 },
       TOPE_FREE,
     );
 
-    expect(excedidas).toEqual([{ kind: QuotaKind.IA_MENSUAL, tope: 13, actual: 200 }]);
+    expect(excedidas).toEqual([{ kind: QuotaKind.IA_MENSUAL, tope: 250_000, actual: 400_000 }]);
   });
   /**
    * 🔴 **El tope de asientos no sale del plan, y por eso es un parámetro.**

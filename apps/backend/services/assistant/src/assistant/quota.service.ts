@@ -84,7 +84,8 @@ export class QuotaService {
     });
 
     return {
-      usados: uso?.used ?? 0,
+      /* Tokens PRAX desde 2026-09-29 (D8); `used` son turnos y ya no decide. */
+      usados: uso?.tokens ?? 0,
       limite: this.limite(limiteMensual),
       periodo: period,
       reinicia: this.reinicio(),
@@ -132,6 +133,8 @@ export class QuotaService {
     userId: string,
     limiteMensual?: number | null,
     organizationId?: string | null,
+    /** Tokens PRAX del turno (`tokensPrax()`). Cero es válido: un turno que no gastó. */
+    tokens = 0,
   ): Promise<AssistantQuota> {
     const period = this.periodo();
     /* Cadena vacía y no `null`: es la clave del índice único. Ver el modelo. */
@@ -139,12 +142,12 @@ export class QuotaService {
 
     const uso = await this.prisma.assistantUsage.upsert({
       where: { userId_organizationId_period: { userId, organizationId: org, period } },
-      create: { userId, organizationId: org, period, used: 1 },
-      update: { used: { increment: 1 } },
+      create: { userId, organizationId: org, period, used: 1, tokens },
+      update: { used: { increment: 1 }, tokens: { increment: tokens } },
     });
 
     return {
-      usados: uso.used,
+      usados: uso.tokens,
       limite: this.limite(limiteMensual),
       periodo: period,
       reinicia: this.reinicio(),

@@ -24,7 +24,7 @@ import {
  *
  * 🔴 **Era un segundo catálogo de planes, por persona, paralelo al de verdad.**
  * Desde la etapa Enterprise quien decide el tope es el plan de la
- * **organización** (`PlanQuotas.iaMensualPorPersona`), y llega en el payload de
+ * **organización** (`PlanQuotas.iaTokensMensualesPorPersona`), y llega en el payload de
  * cada llamada. Lo de aquí no gobernaba nada… salvo el campo `plan` que el
  * servicio seguía devolviendo, con el efecto de que una cuenta con el PRO viejo
  * puesto a mano dentro de una organización gratuita recibía
@@ -42,11 +42,38 @@ import {
  * el plan de la organización. Sin él ese camino daría `undefined`, y `undefined
  * >= n` es siempre `false`: mensajes infinitos y ni un error.
  *
- * **Trece y no cinco**, que era el valor original y sigue siendo el correcto: con
- * cinco no se llega a ver de qué es capaz —dos preguntas para entenderlo, una
- * que sale mal, y se acabó el mes—. Trece dan para una sesión de trabajo entera.
+ * **Tokens PRAX desde 2026-09-29**, igual que el tope del plan gratuito: eran
+ * trece mensajes, y trece turnos de unos 20.000 tokens PRAX dan este orden de
+ * magnitud. Ver `tokensPrax()`.
  */
-export const ASSISTANT_LIMITE_POR_DEFECTO = 13;
+export const ASSISTANT_LIMITE_POR_DEFECTO = 250_000;
+
+/** Lo que Gemini dice que costó una llamada o un turno, en tokens de verdad. */
+export interface UsoDeTokens {
+  entrada: number;
+  salida: number;
+  razonamiento: number;
+  /** La parte de `entrada` que salió de caché. */
+  cache: number;
+}
+
+/**
+ * Cuántos **tokens PRAX** son (D8 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+ *
+ * Cada token pesa lo que cuesta en Gemini Flash respecto a uno de entrada: los de
+ * entrada 1, los de caché 0,25 y los que escribe el modelo —texto y
+ * razonamiento— 8. Así la cuota mide coste y no longitud: una respuesta larga
+ * gasta más que una pregunta larga, que es lo que pasa en la factura.
+ *
+ * Una sola función para el servicio que cobra y la pantalla que lo enseña: si
+ * pesaran distinto, el contador diría una cosa y el 402 otra.
+ */
+export function tokensPrax(uso: UsoDeTokens): number {
+  const cache = Math.min(uso.cache, uso.entrada);
+  return Math.round(
+    (uso.entrada - cache) * 1 + cache * 0.25 + (uso.salida + uso.razonamiento) * 8,
+  );
+}
 
 /** Los cuatro papeles de un mensaje del hilo. */
 export const ASSISTANT_ROLES = ['user', 'model'] as const;
@@ -428,7 +455,17 @@ export interface AssistantChatResult {
    * Lo que gastó este turno en tokens, sumando todas las vueltas del bucle de
    * consultas (F3). `vueltas` son las llamadas al modelo que hizo falta hacer.
    */
-  uso?: { entrada: number; salida: number; razonamiento: number; cache: number; vueltas: number };
+  uso?: {
+    entrada: number;
+    salida: number;
+    razonamiento: number;
+    cache: number;
+    vueltas: number;
+    /** La entrada de la primera vuelta: lo que reenviará el siguiente turno (D9). */
+    contexto: number;
+    /** Lo que se cobró, en tokens PRAX (D8). Sin el turno de recuperación. */
+    tokensPrax: number;
+  };
 }
 
 /** Una conversación en la lista, sin sus mensajes. */
