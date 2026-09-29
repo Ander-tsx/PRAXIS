@@ -539,7 +539,7 @@ que tocan esquema llevan migración (`prisma:deploy`, **nunca `reset`**).
   - Cabecera y burbuja, agrupación por tiempo.
   - Divisor de automatización, marca «enviado con PRAX».
   - Fuera los `text-white` literales.
-- [ ] **F10 — @PRAX en el chat grupal** (D15).
+- [x] **F10 — @PRAX en el chat grupal** (D15). Ver el registro.
 - [ ] **F11 — Cierre.**
   - `CLAUDE.md`: trampa 14 corregida y las trampas nuevas.
   - `ESTADO-ACTUAL`, `GUION-DEMO` y la auditoría de planes.
@@ -899,3 +899,26 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
     - Verificado en el navegador contra el monolito local y el Gemini falso: la
       propuesta de mensaje se acepta, el borde pasa a verde y el mensaje aparece
       en el chat del proyecto con «con PRAX».
+  - **F10 cerrada.**
+    - **La mención**: `@[PRAX](assistant:prax)`, un `ChatRefKind` nuevo con id
+      fijo —PRAX no es una cuenta—. El compositor la ofrece la primera al
+      escribir `@` en el chat de un proyecto, y no en los privados.
+    - 🔴 **El patrón de referencias exigía UUID**, y ampliarlo a `|prax` a secas
+      dejaba pasar `(user:prax)`. Va con `(?<=assistant:)prax|(?<!assistant:)uuid`,
+      en el frontend y en su espejo de `contracts`. Lo fija
+      `web/src/lib/mencion-de-prax.spec.ts`, que encontró el fallo.
+    - **Gateway**: `ProjectChatController.send` guarda el mensaje y, si es de
+      una persona y menciona a PRAX, llama sin esperar a `PraxEnElChatService`.
+      Este prepara el turno con la sesión de quien mencionó
+      (`TurnoDeProyectoService`, extraído de `AssistantController` para que los
+      dos caminos den exactamente el mismo contexto) y publica la respuesta
+      citando el mensaje, como `ASSISTANT` con `originMeta.respuesta`. No lanza
+      nunca: si falla, lo dice en el chat.
+    - **Quién firma**: quien lo invocó —no hay cuenta de PRAX, y no debe
+      haberla: tendría asiento y permisos propios—. La pantalla lo pinta como
+      PRAX, «a petición de …», al otro lado y con su icono.
+    - **Propuestas**: no salen en el chat. Se guardan en la conversación
+      privada de quien preguntó, y la respuesta lleva «Ver N propuestas»
+      (solo para esa persona; al resto, «N propuestas para …»).
+    - Sin «Ver los reportes y usar el asistente», PRAX contesta en el chat qué
+      permiso falta. Con la cuota agotada, lo dice.

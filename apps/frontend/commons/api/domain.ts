@@ -1240,6 +1240,15 @@ export interface ChatMessageOriginMeta {
   taskTitle?: string;
   invocadoPor?: string;
   conversationId?: string;
+  /**
+   * Es la **respuesta de PRAX** a una mención en el chat del grupo (D15), no un
+   * mensaje de la persona. Se pinta como PRAX, «a petición de …».
+   */
+  respuesta?: boolean;
+  /** Cuántas propuestas dejó en la conversación privada de quien preguntó. */
+  propuestas?: number;
+  /** No pudo responder: el texto explica por qué. */
+  error?: boolean;
 }
 
 export interface ChatMessage {

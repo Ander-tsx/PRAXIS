@@ -24,6 +24,7 @@ const ICONO_POR_TIPO: Record<ChatRefKind, typeof KanbanIcon | null> = {
   workspace: LayoutGrid,
   board: KanbanIcon,
   task: SquareCheckIcon,
+  assistant: null,
 };
 
 /**
@@ -59,6 +60,9 @@ function destinoDe(kind: ChatRefKind, id: string): string | null {
   switch (kind) {
     case 'user':
       return `/chat/${id}`;
+    /* PRAX no tiene conversación privada en `/chat`: se habla con él aquí. */
+    case 'assistant':
+      return null;
     case 'task':
       return `/projects/tarea/${id}`;
     case 'board':

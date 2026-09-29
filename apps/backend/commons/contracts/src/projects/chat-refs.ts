@@ -19,7 +19,16 @@
  */
 
 /** Qué tipos de cosa se pueden referenciar. */
-export const CHAT_REF_KINDS = ['user', 'project', 'workspace', 'board', 'task'] as const;
+/* `assistant` es PRAX (D15 de docs/PLAN-PRAX-SEMIAGENTICO.md), con id fijo `prax`:
+   no es una cuenta, así que no tiene UUID. */
+export const CHAT_REF_KINDS = [
+  'user',
+  'project',
+  'workspace',
+  'board',
+  'task',
+  'assistant',
+] as const;
 export type ChatRefKind = (typeof CHAT_REF_KINDS)[number];
 
 /**
@@ -35,7 +44,7 @@ export type ChatRefKind = (typeof CHAT_REF_KINDS)[number];
  *   entre paréntesis no pasa por referencia.
  */
 export const CHAT_REF_PATTERN =
-  /([@/])\[([^\]\n]{1,120})\]\((user|project|workspace|board|task):([0-9a-fA-F-]{36})\)/g;
+  /([@/])\[([^\]\n]{1,120})\]\((user|project|workspace|board|task|assistant):((?<=assistant:)prax|(?<!assistant:)[0-9a-fA-F-]{36})\)/g;
 
 export interface ChatRef {
   /** `@` para personas, `/` para lo demás. */
@@ -75,7 +84,7 @@ export function extraerReferencias(texto: string): ChatRef[] {
 
 /** Construye una etiqueta para meterla en el texto. */
 export function componerReferencia(kind: ChatRefKind, id: string, label: string): string {
-  const sigil = kind === 'user' ? '@' : '/';
+  const sigil = kind === 'user' || kind === 'assistant' ? '@' : '/';
   /* Los corchetes y saltos del nombre se limpian: son lo único que podría
      cerrar la etiqueta antes de tiempo. */
   const limpio = label

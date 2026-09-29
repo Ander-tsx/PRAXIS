@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { COLOR_POR_TIPO_DE_REF, type ChatRefKind } from '../../api/chat-refs';
+import { COLOR_POR_TIPO_DE_REF, type ChatRefKind, conArroba } from '../../api/chat-refs';
 import {
   CHAT_ATTACHMENT_ALLOWED_MIME,
   CHAT_ATTACHMENT_MAX_PER_MESSAGE,
@@ -253,7 +253,7 @@ export function Composer({
     const consulta = disparador.consulta.toLowerCase();
     const delTipo = sugerencias.filter((sugerencia) =>
       disparador.sigil === '@'
-        ? sugerencia.kind === 'user'
+        ? conArroba(sugerencia.kind)
         : sugerencia.kind === 'task' || sugerencia.kind === 'board',
     );
 
@@ -542,7 +542,7 @@ export function Composer({
                     los dos comparten el mismo desplegable de `/` y sin él, «Sprint
                     1» (un tablero) y «Sprint 1 — revisar métricas» (una tarea)
                     se leen igual hasta fijarse en el contexto de la derecha. */}
-                {sugerencia.kind !== 'user' &&
+                {!conArroba(sugerencia.kind) &&
                   (sugerencia.kind === 'board' ? (
                     <KanbanIcon
                       aria-hidden="true"

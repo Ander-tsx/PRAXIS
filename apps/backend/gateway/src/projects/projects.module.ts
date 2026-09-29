@@ -28,6 +28,7 @@ import {
   SharedDocumentsController,
 } from './shared-documents.controller';
 import { SprintsController } from './sprints.controller';
+import { AssistantModule } from '../assistant/assistant.module';
 import { OrigenDeMensajeService } from './origen-de-mensaje.service';
 import { TaskPurgeService } from './task-purge.service';
 import { WorkspacesController, WorkspacesResourceController } from './workspaces.controller';
@@ -42,6 +43,8 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
        escritura —crear proyecto, meter gente— y no en el módulo de facturación,
        que no ve pasar ninguna de las dos. */
     BillingModule,
+    /* Por `PraxEnElChatService`: @PRAX en el chat del grupo (F10). */
+    AssistantModule,
     ClientsModule.registerAsync([
       clienteDeServicio('PROJECTS'),
       clienteDeServicio('TASKS'),

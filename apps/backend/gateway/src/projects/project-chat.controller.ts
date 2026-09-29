@@ -46,6 +46,7 @@ import { JwtGuard } from '../auth/jwt.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { MentionablesService } from './mentionables.service';
+import { PraxEnElChatService } from '../assistant/prax-en-el-chat.service';
 import { OrigenDeMensajeService } from './origen-de-mensaje.service';
 
 /**
@@ -83,6 +84,7 @@ export class ProjectChatController {
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     private readonly mentionables: MentionablesService,
     private readonly origenes: OrigenDeMensajeService,
+    private readonly prax: PraxEnElChatService,
   ) {}
 
   /**
@@ -134,12 +136,24 @@ export class ProjectChatController {
        conversación de PRAX **suya**. Los de regla los publica
        automation-service por TCP. */
     const origen = await this.origenes.resolver(req.user!.userId, praxConversationId);
-    return firstValueFrom(
-      this.projectsClient.send(
+    const guardado = await firstValueFrom(
+      this.projectsClient.send<{ id: string }>(
         { cmd: 'chat_project_send' },
         { ...mensaje, projectId: req.projectId, requesterId: req.user!.userId, ...origen },
       ),
     );
+    /* @PRAX (D15): responde detrás, sin esperar y sin poder tumbar el envío.
+       Solo desde un mensaje escrito a mano: uno que firmó PRAX no lo vuelve a
+       llamar. */
+    if (origen.origin === 'USER' && PraxEnElChatService.loMenciona(mensaje.body) && guardado?.id) {
+      void this.prax.atender({
+        id: guardado.id,
+        projectId: req.projectId!,
+        userId: req.user!.userId,
+        body: mensaje.body ?? '',
+      });
+    }
+    return guardado;
   }
 
   /**

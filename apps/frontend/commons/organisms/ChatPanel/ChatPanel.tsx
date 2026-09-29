@@ -15,6 +15,7 @@ import type { ChatRefKind } from '../../api/chat-refs';
 import { createApiClient } from '../../api/client';
 import type { Directory } from '../../api/directory';
 import { personName } from '../../api/directory';
+import { PRAX_REF_ID } from '../../api/chat-refs';
 import type { ChatAttachment, ChatMessage, ChatMessagePage } from '../../api/domain';
 import { personLabel } from '../../api/domain';
 import type { LinkPreview } from '../../api/link-preview';
@@ -1019,7 +1020,20 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           };
         });
 
-      setSugerencias([...personas, ...(catalogo.refs as Sugerencia[])]);
+      /* En el chat de un proyecto, PRAX es la primera persona a la que se puede
+         mencionar (D15): responde aquí mismo, con los permisos y la cuota de
+         quien lo llama. En los privados no: sois dos. */
+      const prax: Sugerencia[] = rutaCanal.includes('/projects')
+        ? [
+            {
+              kind: 'assistant',
+              id: PRAX_REF_ID,
+              label: 'PRAX',
+              contexto: 'El asistente: contesta aquí a quien lo llama',
+            },
+          ]
+        : [];
+      setSugerencias([...prax, ...personas, ...(catalogo.refs as Sugerencia[])]);
     } catch {
       /* Sin catálogo el desplegable simplemente no ofrece nada. No se avisa: no
          se puede escribir una etiqueta a mano, así que no hay nada que hacer al
@@ -1805,8 +1819,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                         <MessageBubble
                           message={mensaje}
                           author={directorio.perfiles.get(mensaje.authorId)}
-                          mine={mensaje.authorId === currentUserId}
-                          continued={continued}
+                          /* La respuesta de PRAX va firmada por quien lo llamó,
+                             pero no es suya: se pinta al otro lado. */
+                          mine={
+                            mensaje.authorId === currentUserId && !mensaje.originMeta?.respuesta
+                          }
+                          continued={continued && !mensaje.originMeta?.respuesta}
                           canDelete={mensaje.authorId === currentUserId}
                           canReact={canWrite}
                           canFijar={canWrite}

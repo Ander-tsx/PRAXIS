@@ -348,3 +348,39 @@ test.describe('PRAX — automatizaciones', () => {
     expect(encender[0].args).toMatchObject({ reglaId: regla.id, activar: true });
   });
 });
+
+test.describe('PRAX — @PRAX en el chat del grupo', () => {
+  /**
+   * D15: mencionar a PRAX en el chat del proyecto lanza un turno con la sesión
+   * de quien lo menciona, y la respuesta se publica en el chat citando el
+   * mensaje, como ASSISTANT con `respuesta: true`. Corre detrás del envío, así
+   * que se espera a que aparezca.
+   */
+  test('responde en el chat, citando la pregunta y firmado como respuesta de PRAX', async ({
+    request,
+  }) => {
+    const mundo = await crearMundo(request);
+    const headers = comoBearer(mundo.duenno.accessToken);
+    const pregunta = await request.post(`/api/projects/${mundo.proyecto.id}/chat/messages`, {
+      headers,
+      data: { body: '@[PRAX](assistant:prax) ¿cuántas tareas quedan?' },
+    });
+    expect(pregunta.status()).toBe(201);
+    const preguntaId = (await data<{ id: string }>(pregunta)).id;
+
+    let respuesta: { replyTo?: { id: string }; origin: string; originMeta: any } | undefined;
+    for (let intento = 0; intento < 30 && !respuesta; intento += 1) {
+      const pagina = await data<{ items: NonNullable<typeof respuesta>[] }>(
+        await request.get(`/api/projects/${mundo.proyecto.id}/chat/messages`, { headers }),
+      );
+      respuesta = pagina.items.find((m) => m.originMeta?.respuesta === true);
+      if (!respuesta) await new Promise((r) => setTimeout(r, 1000));
+    }
+    expect(respuesta, 'PRAX respondió en el chat').toBeTruthy();
+    expect(respuesta).toMatchObject({
+      origin: 'ASSISTANT',
+      replyTo: { id: preguntaId },
+      originMeta: { invocadoPor: mundo.duenno.userId, respuesta: true },
+    });
+  });
+});

@@ -4,6 +4,7 @@ import {
   COLOR_POR_TIPO_DE_REF,
   type ChatRefKind,
   componerReferencia,
+  conArroba,
   splitMessage,
 } from '../../api/chat-refs';
 import { alpha } from '../../tokens';
@@ -50,7 +51,7 @@ export const FIELD_TYPOGRAPHY = 'px-2 py-1.5 font-sans text-sm leading-relaxed';
 
 /** Cómo se ve una etiqueta en el campo: `@Nombre` para personas, el título si no. */
 export function visibleLabel(kind: ChatRefKind, label: string): string {
-  return kind === 'user' ? `@${label}` : label;
+  return conArroba(kind) ? `@${label}` : label;
 }
 
 /**
@@ -87,7 +88,7 @@ export function serializeField(trozos: FieldChunk[]): string {
             trozo.etiqueta.kind,
             trozo.etiqueta.id,
             /* La `@` es del formato, no del nombre: se quita antes de componer. */
-            trozo.etiqueta.kind === 'user' ? trozo.texto.slice(1) : trozo.texto,
+            conArroba(trozo.etiqueta.kind) ? trozo.texto.slice(1) : trozo.texto,
           )
         : trozo.texto,
     )

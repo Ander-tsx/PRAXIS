@@ -5,6 +5,8 @@ import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
 import { AssistantController } from './assistant.controller';
 import { MyAssistantController } from './my-assistant.controller';
+import { PraxEnElChatService } from './prax-en-el-chat.service';
+import { TurnoDeProyectoService } from './turno-de-proyecto.service';
 
 /**
  * ⚠️ Registra **cuatro** clientes y el controlador usa tres.
@@ -30,5 +32,8 @@ import { MyAssistantController } from './my-assistant.controller';
     ]),
   ],
   controllers: [AssistantController, MyAssistantController],
+  providers: [TurnoDeProyectoService, PraxEnElChatService],
+  /* Para `ProjectChatController`: @PRAX en el chat del grupo (F10). */
+  exports: [PraxEnElChatService],
 })
 export class AssistantModule {}

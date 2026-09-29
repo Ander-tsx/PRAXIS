@@ -20,8 +20,28 @@
 
 import { colors } from '../tokens';
 
-export const CHAT_REF_KINDS = ['user', 'project', 'workspace', 'board', 'task'] as const;
+export const CHAT_REF_KINDS = [
+  'user',
+  'project',
+  'workspace',
+  'board',
+  'task',
+  'assistant',
+] as const;
 export type ChatRefKind = (typeof CHAT_REF_KINDS)[number];
+
+/**
+ * El id fijo de PRAX en una mención: `@[PRAX](assistant:prax)` (D15 de
+ * docs/PLAN-PRAX-SEMIAGENTICO.md). No es un UUID porque PRAX no es una cuenta:
+ * no tiene asiento, ni permisos, ni perfil. El gateway reconoce la mención al
+ * guardar el mensaje y lanza el turno con la sesión de quien la escribió.
+ */
+export const PRAX_REF_ID = 'prax';
+
+/** Personas y PRAX se nombran con `@`; tableros y tareas, con `/`. */
+export function conArroba(kind: ChatRefKind): boolean {
+  return kind === 'user' || kind === 'assistant';
+}
 
 /**
  * El color de cada tipo de referencia — **la única fuente**, para que una
@@ -38,11 +58,12 @@ export const COLOR_POR_TIPO_DE_REF: Record<ChatRefKind, string> = {
   workspace: colors.accent,
   board: colors.info,
   task: colors.success,
+  assistant: colors.primary,
 };
 
 /** **Espejo exacto** de `CHAT_REF_PATTERN` en `@praxis/contracts`. */
 const PATRON_REFERENCIA =
-  /([@/])\[([^\]\n]{1,120})\]\((user|project|workspace|board|task):([0-9a-fA-F-]{36})\)/g;
+  /([@/])\[([^\]\n]{1,120})\]\((user|project|workspace|board|task|assistant):((?<=assistant:)prax|(?<!assistant:)[0-9a-fA-F-]{36})\)/g;
 
 /**
  * Una URL de http/https, sin paréntesis de cierre ni coma final ni punto final.
@@ -164,7 +185,7 @@ export function desdoblarEtiquetas(cuerpo: string): { texto: string; etiquetas: 
          personas; un tablero o una tarea se muestran sin su `/`. Así el texto
          que vuelve al campo es exactamente el que se escribiría a mano, y
          `serializarEtiquetas` lo reconstruye sin duplicar el sigil. */
-      const visible = trozo.kind === 'user' ? `@${trozo.label}` : trozo.label;
+      const visible = conArroba(trozo.kind) ? `@${trozo.label}` : trozo.label;
       texto.push(visible);
       etiquetas.push({ kind: trozo.kind, id: trozo.id, visible });
     }
@@ -195,7 +216,7 @@ export function serializarEtiquetas(texto: string, etiquetas: FlatLabel[]): stri
         etiqueta.kind,
         etiqueta.id,
         /* La `@` es del formato, no del nombre: se quita antes de componer. */
-        etiqueta.kind === 'user' ? etiqueta.visible.slice(1) : etiqueta.visible,
+        conArroba(etiqueta.kind) ? etiqueta.visible.slice(1) : etiqueta.visible,
       ),
     );
     desde = posicion + etiqueta.visible.length;
@@ -207,7 +228,7 @@ export function serializarEtiquetas(texto: string, etiquetas: FlatLabel[]): stri
 
 /** Construye una etiqueta para insertarla en el texto que se está escribiendo. */
 export function componerReferencia(kind: ChatRefKind, id: string, label: string): string {
-  const sigil = kind === 'user' ? '@' : '/';
+  const sigil = conArroba(kind) ? '@' : '/';
   /* Corchetes y saltos fuera: son lo único que podría cerrar la etiqueta antes
      de tiempo y romper el resto del mensaje. */
   const limpio = label

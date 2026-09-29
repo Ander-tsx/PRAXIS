@@ -14,6 +14,7 @@ import {
 import type { LinkPreview } from '../../api/link-preview';
 import { avatarHref } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
+import { PraxAvatar } from '../../atoms/PraxAvatar';
 import { usePresence } from '../../realtime';
 import { alpha, colors } from '../../tokens';
 import { AttachmentPreview } from './AttachmentPreview';
@@ -276,7 +277,11 @@ export function MessageBubble({
    * mapa, y no estar en el mapa también pasa cuando el directorio no se pudo
    * consultar. Se delega en `nombreDeAutor`, que sí conoce esa diferencia.
    */
-  const nombre = author ? personLabel(author) : nombreDeAutor(message.authorId);
+  const nombreDelAutor = author ? personLabel(author) : nombreDeAutor(message.authorId);
+  /* La respuesta de PRAX a una mención (D15): firmada por quien lo llamó, pero
+     se lee como PRAX. */
+  const dePrax = message.origin === 'ASSISTANT' && message.originMeta?.respuesta === true;
+  const nombre = dePrax ? 'PRAX' : nombreDelAutor;
   /* Lo del perfil es del último render de la página; el flujo en vivo lo pisa. */
   const presencia = usePresence(message.authorId, author?.presence);
 
@@ -763,6 +768,14 @@ export function MessageBubble({
        */}
       {continued ? (
         <span className="w-8 shrink-0" aria-hidden="true" />
+      ) : dePrax ? (
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center">
+          <PraxAvatar
+            mood={message.originMeta?.error ? 'oops' : 'idle'}
+            size="sm"
+            animate={false}
+          />
+        </span>
       ) : (
         <Avatar
           label={nombre}
@@ -800,7 +813,14 @@ export function MessageBubble({
            * borde inferior de su caja.
            */
           <span className="flex items-center gap-2 px-1 font-sans text-xs">
-            {hrefDePersona && !mine ? (
+            {dePrax ? (
+              <span className="flex items-baseline gap-2">
+                <span className="font-display font-medium text-[15px] text-text-primary">PRAX</span>
+                <span className="font-sans text-[11px] text-text-secondary">
+                  a petición de {nombreDelAutor}
+                </span>
+              </span>
+            ) : hrefDePersona && !mine ? (
               <a
                 href={hrefDePersona}
                 title={`Escribir a ${nombre} en privado`}
@@ -1068,7 +1088,27 @@ export function MessageBubble({
             {/* D13 de PLAN-PRAX-SEMIAGENTICO: lo mandó esta persona, aceptando
                 una propuesta de PRAX. Sigue siendo suyo; la marca dice cómo se
                 escribió. */}
-            {message.origin === 'ASSISTANT' && (
+            {dePrax &&
+              (message.originMeta?.propuestas ?? 0) > 0 &&
+              /* Las propuestas no se enseñan en el chat del grupo (D15): son de
+                 quien preguntó y solo esa persona puede aceptarlas. */
+              (message.originMeta?.invocadoPor === currentUserId &&
+              message.originMeta?.conversationId ? (
+                <a
+                  href={`/assistant?c=${message.originMeta.conversationId}`}
+                  className="rounded-full border border-border px-1.5 py-px text-text-primary hover:border-border-strong"
+                >
+                  Ver {message.originMeta.propuestas}{' '}
+                  {message.originMeta.propuestas === 1 ? 'propuesta' : 'propuestas'}
+                </a>
+              ) : (
+                <span>
+                  {message.originMeta?.propuestas}{' '}
+                  {message.originMeta?.propuestas === 1 ? 'propuesta' : 'propuestas'} para{' '}
+                  {nombreDelAutor}
+                </span>
+              ))}
+            {message.origin === 'ASSISTANT' && !dePrax && (
               <span
                 title="Lo propuso PRAX y esta persona lo aceptó y lo envió"
                 className="rounded-full border border-border px-1.5 py-px"
