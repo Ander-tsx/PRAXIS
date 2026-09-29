@@ -501,7 +501,7 @@ que tocan esquema llevan migración (`prisma:deploy`, **nunca `reset`**).
     `catch` vacío.
   - Fuera los interruptores «Pronto» que no hacen nada: MCP, Modo Auto y el
     selector de modelo.
-- [ ] **F3 — Turno por SSE y bucle de consulta** (D1, D2, D3, D7).
+- [x] **F3 — Turno por SSE y bucle de consulta** (D1, D2, D3, D7). Ver el registro.
   - `streamGenerateContent`.
   - Herramientas `consultar_*` sobre lo que ya existe: tareas, tablero,
     análisis y miembros.
@@ -696,3 +696,31 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
     siempre**, esté marcado o no. Se abrió a propósito; «Recursos» gobierna qué
     más puede consultar PRAX, y eso importa de verdad cuando existan las
     consultas (F3).
+  - **F3 cerrada.**
+    - **Consultas**: `consultar_tareas`, `consultar_tarea` y
+      `consultar_analisis`, en `assistant/src/assistant/consultas.ts`.
+      - Solo de lectura. Las ejecuta el servicio por el transporte en proceso.
+      - Solo sobre proyectos del ámbito: con foco, ese; sin foco, los de
+        «Recursos».
+      - Nunca lanzan: un fallo vuelve al modelo como `{ error }`.
+      - Filas con tope (`CONSULTA_MAX_TAREAS = 40`) y `omitidas`.
+    - **Bucle**: como mucho 4 vueltas de consulta y 120k tokens de entrada
+      acumulados. La última vuelta va sin consultas y con una nota.
+    - **Turno por eventos**: Gemini va por `streamGenerateContent`.
+      `chatEnVivo()` emite `inicio`, `paso`, `texto` y `fin`, y `chat()` es el
+      mismo turno sin nadie escuchando: una sola implementación.
+    - **Gateway**: `POST …/assistant/chat/stream` en los dos modos. SSE a mano
+      (trampa 12), con latido de 15 s y soltando el turno si el navegador se
+      va. Lo que falla antes de abrir el flujo sale como JSON.
+    - **Frontend**: `commons/assistant/en-vivo.ts` lo pide por el proxy de
+      siempre, que ya no corta los flujos. Pinta los pasos reales y el texto con
+      cursor, y devuelve la misma `RespuestaChat` que la Server Action.
+      `FlujoDePensamiento` deja de ser un reloj.
+    - **Pruebas**: `assistant.turno.spec.ts` (el bucle), streaming en
+      `gemini.client.spec.ts` y e2e `22-prax-en-vivo`.
+    - **Gemini falso** para desarrollo: `e2e/fixtures/gemini-falso.mjs` con
+      `GEMINI_BASE_URL`. Así se vio el bucle entero en el navegador: PRAX
+      escribe, consulta y responde con el número real de tareas.
+    - **Queda para F8**: el texto en vivo ya sale sin burbuja, pero el mensaje
+      final todavía se pinta en la burbuja de antes. Las variantes muertas
+      `panel` y `cajon` siguen ahí; se quitan con el rediseño.
