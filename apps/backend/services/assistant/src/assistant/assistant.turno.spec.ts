@@ -321,6 +321,41 @@ describe('El turno de PRAX: bucle de consultas', () => {
     });
   });
 
+  /**
+   * La propuesta fantasma (visto con Gemini de verdad): el texto dice que hay
+   * una propuesta preparada y no hubo llamada. Tiene que entrar el turno de
+   * recuperación, y lo que proponga ahí es lo que se guarda.
+   */
+  it('si dice «he preparado una propuesta» sin llamar a nada, se le pide que la llame', async () => {
+    const m = montar([
+      respuesta({ text: 'He preparado una propuesta para abrir el proyecto Web.' }),
+      respuesta({
+        text: 'Aquí está.',
+        calls: [
+          {
+            name: 'proponer_abrir_proyecto',
+            args: { projectId: PROYECTO.id, porQue: 'Lo nombraste.' },
+          },
+        ],
+      }),
+    ]);
+
+    await m.servicio.chat(payload as any);
+
+    expect(m.gemini.chat).toHaveBeenCalledTimes(2);
+    expect(m.llamadas[1].params.message).toContain('NO has llamado a ninguna herramienta');
+    const guardado = m.conversaciones.guardarTurno.mock.calls[0] as unknown as [
+      { proposals: { tool: string }[] },
+    ];
+    expect(guardado[0].proposals.map((p) => p.tool)).toEqual(['proponer_abrir_proyecto']);
+  });
+
+  it('«te propongo que…» es una sugerencia, no una tarjeta prometida: no hay segundo turno', async () => {
+    const m = montar([respuesta({ text: 'Te propongo que empieces por la maqueta.' })]);
+    await m.servicio.chat(payload as any);
+    expect(m.gemini.chat).toHaveBeenCalledTimes(1);
+  });
+
   it('una propuesta no se ejecuta: se recoge y se guarda con el turno', async () => {
     const m = montar([
       respuesta({

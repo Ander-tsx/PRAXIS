@@ -5667,3 +5667,33 @@ baja a Gratis —13— pasa el resto del mes por encima sin haber escrito nada m
   tabla sería la forma final.
 - **El portal de Stripe sigue siendo de la persona y no de la organización.**
   Viene de la etapa anterior y está en PENDIENTES-BACKEND.
+
+---
+
+## 49. PRAX semiagéntico: consulta, propone y contesta en el chat
+
+Etapa entera en [docs/PLAN-PRAX-SEMIAGENTICO.md](../PLAN-PRAX-SEMIAGENTICO.md),
+con sus diecisiete decisiones y el registro de cada fase. Rama
+`feature/prax-semiagentico`. Lo que cambia para quien toque PRAX:
+
+- **El turno es un bucle.** El modelo puede pedir consultas `consultar_*` —solo
+  lectura, ejecutadas en el servidor—; su resultado vuelve en la vuelta
+  siguiente. Tope: 4 vueltas y 120 mil tokens de entrada. Las propuestas siguen
+  sin ejecutarse: se recogen y se validan al final.
+- **Llega por SSE** (`…/assistant/chat/stream`), escrito a trozos y con los pasos
+  reales («Buscando tareas en…»). Ya no hay corte de 15 s.
+- **Se cobra en tokens PRAX** (`tokensPrax()` en contracts): entrada ×1, caché
+  ×0,25, salida y razonamiento ×8. Cada respuesta dice lo que costó.
+- **«Recursos»** se guarda en el servidor por persona y organización, y PRAX no
+  lee nada fuera de la organización activa.
+- **Capacidades** en `capabilities.ts`: sprints, documentos (la revisión la
+  aplica el editor), mensajes firmados «con PRAX», mensaje privado y
+  automatizaciones que nacen pausadas. A lo que no puede, contesta con el
+  permiso que falta.
+- **`ChatMessage.origin`**: el aviso de una regla se pinta como divisor y lo que
+  mandó PRAX lleva su marca. `@PRAX` en el chat de un proyecto responde allí
+  mismo; sus propuestas se quedan en la conversación privada.
+- **Jev** decide si un turno de charla lleva el inventario; apagado por defecto.
+
+Las trampas que dejó están en CLAUDE.md, en el bloque «PRAX consulta, propone y
+responde en el chat».

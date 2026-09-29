@@ -27,7 +27,7 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | [docs/PLAN-DOCUMENTOS.md](docs/PLAN-DOCUMENTOS.md) | Documentos dentro de los Espacios. **Etapa 2 entregada** (2026-09-25): editor en bloques (TipTap) **en tiempo real** (`collab-service`, Hocuspocus, puerto 3010), guardado como Yjs + copia en Markdown, compartir como Google Docs (`/d/<id>`), imágenes, versiones y documentos vinculados a tareas. Decisiones E1–E11 y sus trampas |
 | [docs/PLAN-FUSION-ZONAS.md](docs/PLAN-FUSION-ZONAS.md) | **Etapa cerrada** (2026-09-04, rama `feature/fusion-zonas`) — Multi-Zones fusionado en una sola aplicación. Por qué nacieron las zonas (un requisito de una materia, no una decisión de arquitectura), por qué no se sostenían —las 8 apps corrían en **un solo contenedor**, todo el coste y ningún beneficio— y cómo se hizo: ocho decisiones, seis invariantes y doce pasos (F0–F11), **ninguna URL cambiada**. Se conserva por el registro: cada paso anota qué trampa apareció, y varias no dan error —`revalidatePath` sin prefijo, `projectPath()`, un `redirect()` bajo un layout que ya hace streaming— |
 | [docs/PLAN-MONOLITO.md](docs/PLAN-MONOLITO.md) | **Etapa en curso** (2026-09-29): el backend pasa de once procesos a **uno**. La RAM de `praxis-api` era ~90% de la factura de Railway y no era un leak, sino el coste fijo de once V8 en reposo: 1.335 MB frente a 189. Transporte en proceso con la semántica exacta de TCP, fuera Alexa y las rutas muertas de Análisis, y un reposo que deja dormir al contenedor. Diez decisiones, el orden y cómo se despliega. **Va antes que el de PRAX** |
-| [docs/PLAN-PRAX-SEMIAGENTICO.md](docs/PLAN-PRAX-SEMIAGENTICO.md) | **Etapa abierta** (2026-09-29, rama `feature/prax-semiagentico`) — refactor de PRAX, frontend y **backend** por encargo: bucle de consultas de solo lectura (**sigue proponiendo, nunca ejecuta**), turno por SSE, «Recursos» guardado en servidor y atado a la organización activa, cobro en tokens ponderados, Jev como router opcional detrás de un interruptor, `ChatMessage.origin`, @PRAX en el chat grupal y el rediseño de ambos chats. Diecisiete decisiones (D1–D17), seis invariantes y once fases. ⚠️ Destapa que **el corte de 15 s del cliente** es la causa más probable de «PRAX no responde». **Se sigue estrictamente** |
+| [docs/PLAN-PRAX-SEMIAGENTICO.md](docs/PLAN-PRAX-SEMIAGENTICO.md) | **F0–F10 hechas** (2026-09-29, rama `feature/prax-semiagentico`, pendiente de revisión) — refactor de PRAX, frontend y **backend** por encargo: bucle de consultas de solo lectura (**sigue proponiendo, nunca ejecuta**), turno por SSE, «Recursos» guardado en servidor y atado a la organización activa, cobro en tokens ponderados, Jev como router opcional detrás de un interruptor, `ChatMessage.origin`, @PRAX en el chat grupal y el rediseño de ambos chats. Diecisiete decisiones (D1–D17), seis invariantes y once fases. ⚠️ Destapa que **el corte de 15 s del cliente** es la causa más probable de «PRAX no responde». **Se sigue estrictamente** |
 | [docs/PRAX-MCP-SEGUNDA-ITERACION.md](docs/PRAX-MCP-SEGUNDA-ITERACION.md) | Nota interna, sin decidir: Praxis como servidor MCP (Claude usando Praxis) frente a PRAX como cliente MCP. Qué falta —OAuth, sobre todo— y qué choca con «propone; nunca ejecuta» |
 | [docs/frontend/PLAN-PRAX-AGENTICO.md](docs/frontend/PLAN-PRAX-AGENTICO.md) | 🚫 **Sustituido** por el de arriba. Se conserva por el diagnóstico en frío y la ficha de Jev. Era: **etapa por empezar** (2026-09-25). Dos cosas sin tocar todavía: por qué PRAX no responde desde la migración a organizaciones (diagnóstico en frío, sin reproducir — tres hipótesis con `file:line`, nada confirmado) y la idea de un modelo barato de decisión («jev», sin verificar qué modelo es) delante del modelo real para recortar contexto. Incluye por qué «volver agéntico» a PRAX no puede chocar con «el asistente propone; nunca ejecuta» sin decidirlo antes |
 | [kyloo-design/SKILL.md](kyloo-design/SKILL.md) | **Antes de tocar cualquier pantalla.** Cómo se componen: filas en vez de tarjetas, tipografía como jerarquía, activo por tono. ⚠️ **Su paleta, sus radios y sus fuentes están revertidos** (`3fa9b87`) y no se reaplican sin pedirlo — lee el aviso de su cabecera. §13 es la de dentro de la aplicación |
@@ -303,6 +303,10 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
     `:backlog`) y se invalida con `redis.delByPrefix`, no con `del`. Un filtro
     nuevo en `findAllTasks` va en la clave **y** queda cubierto por el prefijo;
     un `del` exacto dejaría las variantes filtradas sirviendo datos viejos.
+    🔴 **La página y el tope también van en la clave** (`:p1:l50`). No iban
+    (`5d0f273b`): la primera petición fijaba la respuesta de todas durante el
+    minuto de caché, así que la página 2 devolvía la 1 y descartar un sprint
+    —que pide 10 000— podía dejar tareas atadas a un sprint borrado.
 
 **Los siete agregados de Análisis aceptan filtros, y tienen tres trampas.**
 `from`/`to`, `boardId`, `assigneeId`, `labelId` y `priority`, en las ocho rutas —
@@ -396,6 +400,41 @@ se calcula al subir —`.md`/`.txt` decodificando, PDF por su capa de texto— y
 `historial()` lo reinyecta con presupuesto (`ASSISTANT_EXTRACT_BUDGET_CHARS`). De
 una **imagen no se guarda nada**: lo que queda de ella es lo que PRAX contó en su
 respuesta, y por eso el prompt se lo exige (regla 17). §42.
+
+**PRAX consulta, propone y responde en el chat; y nada de eso escribe.**
+Desde la etapa semiagéntica ([PLAN-PRAX-SEMIAGENTICO](docs/PLAN-PRAX-SEMIAGENTICO.md)):
+
+- **Las consultas `consultar_*` se ejecutan de verdad**, en el servidor, y son de
+  solo lectura sobre el foco o los proyectos de «Recursos». Lo que enseñan del
+  foco se anota en el ámbito del turno, y las propuestas se validan contra el
+  briefing **más eso**: los ids de sprints, documentos y reglas solo valen si se
+  consultaron en el mismo turno.
+- **`capabilities.ts` es la única lista** de qué herramienta pide qué permiso.
+  De ahí salen las declaraciones y el catálogo del prompt. Una capacidad nueva va
+  ahí, no en `tools.ts` ni en el prompt a mano.
+- 🔴 **Gemini rechaza la petición entera** si una declaración trae un `OBJECT`
+  sin `properties` o con ellas vacías: el turno de todo el que tenga esa
+  herramienta da 400. Lo vigila `capabilities.spec.ts`; un objeto de claves
+  variables viaja como JSON en un `STRING`.
+- **`ChatMessage.origin`** (`USER`, `AUTOMATION`, `ASSISTANT`) **solo se fija
+  por TCP**: por HTTP, `origin` da 400. Para firmar «con PRAX» el cliente manda
+  `praxConversationId` y el gateway comprueba que la conversación es suya
+  (`OrigenDeMensajeService`); ajena, 403.
+- **`@[PRAX](assistant:prax)` en el chat de un proyecto** lanza un turno detrás
+  del envío, con la sesión de quien lo menciona (`PraxEnElChatService`). La
+  respuesta la firma esa persona con `originMeta.respuesta` y se pinta como
+  PRAX; las propuestas se quedan en su conversación privada. El patrón de
+  referencias acepta `prax` **solo** con `assistant`: con `|prax` a secas, `(user:prax)`
+  pasaba por mención.
+- **El contenido de un documento lo aplica el editor**, no una propuesta por
+  REST (E4 de PLAN-DOCUMENTOS): la revisión se deja en `sessionStorage` y la
+  aplica `RevisionDePrax` como una versión restaurada.
+- **En local, sin clave de Gemini válida, se usa el falso**
+  (`e2e/fixtures/gemini-falso.mjs`, `GEMINI_BASE_URL=http://127.0.0.1:3999`).
+  Sus respuestas son un guion fijo —«Déjame mirar las tareas…»—, así que una
+  conversación que siempre dice eso **no es PRAX fallando**. Acepta directivas
+  `#consulta` / `#propon` para probar propuestas: e2e `23-prax-capacidades`,
+  con `E2E_GEMINI_FALSO=1`.
 
 **Lo que se le manda al modelo viaja en CADA turno, y se mide.**
 `pnpm --filter @praxis/assistant-service medir-prompt <projectId>` desglosa el

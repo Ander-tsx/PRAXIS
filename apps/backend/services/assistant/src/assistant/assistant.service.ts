@@ -259,6 +259,14 @@ interface Briefing {
  */
 type TareaDelBriefing = NonNullable<Briefing['tareas']>[number];
 
+/**
+ * Frases con las que el modelo dice que ya hay una propuesta preparada. Solo las
+ * que afirman que existe —«he preparado», «te dejo»—, no un «te propongo que…»,
+ * que es una sugerencia y no promete ninguna tarjeta.
+ */
+const PROPUESTA_PROMETIDA =
+  /\b(he preparado|te he preparado|te dejo|aqu[ií] tienes|abajo tienes|debajo tienes)\b[^.]{0,40}\bpropuesta/i;
+
 /** Vueltas de consulta como mucho en un turno, antes de la respuesta final (D2). */
 const MAX_VUELTAS_DE_CONSULTA = 4;
 /**
@@ -677,7 +685,16 @@ export class AssistantService {
     // Si falló alguna propuesta, o si no escribió texto habiendo propuesto algo,
     // intentamos un segundo turno automático para que el modelo se corrija o explique.
     const invalidasCount = respuesta.calls.length - validadas.length;
-    if (invalidasCount > 0 || (respuesta.calls.length > 0 && !reply)) {
+    /**
+     * La propuesta fantasma: el texto dice «he preparado una propuesta» y no
+     * hubo ninguna llamada. Pasó en la primera prueba contra Gemini de verdad
+     * (con `gemini-flash-lite-latest`): la persona lee que tiene una tarjeta
+     * esperando y debajo no hay nada. Se trata como una propuesta inválida:
+     * turno de recuperación, que la llame o que corrija lo que dijo.
+     */
+    const propuestaFantasma =
+      respuesta.calls.length === 0 && herramientas.length > 1 && PROPUESTA_PROMETIDA.test(reply);
+    if (invalidasCount > 0 || (respuesta.calls.length > 0 && !reply) || propuestaFantasma) {
       /* ⚠️ **Este turno cuesta una llamada entera más**, y hasta ahora no se
          veía en ninguna parte: una conversación donde el modelo falla al
          validar en cada mensaje paga el doble sin que nadie pueda notarlo hasta
@@ -691,6 +708,11 @@ export class AssistantService {
         if (invalidasCount > 0) {
           feedback.push(
             'Has intentado usar herramientas, pero fallaron la validación (quizá referenciaste un id que no existe o usaste mal los parámetros) y fueron descartadas.',
+          );
+        }
+        if (propuestaFantasma) {
+          feedback.push(
+            'Has escrito que preparabas una propuesta, pero NO has llamado a ninguna herramienta: la persona no ve ninguna tarjeta. Llama ahora a la herramienta proponer_* que corresponda, o si no puedes, di que no la has preparado.',
           );
         }
         if (!reply) {
