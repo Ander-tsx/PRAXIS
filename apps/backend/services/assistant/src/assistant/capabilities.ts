@@ -8,6 +8,7 @@ import {
   PROPONER_INICIAR_SPRINT,
   PROPONER_MARCAR_PASOS,
   PROPONER_MENSAJE,
+  PROPONER_MENSAJE_PRIVADO,
   PROPONER_MOVIMIENTO,
   PROPONER_PLANIFICACION,
   PROPONER_PREGUNTA,
@@ -136,6 +137,12 @@ export const CAPACIDADES: Capacidad[] = [
     donde: 'el panel de la tarea, y la pestaña Chat del proyecto',
   },
   {
+    que: 'Escribir por privado a alguien del proyecto',
+    permisos: [],
+    herramientas: [PROPONER_MENSAJE_PRIVADO],
+    donde: 'Mensajes, en la barra lateral',
+  },
+  {
     que: 'Crear tableros con sus columnas',
     permisos: ['canCreateBoard', 'canCreateColumn'],
     herramientas: [PROPONER_TABLERO],
@@ -210,7 +217,7 @@ export const CAPACIDADES: Capacidad[] = [
 const FUERA_DEL_PROYECTO =
   'Fuera del proyecto: el plan, los asientos y la facturacion son de la organizacion ' +
   '(menu de la organizacion, solo quien la administra); el perfil y las notificaciones, ' +
-  'de cada persona; los chats privados, desde Mensajes. Nada de eso lo puedes proponer.';
+  'de cada persona. Nada de eso lo puedes proponer.';
 
 /**
  * Las herramientas que le tocan a esta persona.

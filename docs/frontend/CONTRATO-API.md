@@ -908,6 +908,10 @@ mensaje, de proyecto o privado, trae `origin` —`USER`, `AUTOMATION` o
   `{ invocadoPor, conversationId? }`.
 - 🔴 **`origin` no se acepta en el cuerpo**: mandarlo da 400. Si se aceptara,
   cualquiera podría publicar un «⚡ Regla …» falso. Lo fija el servidor.
+- Para firmar `ASSISTANT` —al aceptar una propuesta de PRAX— el cuerpo lleva
+  **`praxConversationId`** (opcional, UUID). El gateway comprueba que esa
+  conversación es de quien envía: si no, **403**. Vale igual en el chat de
+  proyecto y en `POST /me/chats/:peerId/messages`.
 
 ### Chat privado — cuelga de `/me`, sin proyecto en la ruta
 

@@ -17,6 +17,7 @@ import type {
   MoveProposal,
   OpenProjectProposal,
   PlanningProposal,
+  PrivateMessageProposal,
   QuestionProposal,
   SprintProposal,
   StartSprintProposal,
@@ -41,6 +42,7 @@ import {
   aceptarInicioSprintAction,
   aceptarMarcarPasosAction,
   aceptarMensajeAction,
+  aceptarMensajePrivadoAction,
   aceptarMovimientoAction,
   aceptarPlanificacionAction,
   aceptarPlantillaAction,
@@ -135,6 +137,11 @@ export interface ProposalCardProps {
   nombres: Record<string, string>;
   /** `labelId` → nombre de la etiqueta. */
   etiquetas: Record<string, string>;
+  /**
+   * La conversación de PRAX donde está la tarjeta. La usan las de mensaje para
+   * que el gateway los firme «enviado con PRAX» (D13).
+   */
+  conversationId?: string | null;
 }
 
 export function TaskProposalCard({
@@ -1086,6 +1093,33 @@ export function DocumentRevisionProposalCard({
   );
 }
 
+export function PrivateMessageProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+  conversationId,
+}: ProposalCardProps & { propuesta: PrivateMessageProposal }) {
+  return (
+    <AccionConFrase
+      titulo={`Mensaje privado para ${propuesta.destinatario}`}
+      sinAplicar="Todavía no se ha enviado."
+      porQue={propuesta.porQue}
+      ejecutar={() => aceptarMensajePrivadoAction(propuesta, conversationId)}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+    >
+      <p className="whitespace-pre-wrap rounded-lg border border-border px-3 py-2 font-sans text-sm leading-relaxed text-text-primary">
+        {propuesta.body}
+      </p>
+      <p className="font-sans text-xs text-text-secondary">
+        Solo lo verá {propuesta.destinatario}. Sale a tu nombre, con la marca «enviado con PRAX».
+      </p>
+    </AccionConFrase>
+  );
+}
+
 /** Token de columna → color real. Sin color, el gris de siempre. */
 function colorDeColumna(token?: string): string {
   switch (token) {
@@ -1351,6 +1385,7 @@ export function MessageProposalCard({
   proposalId,
   estadoGuardado,
   propuesta,
+  conversationId,
 }: ProposalCardProps & { propuesta: MessageProposal }) {
   const [estado, setEstado] = useState<Estado>('pendiente');
   const [error, setError] = useState<string | null>(null);
@@ -1360,7 +1395,7 @@ export function MessageProposalCard({
     setEstado('enviando');
     setError(null);
 
-    const respuesta = await aceptarMensajeAction(projectId, propuesta);
+    const respuesta = await aceptarMensajeAction(projectId, propuesta, conversationId);
 
     if (respuesta.error || !respuesta.enviado) {
       setError(respuesta.error ?? 'No se pudo enviar el mensaje.');

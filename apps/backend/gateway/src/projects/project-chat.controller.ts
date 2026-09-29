@@ -46,6 +46,7 @@ import { JwtGuard } from '../auth/jwt.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { MentionablesService } from './mentionables.service';
+import { OrigenDeMensajeService } from './origen-de-mensaje.service';
 
 /**
  * El chat del equipo de un proyecto.
@@ -81,6 +82,7 @@ export class ProjectChatController {
   constructor(
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     private readonly mentionables: MentionablesService,
+    private readonly origenes: OrigenDeMensajeService,
   ) {}
 
   /**
@@ -125,15 +127,17 @@ export class ProjectChatController {
   @RequireProjectPermission(ProjectPermission.CAN_COMMENT)
   @ApiOperation({ summary: 'Escribe en el chat del proyecto' })
   @ApiResponse({ status: 201, description: 'Mensaje creado' })
-  send(@Request() req: Express.Request, @Body() body: SendChatMessageBodyDto) {
+  async send(@Request() req: Express.Request, @Body() body: SendChatMessageBodyDto) {
+    const { praxConversationId, ...mensaje } = body;
+    /* `origin` se decide aquí y no se lee del cuerpo (D13): el DTO rechaza el
+       campo. Es `USER`, o `ASSISTANT` si acepta una propuesta de una
+       conversación de PRAX **suya**. Los de regla los publica
+       automation-service por TCP. */
+    const origen = await this.origenes.resolver(req.user!.userId, praxConversationId);
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'chat_project_send' },
-        /* `origin` se fija aquí y no se lee del cuerpo (D13): el DTO ya rechaza
-           el campo, y esto lo deja escrito por si un día deja de hacerlo. Un
-           mensaje que llega por HTTP es siempre de la persona; los de regla
-           los publica automation-service por TCP. */
-        { ...body, projectId: req.projectId, requesterId: req.user!.userId, origin: 'USER' },
+        { ...mensaje, projectId: req.projectId, requesterId: req.user!.userId, ...origen },
       ),
     );
   }

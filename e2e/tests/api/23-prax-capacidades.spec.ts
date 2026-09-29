@@ -255,3 +255,43 @@ test.describe('PRAX — documentos', () => {
     expect(leido.content).toContain('- [ ] Revisar');
   });
 });
+
+test.describe('PRAX — mensajes firmados', () => {
+  /**
+   * D13: aceptar un mensaje que propuso PRAX lo manda con la sesión de quien
+   * acepta, y el gateway lo firma ASSISTANT **si la conversación es suya**.
+   */
+  test('con una conversación propia sale ASSISTANT; con una ajena, 403', async ({ request }) => {
+    const mundo = await crearMundo(request);
+    const otro = await crearMundo(request);
+    const headers = comoBearer(mundo.duenno.accessToken);
+
+    const abrir = async (m: Mundo) => {
+      const r = await request.post(`/api/projects/${m.proyecto.id}/assistant/chat/stream`, {
+        headers: { ...comoBearer(m.duenno.accessToken), Accept: 'text/event-stream' },
+        data: { message: 'hola' },
+        timeout: 120_000,
+      });
+      const inicio = (await r.text()).split('\n').find((l) => l.startsWith('data:'));
+      return (JSON.parse(inicio!.slice(5)) as { conversationId: string }).conversationId;
+    };
+    const mia = await abrir(mundo);
+    const ajena = await abrir(otro);
+
+    const firmado = await request.post(`/api/projects/${mundo.proyecto.id}/chat/messages`, {
+      headers,
+      data: { body: 'La demo se mueve al jueves.', praxConversationId: mia },
+    });
+    expect(firmado.status()).toBe(201);
+    expect(await data<{ origin: string; originMeta: unknown }>(firmado)).toMatchObject({
+      origin: 'ASSISTANT',
+      originMeta: { invocadoPor: mundo.duenno.userId, conversationId: mia },
+    });
+
+    const robado = await request.post(`/api/projects/${mundo.proyecto.id}/chat/messages`, {
+      headers,
+      data: { body: 'Firmado con la conversación de otro', praxConversationId: ajena },
+    });
+    expect(robado.status()).toBe(403);
+  });
+});

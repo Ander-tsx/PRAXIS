@@ -189,6 +189,19 @@ export interface MessageProposal {
 }
 
 /**
+ * `proponer_mensaje_privado`. A una persona del proyecto, a nombre de quien
+ * acepta y firmado «enviado con PRAX» (D13 y D16 de PLAN-PRAX-SEMIAGENTICO).
+ * `destinatario` es el nombre, para que la tarjeta se lea igual dentro de una
+ * semana.
+ */
+export interface PrivateMessageProposal {
+  destinatarioId: string;
+  destinatario: string;
+  body: string;
+  porQue?: string;
+}
+
+/**
  * `proponer_marcar_pasos`. Marca pasos del checklist como hechos.
  *
  * ⚠️ **Solo marca.** No desmarca ni borra: el asistente no deshace trabajo.
@@ -629,6 +642,15 @@ export function isDocumentRevisionProposal(
  */
 export function claveDeRevisionDePrax(documentoId: string): string {
   return `praxis:revision-prax:${documentoId}`;
+}
+
+export function isPrivateMessageProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: PrivateMessageProposal } {
+  return (
+    propuesta.tool === 'proponer_mensaje_privado' &&
+    typeof propuesta.args.destinatarioId === 'string'
+  );
 }
 
 export function isMessageProposal(

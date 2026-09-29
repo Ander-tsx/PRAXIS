@@ -500,6 +500,15 @@ export class ConversationsService {
    *
    * Los mensajes y las propuestas caen en cascada.
    */
+  /**
+   * ¿Es de esta persona? Para firmar un mensaje de chat como «enviado con
+   * PRAX» (D13 de docs/PLAN-PRAX-SEMIAGENTICO.md): quien lo manda tiene que
+   * poder señalar una conversación suya, no la de cualquiera.
+   */
+  async esDe(userId: string, conversationId: string): Promise<boolean> {
+    return (await this.prisma.conversation.count({ where: { id: conversationId, userId } })) > 0;
+  }
+
   async borrar(userId: string, conversationId: string) {
     const { count } = await this.prisma.conversation.deleteMany({
       where: { id: conversationId, userId },

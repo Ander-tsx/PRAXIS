@@ -157,6 +157,12 @@ export class AssistantController {
     }
   }
 
+  /** ¿La conversación es de esta persona? Lo pregunta el chat antes de firmar con PRAX. */
+  @MessagePattern({ cmd: 'assistant_conversation_owned' })
+  conversacionPropia(@Payload() dto: { userId: string; conversationId: string }) {
+    return this.assistant.esConversacionDe(dto.userId, dto.conversationId);
+  }
+
   @MessagePattern({ cmd: 'assistant_conversation_delete' })
   async borrar(@Payload() dto: { userId: string; conversationId: string }) {
     try {

@@ -104,6 +104,20 @@ export class SendChatMessageBodyDto {
   @IsOptional()
   @IsBoolean()
   enHilo?: boolean;
+
+  /**
+   * La conversación de PRAX de la que sale este mensaje, si lo propuso PRAX y
+   * quien lo envía lo aceptó (D13 y D16 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+   *
+   * ⚠️ **No es `origin`.** `origin` no se acepta nunca por HTTP —un «⚡ Regla…»
+   * falso—; esto es una referencia que el gateway **comprueba**: la
+   * conversación tiene que ser de quien envía. Si lo es, el mensaje se guarda
+   * como `ASSISTANT` y se pinta con la marca «enviado con PRAX».
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID('4')
+  praxConversationId?: string;
 }
 
 /**

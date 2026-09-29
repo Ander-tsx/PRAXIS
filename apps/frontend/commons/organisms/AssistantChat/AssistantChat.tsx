@@ -26,6 +26,7 @@ import {
   isDocumentProposal,
   isDocumentRevisionProposal,
   isMessageProposal,
+  isPrivateMessageProposal,
   isPlanningProposal,
   isSprintProposal,
   isStartSprintProposal,
@@ -61,6 +62,7 @@ import {
   DocumentProposalCard,
   DocumentRevisionProposalCard,
   MessageProposalCard,
+  PrivateMessageProposalCard,
   PlanningProposalCard,
   SprintProposalCard,
   StartSprintProposalCard,
@@ -1351,6 +1353,20 @@ export function AssistantChat({
                             />
                           );
                         }
+                        if (isPrivateMessageProposal(propuesta)) {
+                          return (
+                            <PrivateMessageProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId ?? ''}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                              conversationId={conversationId}
+                            />
+                          );
+                        }
                         if (isMessageProposal(propuesta)) {
                           return (
                             <MessageProposalCard
@@ -1361,6 +1377,7 @@ export function AssistantChat({
                               propuesta={propuesta.args}
                               nombres={nombres}
                               etiquetas={etiquetas}
+                              conversationId={conversationId}
                             />
                           );
                         }

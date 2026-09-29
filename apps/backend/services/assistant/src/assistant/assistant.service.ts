@@ -171,6 +171,7 @@ const NOMBRE_DE_PROPUESTA: Record<string, string> = {
   proponer_iniciar_sprint: 'empezar un sprint',
   proponer_planificacion: 'repartir tareas entre backlog y sprint',
   proponer_documento: 'un documento nuevo',
+  proponer_mensaje_privado: 'un mensaje privado',
   proponer_revision_documento: 'una revision del documento',
   proponer_abrir_proyecto: 'abrir uno de tus proyectos',
   proponer_plantilla: 'la estructura de un proyecto nuevo',
@@ -900,6 +901,10 @@ export class AssistantService {
    * proyecto es el foco de cada turno y puede cambiar a mitad. La clave de acceso
    * sigue siendo el `userId`, que es lo que impide leer un hilo ajeno.
    */
+  esConversacionDe(userId: string, conversationId: string) {
+    return this.conversaciones.esDe(userId, conversationId);
+  }
+
   listarConversaciones(userId: string, ambito?: AmbitoDeOrganizacion) {
     return this.conversaciones.listar(userId, ambito);
   }
@@ -1385,6 +1390,24 @@ export class AssistantService {
       };
     }
 
+    if (call.name === 'proponer_mensaje_privado') {
+      const destinatario = payload.miembros.find(
+        (m) => m.userId === String(call.args.destinatarioId ?? ''),
+      );
+      const body = String(call.args.body ?? '').trim();
+      /* A alguien del proyecto que no sea quien habla: escribirse a uno mismo
+         es un 400 del gateway, y a alguien de fuera PRAX no lo conoce. */
+      if (!destinatario || destinatario.userId === payload.userId || !body) return null;
+      return {
+        tool: call.name,
+        args: {
+          destinatarioId: destinatario.userId,
+          destinatario: destinatario.nombre,
+          body: body.slice(0, 2000),
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+        },
+      };
+    }
     if (call.name === 'proponer_documento') return this.validarDocumento(call);
     if (call.name === 'proponer_revision_documento') return this.validarRevision(call, briefing);
     if (call.name === 'proponer_sprint') return this.validarSprint(call, briefing);

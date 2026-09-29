@@ -44,6 +44,7 @@ import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { MentionablesService } from './mentionables.service';
+import { OrigenDeMensajeService } from './origen-de-mensaje.service';
 
 /**
  * Conversaciones privadas entre dos personas.
@@ -77,6 +78,7 @@ export class DirectChatController {
     private readonly mentionables: MentionablesService,
     private readonly rolesService: GlobalRolesService,
     private readonly cuotas: QuotaService,
+    private readonly origenes: OrigenDeMensajeService,
   ) {}
 
   /**
@@ -214,12 +216,14 @@ export class DirectChatController {
     @Body() body: SendChatMessageBodyDto,
   ) {
     const yaAutorizado = await this.puedeHablarCon(req.user!.userId, peerId);
+    const { praxConversationId, ...mensaje } = body;
+    /* `origin` se decide aquí y no se lee del cuerpo (D13): `USER`, o
+       `ASSISTANT` si acepta una propuesta de una conversación de PRAX suya. */
+    const origen = await this.origenes.resolver(req.user!.userId, praxConversationId);
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'chat_direct_send' },
-        /* `origin` se fija aquí y no se lee del cuerpo (D13): un mensaje que
-           llega por HTTP es siempre de la persona. */
-        { ...body, peerId, requesterId: req.user!.userId, isAdmin: yaAutorizado, origin: 'USER' },
+        { ...mensaje, peerId, requesterId: req.user!.userId, isAdmin: yaAutorizado, ...origen },
       ),
     );
   }

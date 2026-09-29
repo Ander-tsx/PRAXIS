@@ -28,6 +28,7 @@ import {
   SharedDocumentsController,
 } from './shared-documents.controller';
 import { SprintsController } from './sprints.controller';
+import { OrigenDeMensajeService } from './origen-de-mensaje.service';
 import { TaskPurgeService } from './task-purge.service';
 import { WorkspacesController, WorkspacesResourceController } from './workspaces.controller';
 
@@ -78,6 +79,7 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
     AutomationPurgeService,
     MentionablesService,
     DocumentAccessService,
+    OrigenDeMensajeService,
     OptionalJwtGuard,
   ],
   /**

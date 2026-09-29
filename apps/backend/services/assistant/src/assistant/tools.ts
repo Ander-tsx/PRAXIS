@@ -284,12 +284,13 @@ export const PROPONER_COMENTARIO: FunctionDeclaration = {
 /**
  * Escribir en el chat del equipo.
  *
- * ⚠️ **Solo el chat del proyecto que se está mirando, nunca uno privado.** El
- * asistente vive dentro de un proyecto y lo que sabe es de ese proyecto; darle
- * la capacidad de escribirle a alguien por privado sería dejarle mandar mensajes
- * a nombre de una persona en una conversación que el proyecto no contiene. Si
- * hace falta avisar a alguien, se le menciona aquí — que es público y queda a la
- * vista de todo el equipo.
+ * ⚠️ **Solo el chat del proyecto que se está mirando.** Los privados tienen su
+ * propia herramienta, `proponer_mensaje_privado`, desde F7 de
+ * docs/PLAN-PRAX-SEMIAGENTICO.md: esta nota decía que no los habría nunca —se
+ * mandarían a nombre de una persona en una conversación que el proyecto no
+ * contiene—, y el dueño del producto lo pidió (D16). Lo que lo hace aceptable
+ * es lo mismo que en todo lo demás: lo manda **quien acepta**, lee el texto
+ * entero antes, y sale firmado «enviado con PRAX».
  *
  * Cuelga de `canComment` por lo mismo que el chat: es el permiso de participar
  * en una conversación sin poder editar el trabajo de nadie.
@@ -321,6 +322,37 @@ export const PROPONER_MENSAJE: FunctionDeclaration = {
       },
     },
     required: ['body', 'porQue'],
+  },
+};
+
+/**
+ * Escribirle por privado a alguien del proyecto (D16).
+ *
+ * Sin permiso de proyecto: al chat privado se entra por la organización
+ * (trampa 22 de CLAUDE.md), y el gateway lo vuelve a comprobar al enviar. El
+ * destinatario tiene que ser del proyecto: es la gente que PRAX conoce.
+ */
+export const PROPONER_MENSAJE_PRIVADO: FunctionDeclaration = {
+  name: 'proponer_mensaje_privado',
+  description:
+    'Prepara un mensaje PRIVADO para una persona del proyecto. NO lo envia: quien te ' +
+    'habla lo lee y lo acepta, y sale a SU nombre con la marca "enviado con PRAX". Usalo ' +
+    'solo si te lo piden o si es algo que no debe ver todo el equipo; si no, ' +
+    'proponer_mensaje.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      destinatarioId: {
+        type: 'STRING',
+        description: 'userId de "PERSONAS DEL PROYECTO". Nunca el de quien te escribe.',
+      },
+      body: {
+        type: 'STRING',
+        description: 'El mensaje en primera persona, como lo escribiria quien lo envia.',
+      },
+      porQue: { type: 'STRING', description: 'Obligatorio. Una frase.' },
+    },
+    required: ['destinatarioId', 'body', 'porQue'],
   },
 };
 

@@ -15,6 +15,7 @@ import type {
   FullConversation,
   MoveProposal,
   PlanningProposal,
+  PrivateMessageProposal,
   SprintProposal,
   StartSprintProposal,
   TaskProposal,
@@ -1218,6 +1219,12 @@ export async function aceptarPlanificacionAction(
 export async function aceptarMensajeAction(
   projectId: string,
   propuesta: { body?: unknown },
+  /**
+   * La conversación de PRAX de la que sale. Con ella el gateway firma el
+   * mensaje «enviado con PRAX» —después de comprobar que es tuya—; sin ella,
+   * sale como un mensaje normal.
+   */
+  praxConversationId?: string | null,
 ): Promise<{ error: string | null; enviado: boolean }> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.', enviado: false };
@@ -1228,12 +1235,49 @@ export async function aceptarMensajeAction(
   try {
     /* Se confirma contra el `data`, no contra el status: un 200 sin cuerpo ya
        nos ha mentido antes. */
-    const creado = await api.post<{ id: string }>(`/projects/${projectId}/chat/messages`, { body });
+    const creado = await api.post<{ id: string }>(`/projects/${projectId}/chat/messages`, {
+      body,
+      ...(praxConversationId ? { praxConversationId } : {}),
+    });
     if (!creado?.id) return { error: 'El servidor no envió el mensaje.', enviado: false };
 
     return { error: null, enviado: true };
   } catch (error) {
     return { error: describe(error, 'No se pudo enviar el mensaje.'), enviado: false };
+  }
+}
+
+/**
+ * Un mensaje privado a alguien del proyecto.
+ *
+ * `POST /me/chats/:peerId/messages`: el gateway decide si podéis hablar —por
+ * organización (trampa 22)— y firma «enviado con PRAX» si la conversación es
+ * tuya. El destinatario ya lo validó el servicio contra los miembros.
+ */
+export async function aceptarMensajePrivadoAction(
+  propuesta: PrivateMessageProposal,
+  praxConversationId?: string | null,
+): Promise<{ error: string | null; hecho: string | null; href?: string }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', hecho: null };
+
+  const body = String(propuesta.body ?? '').trim();
+  const peerId = String(propuesta.destinatarioId ?? '');
+  if (!body || !peerId) return { error: 'La propuesta no dice qué ni a quién.', hecho: null };
+
+  try {
+    const creado = await api.post<{ id: string }>(`/me/chats/${peerId}/messages`, {
+      body,
+      ...(praxConversationId ? { praxConversationId } : {}),
+    });
+    if (!creado?.id) return { error: 'El servidor no envió el mensaje.', hecho: null };
+    return {
+      error: null,
+      hecho: `Mensaje enviado a ${propuesta.destinatario}.`,
+      href: `/chat/${peerId}`,
+    };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo enviar el mensaje.'), hecho: null };
   }
 }
 

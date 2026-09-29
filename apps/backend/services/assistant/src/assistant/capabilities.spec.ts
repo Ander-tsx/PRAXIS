@@ -20,7 +20,7 @@ describe('capabilities', () => {
     canMoveTask: true,
   };
 
-  it('un colaborador recibe preguntar, mover, marcar pasos, comentar y el mensaje; nada más', () => {
+  it('un colaborador recibe preguntar, mover, marcar pasos, comentar y los mensajes; nada más', () => {
     const nombres = herramientasPara(colaborador).map((h) => h.name);
     expect(nombres).toEqual([
       'proponer_pregunta',
@@ -28,12 +28,16 @@ describe('capabilities', () => {
       'proponer_marcar_pasos',
       'proponer_comentario',
       'proponer_mensaje',
+      'proponer_mensaje_privado',
     ]);
   });
 
-  it('un rol de solo lectura solo puede preguntar', () => {
+  /* El privado no depende de ningún permiso de proyecto: al chat privado se
+     entra por la organización (trampa 22 de CLAUDE.md). */
+  it('un rol de solo lectura puede preguntar y escribir por privado; nada más', () => {
     expect(herramientasPara({ canViewProject: true }).map((h) => h.name)).toEqual([
       'proponer_pregunta',
+      'proponer_mensaje_privado',
     ]);
   });
 
