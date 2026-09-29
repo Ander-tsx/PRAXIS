@@ -13,6 +13,28 @@
 >
 > **Se sigue estrictamente.** Una sesión que retome esto empieza leyéndolo
 > entero, y marca la casilla de cada fase al cerrarla, con su commit.
+>
+> ### Cómo empieza la sesión que lo retome
+>
+> El dueño del producto lo dejó así (2026-09-29): una sesión nueva **lee este
+> plan, lo comenta un poco con él y después se pone a trabajar**. No empieza a
+> escribir código sin esa conversación. En orden:
+>
+> 1. Leer este documento entero, [PLAN-MONOLITO](PLAN-MONOLITO.md) §1-§3 (el
+>    backend es ya un proceso: cambia *dónde* vive el código, no el plan) y la
+>    nota de [MCP](PRAX-MCP-SEGUNDA-ITERACION.md).
+> 2. Abrir las dos imágenes de referencia de §1.7, que son parte del encargo.
+> 3. Comprobar que Jev sigue respondiendo con la prueba de humo de §5. La clave
+>    está en el `.env` de assistant-service, que no se versiona. Si falta o se
+>    rotó, pedírsela al dueño del producto.
+> 4. Traer a la conversación lo que merece discutirse antes de F0:
+>    - el orden de las fases;
+>    - D15: si @PRAX en el chat grupal puede proponer o solo responder;
+>    - la ponderación de D8;
+>    - si el efecto de escritura de D11 va con streaming real desde F3 o simulado
+>      antes.
+>
+>    Las tres preguntas de §5 ya están cerradas.
 
 ---
 
@@ -182,6 +204,64 @@ Las tres hipótesis del plan anterior quedan así: la 3 (`organizationId` nulo),
 - **Cuánto ahorra**: con 20k tokens candidatos que se quedan en 6k, un **~55%
   neto** por turno. Con 4k no compensa el salto de red.
 
+### 1.7 Las referencias visuales del encargo
+
+El dueño del producto pasó dos capturas como **idea, no como calco** («no lo
+hagas exactamente así, pero es para que entiendas el punto»). Están en el
+repositorio para que cualquier sesión las pueda abrir. En palabras, lo que
+importa de cada una:
+
+**[`propuesta-de-prax.png`](assets/referencias-prax/propuesta-de-prax.png)**:
+PRAX proponiendo asignar dos tareas (D11 y D12). Fondo oscuro.
+
+- **Icono de PRAX** arriba a la izquierda: una máscara en contorno violeta.
+- **La etiqueta `PRAX`**: pequeña, en mayúsculas espaciadas, gris.
+- **El texto de PRAX**: grande, con peso, en blanco y **sin burbuja**. Por
+  ejemplo: «Dos: «Revisión de diseño» y «Migración de permisos». ¿Se las
+  asigno a Lucía?».
+- **La propuesta**: debajo, un recuadro de esquinas redondeadas (~12 px) con
+  borde fino violeta y relleno algo más claro que el fondo.
+  - **Cabecera**: `PROPUESTA` en monoespaciada pequeña, violeta, en
+    mayúsculas espaciadas, y a su lado el título, «Asignar 2 tareas», en
+    blanco.
+  - **Cuerpo**: **filas**, no tarjetas, cada una con un fondo apenas más claro
+    y redondeada. Lleva el nombre de la tarea, una píldora con su columna
+    («Review» en tinte azul, «To Do» en tinte violeta) y, a la derecha, una
+    flecha gris `⟶` y el avatar redondo de iniciales («LR») de quien la
+    recibe.
+  - **Pie**: el botón «Aceptar» macizo y violeta, «Rechazar» como texto gris,
+    y a la derecha, en gris muy tenue: «con tus permisos, por el mismo botón
+    que usarías tú».
+
+  Ese último texto es la regla «propone; nunca ejecuta» contada al usuario, y
+  merece quedarse.
+
+**[`chat-de-personas.png`](assets/referencias-prax/chat-de-personas.png)**: el
+chat de un equipo (D14). Fondo oscuro.
+
+- **Separador de día**: `HOY`, centrado, pequeño, en mayúsculas espaciadas y
+  gris.
+- **Cada mensaje**:
+  - un **avatar redondo de color con iniciales** a la izquierda: «LR» azul,
+    «DV» ámbar, «MS» verde;
+  - a su derecha, una cabecera con el **nombre en blanco y negrita** y la
+    **hora en gris pequeña** («9:12 a. m.»);
+  - debajo, la **burbuja**: gris oscuro, redondeada (~12 px) y con el texto en
+    blanco.
+- **Menciones y referencias** dentro del texto, como fichas con tinte:
+  «@Mariana» en violeta, «Review» en azul.
+- **Al final, el aviso de una automatización como divisor**:
+  - dos líneas punteadas a los lados;
+  - en el centro, una píldora de borde fino y esquinas del todo redondas con
+    «⚡ Regla «Tarea en revisión» avisó a 2 personas» en gris.
+
+  No parece un mensaje de nadie, aunque en la base pertenezca a quien creó la
+  regla (D13).
+
+⚠️ Las dos usan colores literales. Aquí van **por tokens** de `theme.css`: nada
+de `text-white` (hallazgo E4), y el violeta y el verde de D12 salen de la
+paleta.
+
 ---
 
 ## 2. Decisiones
@@ -320,7 +400,7 @@ Cómo se animan:
   asienta en su estado aceptado.
 - El borrado se queda en rojo.
 
-La imagen de referencia del encargo es una idea, no un calco. La composición
+La imagen de referencia del encargo ([§1.7](#17-las-referencias-visuales-del-encargo)) es una idea, no un calco. La composición
 sigue `kyloo-design` §13: filas en vez de tarjetas dentro de la propuesta y
 tipografía como jerarquía.
 
