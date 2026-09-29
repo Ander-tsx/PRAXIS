@@ -65,6 +65,13 @@ createServer((req, res) => {
   });
   req.on('end', async () => {
     const peticion = JSON.parse(cuerpo || '{}');
+    /* Cuánto pesa lo que se le manda: sirve para medir el router (D10) con y
+       sin Jev sobre el mismo mensaje. */
+    const instruccion = (peticion.systemInstruction?.parts ?? []).map((p) => p.text ?? '').join('');
+    console.log(
+      `[gemini-falso] ${req.url?.split(':').pop()} instruccion=${instruccion.length} ` +
+        `inventarioOmitido=${instruccion.includes('"inventarioOmitido":true')}`,
+    );
     const trozos = guion(peticion);
     trozos[trozos.length - 1].usageMetadata = USO;
     if (req.url?.includes('streamGenerateContent')) {

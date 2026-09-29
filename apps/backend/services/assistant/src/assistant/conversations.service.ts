@@ -180,6 +180,11 @@ export class ConversationsService {
    * `ASSISTANT_EXTRACT_BUDGET_CHARS`— sigue delante mientras la conversación
    * quepa.
    */
+  /** Cuántos mensajes tiene el hilo entero: para decir cuántos no ve el modelo (D9). */
+  contar(conversationId: string): Promise<number> {
+    return this.prisma.message.count({ where: { conversationId } });
+  }
+
   async historial(conversationId: string) {
     const mensajes = await this.prisma.message.findMany({
       where: { conversationId },

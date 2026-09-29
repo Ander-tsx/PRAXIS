@@ -54,6 +54,7 @@ function montar(respuestas: GeminiReply[]) {
   const conversaciones = {
     resolver: jest.fn(async () => 'conv-1'),
     historial: jest.fn(async () => []),
+    contar: jest.fn(async () => 0),
     guardarTurno: jest.fn(async () => []),
   };
   const adjuntos = { paraElTurno: jest.fn(async () => []) };
@@ -66,6 +67,14 @@ function montar(respuestas: GeminiReply[]) {
     conversaciones as any,
     adjuntos as any,
     consultas as any,
+    {
+      decidir: async () => ({
+        incluirInventario: true,
+        intencion: null,
+        router: 'heuristic',
+        motivo: 'prueba',
+      }),
+    } as any,
   );
   return { servicio, gemini, consultas, llamadas, conversaciones, quota };
 }

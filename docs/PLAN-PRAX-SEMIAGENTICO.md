@@ -186,7 +186,7 @@ Las tres hipótesis del plan anterior quedan así: la 3 (`organizationId` nulo),
 - **Límites**: 32k tokens entre `state` y la pregunta más larga. Latencia de
   70 a 500 ms.
 - **Alta**: la consola de TypeSafe tiene las cuentas nuevas **pausadas desde el
-  22-09**. Se entra hoy por **OpenRouter** (`typesafe/jev-latest`) o Cloudflare.
+  22-09**. Se entra hoy por **OpenRouter** (`~typesafe/jev-latest`, con la tilde) o Cloudflare.
 - **Calidad** (pruebas independientes): a la par de un LLM de precio medio.
   Tres pegas:
   - En español rinde **3 a 6 puntos** peor.
@@ -516,11 +516,11 @@ que tocan esquema llevan migración (`prisma:deploy`, **nunca `reset`**).
   - Aviso de conversación larga y del corte del historial.
   - `PlanCatalog`, `AmpliarPlan`, `ContadorCuota` y `planes.ts` en tokens.
   - `docs/AUDITORIA-PLANES.md` actualizado.
-- [ ] **F5 — Router** (D10).
-  - `ContextRouter` + `HeuristicRouter` (el comportamiento de hoy, extraído) +
-    `JevRouter` por OpenRouter, apagado por defecto.
+- [x] **F5 — Router** (D10). Ver el registro.
+  - `RouterDeContexto` con los dos modos (`heuristic`, el comportamiento de
+    antes, y `jev` por OpenRouter), apagado por defecto.
   - Conjunto de calibración en español.
-  - Medir con y sin Jev sobre los mismos turnos antes de encenderlo.
+  - Medido con y sin Jev sobre los mismos turnos.
 - [ ] **F6 — Origen del mensaje** (D13).
   - `ChatMessage.origin`/`originMeta`, solo TCP.
   - `ActionContext` con la regla.
@@ -571,7 +571,7 @@ Las tres preguntas abiertas se cerraron aceptando las propuestas:
   (`services/assistant/.gitignore:3`). 🔴 **Es provisional**: el dueño la
   rotará, y **nunca** se escribe en un archivo versionado ni en un documento.
 - Las otras variables, ya puestas: `PRAX_ROUTER=heuristic` (apagado hasta
-  F5), `JEV_MODEL=typesafe/jev-latest`, `JEV_TIMEOUT_MS=800`. Están en
+  F5), `JEV_MODEL=~typesafe/jev-latest`, `JEV_TIMEOUT_MS=800`. Están en
   `.env.example` sin valor de clave.
 - ⚠️ **La ruta no es la de chat.** OpenRouter expone Jev en
   `POST https://openrouter.ai/api/alpha/decisions`, no en
@@ -749,3 +749,36 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
     - **Pendiente, a propósito:** el corte del historial a 12 mensajes todavía
       no se le dice al modelo (D9, segunda mitad). Va con F5, que es donde se
       decide qué contexto entra.
+  - **F5 cerrada.**
+    - **Qué decide**: solo si el turno lleva el **inventario de tareas**. Es
+      lo único caro del briefing y, desde F3, lo único que PRAX puede pedir si
+      le falta. Se quita cuando Jev dice «charla» con confianza ≥ 0,85; ante
+      cualquier otra cosa, inventario entero.
+    - **Dónde**: `assistant/src/assistant/router.ts` (`RouterDeContexto`). Un
+      solo servicio con dos modos en vez de tres clases: el heurístico no tenía
+      nada que extraer, porque hoy no omite nunca.
+    - **I3**: el briefing sin inventario lleva `inventarioOmitido: true` y una
+      regla del prompt le dice al modelo que no tiene las tareas delante y que
+      las consulte. Las propuestas se siguen validando contra el briefing
+      completo.
+    - **I4**: `JEV_TIMEOUT_MS` (800) o cualquier fallo → decide el heurístico
+      y el turno sigue. Se registra `prax_router_jev_fallo`.
+    - **D9, segunda mitad**: cuando el hilo tiene más mensajes que los que se
+      mandan, el prompt lleva una `NOTA SOBRE EL HILO` con los dos números.
+    - 🔴 **La trampa del alias**: el modelo es **`~typesafe/jev-latest`, con
+      tilde**. Sin ella, OpenRouter responde 400 «Model typesafe/jev-latest
+      does not exist» y, por I4, **PRAX sigue funcionando como si nada**: el
+      router cae al heurístico en cada turno y solo lo delata el log. Así
+      estuvo el primer intento de calibración.
+    - **Calibración** (8 mensajes en español, contra OpenRouter, 2026-09-29):
+      8 de 8. «¡gracias!», «hola, ¿qué tal?» y «perfecto, muchas gracias por la
+      ayuda» → charla 1,00; «vale» → charla 0,96; las dos preguntas →
+      pregunta 1,00; «mueve «Revisar permisos» a Hecho» y «asígnale a Lucía las
+      dos de revisión» → cambio 1,00. Latencia **170-380 ms**.
+    - **Medida** (monolito local, Gemini falso, proyecto con 41 tareas): la
+      instrucción pasa de **26 854 a 14 632 caracteres** en un turno de
+      charla, un 45 % menos. En preguntas y cambios no cambia nada. El
+      Gemini falso ahora escribe en su log el tamaño de cada instrucción.
+    - **Sigue apagado** (`PRAX_ROUTER=heuristic`). Encenderlo en producción
+      es poner `PRAX_ROUTER=jev` y `OPENROUTER_API_KEY` en Railway; lo decide
+      el dueño, que además va a rotar la clave provisional.

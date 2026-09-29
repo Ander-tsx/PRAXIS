@@ -70,6 +70,21 @@ interface Regla {
 
 const REGLAS: Regla[] = [
   /**
+   * El inventario que no viaja (D10 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+   *
+   * El router puede quitar las tareas del contexto en un turno de charla. El
+   * modelo tiene que saberlo, o respondería «no hay tareas» sobre un proyecto
+   * lleno: un recorte que no se dice es peor que no recortar (I3).
+   */
+  {
+    ambito: 'proyecto',
+    texto:
+      'Si el contexto trae "inventarioOmitido": true, en este turno NO tienes delante ' +
+      'las tareas del proyecto, aunque existan. Si las necesitas para responder, usa ' +
+      'consultar_tareas o consultar_tarea; nunca digas que no hay tareas por no verlas.',
+  },
+
+  /**
    * 0 — Las consultas (F3 de docs/PLAN-PRAX-SEMIAGENTICO.md).
    *
    * Con `consultar_*` PRAX puede **mirar** antes de responder, y la tentación del

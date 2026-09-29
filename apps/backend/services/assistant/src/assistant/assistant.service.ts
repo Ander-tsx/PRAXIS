@@ -35,6 +35,7 @@ import { type AmbitoDeOrganizacion, ConversationsService } from './conversations
 import { GeminiClient, type GeminiContent, GeminiError, type UsoDeGemini } from './gemini.client';
 import { instruccionSinProyecto, systemInstruction } from './prompt';
 import { QuotaService } from './quota.service';
+import { RouterDeContexto } from './router';
 import { PROPONER_PLANTILLA, instruccionDePlantilla, validarPlantilla } from './template';
 import { herramientasPara, herramientasSinProyecto } from './tools';
 
@@ -274,6 +275,7 @@ export class AssistantService {
     private readonly conversaciones: ConversationsService,
     private readonly adjuntos: AttachmentsService,
     private readonly consultas: ConsultasService,
+    private readonly router: RouterDeContexto,
   ) {
     this.reportsClient = ClientProxyFactory.create(opcionesDeCliente('REPORTS', this.config));
   }
@@ -414,9 +416,25 @@ export class AssistantService {
        —no debería pasar— el prompt omite el bloque en vez de mentir con un id. */
     const quienPregunta = payload.miembros.find((miembro) => miembro.userId === payload.userId);
 
-    const instruccion = briefing
+    /* Qué contexto viaja en este turno (D10). El briefing del prompt puede ir
+       sin inventario; el completo se queda para validar las propuestas. */
+    const decision = await this.router.decidir({
+      mensaje: payload.message,
+      conProyecto: Boolean(briefing),
+    });
+    const briefingParaPrompt =
+      briefing && !decision.incluirInventario
+        ? {
+            ...briefing,
+            tareas: [],
+            tareasOmitidas: undefined,
+            inventarioOmitido: true,
+          }
+        : briefing;
+
+    const instruccionBase = briefingParaPrompt
       ? systemInstruction(
-          briefing,
+          briefingParaPrompt,
           payload.miembros,
           herramientas.map((herramienta) => herramienta.name),
           payload.chat ?? [],
@@ -427,6 +445,17 @@ export class AssistantService {
           herramientas.map((herramienta) => herramienta.name),
           quienPregunta,
         );
+
+    /* D9: el hilo se corta a los últimos mensajes y el modelo tiene que saberlo.
+       Sin esto, a «¿qué te dije al principio?» contestaba como si lo hubiera
+       leído todo. */
+    const mensajesDelHilo = await this.conversaciones.contar(conversationId);
+    const instruccion =
+      mensajesDelHilo > history.length
+        ? `${instruccionBase}\n\nNOTA SOBRE EL HILO: esta conversacion tiene ${mensajesDelHilo} ` +
+          `mensajes y solo ves los ultimos ${history.length}. Si te preguntan por algo anterior, ` +
+          'di que no lo tienes delante en vez de suponerlo.'
+        : instruccionBase;
 
     /* Sobre qué se puede consultar (D3). Con foco, ese proyecto; sin foco, los de
        «Recursos», que ya llegan filtrados por el gateway. Sin ninguno, no se

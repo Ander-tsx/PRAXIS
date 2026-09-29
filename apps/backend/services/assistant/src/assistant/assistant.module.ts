@@ -10,6 +10,7 @@ import { ConsultasService } from './consultas';
 import { ConversationsService } from './conversations.service';
 import { GeminiClient } from './gemini.client';
 import { QuotaService } from './quota.service';
+import { RouterDeContexto } from './router';
 
 @Module({
   imports: [PrismaModule, BlobStorageModule],
@@ -18,6 +19,7 @@ import { QuotaService } from './quota.service';
     AssistantService,
     AlcanceService,
     ConsultasService,
+    RouterDeContexto,
     ConversationsService,
     AttachmentsService,
     QuotaService,
