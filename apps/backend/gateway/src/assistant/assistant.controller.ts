@@ -7,11 +7,13 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
+  Logger,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Request,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
@@ -23,11 +25,13 @@ import {
   RenameConversationBodyDto,
   ResolveProposalBodyDto,
 } from '@praxis/contracts';
+import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { QuotaService } from '../billing/quota.service';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
+import { transmitirTurno } from './turno-en-vivo';
 
 /**
  * El asistente de un proyecto.
@@ -77,6 +81,8 @@ import { ProjectPermissionGuard } from '../common/guards/project-permission.guar
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/assistant')
 export class AssistantController {
+  private readonly log = new Logger(AssistantController.name);
+
   constructor(
     @Inject('ASSISTANT_SERVICE') private readonly assistantClient: ClientProxy,
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
@@ -149,8 +155,38 @@ export class AssistantController {
     @Request() req: Express.Request,
     @Body() body: AssistantChatBodyDto,
   ) {
-    const userId = req.user!.userId;
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_chat' },
+        await this.prepararTurno(projectId, req.user!.userId, body),
+      ),
+    );
+  }
 
+  /**
+   * El mismo turno, contado mientras ocurre por SSE (D7). Mismo guard y mismo
+   * permiso que la ruta de siempre: los decoradores de clase y de método son
+   * los mismos, y la organización se comprueba igual antes de abrir el flujo.
+   */
+  @Post('chat/stream')
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
+  @ApiOperation({ summary: 'Un turno con el asistente del proyecto, por Server-Sent Events' })
+  async chatEnVivo(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Request() req: Express.Request,
+    @Body() body: AssistantChatBodyDto,
+    @Res() res: Response,
+  ) {
+    const payload = await this.prepararTurno(projectId, req.user!.userId, body);
+    transmitirTurno(
+      res,
+      this.assistantClient.send({ cmd: 'assistant_chat_vivo' }, payload),
+      this.log,
+    );
+  }
+
+  /** Todo lo que el servicio necesita para un turno con proyecto. */
+  private async prepararTurno(projectId: string, userId: string, body: AssistantChatBodyDto) {
     /* La organización sale del proyecto: es el recurso el que dice dónde se
        está trabajando, y por tanto qué plan aplica y contra qué cubo se cuenta.
 
@@ -182,30 +218,25 @@ export class AssistantController {
       this.cuotas.iaDe(userId, organizacionDelProyecto),
     ]);
 
-    return firstValueFrom(
-      this.assistantClient.send(
-        { cmd: 'assistant_chat' },
-        {
-          projectId,
-          userId,
-          message: body.message,
-          /* `history` ya no viaja: el hilo lo guarda el servicio y lo lee de su
+    return {
+      projectId,
+      userId,
+      message: body.message,
+      /* `history` ya no viaja: el hilo lo guarda el servicio y lo lee de su
              base. Ver la nota de `AssistantTurnDto`. */
-          conversationId: body.conversationId,
-          /* Solo los ids: los bytes ya están guardados desde que se subieron,
+      conversationId: body.conversationId,
+      /* Solo los ids: los bytes ya están guardados desde que se subieron,
              y es assistant-service quien los tiene. Que aquí no viaje ningún
              archivo es justo lo que quita de encima el tope de 1 MB de la
              Server Action. Ver `AssistantChatBodyDto.attachmentIds`. */
-          attachmentIds: body.attachmentIds,
-          permisos,
-          miembros,
-          chat,
-          limiteMensual: ia.limite,
-          organizationId: ia.organizationId,
-          planTier: ia.tier,
-        },
-      ),
-    );
+      attachmentIds: body.attachmentIds,
+      permisos,
+      miembros,
+      chat,
+      limiteMensual: ia.limite,
+      organizationId: ia.organizationId,
+      planTier: ia.tier,
+    };
   }
 
   /**

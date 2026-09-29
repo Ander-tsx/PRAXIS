@@ -33,6 +33,7 @@ import {
   conversacionesAction,
   preguntarAction,
 } from '../../assistant/actions';
+import { preguntarEnVivo } from '../../assistant/en-vivo';
 import { Badge, Button, PRAX_NAME, PraxAvatar, type PraxMood } from '../../atoms';
 import { alpha, colors } from '../../tokens';
 import { useDock } from '../AppLayout/DockPanel';
@@ -498,6 +499,8 @@ export function AssistantChat({
   const enBlanco = mensajes.length === 0 && conversationId === null;
   const [texto, setTexto] = useState('');
   const [pendiente, setPendiente] = useState(false);
+  /** Lo que va llegando del turno en curso: los pasos y el texto (F3). */
+  const [enVivo, setEnVivo] = useState<{ pasos: string[]; texto: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   /**
    * El turno que se puede volver a mandar tal cual, si el último falló.
@@ -771,12 +774,29 @@ export function AssistantChat({
      * `thinking`: ni respuesta, ni `oops`, ni forma de reintentar sin recargar.
      */
     let respuesta: Awaited<ReturnType<typeof preguntarAction>>;
+    setEnVivo({ pasos: [], texto: '' });
     try {
-      respuesta = await preguntarAction(
-        projectId,
-        limpio,
-        conversationId ?? undefined,
-        enviados.map((adjunto) => adjunto.id),
+      /* En vivo (F3): los pasos y el texto se pintan según llegan, y el final
+         tiene la misma forma que la Server Action de antes, así que lo de abajo
+         no cambia. */
+      respuesta = await preguntarEnVivo(
+        {
+          gatewayPath,
+          projectId,
+          message: limpio,
+          conversationId: conversationId ?? undefined,
+          attachmentIds: enviados.map((adjunto) => adjunto.id),
+          organizationId: organizacionActivaId,
+        },
+        {
+          alEmpezar: (id) => setConversationId(id),
+          alPaso: (paso) =>
+            setEnVivo((actual) =>
+              actual ? { ...actual, pasos: [...actual.pasos, paso] } : actual,
+            ),
+          alTexto: (delta) =>
+            setEnVivo((actual) => (actual ? { ...actual, texto: actual.texto + delta } : actual)),
+        },
       );
     } catch {
       respuesta = {
@@ -791,6 +811,7 @@ export function AssistantChat({
     }
 
     setPendiente(false);
+    setEnVivo(null);
     if (respuesta.cuota) setCuota(respuesta.cuota);
     /* Aunque el turno falle: si el servidor llegó a abrir la conversación, el
        siguiente intento tiene que caer dentro y no abrir otra. */
@@ -1451,7 +1472,20 @@ export function AssistantChat({
                   </div>
                 ))}
 
-                {pendiente && <FlujoDePensamiento alAvanzar={irAlFondo} />}
+                {pendiente &&
+                  (enVivo?.texto ? (
+                    /* El texto según lo escribe PRAX, con un cursor al final. La
+                       burbuja definitiva la pone el `fin` del turno. */
+                    <div className="max-w-[85%] whitespace-pre-wrap font-sans text-sm text-text-primary">
+                      {enVivo.texto}
+                      <span
+                        className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-pulse bg-text-primary"
+                        aria-hidden="true"
+                      />
+                    </div>
+                  ) : (
+                    <FlujoDePensamiento pasos={enVivo?.pasos ?? []} alAvanzar={irAlFondo} />
+                  ))}
               </div>
             )}
 

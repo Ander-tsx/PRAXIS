@@ -45,6 +45,7 @@ import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { QuotaService } from '../billing/quota.service';
+import { transmitirTurno } from './turno-en-vivo';
 
 /**
  * Lo del asistente que **no tiene proyecto detrás**.
@@ -141,8 +142,38 @@ export class MyAssistantController {
   @ApiResponse({ status: 402, description: 'Cuota mensual agotada (QUOTA_EXCEEDED)' })
   @ApiResponse({ status: 502, description: 'Gemini no respondió. No se ha consumido cuota' })
   async chat(@Request() req: Express.Request, @Body() body: AssistantChatBodyDto) {
-    const userId = req.user!.userId;
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_chat' },
+        await this.prepararTurno(req.user!.userId, body),
+      ),
+    );
+  }
 
+  /**
+   * El mismo turno, contado mientras ocurre por SSE (D7 de
+   * docs/PLAN-PRAX-SEMIAGENTICO.md). Ver `turno-en-vivo.ts`.
+   *
+   * Lo que falla antes de empezar —la organización, la sesión— sale como un error
+   * JSON de los de siempre; lo que falla a medias, como un evento `error`.
+   */
+  @Post('chat/stream')
+  @ApiOperation({ summary: 'Un turno con PRAX, sin proyecto, por Server-Sent Events' })
+  async chatEnVivo(
+    @Request() req: Express.Request,
+    @Body() body: AssistantChatBodyDto,
+    @Res() res: Response,
+  ) {
+    const payload = await this.prepararTurno(req.user!.userId, body);
+    transmitirTurno(
+      res,
+      this.assistantClient.send({ cmd: 'assistant_chat_vivo' }, payload),
+      this.log,
+    );
+  }
+
+  /** Todo lo que el servicio necesita para un turno sin proyecto. */
+  private async prepararTurno(userId: string, body: AssistantChatBodyDto) {
     /* 🔴 **Antes de nada, y no en paralelo con lo demás.** Aquí no hay proyecto
        del que sacar la organización, así que la elige quien llama — y si la
        elegida no es suya, esto lanza `403 NOT_IN_ORG` antes de haber pedido
@@ -161,35 +192,30 @@ export class MyAssistantController {
       this.cuotas.iaDe(userId, organizationId),
     ]);
 
-    return firstValueFrom(
-      this.assistantClient.send(
-        { cmd: 'assistant_chat' },
-        {
-          /* La marca del modo. El servicio no lo deduce de nada más. */
-          projectId: null,
-          userId,
-          message: body.message,
-          conversationId: body.conversationId,
-          attachmentIds: body.attachmentIds,
-          /* Vacío y no «los de algún proyecto»: no hay proyecto del que sacar
+    return {
+      /* La marca del modo. El servicio no lo deduce de nada más. */
+      projectId: null,
+      userId,
+      message: body.message,
+      conversationId: body.conversationId,
+      attachmentIds: body.attachmentIds,
+      /* Vacío y no «los de algún proyecto»: no hay proyecto del que sacar
              miembros, y el mapa de permisos de un proyecto que no existe no
              significa nada. */
-          permisos: {},
-          /* Solo quien pregunta: es lo único que se puede saber sin proyecto, y
+      permisos: {},
+      /* Solo quien pregunta: es lo único que se puede saber sin proyecto, y
              es lo que el prompt necesita para llamarle por su nombre. */
-          miembros: quien ? [quien] : [],
-          proyectos: alcance.proyectos
-            .filter((proyecto) => proyecto.incluido)
-            .map(({ id, nombre }) => ({ id, nombre })),
-          /* El tope de su plan. Ver la nota de la ruta de proyecto: quien cuenta
+      miembros: quien ? [quien] : [],
+      proyectos: alcance.proyectos
+        .filter((proyecto) => proyecto.incluido)
+        .map(({ id, nombre }) => ({ id, nombre })),
+      /* El tope de su plan. Ver la nota de la ruta de proyecto: quien cuenta
              es assistant-service, quien sabe cuánto da el plan es billing. El
              `planTier` va solo para poder nombrarlo si se agota. */
-          limiteMensual: ia.limite,
-          organizationId: ia.organizationId,
-          planTier: ia.tier,
-        },
-      ),
-    );
+      limiteMensual: ia.limite,
+      organizationId: ia.organizationId,
+      planTier: ia.tier,
+    };
   }
 
   /**

@@ -150,11 +150,20 @@ export class GeminiClient {
    * agotan los reintentos contra el principal y se falla con el motivo real.
    */
   private readonly modelFallback: string | null;
+  /**
+   * Dónde está la API. Siempre Google, salvo en desarrollo y pruebas, que pueden
+   * apuntar a `e2e/fixtures/gemini-falso.mjs` para ver PRAX funcionar sin una
+   * clave (y sin gastar cuota de nadie).
+   */
+  private readonly baseUrl: string;
 
   constructor(config: ConfigService) {
     this.apiKey = config.getOrThrow<string>('GEMINI_API_KEY');
     this.model = config.get<string>('GEMINI_MODEL') ?? 'gemini-flash-latest';
     this.modelFallback = config.get<string>('GEMINI_MODEL_FALLBACK')?.trim() || null;
+    this.baseUrl = (
+      config.get<string>('GEMINI_BASE_URL')?.trim() || 'https://generativelanguage.googleapis.com'
+    ).replace(/\/$/, '');
   }
 
   /**
@@ -322,7 +331,7 @@ export class GeminiClient {
     }
 
     const metodo = alTexto ? 'streamGenerateContent?alt=sse' : 'generateContent';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:${metodo}`;
+    const url = `${this.baseUrl}/v1beta/models/${modelo}:${metodo}`;
 
     let response: Response;
     try {

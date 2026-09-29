@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { alpha, colors } from '../../tokens';
 
 /**
@@ -8,79 +8,50 @@ import { alpha, colors } from '../../tokens';
  *
  * No mide nada: ver más abajo por qué el reloj es de adorno y las fases no.
  */
-const PASO_MS = 1100;
-
 interface Paso {
   texto: string;
   icono: ReactNode;
 }
 
 interface FlujoDePensamientoProps {
-  /** Se llama al descubrir cada paso, para que el hilo lo siga hacia abajo. */
+  /**
+   * Lo que el servidor va contando que hace (F3): una línea por consulta.
+   * Delante va siempre «Pensando», que es lo que ocurre antes de la primera.
+   */
+  pasos: string[];
+  /** Se llama al llegar cada paso, para que el hilo lo siga hacia abajo. */
   alAvanzar?: () => void;
 }
 
 /**
- * Las fases por las que pasa de verdad una pregunta.
+ * Lo que está haciendo PRAX mientras se le espera.
  *
- * Están en el orden en que ocurren dentro de `assistant.service.ts`: se arma el
- * contexto del proyecto —instantánea, tiempos, predicción, personas—, se manda
- * a Gemini y se validan las herramientas que conteste antes de convertirlas en
- * propuestas.
+ * ## Ya no es un reloj (F3 de docs/PLAN-PRAX-SEMIAGENTICO.md)
+ *
+ * Esto enseñaba tres fases fijas —«Leyendo el estado», «Consultando al modelo»,
+ * «Revisando propuesta»— y pasaba de una a otra con un temporizador, porque el
+ * turno llegaba entero y no había forma de saber en qué andaba. Con el turno en
+ * vivo, cada línea es algo que **ha ocurrido de verdad**: el servidor manda un
+ * paso por cada consulta que hace el modelo («Buscando tareas en «Web»…»).
+ *
+ * El último paso se queda encendido hasta que llega la respuesta. Los anteriores
+ * pasan a hechos.
  */
-const PASOS: Paso[] = [
-  { texto: 'Leyendo el estado del proyecto', icono: <IconoDatos /> },
-  { texto: 'Consultando al modelo', icono: <IconoModelo /> },
-  { texto: 'Revisando propuesta', icono: <IconoRevision /> },
-];
+export function FlujoDePensamiento({ pasos, alAvanzar }: FlujoDePensamientoProps) {
+  const lista: Paso[] = [
+    { texto: 'Pensando', icono: <IconoModelo /> },
+    ...pasos.map((texto) => ({ texto, icono: <IconoDatos /> })),
+  ];
+  const activo = lista.length - 1;
 
-/**
- * Lo que se enseña mientras el asistente responde.
- *
- * Sustituye a un «Pensando…» suelto, que durante cinco segundos no decía nada
- * más que «espera».
- *
- * ⚠️ **Esto no es el pensamiento del modelo, y conviene tenerlo claro.** Gemini
- * puede devolver su cadena de razonamiento, pero este servicio llama a
- * `:generateContent` sin streaming y sin pedir `thoughts`: cuando la respuesta
- * llega, ya está entera. Enseñar un razonamiento en vivo exigiría rehacer el
- * bucle del servicio, el transporte y la Server Action.
- *
- * Lo que sí es cierto son **las fases**: las tres ocurren, en ese orden, en cada
- * pregunta. Lo simulado es el reloj —cuándo se pasa de una a la siguiente—,
- * porque sin streaming no hay forma de saberlo desde aquí. Por eso ninguna dice
- * un número ni un resultado: describen en qué anda, no lo que ha encontrado.
- * Inventar «he leído 47 tareas» sí sería mentir.
- *
- * El último paso se queda encendido hasta que llega la respuesta, en vez de dar
- * la vuelta: una lista que se reinicia sugiere que algo se atascó.
- */
-export function FlujoDePensamiento({ alAvanzar }: FlujoDePensamientoProps) {
-  const [activo, setActivo] = useState(0);
-
-  useEffect(() => {
-    if (activo >= PASOS.length - 1) return;
-    const temporizador = window.setTimeout(() => setActivo((actual) => actual + 1), PASO_MS);
-    return () => window.clearTimeout(temporizador);
-  }, [activo]);
-
-  /**
-   * Cada paso nuevo empuja el hilo hacia abajo, y quien lo desplaza está fuera.
-   *
-   * ⚠️ **En su propio efecto, no dentro del temporizador.** Ese sale por la
-   * puerta de arriba en el último paso —ya no hay siguiente que programar—, así
-   * que el aviso metido ahí no llegaría justo en el paso que más lo necesita:
-   * el tercero es el que se queda escrito debajo del borde mientras se espera
-   * la respuesta.
-   */
-  // biome-ignore lint/correctness/useExhaustiveDependencies: el aviso es por `activo`, no por la función
+  // biome-ignore lint/correctness/useExhaustiveDependencies: el aviso es por cada paso nuevo
   useEffect(() => {
     alAvanzar?.();
   }, [activo]);
 
   return (
     <div className="flex flex-col" aria-label="El asistente está trabajando">
-      {PASOS.map((paso, indice) => {
+      {lista.map((paso, indice) => {
         const hecho = indice < activo;
         const enCurso = indice === activo;
         /* Los que aún no han llegado no se pintan: la lista crece conforme
@@ -89,7 +60,7 @@ export function FlujoDePensamiento({ alAvanzar }: FlujoDePensamientoProps) {
         if (!hecho && !enCurso) return null;
 
         return (
-          <div key={paso.texto} className="flex flex-col">
+          <div key={`${indice}-${paso.texto}`} className="flex flex-col">
             <div className="flex items-center gap-2.5">
               <span
                 className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-colors"
@@ -176,17 +147,6 @@ function IconoModelo() {
 }
 
 /* Heroicons v2 «clipboard-document-check»: validar lo que el modelo propone. */
-function IconoRevision() {
-  return (
-    <Icono>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 18 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3.75"
-      />
-    </Icono>
-  );
-}
 
 /* Heroicons v2 «check». */
 function IconoHecho() {
