@@ -50,6 +50,7 @@ COPY apps/backend/commons/observability/package.json    apps/backend/commons/obs
 # estaba duplicado en tasks y projects. Sin esta línea, `pnpm install` no lo
 # enlaza y los dos servicios fallan al importarlo.
 COPY apps/backend/commons/domain-events/package.json    apps/backend/commons/domain-events/
+COPY apps/backend/commons/local-transport/package.json   apps/backend/commons/local-transport/
 COPY apps/backend/services/automation/package.json      apps/backend/services/automation/
 COPY apps/backend/services/billing/package.json         apps/backend/services/billing/
 COPY apps/backend/services/assistant/package.json       apps/backend/services/assistant/

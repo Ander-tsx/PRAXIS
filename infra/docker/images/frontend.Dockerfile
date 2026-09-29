@@ -34,6 +34,7 @@ COPY apps/backend/gateway/package.json                  apps/backend/gateway/
 COPY apps/backend/commons/contracts/package.json        apps/backend/commons/contracts/
 COPY apps/backend/commons/observability/package.json    apps/backend/commons/observability/
 COPY apps/backend/commons/domain-events/package.json    apps/backend/commons/domain-events/
+COPY apps/backend/commons/local-transport/package.json   apps/backend/commons/local-transport/
 COPY apps/backend/services/assistant/package.json       apps/backend/services/assistant/
 COPY apps/backend/services/automation/package.json      apps/backend/services/automation/
 COPY apps/backend/services/billing/package.json         apps/backend/services/billing/

@@ -9,7 +9,7 @@
     "start:frontend": "turbo run start --concurrency=16 --filter=\"./apps/frontend/*\"",
     "dev:cli": "node scripts/dev-cli/index.mjs",
     "build": "turbo run build",
-    "build:shared": "pnpm --filter @praxis/contracts --filter @praxis/observability --filter @praxis/domain-events --filter @praxis/editor-schema run build",
+    "build:shared": "pnpm --filter @praxis/contracts --filter @praxis/observability --filter @praxis/domain-events --filter @praxis/local-transport --filter @praxis/editor-schema run build",
     "lint": "turbo run lint",
     "test": "turbo run test --filter=!@praxis/e2e",
     "test:int": "turbo run test:int --filter=!@praxis/e2e",
