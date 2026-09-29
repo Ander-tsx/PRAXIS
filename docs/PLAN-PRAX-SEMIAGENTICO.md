@@ -471,16 +471,57 @@ arregla.
 
 ---
 
-## 5. Abierto — decidir con el dueño del producto
+## 5. Decidido con el dueño del producto (2026-09-29)
 
-1. **Cifras de tokens por plan.** Salen de F0. La propuesta inicial será
-   «mensajes de hoy × tokens medios por turno medidos», redondeada. Hay que
-   confirmarla antes de F4.
-2. **La unidad que ve el usuario.** Propuesta: «tokens PRAX», con una línea que
-   explique la ponderación. La alternativa, tokens en crudo, es más honesta en
-   apariencia, pero una respuesta larga costaría 8× sin que se entienda por qué.
-3. **Cuenta de OpenRouter** para Jev: quién la da de alta, con qué tarjeta y
-   qué tope de gasto.
+Las tres preguntas abiertas se cerraron aceptando las propuestas:
+
+1. **Cifras de tokens por plan**: salen de medir en F0, con «mensajes de hoy ×
+   tokens medios por turno», redondeadas. Se confirman al cerrar F0, antes de
+   F4.
+2. **Unidad que ve el usuario**: **«tokens PRAX»** ponderados (D8), con una
+   línea que explique la ponderación.
+3. **OpenRouter para Jev**: la cuenta la dio de alta el dueño del producto, con
+   un **tope de gasto muy bajo** a propósito, para que una filtración no cueste
+   nada.
+
+### Jev por OpenRouter: cómo está conectado
+
+- **La clave** vive en `apps/backend/services/assistant/.env` como
+  `OPENROUTER_API_KEY`. Ese `.env` está ignorado por git
+  (`services/assistant/.gitignore:3`). 🔴 **Es provisional**: el dueño la
+  rotará, y **nunca** se escribe en un archivo versionado ni en un documento.
+- Las otras variables, ya puestas: `PRAX_ROUTER=heuristic` (apagado hasta
+  F5), `JEV_MODEL=typesafe/jev-latest`, `JEV_TIMEOUT_MS=800`. Están en
+  `.env.example` sin valor de clave.
+- ⚠️ **La ruta no es la de chat.** OpenRouter expone Jev en
+  `POST https://openrouter.ai/api/alpha/decisions`, no en
+  `/api/v1/chat/completions`, que es lo que usaría un cliente de OpenAI por
+  inercia. El cuerpo es `{ model, state, questions }`, con `questions` como
+  **mapa** por id, igual que la API directa de TypeSafe. El alias es
+  `~typesafe/jev-latest`, con la tilde.
+- **La respuesta** trae:
+  - `answers[id]`: `noul` como número; `choice` con `choice`, `probabilities`
+    y `confidence`.
+  - `usage.input_tokens`, `usage.output_tokens` y **`usage.cost` en dólares**.
+    Ese coste es el que suma D8, así que no hay que calcularlo.
+
+**Prueba de humo (2026-09-29)**, con un caso real de PRAX:
+
+- **Entrada**: un mensaje en español («¿Qué tareas del sprint actual del
+  rediseño del checkout siguen bloqueadas?») y tres proyectos candidatos.
+- **Preguntas**: una `choice` de intención y tres `noul` de relevancia.
+- **Resultado**: HTTP 200 en **0,41 s**, 559 tokens de entrada,
+  **$0,0000235**. Acertó las cuatro:
+
+| Pregunta | Respuesta |
+|---|---|
+| intención | `question`, confianza 1 |
+| checkout | 0,99 |
+| permisos | 0,09 |
+| landing | 0,05 |
+
+Es una prueba, no la calibración que pide D10: los umbrales se siguen
+ajustando con 50 a 300 ejemplos propios antes de encenderlo.
 
 ---
 
@@ -489,3 +530,10 @@ arregla.
 - **2026-09-29** — Plan escrito. Cuatro investigaciones de solo lectura
   (backend y frontend de PRAX, chats, Jev) y la verificación del corte de 15 s.
   Nada de código tocado todavía.
+- **2026-09-29** — Se cierran las tres preguntas de §5. La clave de OpenRouter
+  queda en el `.env` y Jev responde (prueba de humo en §5).
+  ⏸️ **Plan en pausa antes de F0**: el dueño del producto prioriza el coste de
+  RAM de `praxis-api` en Railway (~90% de la factura), que puede acabar en
+  juntar los microservicios en uno. Si se hace, el mapa de §1 cambia de sitio
+  —servicios, rutas TCP—, pero no de fondo, y las decisiones siguen valiendo.
+  Una sesión que retome esto **mira primero cómo quedó el backend**.
