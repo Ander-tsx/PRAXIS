@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { lastValueFrom, toArray } from 'rxjs';
+import { lastValueFrom, of, toArray } from 'rxjs';
 
 import { AssistantService, type EventoDeTurno } from './assistant.service';
 import type { GeminiReply } from './gemini.client';
@@ -169,6 +169,64 @@ describe('El turno de PRAX: bucle de consultas', () => {
     expect(m.llamadas[0].params.tools.some((t: any) => t.name.startsWith('consultar_'))).toBe(
       false,
     );
+  });
+
+  /**
+   * Una tarea que no cabía en el inventario se puede leer consultando; si luego
+   * no se pudiera proponer sobre ella, PRAX la encontraría y la propuesta se
+   * descartaría por «no estar en el proyecto».
+   */
+  it('se puede proponer sobre una tarea que solo se vio consultando', async () => {
+    const m = montar([
+      respuesta({ calls: [{ name: 'consultar_tareas', args: {} }] }),
+      respuesta({
+        text: 'Te propongo moverla.',
+        calls: [
+          {
+            name: 'proponer_movimiento',
+            args: { taskId: 'tarea-oculta', columnId: 'col-hecho', porQue: 'Terminada.' },
+          },
+        ],
+      }),
+    ]);
+    m.consultas.ejecutar.mockImplementation((async (_n: string, _a: unknown, ambito: any) => {
+      ambito.vistas.set('tarea-oculta', {
+        id: 'tarea-oculta',
+        titulo: 'Fuera del inventario',
+        columnId: 'col-hacer',
+        cerrada: false,
+      });
+      return { total: 1, omitidas: 0, tareas: [] };
+    }) as any);
+    const briefing = {
+      proyecto: { nombre: 'Web' },
+      columnas: [
+        { id: 'col-hacer', nombre: 'Por hacer', orden: 0 },
+        { id: 'col-hecho', nombre: 'Hecho', orden: 1 },
+      ],
+      etiquetas: [],
+      tareas: [],
+    };
+
+    (m.servicio as any).reportsClient = { send: () => of(briefing) };
+
+    await m.servicio.chat({
+      ...payload,
+      projectId: PROYECTO.id,
+      proyectos: [],
+      permisos: { canMoveTask: true },
+    } as any);
+
+    const guardado = m.conversaciones.guardarTurno.mock.calls[0] as unknown as [
+      { proposals: { tool: string; args: Record<string, unknown> }[] },
+    ];
+    expect(guardado[0].proposals).toHaveLength(1);
+    expect(guardado[0].proposals[0].args).toMatchObject({
+      taskId: 'tarea-oculta',
+      taskTitle: 'Fuera del inventario',
+      columnName: 'Hecho',
+      columnaActual: 'Por hacer',
+    });
   });
 
   it('una propuesta no se ejecuta: se recoge y se guarda con el turno', async () => {

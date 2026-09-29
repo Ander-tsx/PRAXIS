@@ -24,6 +24,7 @@ import { bloqueDeArchivo } from './attachment-text';
 import { AttachmentsService } from './attachments.service';
 import {
   type AmbitoDeConsulta,
+  type TareaVista,
   ConsultasService,
   HERRAMIENTAS_DE_CONSULTA,
   esConsulta,
@@ -472,6 +473,7 @@ export class AssistantService {
           ]
         : (payload.proyectos ?? []),
       nombres: Object.fromEntries(payload.miembros.map((m) => [m.userId, m.nombre])),
+      vistas: new Map(),
     };
     const conConsultas = ambito.proyectos.length > 0;
     const todasLasHerramientas = conConsultas
@@ -630,10 +632,13 @@ export class AssistantService {
     }
 
     const respuesta = { calls: llamadas, text: escrito.trim() };
+    const briefingParaValidar = briefing
+      ? this.conTareasVistas(briefing, ambito.vistas ?? new Map())
+      : null;
     let validadas = respuesta.calls
       .map((call) =>
-        briefing
-          ? this.validarPropuesta(call, briefing, payload)
+        briefingParaValidar
+          ? this.validarPropuesta(call, briefingParaValidar, payload)
           : this.validarSinProyecto(call, payload),
       )
       .filter((propuesta): propuesta is AssistantProposal => propuesta !== null);
@@ -686,6 +691,7 @@ export class AssistantService {
                   herramientas.map((herramienta) => herramienta.name),
                   payload.chat ?? [],
                   quienPregunta,
+                  catalogoDeCapacidades(payload.permisos),
                 )
               : instruccionSinProyecto(
                   payload.proyectos ?? [],
@@ -703,8 +709,8 @@ export class AssistantService {
 
         const nuevasValidadas = segundaRespuesta.calls
           .map((call) =>
-            briefing
-              ? this.validarPropuesta(call, briefing, payload)
+            briefingParaValidar
+              ? this.validarPropuesta(call, briefingParaValidar, payload)
               : this.validarSinProyecto(call, payload),
           )
           .filter((propuesta): propuesta is AssistantProposal => propuesta !== null);
@@ -1468,6 +1474,33 @@ export class AssistantService {
     }
 
     return null;
+  }
+
+  /**
+   * El briefing con las tareas que PRAX vio consultando en este turno.
+   *
+   * Solo para validar: el modelo ya las tiene delante por la consulta. Se
+   * añaden las que no estaban en el inventario, con la columna y el tablero
+   * resueltos contra las columnas del briefing, que son las de todo el proyecto.
+   */
+  private conTareasVistas(briefing: Briefing, vistas: Map<string, TareaVista>): Briefing {
+    if (!briefing.tareas || vistas.size === 0) return briefing;
+    const conocidas = new Set(briefing.tareas.map((t) => t.id));
+    const nuevas: TareaDelBriefing[] = [];
+    for (const vista of vistas.values()) {
+      if (conocidas.has(vista.id)) continue;
+      const columna = briefing.columnas.find((c) => c.id === vista.columnId);
+      nuevas.push({
+        id: vista.id,
+        titulo: vista.titulo,
+        cerrada: vista.cerrada,
+        columnId: vista.columnId,
+        columna: columna?.nombre ?? '',
+        ...(columna?.tablero ? { tablero: columna.tablero } : {}),
+        ...(vista.pasos ? { pasos: vista.pasos } : {}),
+      });
+    }
+    return nuevas.length > 0 ? { ...briefing, tareas: [...briefing.tareas, ...nuevas] } : briefing;
   }
 
   /**

@@ -124,6 +124,27 @@ export interface AmbitoDeConsulta {
   proyectos: { id: string; nombre: string }[];
   /** userId → nombre, para no devolverle al modelo ids de personas. */
   nombres: Record<string, string>;
+  /**
+   * Las tareas **del foco** que las consultas le han enseñado al modelo en este
+   * turno, por id.
+   *
+   * ⚠️ Sin esto, una tarea que no cabía en el inventario del briefing
+   * (`INVENTARIO_MAX_CHARS`) o que el router dejó fuera se podía **leer** pero
+   * no **proponer**: PRAX la encontraba consultando, proponía moverla y la
+   * validación la descartaba por «no estar en el proyecto». Solo las del foco,
+   * porque las propuestas se ejecutan con los permisos de ese proyecto.
+   */
+  vistas?: Map<string, TareaVista>;
+}
+
+/** Lo justo de una tarea vista para validar una propuesta sobre ella. */
+export interface TareaVista {
+  id: string;
+  titulo: string;
+  columnId: string;
+  cerrada: boolean;
+  /** Solo si se leyó entera (`consultar_tarea`). */
+  pasos?: { id: string; texto: string; hecho: boolean }[];
 }
 
 interface TareaEnLista {
@@ -248,6 +269,17 @@ export class ConsultasService {
     });
 
     const visibles = elegidas.slice(0, CONSULTA_MAX_TAREAS);
+    if (projectId === ambito.foco) {
+      for (const t of visibles) {
+        ambito.vistas?.set(t.id, {
+          ...ambito.vistas.get(t.id),
+          id: t.id,
+          titulo: t.title,
+          columnId: t.columnId,
+          cerrada: Boolean(t.completedAt),
+        });
+      }
+    }
     const nombres = await this.nombresDe(
       visibles.flatMap((t) => (t.assignees ?? []).map((a) => a.userId)),
       ambito,
@@ -280,6 +312,23 @@ export class ConsultasService {
       return { error: 'No encuentro esa tarea entre los proyectos que puedes consultar.' };
     }
 
+    const pasos = (tarea.checklists ?? []).map(
+      (c: { id: string; text: string; completed: boolean }) => ({
+        id: c.id,
+        texto: c.text,
+        hecho: c.completed,
+      }),
+    );
+    if (tarea.projectId === ambito.foco) {
+      ambito.vistas?.set(tarea.id, {
+        id: tarea.id,
+        titulo: tarea.title,
+        columnId: tarea.columnId,
+        cerrada: Boolean(tarea.completedAt),
+        pasos,
+      });
+    }
+
     const comentarios = (tarea.comments ?? []).slice(-CONSULTA_MAX_COMENTARIOS);
     const nombres = await this.nombresDe(
       [
@@ -301,9 +350,11 @@ export class ConsultasService {
         (a: { userId: string }) => nombres[a.userId] ?? 'alguien sin nombre',
       ),
       etiquetas: (tarea.labels ?? []).map((l: { label?: { name?: string } }) => l.label?.name),
-      checklist: (tarea.checklists ?? []).map((c: { text: string; completed: boolean }) => ({
-        paso: c.text,
-        hecho: c.completed,
+      /* Con id: es lo que necesita `proponer_marcar_pasos`. */
+      checklist: pasos.map((p: { id: string; texto: string; hecho: boolean }) => ({
+        id: p.id,
+        paso: p.texto,
+        hecho: p.hecho,
       })),
       comentarios: comentarios.map((c: { authorId: string; body: string; createdAt: string }) => ({
         autor: nombres[c.authorId] ?? 'alguien sin nombre',

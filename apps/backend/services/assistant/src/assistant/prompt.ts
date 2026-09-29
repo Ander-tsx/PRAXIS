@@ -100,7 +100,8 @@ const REGLAS: Regla[] = [
       'una tarea, tareas de otro proyecto, un informe) en vez de suponer. No las uses ' +
       'para lo que ya esta en el contexto. Si una consulta devuelve "omitidas" mayor que ' +
       'cero, di que viste solo una parte. Si devuelve "error", dilo con tus palabras. ' +
-      'Consultar no cambia nada: para cambiar algo sigues proponiendo.',
+      'Consultar no cambia nada: para cambiar algo sigues proponiendo, y los ids que ' +
+      'te devuelva una consulta de ESTE proyecto valen para proponer en este turno.',
   },
 
   /**
