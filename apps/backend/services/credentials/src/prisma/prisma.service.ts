@@ -40,7 +40,11 @@ const POOL_MAX_POR_DEFECTO = 5;
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor(config: ConfigService) {
     const adapter = new PrismaPg({
-      connectionString: config.getOrThrow<string>('DATABASE_URL'),
+      /* En el monolito todos los servicios comparten `process.env`, y un solo
+         `DATABASE_URL` los mandaría a todos al mismo schema. Ver
+         docs/PLAN-MONOLITO.md, M4. */
+      connectionString:
+        config.get<string>('CREDENTIALS_DATABASE_URL') ?? config.getOrThrow<string>('DATABASE_URL'),
       max: Number(config.get<string>('DATABASE_POOL_MAX') ?? POOL_MAX_POR_DEFECTO),
       /**
        * Una conexión que lleva 30 s sin usarse se devuelve.
