@@ -1,10 +1,12 @@
 import {
   PROPONER_ASIGNACION,
+  PROPONER_AUTOMATIZACION,
   PROPONER_BORRADO,
   PROPONER_CHECKLIST,
   PROPONER_COMENTARIO,
   PROPONER_DOCUMENTO,
   PROPONER_EDICION,
+  PROPONER_ESTADO_AUTOMATIZACION,
   PROPONER_INICIAR_SPRINT,
   PROPONER_MARCAR_PASOS,
   PROPONER_MENSAJE,
@@ -169,7 +171,7 @@ export const CAPACIDADES: Capacidad[] = [
   {
     que: 'Crear, activar y pausar automatizaciones (reglas)',
     permisos: ['canManageAutomations'],
-    herramientas: [],
+    herramientas: [PROPONER_AUTOMATIZACION, PROPONER_ESTADO_AUTOMATIZACION],
     donde: 'la pestaña Automatizaciones del proyecto',
   },
   {

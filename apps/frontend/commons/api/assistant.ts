@@ -346,6 +346,28 @@ export interface DocumentRevisionProposal {
   porQue?: string;
 }
 
+/**
+ * Una automatización (F7 de docs/PLAN-PRAX-SEMIAGENTICO.md). `trigger`,
+ * `conditions` y `actions` son el cuerpo exacto de `POST /automations`, ya
+ * comprobado contra el catálogo; `frase` es cómo se lee, escrita por el servicio
+ * con ese mismo catálogo. **Nace pausada.**
+ */
+export interface AutomationProposal {
+  nombre: string;
+  frase: string;
+  trigger: { type: string; config: Record<string, unknown> };
+  conditions: { field: string; operator: string; value: unknown }[];
+  actions: { type: string; config: Record<string, unknown> }[];
+  porQue?: string;
+}
+
+export interface AutomationStateProposal {
+  reglaId: string;
+  nombre: string;
+  activar: boolean;
+  porQue?: string;
+}
+
 export interface BoardProposal {
   /** Nombre del espacio de trabajo. Se resuelve o se crea al aceptar. */
   espacio: string;
@@ -650,6 +672,21 @@ export function isPrivateMessageProposal(
   return (
     propuesta.tool === 'proponer_mensaje_privado' &&
     typeof propuesta.args.destinatarioId === 'string'
+  );
+}
+
+export function isAutomationProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: AutomationProposal } {
+  return propuesta.tool === 'proponer_automatizacion' && Array.isArray(propuesta.args.actions);
+}
+
+export function isAutomationStateProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: AutomationStateProposal } {
+  return (
+    propuesta.tool === 'proponer_estado_automatizacion' &&
+    typeof propuesta.args.reglaId === 'string'
   );
 }
 

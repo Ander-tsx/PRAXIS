@@ -4,6 +4,8 @@ import {
   catalogoDeCapacidades,
   herramientasPara,
 } from './capabilities';
+import { HERRAMIENTAS_DE_CONSULTA } from './consultas';
+import { herramientasSinProyecto } from './tools';
 
 /**
  * El catálogo de capacidades (D4 de docs/PLAN-PRAX-SEMIAGENTICO.md).
@@ -69,5 +71,37 @@ describe('capabilities', () => {
         expect(NOMBRE_DE_PERMISO[permiso]).toBeTruthy();
       }
     }
+  });
+});
+
+/**
+ * 🔴 Gemini rechaza la petición **entera** si una declaración trae un OBJECT
+ * sin `properties` (o con `properties` vacío). No da error al compilar ni al
+ * declararla: da un 400 en el turno de todo el que tenga esa herramienta.
+ */
+describe('las declaraciones que ve Gemini', () => {
+  function objetosVacios(esquema: unknown, ruta: string): string[] {
+    if (!esquema || typeof esquema !== 'object') return [];
+    const nodo = esquema as Record<string, unknown>;
+    const propios =
+      nodo.type === 'OBJECT' &&
+      (!nodo.properties || Object.keys(nodo.properties as object).length === 0)
+        ? [ruta]
+        : [];
+    const hijos = Object.entries(nodo).flatMap(([clave, valor]) =>
+      objetosVacios(valor, `${ruta}.${clave}`),
+    );
+    return [...propios, ...hijos];
+  }
+
+  it('ningún OBJECT sin propiedades, en ninguna herramienta', () => {
+    const todos = Object.fromEntries(Object.keys(NOMBRE_DE_PERMISO).map((p) => [p, true]));
+    const declaraciones = [
+      ...herramientasPara(todos),
+      ...HERRAMIENTAS_DE_CONSULTA,
+      ...herramientasSinProyecto(),
+    ];
+    const vacios = declaraciones.flatMap((d) => objetosVacios(d.parameters, d.name));
+    expect(vacios).toEqual([]);
   });
 });

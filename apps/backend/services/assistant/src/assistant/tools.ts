@@ -600,6 +600,100 @@ export const PROPONER_REVISION_DOCUMENTO: FunctionDeclaration = {
   },
 };
 
+/**
+ * Las automatizaciones (D16 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+ *
+ * Una regla nueva **nace pausada**: aceptarla la crea, y encenderla es otro
+ * gesto —otra tarjeta, o el interruptor de la pestaña—. Una regla que actúa
+ * sola sobre el trabajo de todo el equipo no se enciende de rebote al aceptar
+ * una propuesta. Y la cuota se cuenta **al activar** (trampa 23), así que crear
+ * pausada no gasta plan.
+ *
+ * Los tipos, las condiciones y las claves de configuración salen del catálogo
+ * del motor, que solo se conoce consultando: sin `consultar_automatizaciones`
+ * en el mismo turno, se descarta.
+ */
+export const PROPONER_AUTOMATIZACION: FunctionDeclaration = {
+  name: 'proponer_automatizacion',
+  description:
+    'Prepara una regla de automatizacion NUEVA, que nace pausada. NO la crea: la persona ' +
+    'la acepta. Usa SOLO disparadores, condiciones, acciones y claves del catalogo de ' +
+    'consultar_automatizaciones de este turno, y los ids de columnas, etiquetas y personas ' +
+    'del contexto.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      nombre: { type: 'STRING', description: 'Corto y descriptivo, maximo 120 caracteres.' },
+      disparador: {
+        type: 'OBJECT',
+        properties: {
+          type: { type: 'STRING', description: 'type de un disparador del catalogo.' },
+          /* JSON en texto y no OBJECT: Gemini rechaza un OBJECT sin
+             `properties` —y el turno entero con él—, y las claves dependen del
+             disparador. */
+          config: {
+            type: 'STRING',
+            description:
+              'JSON con sus claves de config, p. ej. {"leadTimeMinutes":1440}. "{}" si no tiene.',
+          },
+        },
+        required: ['type'],
+      },
+      condiciones: {
+        type: 'ARRAY',
+        description: 'Opcional. Como mucho 10. Solo campos de ese disparador.',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            field: { type: 'STRING' },
+            operator: { type: 'STRING' },
+            value: {
+              type: 'STRING',
+              description: 'El valor. Para IN, varios separados por comas.',
+            },
+          },
+          required: ['field', 'operator', 'value'],
+        },
+      },
+      acciones: {
+        type: 'ARRAY',
+        description: 'De 1 a 5, en orden.',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            type: { type: 'STRING', description: 'type de una accion del catalogo.' },
+            config: {
+              type: 'STRING',
+              description:
+                'JSON con sus claves de config, p. ej. {"recipientSelector":"ASSIGNEES"}.',
+            },
+          },
+          required: ['type'],
+        },
+      },
+      porQue: { type: 'STRING', description: 'Obligatorio. Que problema resuelve.' },
+    },
+    required: ['nombre', 'disparador', 'acciones', 'porQue'],
+  },
+};
+
+export const PROPONER_ESTADO_AUTOMATIZACION: FunctionDeclaration = {
+  name: 'proponer_estado_automatizacion',
+  description:
+    'Prepara la propuesta de ACTIVAR o PAUSAR una regla que ya existe, vista con ' +
+    'consultar_automatizaciones en este turno. NO la cambia: la persona lo acepta. Activar ' +
+    'cuenta en el tope de reglas activas del plan.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      reglaId: { type: 'STRING', description: 'id de una regla de la consulta.' },
+      activar: { type: 'BOOLEAN', description: 'true para activarla, false para pausarla.' },
+      porQue: { type: 'STRING', description: 'Obligatorio. Una frase.' },
+    },
+    required: ['reglaId', 'activar', 'porQue'],
+  },
+};
+
 /** Los colores de columna del design system. Espejo de `COLUMN_COLORS`. */
 const COLORES_DE_COLUMNA = ['primary', 'accent', 'info', 'warning', 'error', 'success'];
 

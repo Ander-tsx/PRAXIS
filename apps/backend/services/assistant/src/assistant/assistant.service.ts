@@ -24,6 +24,7 @@ import { bloqueDeArchivo } from './attachment-text';
 import { AttachmentsService } from './attachments.service';
 import {
   type AmbitoDeConsulta,
+  type AutomatizacionesVistas,
   type DocumentoVisto,
   REVISION_MAX_CARACTERES,
   type SprintVisto,
@@ -171,6 +172,8 @@ const NOMBRE_DE_PROPUESTA: Record<string, string> = {
   proponer_iniciar_sprint: 'empezar un sprint',
   proponer_planificacion: 'repartir tareas entre backlog y sprint',
   proponer_documento: 'un documento nuevo',
+  proponer_automatizacion: 'una automatizacion',
+  proponer_estado_automatizacion: 'encender o pausar una automatizacion',
   proponer_mensaje_privado: 'un mensaje privado',
   proponer_revision_documento: 'una revision del documento',
   proponer_abrir_proyecto: 'abrir uno de tus proyectos',
@@ -225,6 +228,8 @@ interface Briefing {
   sprintsVistos?: Map<string, SprintVisto>;
   /** Lo mismo con los documentos. */
   documentosVistos?: Map<string, DocumentoVisto>;
+  /** Y con el catálogo y las reglas de automatización. */
+  automatizaciones?: AutomatizacionesVistas;
   etiquetas: { id: string; nombre: string }[];
   /** El inventario con ids: lo que permite validar un `taskId` antes de enseñarlo. */
   tareas?: {
@@ -495,6 +500,7 @@ export class AssistantService {
       vistas: new Map(),
       sprintsVistos: new Map(),
       documentosVistos: new Map(),
+      permisos: payload.permisos,
     };
     const conConsultas = ambito.proyectos.length > 0;
     /* Un documento entero sale como tokens de salida, y con los 2048 de
@@ -1408,6 +1414,28 @@ export class AssistantService {
         },
       };
     }
+    if (call.name === 'proponer_automatizacion') {
+      return this.validarAutomatizacion(call, briefing, payload);
+    }
+    if (call.name === 'proponer_estado_automatizacion') {
+      const regla = briefing.automatizaciones?.reglas.get(String(call.args.reglaId ?? ''));
+      const activar = call.args.activar === true;
+      /* Solo reglas vistas, y solo si cambia algo: activar una encendida es una
+         tarjeta que no hace nada. Una INVALID o pausada por el sistema no se
+         enciende desde aquí: hay que arreglarla antes, en su pantalla. */
+      if (!regla || (activar ? regla.estado !== 'DISABLED' : regla.estado !== 'ENABLED')) {
+        return null;
+      }
+      return {
+        tool: call.name,
+        args: {
+          reglaId: regla.id,
+          nombre: regla.nombre,
+          activar,
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+        },
+      };
+    }
     if (call.name === 'proponer_documento') return this.validarDocumento(call);
     if (call.name === 'proponer_revision_documento') return this.validarRevision(call, briefing);
     if (call.name === 'proponer_sprint') return this.validarSprint(call, briefing);
@@ -1543,6 +1571,150 @@ export class AssistantService {
     }
 
     return null;
+  }
+
+  /**
+   * Una regla nueva, contra el catálogo que PRAX consultó en el turno.
+   *
+   * ⚠️ **Todo o nada.** Si una condición o una acción no encaja, se descarta la
+   * propuesta entera en vez de quitar la pieza: una regla sin una de sus
+   * condiciones hace **más** de lo que se pidió —«avisa de todas» en vez de
+   * «avisa de las urgentes»—, y eso es peor que no proponer nada. El motor la
+   * vuelve a validar al crearla; esto es para que no salga una tarjeta que va a
+   * dar 400, y para escribir la frase que la tarjeta enseña.
+   */
+  private validarAutomatizacion(
+    call: { name: string; args: Record<string, unknown> },
+    briefing: Briefing,
+    payload: ChatPayload,
+  ): AssistantProposal | null {
+    const catalogo = briefing.automatizaciones?.catalogo;
+    const nombre = String(call.args.nombre ?? '').trim();
+    if (!catalogo || !nombre) {
+      this.log.warn('El modelo propuso una regla sin haber consultado el catalogo');
+      return null;
+    }
+    const json = (valor: unknown): Record<string, unknown> => {
+      if (valor && typeof valor === 'object') return valor as Record<string, unknown>;
+      try {
+        const leido = JSON.parse(String(valor ?? '{}'));
+        return leido && typeof leido === 'object' ? leido : {};
+      } catch {
+        return {};
+      }
+    };
+    /* De qué lista sale un id, y cómo se llama para la frase. */
+    const listas: Record<string, Map<string, string>> = {
+      columns: new Map(briefing.columnas.map((c) => [c.id, c.nombre])),
+      labels: new Map(briefing.etiquetas.map((l) => [l.id, l.nombre])),
+      members: new Map(payload.miembros.map((m) => [m.userId, m.nombre])),
+    };
+    const legible = (
+      spec: { options?: { value: string; label: string }[]; source?: string },
+      valor: unknown,
+    ): string | null => {
+      const uno = (v: unknown) => {
+        const texto = String(v);
+        if (spec.source) return listas[spec.source]?.get(texto) ?? null;
+        if (spec.options) return spec.options.find((o) => o.value === texto)?.label ?? null;
+        return texto;
+      };
+      if (Array.isArray(valor)) {
+        const partes = valor.map(uno);
+        return partes.every((p) => p !== null) ? partes.join(', ') : null;
+      }
+      return uno(valor);
+    };
+
+    const disparadorPedido = json(call.args.disparador);
+    const disparador = catalogo.triggers.find((t) => t.type === disparadorPedido.type);
+    if (!disparador) return null;
+    const configPedida = json(disparadorPedido.config);
+    const configDelDisparador = Object.fromEntries(
+      disparador.config.map((c) => {
+        const valor = Number(configPedida[c.key]);
+        return [c.key, Number.isInteger(valor) && valor >= c.min ? valor : c.defaultValue];
+      }),
+    );
+
+    const OPERADOR: Record<string, string> = {
+      EQUALS: 'es',
+      NOT_EQUALS: 'no es',
+      IN: 'es una de',
+      GT: 'es mayor que',
+      GTE: 'es al menos',
+      LT: 'es menor que',
+      LTE: 'es como mucho',
+      CONTAINS: 'contiene',
+    };
+    const condiciones: { field: string; operator: string; value: unknown }[] = [];
+    const frasesDeCondicion: string[] = [];
+    for (const cruda of (Array.isArray(call.args.condiciones) ? call.args.condiciones : []).slice(
+      0,
+      10,
+    )) {
+      const c = json(cruda);
+      const campo = disparador.fields.find((f) => f.field === c.field);
+      const operador = String(c.operator ?? '');
+      if (!campo || !campo.operators.includes(operador)) return null;
+      let valor: unknown = c.value;
+      if (operador === 'IN' && typeof valor === 'string')
+        valor = valor.split(',').map((v) => v.trim());
+      if (campo.kind === 'integer') valor = Number(valor);
+      if (campo.kind === 'boolean') valor = valor === true || valor === 'true';
+      const etiqueta = legible(campo, valor);
+      if (etiqueta === null || (campo.kind === 'integer' && !Number.isFinite(valor as number))) {
+        return null;
+      }
+      condiciones.push({ field: campo.field, operator: operador, value: valor });
+      frasesDeCondicion.push(
+        `${campo.label.toLowerCase()} ${OPERADOR[operador] ?? operador} ${etiqueta}`,
+      );
+    }
+
+    const acciones: { type: string; config: Record<string, unknown> }[] = [];
+    const frasesDeAccion: string[] = [];
+    const pedidas = Array.isArray(call.args.acciones) ? call.args.acciones : [];
+    if (pedidas.length === 0 || pedidas.length > 5) return null;
+    for (const cruda of pedidas) {
+      const a = json(cruda);
+      const spec = catalogo.actions.find((s) => s.type === a.type);
+      if (!spec) return null;
+      const config = json(a.config);
+      const limpia: Record<string, unknown> = {};
+      const partes: string[] = [];
+      for (const campo of spec.config) {
+        const valor = config[campo.key];
+        if (valor === undefined || valor === null || valor === '') {
+          if (campo.required) return null;
+          continue;
+        }
+        if (campo.kind === 'text' && String(valor).length > (campo.maxLength ?? 500)) return null;
+        const etiqueta = legible(campo, valor);
+        if (etiqueta === null) return null;
+        limpia[campo.key] = valor;
+        partes.push(campo.kind === 'text' ? `«${etiqueta}»` : etiqueta.toLowerCase());
+      }
+      acciones.push({ type: spec.type, config: limpia });
+      frasesDeAccion.push(
+        partes.length > 0 ? `${spec.sentence} ${partes.join(', ')}` : spec.label.toLowerCase(),
+      );
+    }
+
+    return {
+      tool: call.name,
+      args: {
+        nombre: nombre.slice(0, 120),
+        frase:
+          `Cuando ${disparador.sentence}` +
+          (frasesDeCondicion.length > 0 ? `, si ${frasesDeCondicion.join(' y ')}` : '') +
+          `, entonces ${frasesDeAccion.join(' y ')}.`,
+        trigger: { type: disparador.type, config: configDelDisparador },
+        conditions: condiciones,
+        actions: acciones,
+        ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+      },
+    };
   }
 
   /**
@@ -1730,6 +1902,7 @@ export class AssistantService {
       ...briefing,
       ...(ambito.sprintsVistos?.size ? { sprintsVistos: ambito.sprintsVistos } : {}),
       ...(ambito.documentosVistos?.size ? { documentosVistos: ambito.documentosVistos } : {}),
+      ...(ambito.automatizaciones ? { automatizaciones: ambito.automatizaciones } : {}),
     };
     return this.conTareasVistas(conVistos, ambito.vistas ?? new Map());
   }

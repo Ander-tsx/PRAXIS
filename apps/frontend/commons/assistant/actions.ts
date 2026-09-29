@@ -2,6 +2,8 @@
 
 import type {
   AssignmentProposal,
+  AutomationProposal,
+  AutomationStateProposal,
   AssistantChatResult,
   AssistantQuota,
   BoardProposal,
@@ -1049,6 +1051,94 @@ export async function aceptarDocumentoAction(
     };
   } catch (error) {
     return { error: describe(error, 'No se pudo crear el documento.'), hecho: null };
+  }
+}
+
+/**
+ * Una regla nueva, **pausada**.
+ *
+ * `POST /projects/:id/automations` con `canManageAutomations` y el cuerpo que ya
+ * trae la propuesta. Nace `DISABLED` aunque el modelo pidiera otra cosa: una
+ * regla que actúa sola sobre el trabajo del equipo no se enciende de rebote.
+ */
+export async function aceptarAutomatizacionAction(
+  projectId: string,
+  propuesta: AutomationProposal,
+): Promise<{ error: string | null; hecho: string | null; href?: string }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', hecho: null };
+  const nombre = String(propuesta.nombre ?? '').trim();
+  if (!nombre || !Array.isArray(propuesta.actions) || propuesta.actions.length === 0) {
+    return { error: 'La propuesta no trae una regla completa.', hecho: null };
+  }
+  try {
+    const creada = await api.post<{ id: string; name: string; status: string }>(
+      `/projects/${projectId}/automations`,
+      {
+        name: nombre.slice(0, 120),
+        status: 'DISABLED',
+        trigger: propuesta.trigger,
+        conditions: propuesta.conditions ?? [],
+        actions: propuesta.actions,
+      },
+    );
+    if (!creada?.id) return { error: 'El servidor no guardó la regla.', hecho: null };
+    return {
+      error: null,
+      hecho: `Se creó «${creada.name}», pausada. Enciéndela cuando quieras.`,
+      href: `/projects/${projectId}?tab=automation`,
+    };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo crear la regla.'), hecho: null };
+  }
+}
+
+/**
+ * Encender o pausar una regla. La ruta pide la definición entera, así que se
+ * lee y se reenvía con el estado cambiado, como el interruptor de la pestaña
+ * (`toggleAutomationRuleAction`). Encender cuenta en el tope del plan: el 402
+ * llega con su mensaje.
+ */
+export async function aceptarEstadoAutomatizacionAction(
+  projectId: string,
+  propuesta: AutomationStateProposal,
+): Promise<{ error: string | null; hecho: string | null; href?: string }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', hecho: null };
+  const siguiente = propuesta.activar ? 'ENABLED' : 'DISABLED';
+  try {
+    const regla = await api.get<{
+      name: string;
+      description?: string | null;
+      trigger: { type: string; config: unknown };
+      conditions: { field: string; operator: string; value: unknown }[];
+      actions: { type: string; config: unknown }[];
+    }>(`/projects/${projectId}/automations/${propuesta.reglaId}`);
+    const guardada = await api.patch<{ status: string; name: string }>(
+      `/projects/${projectId}/automations/${propuesta.reglaId}`,
+      {
+        name: regla.name,
+        ...(regla.description != null && { description: regla.description }),
+        status: siguiente,
+        trigger: { type: regla.trigger.type, config: regla.trigger.config },
+        conditions: regla.conditions.map(({ field, operator, value }) => ({
+          field,
+          operator,
+          value,
+        })),
+        actions: regla.actions.map(({ type, config }) => ({ type, config })),
+      },
+    );
+    if (guardada?.status !== siguiente) {
+      return { error: 'El servidor no cambió el estado de la regla.', hecho: null };
+    }
+    return {
+      error: null,
+      hecho: `«${guardada.name}» está ${propuesta.activar ? 'encendida' : 'pausada'}.`,
+      href: `/projects/${projectId}?tab=automation`,
+    };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo cambiar la regla.'), hecho: null };
   }
 }
 

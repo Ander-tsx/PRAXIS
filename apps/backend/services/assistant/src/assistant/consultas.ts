@@ -175,6 +175,23 @@ export const CONSULTAR_DOCUMENTO: FunctionDeclaration = {
   },
 };
 
+export const CONSULTAR_AUTOMATIZACIONES: FunctionDeclaration = {
+  name: 'consultar_automatizaciones',
+  description:
+    'LEE las automatizaciones (reglas) del proyecto y el CATALOGO de lo que se puede ' +
+    'automatizar: disparadores, condiciones y acciones, con las claves de su ' +
+    'configuracion. No cambia nada. Hace falta en este turno para proponer una regla o ' +
+    'activarla. Solo funciona con el permiso «Gestionar automatizaciones».',
+  /* Con un parámetro de verdad: Gemini rechaza un OBJECT con `properties`
+     vacío, y con él el turno entero. */
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      soloActivas: { type: 'BOOLEAN', description: 'Opcional. Solo las reglas encendidas.' },
+    },
+  },
+};
+
 export const HERRAMIENTAS_DE_CONSULTA = [
   CONSULTAR_TAREAS,
   CONSULTAR_TAREA,
@@ -182,6 +199,7 @@ export const HERRAMIENTAS_DE_CONSULTA = [
   CONSULTAR_SPRINTS,
   CONSULTAR_DOCUMENTOS,
   CONSULTAR_DOCUMENTO,
+  CONSULTAR_AUTOMATIZACIONES,
 ];
 const NOMBRES = new Set(HERRAMIENTAS_DE_CONSULTA.map((h) => h.name));
 
@@ -216,6 +234,50 @@ export interface AmbitoDeConsulta {
    * el principio que enseña la lista.
    */
   documentosVistos?: Map<string, DocumentoVisto>;
+  /**
+   * Los permisos de quien pregunta **en el foco**. Hace falta para no enseñar
+   * lo que su pantalla no le enseñaría (I6): las automatizaciones solo las ve
+   * quien las gestiona.
+   */
+  permisos?: Record<string, boolean>;
+  /** Lo que enseñó `consultar_automatizaciones`: el catálogo y las reglas. */
+  automatizaciones?: AutomatizacionesVistas;
+}
+
+/** El catálogo del motor, tal cual lo sirve automation-service. */
+export interface CatalogoDeAutomatizacion {
+  triggers: {
+    type: string;
+    label: string;
+    sentence: string;
+    config: { key: string; min: number; defaultValue: number }[];
+    fields: {
+      field: string;
+      label: string;
+      kind: string;
+      operators: string[];
+      options?: { value: string; label: string }[];
+      source?: string;
+    }[];
+  }[];
+  actions: {
+    type: string;
+    label: string;
+    sentence: string;
+    config: {
+      key: string;
+      kind: string;
+      required: boolean;
+      options?: { value: string; label: string }[];
+      source?: string;
+      maxLength?: number;
+    }[];
+  }[];
+}
+
+export interface AutomatizacionesVistas {
+  catalogo: CatalogoDeAutomatizacion;
+  reglas: Map<string, { id: string; nombre: string; estado: string }>;
 }
 
 export interface DocumentoVisto {
@@ -266,8 +328,10 @@ export class ConsultasService {
   private readonly reports: ClientProxy;
   private readonly credentials: ClientProxy;
   private readonly projects: ClientProxy;
+  private readonly automation: ClientProxy;
 
   constructor(config: ConfigService) {
+    this.automation = ClientProxyFactory.create(opcionesDeCliente('AUTOMATION', config));
     this.projects = ClientProxyFactory.create(opcionesDeCliente('PROJECTS', config));
     this.tasks = ClientProxyFactory.create(opcionesDeCliente('TASKS', config));
     this.reports = ClientProxyFactory.create(opcionesDeCliente('REPORTS', config));
@@ -280,6 +344,7 @@ export class ConsultasService {
     if (nombre === 'consultar_tarea') return 'Leyendo una tarea';
     if (nombre === 'consultar_sprints')
       return `Mirando los sprints${proyecto ? ` de ${proyecto}` : ''}`;
+    if (nombre === 'consultar_automatizaciones') return 'Mirando las automatizaciones';
     if (nombre === 'consultar_documentos') {
       return `Buscando documentos${proyecto ? ` en ${proyecto}` : ''}`;
     }
@@ -309,6 +374,9 @@ export class ConsultasService {
       if (nombre === 'consultar_analisis') return await this.analisis(args, ambito);
       if (nombre === 'consultar_sprints') return await this.sprints(args, ambito);
       if (nombre === 'consultar_documentos') return await this.documentos(args, ambito);
+      if (nombre === 'consultar_automatizaciones') {
+        return await this.automatizaciones(ambito, args.soloActivas === true);
+      }
       if (nombre === 'consultar_documento') return await this.documento(args, ambito);
       return { error: `No existe la consulta ${nombre}.` };
     } catch (error) {
@@ -587,6 +655,90 @@ export class ConsultasService {
       });
     }
     return { proyecto: this.nombreDeProyecto(projectId, ambito), tableros: resultado };
+  }
+
+  /**
+   * Las reglas del proyecto y el catálogo, compactos.
+   *
+   * Solo con foco y con «Gestionar automatizaciones»: es el permiso que pide
+   * la pantalla de reglas, y una consulta de PRAX no enseña nada que esa
+   * persona no vería en su pantalla (I6).
+   */
+  private async automatizaciones(ambito: AmbitoDeConsulta, soloActivas = false) {
+    if (!ambito.foco) {
+      return { error: 'Las automatizaciones se consultan con un proyecto abierto.' };
+    }
+    if (ambito.permisos?.canManageAutomations !== true) {
+      return {
+        error:
+          'Para ver las automatizaciones hace falta el permiso «Gestionar automatizaciones». ' +
+          'Dilo asi.',
+      };
+    }
+    const [catalogo, reglas] = await Promise.all([
+      firstValueFrom(
+        this.automation.send<CatalogoDeAutomatizacion>({ cmd: 'automation_catalog' }, {}),
+      ),
+      firstValueFrom(
+        this.automation.send<
+          {
+            id: string;
+            name: string;
+            status: string;
+            trigger?: { type: string } | null;
+            actions?: { type: string }[];
+          }[]
+        >({ cmd: 'automation_rule_list' }, { projectId: ambito.foco }),
+      ),
+    ]);
+    const disparador = (type?: string) => catalogo.triggers.find((t) => t.type === type);
+    const accion = (type: string) => catalogo.actions.find((a) => a.type === type);
+    ambito.automatizaciones = {
+      catalogo,
+      reglas: new Map(
+        (reglas ?? []).map((r) => [r.id, { id: r.id, nombre: r.name, estado: r.status }]),
+      ),
+    };
+    return {
+      reglas: (reglas ?? [])
+        .filter((r) => !soloActivas || r.status === 'ENABLED')
+        .map((r) => ({
+          id: r.id,
+          nombre: r.name,
+          estado: r.status,
+          frase:
+            `Cuando ${disparador(r.trigger?.type)?.sentence ?? r.trigger?.type}, ` +
+            (r.actions ?? []).map((a) => accion(a.type)?.sentence ?? a.type).join(' y '),
+        })),
+      catalogo: {
+        disparadores: catalogo.triggers.map((t) => ({
+          type: t.type,
+          frase: t.sentence,
+          config: t.config.map((c) => ({ key: c.key, min: c.min, porDefecto: c.defaultValue })),
+          condiciones: t.fields.map((f) => ({
+            field: f.field,
+            tipo: f.kind,
+            operadores: f.operators,
+            ...(f.options ? { valores: f.options.map((o) => o.value) } : {}),
+            ...(f.source ? { deLaLista: f.source } : {}),
+          })),
+        })),
+        acciones: catalogo.actions.map((a) => ({
+          type: a.type,
+          frase: a.sentence,
+          config: a.config.map((c) => ({
+            key: c.key,
+            tipo: c.kind,
+            obligatorio: c.required,
+            ...(c.options ? { valores: c.options.map((o) => o.value) } : {}),
+            ...(c.source ? { deLaLista: c.source } : {}),
+          })),
+        })),
+        nota:
+          '"deLaLista" dice de donde sale el id: columns (columnas de "tableros"), labels ' +
+          '("etiquetas") o members (PERSONAS DEL PROYECTO).',
+      },
+    };
   }
 
   /** Los espacios de documentos de un proyecto, con su nombre. */

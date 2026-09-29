@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { Fragment, createContext, useContext, useEffect, useRef, useState } from 'react';
 import type {
   AssignmentProposal,
+  AutomationProposal,
+  AutomationStateProposal,
   BoardProposal,
   CheckStepsProposal,
   ChecklistProposal,
@@ -34,11 +36,13 @@ import {
 import {
   type AceptarSobreTareaState,
   aceptarAsignacionAction,
+  aceptarAutomatizacionAction,
   aceptarBorradoAction,
   aceptarChecklistAction,
   aceptarComentarioAction,
   aceptarDocumentoAction,
   aceptarEdicionAction,
+  aceptarEstadoAutomatizacionAction,
   aceptarInicioSprintAction,
   aceptarMarcarPasosAction,
   aceptarMensajeAction,
@@ -1116,6 +1120,57 @@ export function PrivateMessageProposalCard({
       <p className="font-sans text-xs text-text-secondary">
         Solo lo verá {propuesta.destinatario}. Sale a tu nombre, con la marca «enviado con PRAX».
       </p>
+    </AccionConFrase>
+  );
+}
+
+export function AutomationProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: AutomationProposal }) {
+  return (
+    <AccionConFrase
+      titulo="Automatización propuesta"
+      sinAplicar="Todavía no existe."
+      porQue={propuesta.porQue}
+      ejecutar={() => aceptarAutomatizacionAction(projectId, propuesta)}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+    >
+      <p className="font-sans text-sm font-medium text-text-primary">{propuesta.nombre}</p>
+      <p className="font-sans text-sm leading-relaxed text-text-secondary">{propuesta.frase}</p>
+      <p className="font-sans text-xs text-text-secondary">
+        Nace pausada: no hará nada hasta que la enciendas.
+      </p>
+    </AccionConFrase>
+  );
+}
+
+export function AutomationStateProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: AutomationStateProposal }) {
+  return (
+    <AccionConFrase
+      titulo={propuesta.activar ? 'Encender una automatización' : 'Pausar una automatización'}
+      sinAplicar="Sigue como estaba."
+      porQue={propuesta.porQue}
+      ejecutar={() => aceptarEstadoAutomatizacionAction(projectId, propuesta)}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+    >
+      <p className="font-sans text-sm font-medium text-text-primary">{propuesta.nombre}</p>
+      {propuesta.activar && (
+        <p className="font-sans text-xs text-text-secondary">
+          Cuenta en el tope de reglas encendidas de tu plan.
+        </p>
+      )}
     </AccionConFrase>
   );
 }

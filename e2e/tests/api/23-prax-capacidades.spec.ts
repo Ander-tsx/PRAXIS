@@ -295,3 +295,56 @@ test.describe('PRAX — mensajes firmados', () => {
     expect(robado.status()).toBe(403);
   });
 });
+
+test.describe('PRAX — automatizaciones', () => {
+  test('propone una regla pausada con su frase, y un tipo inventado no llega a tarjeta', async ({
+    request,
+  }) => {
+    const mundo = await crearMundo(request);
+    const propuestas = await turno(
+      request,
+      mundo,
+      [
+        'Avísame de lo que va a vencer',
+        '#consulta consultar_automatizaciones {}',
+        '#propon proponer_automatizacion {"nombre":"Avisar vencimientos","disparador":{"type":"TASK_DUE_SOON","config":"{\\"leadTimeMinutes\\":1440}"},"acciones":[{"type":"CREATE_NOTIFICATION","config":"{\\"recipientSelector\\":\\"ASSIGNEES\\"}"}],"porQue":"Lo pediste."}',
+        '#propon proponer_automatizacion {"nombre":"Inventada","disparador":{"type":"TASK_EXPLODED"},"acciones":[{"type":"CREATE_NOTIFICATION"}],"porQue":"x"}',
+      ].join('\n'),
+    );
+    expect(propuestas).toHaveLength(1);
+    expect(propuestas[0].args).toMatchObject({
+      nombre: 'Avisar vencimientos',
+      trigger: { type: 'TASK_DUE_SOON', config: { leadTimeMinutes: 1440 } },
+      actions: [{ type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'ASSIGNEES' } }],
+    });
+    expect(String(propuestas[0].args.frase)).toMatch(/^Cuando .+, entonces avisa a /);
+
+    /* Aceptar es `aceptarAutomatizacionAction`: nace DISABLED. */
+    const headers = comoBearer(mundo.duenno.accessToken);
+    const creada = await request.post(`/api/projects/${mundo.proyecto.id}/automations`, {
+      headers,
+      data: {
+        name: propuestas[0].args.nombre,
+        status: 'DISABLED',
+        trigger: propuestas[0].args.trigger,
+        conditions: propuestas[0].args.conditions,
+        actions: propuestas[0].args.actions,
+      },
+    });
+    expect(creada.status(), 'El motor acepta lo que validó PRAX').toBe(201);
+    const regla = await data<{ id: string; status: string }>(creada);
+    expect(regla.status).toBe('DISABLED');
+
+    const encender = await turno(
+      request,
+      mundo,
+      [
+        'Enciéndela',
+        '#consulta consultar_automatizaciones {}',
+        `#propon proponer_estado_automatizacion {"reglaId":"${regla.id}","activar":true,"porQue":"Lista."}`,
+      ].join('\n'),
+    );
+    expect(encender).toHaveLength(1);
+    expect(encender[0].args).toMatchObject({ reglaId: regla.id, activar: true });
+  });
+});

@@ -25,6 +25,8 @@ import {
   isEditProposal,
   isDocumentProposal,
   isDocumentRevisionProposal,
+  isAutomationProposal,
+  isAutomationStateProposal,
   isMessageProposal,
   isPrivateMessageProposal,
   isPlanningProposal,
@@ -61,6 +63,8 @@ import {
   MarkStepsProposalCard,
   DocumentProposalCard,
   DocumentRevisionProposalCard,
+  AutomationProposalCard,
+  AutomationStateProposalCard,
   MessageProposalCard,
   PrivateMessageProposalCard,
   PlanningProposalCard,
@@ -1406,6 +1410,32 @@ export function AssistantChat({
                         if (isDocumentRevisionProposal(propuesta)) {
                           return (
                             <DocumentRevisionProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId ?? ''}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
+                        if (isAutomationProposal(propuesta)) {
+                          return (
+                            <AutomationProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId ?? ''}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
+                        if (isAutomationStateProposal(propuesta)) {
+                          return (
+                            <AutomationStateProposalCard
                               key={propuesta.id ?? `${mensaje.id}-${indice}`}
                               projectId={projectId ?? ''}
                               proposalId={propuesta.id}

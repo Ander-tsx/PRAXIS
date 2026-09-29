@@ -525,7 +525,7 @@ que tocan esquema llevan migración (`prisma:deploy`, **nunca `reset`**).
   - `ChatMessage.origin`/`originMeta`, solo TCP.
   - `ActionContext` con la regla.
   - `CON_MENSAJE` selecciona los campos.
-- [ ] **F7 — Capacidades** (D4, D16).
+- [x] **F7 — Capacidades** (D4, D16). Ver el registro.
   - `capabilities.ts` como fuente única.
   - Consultas y propuestas nuevas: backlog, sprints, chat, documentos y
     automatizaciones.
@@ -811,3 +811,51 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
       comprobado contra las conversaciones de quien envía), nunca `origin` a
       pelo. Un `ASSISTANT` falso haría menos daño que un `AUTOMATION` falso
       —sigue siendo tu mensaje—, pero la regla es la misma.
+  - **F7 cerrada.** Siete commits: `94b666a7`, `482acd4d`, `5d0f273b`, `2677f854`,
+    `0b5b795b`, `c8cb6ffc` y el de automatizaciones.
+    - **Catálogo** (`capabilities.ts`): una lista de qué se puede hacer, qué
+      permiso pide y con qué propuesta. De ahí salen las declaraciones y un
+      bloque del prompt con tres formas de línea: `PUEDES PROPONERLO`, `LO HACE A
+      MANO en …` y `LE FALTA «…»`, con el nombre de la pantalla de roles.
+      `proponer_grafico` fuera: su lienzo se archivó con `reports-front`.
+    - **Lo visto en el turno.** Las consultas anotan en el ámbito lo que
+      enseñan del foco —tareas, sprints, documentos, el catálogo de reglas—, y
+      las propuestas se validan contra el briefing **más eso**. Los ids que no
+      están en el briefing (sprints, documentos, reglas) solo valen si se
+      consultaron en el mismo turno.
+    - **Sprints**: `consultar_sprints`; crear, empezar (nunca con otro en
+      curso) y repartir entre backlog y sprint (solo tareas del tablero del
+      sprint). Estimar va en `proponer_edicion` (`puntos`). **Cerrar no se
+      propone**: obliga a decidir tarea a tarea qué pasa con lo pendiente.
+    - **Documentos**: `consultar_documentos`, `consultar_documento` (hasta 20
+      mil caracteres, y dice si recorta), `proponer_documento` y
+      `proponer_revision_documento`. La revisión la aplica **el editor**
+      (`RevisionDePrax`), como una versión restaurada, porque el contenido
+      solo entra por el tiempo real (E4). Solo sobre documentos leídos enteros
+      en el turno y de hasta 12 mil caracteres; el techo de salida sube a 8192
+      solo a quien puede proponerlo.
+    - **Mensajes**: `praxConversationId` en el cuerpo del chat; el gateway
+      (`OrigenDeMensajeService`) comprueba que la conversación es de quien
+      envía y firma `ASSISTANT`. Ajena: 403. `proponer_mensaje_privado`, sin
+      permiso de proyecto. `consultar_chat` **no se hizo**: el chat del equipo
+      ya viaja en el contexto.
+    - **Automatizaciones**: `consultar_automatizaciones` (solo con foco y con
+      «Gestionar automatizaciones», I6), `proponer_automatizacion` —nace
+      **pausada**, todo o nada contra el catálogo, con la frase «Cuando …,
+      entonces …» escrita por el servicio— y `proponer_estado_automatizacion`.
+    - 🔴 **La trampa de Gemini**: un `OBJECT` sin `properties` (o vacío) en una
+      declaración hace que la API rechace la petición **entera**, y con ella el
+      turno de todo el que tenga esa herramienta. La configuración de una regla
+      viaja por eso como JSON en un `STRING`. Lo vigila una prueba en
+      `capabilities.spec.ts` que recorre todas las declaraciones.
+    - **Arreglos de paso**: la caché del listado del tablero ignoraba página y
+      tope (**también en producción**; `5d0f273b` se puede llevar a `main`
+      solo), las pruebas de integración de tasks sin `delByPrefix` en el doble,
+      y el turno de recuperación que duplicaba tarjetas.
+    - **Pruebas**: `capabilities.spec.ts`, el turno con lo visto y los sprints, y
+      e2e `23-prax-capacidades` (7) con el Gemini falso, que ahora acepta
+      directivas `#consulta` / `#propon`.
+    - ⚠️ **Coste a vigilar**: a quien tiene todos los permisos se le declaran
+      19 propuestas y 7 consultas, **~25 mil caracteres por vuelta** (unos 6-7
+      mil tokens), más ~2 mil del catálogo. Un colaborador, ~9 mil. Es lo que
+      pedía D10 con Jev eligiendo qué herramientas declarar; queda abierto.
