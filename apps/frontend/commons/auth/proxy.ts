@@ -1,5 +1,6 @@
 import { decodeJwt } from 'jose';
 import { type NextRequest, NextResponse } from 'next/server';
+import { fetchAlGateway } from '../api/despertar';
 import type { ApiEnvelopeError } from '../api/envelope';
 import { isTimeout, timeoutSignal } from '../api/timeout';
 import {
@@ -84,7 +85,7 @@ async function refreshAccessToken(
   refreshToken: string,
 ): Promise<string | null> {
   try {
-    const response = await fetch(`${gatewayUrl}/api/auth/refresh`, {
+    const response = await fetchAlGateway(`${gatewayUrl}/api/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
@@ -165,7 +166,7 @@ export function createGatewayProxy(options: CreateGatewayProxyOptions = {}) {
     const esFlujoDeEventos = (request.headers.get('accept') ?? '').includes('text/event-stream');
 
     const send = (token: string) =>
-      fetch(target, {
+      fetchAlGateway(target, {
         method: request.method,
         headers: (() => {
           const headers = new Headers(forwardedHeaders);

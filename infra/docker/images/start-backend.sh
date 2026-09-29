@@ -13,8 +13,14 @@
 # un `release`/pre-deploy de una sola ejecución.
 set -u
 
-echo "==> [start-backend] Aplicando migraciones de Prisma…"
-if bash /app/migrar.sh; then
+# ⚡ Primero, la comprobación rápida. Railway duerme este servicio cuando nadie
+# lo usa y cada despertar es un arranque: los siete `prisma migrate deploy`
+# costaban 8 s en local y más en Railway antes de servir nada. Si todas las
+# migraciones de la imagen ya están aplicadas —el caso de cada despertar—, se
+# salta Prisma entero. Si falta alguna o no se puede comprobar, se migra.
+if node /app/apps/backend/monolith/scripts/migraciones-al-dia.cjs; then
+  echo "==> [start-backend] Migraciones ya aplicadas; sin Prisma."
+elif echo "==> [start-backend] Aplicando migraciones de Prisma…" && bash /app/migrar.sh; then
   echo "==> [start-backend] Migraciones al día."
 else
   # No se aborta el arranque: si la base no está lista todavía, los servicios

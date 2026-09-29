@@ -226,6 +226,30 @@ queda**: decide el acceso a PRAX.
   ⚠️ **El precio:** la primera petición tras dormir espera a que arranque el
   contenedor, unos segundos.
 
+  **Dos arreglos para que despertar no rompa nada** (2026-09-29, antes del
+  primer despliegue):
+  - **Las migraciones ya no se aplican en cada arranque.**
+    - **El problema:** con sueño, cada despertar es un arranque, y los siete
+      `prisma migrate deploy` costaban 8,4 s medidos en local antes de servir
+      nada.
+    - **El arreglo:** `monolith/scripts/migraciones-al-dia.cjs` compara, con una
+      sola conexión, las carpetas de migración de la imagen con
+      `_prisma_migrations` de cada schema (0,13 s). `start-backend.sh` solo
+      llama a `migrar.sh` si falta alguna o si la comprobación falla: ante la
+      duda, migra.
+  - **El frontend reintenta mientras el backend despierta.**
+    - **El problema:** Railway avisa de que *«the first request sent to a slept
+      service may return a 502»*. `praxis-api` solo recibe tráfico de
+      `praxis-web` por la red privada, que sí lo despierta.
+    - **El arreglo:** `commons/api/despertar.ts` (`fetchAlGateway`), usado en
+      todos los `fetch` del servidor web al gateway. Reintenta lo que no llegó a
+      salir con cualquier método, y los 502/503 que no son JSON solo en
+      `GET`/`HEAD`: un `POST /auth/refresh` repetido rotaría los tokens dos
+      veces. Esperas de 0,8, 2 y 4 s, dentro del plazo de 15 s.
+  - **`praxis-web` sigue sin dormir**, como estaba: dormirlo haría que la
+    primera visita pudiera recibir el 502 directamente en el navegador. Se
+    decide después de ver unos días cómo despierta `praxis-api`.
+
   ⚠️ **Lo que lo mantiene despierto sin querer:** una pestaña abierta, por los
   latidos del SSE cada 25 s. Eso está bien: alguien lo está usando.
 - [x] **M-J — Documentación**: `CLAUDE.md` (puertos, comandos, «los 10

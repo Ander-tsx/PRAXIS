@@ -1,5 +1,6 @@
 import { decodeJwt } from 'jose';
 import { type NextRequest, NextResponse } from 'next/server';
+import { fetchAlGateway } from '../api/despertar';
 import { timeoutSignal } from '../api/timeout';
 import {
   ACCESS_TOKEN_FALLBACK_MAX_AGE,
@@ -60,7 +61,7 @@ async function requestNewAccessToken(
   refreshToken: string,
 ): Promise<Renovacion> {
   try {
-    const response = await fetch(`${gatewayUrl}/api/auth/refresh`, {
+    const response = await fetchAlGateway(`${gatewayUrl}/api/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
