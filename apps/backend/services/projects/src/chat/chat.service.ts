@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
+import type { ChatMessageOrigin, Prisma } from '../generated/prisma-client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventDispatcher } from '../realtime/event-dispatcher.service';
 import { RedisService } from '../redis/redis.service';
@@ -36,6 +37,10 @@ const CON_MENSAJE = {
      poder distinguirla de un mensaje vacío: es lo que decide si se pinta la
      burbuja o el «Mensaje eliminado», y si el mensaje admite acciones. */
   deletedAt: true,
+  /* De dónde vino (D13). La pantalla pinta un aviso de regla como divisor y
+     un mensaje de PRAX con su marca; sin esto, los dos parecen de la persona. */
+  origin: true,
+  originMeta: true,
   reactions: true,
   /* `attachments` con solo el `mimeType`: es lo que necesita la cita para
      decir «📷 Imagen» en vez de un hueco vacío cuando el mensaje citado no
@@ -166,6 +171,12 @@ export class ChatService {
      * fuera de la conversación general.
      */
     enHilo?: boolean;
+    /**
+     * De dónde vino (D13). **Solo llega por TCP**: el gateway no lo deja
+     * pasar desde un cuerpo HTTP, así que aquí se confía en quien lo manda.
+     */
+    origin?: ChatMessageOrigin;
+    originMeta?: Record<string, unknown> | null;
   }) {
     /* Una respuesta tiene que apuntar a un mensaje **de este mismo canal**. Sin
        esta comprobación, un id conocido de otra conversación se citaría dentro
@@ -203,6 +214,8 @@ export class ChatService {
         body: cuerpo,
         replyToId: dto.replyToId ?? null,
         visibleEnChat: !dto.enHilo,
+        origin: dto.origin ?? 'USER',
+        ...(dto.originMeta ? { originMeta: dto.originMeta as Prisma.InputJsonValue } : {}),
       },
       select: CON_MENSAJE,
     });

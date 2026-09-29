@@ -1230,6 +1230,18 @@ export interface ChatReaction {
  * sacan a Juan del equipo, el nombre ya está escrito y se pinta como texto
  * plano, sin consultar nada.
  */
+export type ChatMessageOrigin = 'USER' | 'AUTOMATION' | 'ASSISTANT';
+
+/** Lo que se copia al publicar, para pintar el origen aunque la regla ya no exista. */
+export interface ChatMessageOriginMeta {
+  ruleId?: string;
+  ruleName?: string;
+  taskId?: string;
+  taskTitle?: string;
+  invocadoPor?: string;
+  conversationId?: string;
+}
+
 export interface ChatMessage {
   id: string;
   channelId: string;
@@ -1275,6 +1287,17 @@ export interface ChatMessage {
    * interfaz no es lo que las impide.
    */
   deletedAt: string | null;
+  /**
+   * De dónde vino (D13 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+   *
+   * El mensaje sigue siendo de `authorId`; esto dice cómo llegó a escribirse.
+   * `AUTOMATION` se pinta como divisor —«⚡ Regla «X»…»— y no como algo que esa
+   * persona escribió a mano; `ASSISTANT` como mensaje suyo con la marca
+   * «enviado con PRAX». Opcional porque un mensaje anterior al campo, servido
+   * desde una caché, puede no traerlo: sin él, es `USER`.
+   */
+  origin?: ChatMessageOrigin;
+  originMeta?: ChatMessageOriginMeta | null;
   /**
    * A qué mensaje responde, con lo justo para pintar la cita.
    *

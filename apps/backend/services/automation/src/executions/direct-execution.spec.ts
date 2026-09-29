@@ -528,6 +528,25 @@ describe('acciones que escriben', () => {
   });
 
   /**
+   * D13: el mensaje es de quien creó la regla, pero sale firmado como aviso de
+   * la regla. Sin esto, la pantalla lo pinta como si esa persona lo hubiera
+   * escrito a mano.
+   */
+  it('el mensaje de una regla sale con origin AUTOMATION y la regla copiada', async () => {
+    const banco = montar({
+      rules: [conAccion({ type: 'POST_CHAT_MESSAGE', config: { text: 'Hola' } })],
+      tasks: [tarea()],
+    });
+
+    await banco.servicio.reviewProject('project-a');
+    const mensaje = banco.enviados.find((envio) => envio.cmd === 'chat_project_send');
+    expect(mensaje?.payload).toMatchObject({
+      origin: 'AUTOMATION',
+      originMeta: { ruleName: expect.any(String), taskTitle: 'Entregar reporte' },
+    });
+  });
+
+  /**
    * 🔴 Una regla que mueve produce un hecho de movimiento, que despierta a las
    * reglas de movimiento. El fusible existe para que eso no gire para siempre.
    */

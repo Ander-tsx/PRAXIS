@@ -584,6 +584,22 @@ enum ChatChannelKind {
   @@schema("projects")
 }
 
+/// De dónde vino un mensaje de chat (D13 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+///
+/// El mensaje **sigue siendo de una persona** —`authorId` no cambia de
+/// significado—; esto dice cómo llegó a escribirse, para que la pantalla lo
+/// pinte distinto.
+enum ChatMessageOrigin {
+  /// Lo escribió la persona. El de siempre.
+  USER
+  /// Lo publicó una regla de automatización. El autor es quien creó la regla.
+  AUTOMATION
+  /// Lo mandó PRAX en nombre de quien aceptó la propuesta o lo mencionó.
+  ASSISTANT
+
+  @@schema("projects")
+}
+
 /// Un canal de chat.
 ///
 /// ## Por qué un modelo común para el chat de proyecto y el privado
@@ -756,6 +772,20 @@ model ChatMessage {
   /// conversación necesita para seguir teniendo sentido. Un borrado que dejara
   /// el texto guardado «por si acaso» no sería un borrado.
   deletedAt DateTime?
+
+  /// De dónde vino (D13 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+  ///
+  /// 🔴 **Solo se fija por TCP.** Los DTO HTTP del gateway no lo admiten: si lo
+  /// admitieran, cualquiera podría publicar un mensaje que se pinta como aviso
+  /// de una regla. Lo ponen automation-service al ejecutar «escribir en el chat»
+  /// y el gateway cuando habla PRAX.
+  origin     ChatMessageOrigin @default(USER)
+  /// Lo justo para pintar el origen, copiado como en `Notification`: si borran
+  /// la regla, el divisor sigue diciendo cuál fue.
+  ///
+  /// - `AUTOMATION`: `{ ruleId, ruleName, taskId?, taskTitle? }`
+  /// - `ASSISTANT`: `{ invocadoPor, conversationId? }`
+  originMeta Json?
 
   createdAt DateTime @default(now())
 

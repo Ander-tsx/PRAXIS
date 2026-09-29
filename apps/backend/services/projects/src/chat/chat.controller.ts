@@ -5,6 +5,7 @@ import {
   DeleteChatAttachmentDto,
   GetChatAttachmentContentDto,
 } from '@praxis/contracts';
+import type { ChatMessageOrigin } from '../generated/prisma-client';
 import { ChannelsService } from './channels.service';
 import { ChatAttachmentsService } from './chat-attachments.service';
 import { ChatService } from './chat.service';
@@ -69,6 +70,9 @@ export class ChatController {
       replyToId?: string | null;
       attachmentIds?: string[];
       enHilo?: boolean;
+      /* Solo por TCP (D13): automation-service y el gateway cuando habla PRAX. */
+      origin?: ChatMessageOrigin;
+      originMeta?: Record<string, unknown> | null;
     },
   ) {
     const canal = await this.channels.deProyecto(dto.projectId);
@@ -182,6 +186,8 @@ export class ChatController {
       replyToId?: string | null;
       attachmentIds?: string[];
       enHilo?: boolean;
+      origin?: ChatMessageOrigin;
+      originMeta?: Record<string, unknown> | null;
     },
   ) {
     const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);

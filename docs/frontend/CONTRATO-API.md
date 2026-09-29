@@ -897,6 +897,18 @@ event: latido         data: { t }        cada 25 s
 | GET | `/projects/:id/chat/attachments/:aid/content` | — | `canViewProject` |
 | DELETE | `/projects/:id/chat/attachments/:aid` | — | autor, o `canManageMembers` |
 
+**De dónde vino un mensaje** (D13 de `docs/PLAN-PRAX-SEMIAGENTICO.md`). Cada
+mensaje, de proyecto o privado, trae `origin` —`USER`, `AUTOMATION` o
+`ASSISTANT`— y `originMeta`:
+
+- `AUTOMATION`: lo publicó una regla. `authorId` es quien la creó, pero se pinta
+  como aviso de la regla. `originMeta` = `{ ruleId, ruleName, taskId, taskTitle }`,
+  copiados: si borran la regla, siguen ahí.
+- `ASSISTANT`: lo mandó PRAX en nombre de `authorId`. `originMeta` =
+  `{ invocadoPor, conversationId? }`.
+- 🔴 **`origin` no se acepta en el cuerpo**: mandarlo da 400. Si se aceptara,
+  cualquiera podría publicar un «⚡ Regla …» falso. Lo fija el servidor.
+
 ### Chat privado — cuelga de `/me`, sin proyecto en la ruta
 
 🔴 **La puerta es la organización, no el proyecto, desde 2026-08-28.** Se puede

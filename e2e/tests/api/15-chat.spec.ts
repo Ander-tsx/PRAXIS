@@ -686,3 +686,43 @@ test.describe('Chat — aislamiento', () => {
     expect(intacto?.deletedAt).toBeNull();
   });
 });
+
+/**
+ * De dónde vino un mensaje (D13 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+ *
+ * Un aviso de regla se pinta como divisor, no como algo que su autor escribió.
+ * Si el campo se aceptara por HTTP, cualquiera del equipo podría publicar un
+ * «⚡ Regla …» falso. Solo lo fija automation-service, por TCP.
+ */
+test.describe('Chat — origen del mensaje', () => {
+  test('🔴 `origin` no se acepta por HTTP, ni en el chat de proyecto ni en el privado', async ({
+    request,
+  }) => {
+    const delDuenno = comoBearer(duenno.accessToken);
+    for (const origin of ['AUTOMATION', 'ASSISTANT', 'USER']) {
+      const falso = await request.post(`/api/projects/${proyectoId}/chat/messages`, {
+        headers: delDuenno,
+        data: { body: 'Regla «Despliegue» avisó a todos', origin },
+      });
+      expect(falso.status(), `origin=${origin} por HTTP`).toBe(400);
+    }
+
+    const otro = await nuevoInterlocutor(request);
+    const privado = await request.post(conversacionDe(duenno, otro, '/messages'), {
+      headers: delDuenno,
+      data: { body: 'hola', origin: 'AUTOMATION', originMeta: { ruleName: 'x' } },
+    });
+    expect(privado.status()).toBe(400);
+  });
+
+  test('un mensaje escrito a mano sale como USER, sin metadatos', async ({ request }) => {
+    const respuesta = await request.post(`/api/projects/${proyectoId}/chat/messages`, {
+      headers: comoBearer(duenno.accessToken),
+      data: { body: 'escrito a mano' },
+    });
+    expect(respuesta.status()).toBe(201);
+    const mensaje = await data<Mensaje & { origin: string; originMeta: unknown }>(respuesta);
+    expect(mensaje.origin).toBe('USER');
+    expect(mensaje.originMeta).toBeNull();
+  });
+});

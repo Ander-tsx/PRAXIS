@@ -217,7 +217,9 @@ export class DirectChatController {
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'chat_direct_send' },
-        { ...body, peerId, requesterId: req.user!.userId, isAdmin: yaAutorizado },
+        /* `origin` se fija aquí y no se lee del cuerpo (D13): un mensaje que
+           llega por HTTP es siempre de la persona. */
+        { ...body, peerId, requesterId: req.user!.userId, isAdmin: yaAutorizado, origin: 'USER' },
       ),
     );
   }

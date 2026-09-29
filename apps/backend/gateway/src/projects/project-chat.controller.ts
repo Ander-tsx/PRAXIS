@@ -129,7 +129,11 @@ export class ProjectChatController {
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'chat_project_send' },
-        { ...body, projectId: req.projectId, requesterId: req.user!.userId },
+        /* `origin` se fija aquí y no se lee del cuerpo (D13): el DTO ya rechaza
+           el campo, y esto lo deja escrito por si un día deja de hacerlo. Un
+           mensaje que llega por HTTP es siempre de la persona; los de regla
+           los publica automation-service por TCP. */
+        { ...body, projectId: req.projectId, requesterId: req.user!.userId, origin: 'USER' },
       ),
     );
   }

@@ -48,6 +48,14 @@ export interface ActionContext {
   task: TaskShape;
   /** Los encargados actuales, ya resueltos: es a quién avisa `ASSIGNEES`. */
   recipients: string[];
+  /**
+   * La regla que se está ejecutando (D13 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+   *
+   * Hace falta para firmar lo que publica en el chat: el mensaje es de quien
+   * creó la regla, pero la pantalla lo pinta como un aviso de la regla y no
+   * como si esa persona lo hubiera escrito a mano.
+   */
+  rule: { id: string; name: string };
 }
 
 export interface ActionClients {
@@ -262,6 +270,15 @@ function escribirEnElChat(
         projectId: contexto.projectId,
         requesterId: contexto.requesterId,
         body: rellenar(String(config.text), contexto),
+        /* Solo por TCP (D13). Los nombres van copiados: si borran la regla o la
+           tarea, el divisor sigue diciendo cuáles fueron. */
+        origin: 'AUTOMATION',
+        originMeta: {
+          ruleId: contexto.rule.id,
+          ruleName: contexto.rule.name,
+          taskId: contexto.task.id,
+          taskTitle: contexto.task.title,
+        },
       },
     ),
   );

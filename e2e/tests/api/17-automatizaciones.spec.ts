@@ -19,6 +19,57 @@ interface Bandeja {
 }
 
 test.describe('Automatización académica', () => {
+  /**
+   * D13 de docs/PLAN-PRAX-SEMIAGENTICO.md: el mensaje es de quien creó la regla,
+   * pero sale firmado como aviso de la regla. Sin `origin`, el chat lo pintaba
+   * como si esa persona lo hubiera escrito a mano.
+   */
+  test('lo que una regla publica en el chat sale con origin AUTOMATION', async ({ request }) => {
+    const mundo = await crearMundo(request);
+    const headers = comoBearer(mundo.duenno.accessToken);
+    const tarea = await crearTarea(request, mundo.duenno.accessToken, mundo);
+    const manana = new Date();
+    manana.setUTCDate(manana.getUTCDate() + 1);
+    const actualizacion = await request.patch(`/api/tasks/${tarea.id}`, {
+      headers,
+      data: { dueDate: manana.toISOString() },
+    });
+    expect(actualizacion.status()).toBe(200);
+    /* Sin encargado no hay a quién le venza: el barrido ni la considera. */
+    const asignacion = await request.post(`/api/tasks/${tarea.id}/assign`, {
+      headers,
+      data: { assigneeIds: [mundo.duenno.userId] },
+    });
+    expect(asignacion.status()).toBe(200);
+
+    const nombreRegla = nombreUnico('Avisar en el chat').slice(0, 120);
+    const alta = await request.post(`/api/projects/${mundo.proyecto.id}/automations`, {
+      headers,
+      data: {
+        name: nombreRegla,
+        status: 'ENABLED',
+        trigger: { type: 'TASK_DUE_SOON', config: { leadTimeMinutes: 4320 } },
+        conditions: [],
+        actions: [{ type: 'POST_CHAT_MESSAGE', config: { text: '{tarea} vence pronto' } }],
+      },
+    });
+    expect(alta.status(), 'Crear la regla que escribe en el chat').toBe(201);
+
+    const revision = await request.post(`/api/projects/${mundo.proyecto.id}/automations/review`, {
+      headers,
+    });
+    expect(await data<Revision>(revision)).toMatchObject({ succeeded: 1, failed: 0 });
+
+    const chat = await data<{
+      items: Array<{ body: string; authorId: string; origin: string; originMeta: any }>;
+    }>(await request.get(`/api/projects/${mundo.proyecto.id}/chat/messages`, { headers }));
+    const aviso = chat.items.find((mensaje) => mensaje.body.endsWith('vence pronto'));
+    expect(aviso, 'La regla publicó en el chat').toBeTruthy();
+    expect(aviso?.authorId).toBe(mundo.duenno.userId);
+    expect(aviso?.origin).toBe('AUTOMATION');
+    expect(aviso?.originMeta).toMatchObject({ ruleName: nombreRegla, taskId: tarea.id });
+  });
+
   test('avisa un vencimiento próximo una sola vez y deja auditoría', async ({ request }) => {
     const mundo = await crearMundo(request);
     const headers = comoBearer(mundo.duenno.accessToken);

@@ -329,6 +329,7 @@ export class AutomationEngineService {
       requesterId: rule.createdBy,
       task: candidate.task,
       recipients: candidate.recipients,
+      rule: { id: rule.id, name: rule.name },
     };
 
     const operaciones = rule.actions.map(

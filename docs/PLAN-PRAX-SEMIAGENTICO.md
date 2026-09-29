@@ -521,7 +521,7 @@ que tocan esquema llevan migración (`prisma:deploy`, **nunca `reset`**).
     antes, y `jev` por OpenRouter), apagado por defecto.
   - Conjunto de calibración en español.
   - Medido con y sin Jev sobre los mismos turnos.
-- [ ] **F6 — Origen del mensaje** (D13).
+- [x] **F6 — Origen del mensaje** (D13). Ver el registro.
   - `ChatMessage.origin`/`originMeta`, solo TCP.
   - `ActionContext` con la regla.
   - `CON_MENSAJE` selecciona los campos.
@@ -788,3 +788,26 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
     - **Sigue apagado** (`PRAX_ROUTER=heuristic`). Encenderlo en producción
       es poner `PRAX_ROUTER=jev` y `OPENROUTER_API_KEY` en Railway; lo decide
       el dueño, que además va a rotar la clave provisional.
+  - **F6 cerrada.**
+    - **Esquema**: `ChatMessage.origin` (enum `ChatMessageOrigin`, por defecto
+      `USER`) y `originMeta` JSONB. Migración
+      `20260929150000_chat_message_origin`, sin tocar filas: todo lo que ya
+      había lo escribió una persona.
+    - **Solo por TCP**: los dos `send` de `chat.controller.ts` lo aceptan en el
+      payload; el gateway lo fija a `USER` en las dos rutas HTTP en vez de
+      leerlo del cuerpo. El DTO además lo rechaza con 400, y hay e2e de las dos
+      cosas (`15-chat`, «origen del mensaje»).
+    - **Automatizaciones**: `ActionContext` lleva `rule: { id, name }` y
+      «escribir en el chat» publica con `origin: AUTOMATION` y la regla y la
+      tarea copiadas en `originMeta`. Unitaria en `direct-execution.spec.ts` y
+      e2e en `17-automatizaciones`.
+    - `CON_MENSAJE` los selecciona, así que salen en el listado, el hilo, la
+      búsqueda y el aviso en vivo. `ChatMessage` del frontend los tiene como
+      opcionales; pintarlos es F9.
+    - ⚠️ **Lo que D16 necesita y F6 deja para F7**: cuando alguien acepta una
+      propuesta de PRAX de mandar un mensaje, lo manda **el navegador** por la
+      ruta HTTP de siempre, que fija `USER`. Para que salga como `ASSISTANT`
+      hará falta un campo propio y acotado (algo como `praxConversationId`,
+      comprobado contra las conversaciones de quien envía), nunca `origin` a
+      pelo. Un `ASSISTANT` falso haría menos daño que un `AUTOMATION` falso
+      —sigue siendo tu mensaje—, pero la regla es la misma.
