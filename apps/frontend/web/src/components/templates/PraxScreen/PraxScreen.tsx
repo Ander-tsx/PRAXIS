@@ -49,13 +49,6 @@ export interface PraxScreenProps {
  * hablar. Ahora el proyecto se elige dentro de la conversación —PRAX lo pregunta
  * con botones— y se cambia desde ahí, así que un control aparte para lo mismo
  * sobraba y además ocupaba la fila más visible de la pantalla.
- *
- * ## Sin `alAceptarGrafico`, a propósito
- *
- * Aquí no hay lienzo, así que una propuesta de gráfico no se puede aplicar sobre
- * nada que se esté viendo. `AssistantChat` lo detecta —la prop no llega— y la
- * tarjeta enseña qué gráfico es y remite a Análisis, en vez de ofrecer un
- * «Aceptar» que escribiría en una pantalla invisible. Ver `AccionDelLienzo`.
  */
 export function PraxScreen({
   projectId,

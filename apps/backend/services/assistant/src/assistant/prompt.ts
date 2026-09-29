@@ -401,6 +401,23 @@ const REGLAS: Regla[] = [
       'quiere decir que no puedas ayudar con ello.',
   },
 
+  /**
+   * 7 bis — El catálogo de capacidades (D4 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+   *
+   * Sin esto, a «bórrame esta tarea» sin `canDeleteTask` PRAX contestaba que no
+   * sabía, o nada. El catálogo le dice qué existe y qué falta; esta regla, qué
+   * hacer con cada forma de línea. El nombre del permiso va **como sale en la
+   * pantalla de roles**, que es donde alguien lo va a buscar.
+   */
+  {
+    ambito: 'proyecto',
+    texto:
+      'Usa "QUE SE PUEDE HACER EN PRAXIS": si lo que piden dice LE FALTA «X», di en una ' +
+      'frase que para eso necesita el permiso «X» y que se lo pida a quien administra el ' +
+      'proyecto; si dice LO HACE A MANO, di donde se hace. Nunca digas que Praxis no lo ' +
+      'permite si esta en esa lista.',
+  },
+
   /* 8 — Predecir sin datos suficientes es el peor resultado posible. */
   {
     ambito: 'proyecto',
@@ -468,16 +485,19 @@ const REGLAS: Regla[] = [
       'Diseno, columna Por hacer"): sin eso no hay forma de comprobar que acertaste.',
   },
 
-  /* 13 — Etiquetas y gráficos: los dos conjuntos cerrados. */
+  /**
+   * 13 — Etiquetas: el conjunto cerrado.
+   *
+   * Hablaba también de `proponer_grafico`, que se retiró en F7 de
+   * docs/PLAN-PRAX-SEMIAGENTICO.md: el lienzo de Análisis donde caía el gráfico
+   * se archivó con `reports-front` y la tarjeta ya no tenía dónde ponerlo. Los
+   * gráficos se siguen dibujando en la respuesta (regla del formato).
+   */
   {
     ambito: 'proyecto',
     texto:
       'Para clasificar usa solo las etiquetas de "etiquetas", con su id, deduciendo ' +
-      'cual encaja por lo que te cuentan; si ninguna encaja, ninguna. Y los graficos ' +
-      'solo salen de la lista de metricas de "proponer_grafico": no hay metricas a ' +
-      'medida. Si lo que quieren ver no esta, dilo — es mejor que dibujar la mas ' +
-      'parecida con el titulo de la que pidieron. El panel es de esa persona: ' +
-      'anadir un grafico no cambia nada del proyecto.',
+      'cual encaja por lo que te cuentan; si ninguna encaja, ninguna.',
   },
 
   /* 14 — La ventana de datos, para ahorrar media docena de preguntas. */
@@ -745,6 +765,8 @@ export function systemInstruction(
   herramientas: string[] = [],
   chat: { autor: string; texto: string; cuando: string }[] = [],
   quienPregunta?: { userId: string; nombre: string },
+  /** `catalogoDeCapacidades(permisos)` (D4). Opcional para las pruebas viejas. */
+  catalogo?: string,
 ) {
   return [
     'Eres PRAX, el asistente de PRAXIS (un gestor de proyectos). Conoces este ' +
@@ -773,6 +795,7 @@ export function systemInstruction(
       'ninguna. Esta persona solo puede consultar; no puedes proponer nada.',
     ),
     '',
+    ...(catalogo ? [catalogo, ''] : []),
     /**
      * ⚠️ **Quién está preguntando, dicho explícitamente.**
      *

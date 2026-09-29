@@ -18,6 +18,11 @@
  * revienta al pulsarlo, que es exactamente lo que existe para evitar
  * `permissions/me`. Que la herramienta no entre en la lista significa que el
  * modelo **no puede ni sugerirlo**.
+ *
+ * ⚠️ **El filtro ya no vive aquí**: está en `capabilities.ts` (D4 de
+ * docs/PLAN-PRAX-SEMIAGENTICO.md), que es la única lista de qué herramienta pide
+ * qué permiso y de la que sale también el catálogo del prompt. Aquí quedan las
+ * declaraciones.
  */
 
 import { PROPONER_PLANTILLA } from './template';
@@ -31,7 +36,7 @@ export interface FunctionDeclaration {
 /** Las prioridades del dominio, tal cual las declara el DTO de tarea. */
 const PRIORIDADES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
-const PROPONER_TAREA: FunctionDeclaration = {
+export const PROPONER_TAREA: FunctionDeclaration = {
   name: 'proponer_tarea',
   description:
     'Prepara una propuesta de tarea nueva para que la persona la revise y la acepte. ' +
@@ -104,7 +109,7 @@ const PROPONER_TAREA: FunctionDeclaration = {
   },
 };
 
-const PROPONER_ASIGNACION: FunctionDeclaration = {
+export const PROPONER_ASIGNACION: FunctionDeclaration = {
   name: 'proponer_asignacion',
   description:
     'Prepara una propuesta para cambiar quien lleva una tarea que YA existe. NO la ' +
@@ -139,7 +144,7 @@ const PROPONER_ASIGNACION: FunctionDeclaration = {
   },
 };
 
-const PROPONER_EDICION: FunctionDeclaration = {
+export const PROPONER_EDICION: FunctionDeclaration = {
   name: 'proponer_edicion',
   description:
     'Prepara una propuesta para cambiar los datos de una tarea que YA existe: ' +
@@ -181,7 +186,7 @@ const PROPONER_EDICION: FunctionDeclaration = {
   },
 };
 
-const PROPONER_MOVIMIENTO: FunctionDeclaration = {
+export const PROPONER_MOVIMIENTO: FunctionDeclaration = {
   name: 'proponer_movimiento',
   description:
     'Prepara una propuesta para mover una tarea a otra columna del tablero. NO la ' +
@@ -213,7 +218,7 @@ const PROPONER_MOVIMIENTO: FunctionDeclaration = {
   },
 };
 
-const PROPONER_CHECKLIST: FunctionDeclaration = {
+export const PROPONER_CHECKLIST: FunctionDeclaration = {
   name: 'proponer_checklist',
   description:
     'Prepara una propuesta para anadir pasos al checklist de una tarea que YA ' +
@@ -242,7 +247,7 @@ const PROPONER_CHECKLIST: FunctionDeclaration = {
   },
 };
 
-const PROPONER_COMENTARIO: FunctionDeclaration = {
+export const PROPONER_COMENTARIO: FunctionDeclaration = {
   name: 'proponer_comentario',
   description:
     'Prepara una propuesta de comentario en una tarea que YA existe. NO lo ' +
@@ -283,7 +288,7 @@ const PROPONER_COMENTARIO: FunctionDeclaration = {
  * Cuelga de `canComment` por lo mismo que el chat: es el permiso de participar
  * en una conversación sin poder editar el trabajo de nadie.
  */
-const PROPONER_MENSAJE: FunctionDeclaration = {
+export const PROPONER_MENSAJE: FunctionDeclaration = {
   name: 'proponer_mensaje',
   description:
     'Prepara un mensaje para el chat del equipo de ESTE proyecto. NO lo envia: ' +
@@ -324,7 +329,7 @@ const PROPONER_MENSAJE: FunctionDeclaration = {
  * Es la contrapartida natural de tener los pasos en el contexto: sin esto, el
  * asistente puede decir «te faltan dos pasos» y no puede hacer nada al respecto.
  */
-const PROPONER_MARCAR_PASOS: FunctionDeclaration = {
+export const PROPONER_MARCAR_PASOS: FunctionDeclaration = {
   name: 'proponer_marcar_pasos',
   description:
     'Prepara una propuesta para marcar como HECHOS uno o varios pasos del ' +
@@ -352,110 +357,6 @@ const PROPONER_MARCAR_PASOS: FunctionDeclaration = {
       },
     },
     required: ['taskId', 'itemIds', 'porQue'],
-  },
-};
-
-/**
- * Añadir un gráfico al lienzo de Análisis de quien pregunta.
- *
- * ## Es la única que no escribe en el proyecto
- *
- * Las otras ocho proponen tocar el tablero. Esta propone tocar **el lienzo de
- * quien está hablando**, que es suyo y de nadie más: aceptar no cambia ni una
- * tarea, ni un comentario, ni lo que ve ningún compañero. Por eso cuelga de
- * `canViewReports`, el permiso que ya hizo falta para llegar al asistente, y no
- * de ninguno de escritura — no hay ninguno que conceder porque no hay nada
- * ajeno que escribir.
- *
- * Sigue llegando **como propuesta con su tarjeta**, igual que las demás. No es
- * una formalidad: un gráfico que apareciera solo en la pantalla de alguien es
- * exactamente la clase de cosa que hace desconfiar de un asistente, por
- * inofensiva que sea.
- *
- * ## Lo que el modelo elige, y lo que no
- *
- * Elige **de un conjunto cerrado**: forma, métrica, recorte y rango. No escribe
- * consultas, no escribe código y no produce ni una cifra — los números salen de
- * los agregados que `reports-service` ya calcula, exactamente los mismos que
- * alimentan los gráficos del catálogo.
- *
- * Es la línea de la regla 1 del prompt aplicada a los gráficos: **inventar el
- * dato de partida está prohibido**. Un `SELECT` redactado por un modelo, o unas
- * cifras estimadas «para ilustrar», serían justo eso, y se leerían con la misma
- * autoridad que los medidos. `validarGrafico` rechaza además las combinaciones
- * que no se sostienen —una serie temporal pedida como dona, un rango sobre una
- * foto del momento—, porque un conjunto cerrado que admite combinaciones sin
- * sentido no es un conjunto cerrado.
- */
-const PROPONER_GRAFICO: FunctionDeclaration = {
-  name: 'proponer_grafico',
-  description:
-    'Prepara un grafico para anadirlo al panel de Analisis de quien te habla. NO lo ' +
-    'anade: tiene que aceptarlo. El panel es SUYO y de nadie mas, asi que esto no ' +
-    'cambia nada del proyecto ni lo ve el resto del equipo. Elige SOLO de las ' +
-    'opciones de abajo: no puedes inventar una metrica, ni calcular tu los numeros, ' +
-    'ni pedir un corte que no este en la lista. Usalo cuando te pidan ver algo de una ' +
-    'forma concreta, o cuando lo que estas explicando se entienda mejor mirandolo.',
-  parameters: {
-    type: 'OBJECT',
-    properties: {
-      metrica: {
-        type: 'STRING',
-        enum: [
-          'tareas_por_columna',
-          'tareas_por_prioridad',
-          'tareas_por_etiqueta',
-          'carga_por_persona',
-          'cerradas_por_persona',
-          'vencidas_por_persona',
-          'paradas_por_columna',
-          'flujo_por_columna',
-          'cierres_por_semana',
-          'creadas_por_semana',
-        ],
-        description:
-          'Que se cuenta. Las cuatro primeras y "paradas_por_columna" son una foto ' +
-          'del momento; las tres ultimas son una evolucion en el tiempo.',
-      },
-      forma: {
-        type: 'STRING',
-        enum: ['barras', 'barras_horizontales', 'dona', 'lineas', 'area_apilada'],
-        description:
-          'Como se dibuja. Las metricas de foto admiten barras, barras_horizontales ' +
-          'y dona. "flujo_por_columna" solo lineas o area_apilada. Las semanales ' +
-          'admiten lineas, area_apilada y barras. Pedir otra combinacion se rechaza.',
-      },
-      dias: {
-        type: 'INTEGER',
-        description:
-          'Opcional, de 1 a 365. SOLO para "paradas_por_columna" (ahi es el umbral: ' +
-          'cuantos dias sin moverse), "flujo_por_columna" y las semanales. En las de ' +
-          'foto NO se puede: cuentan lo que hay ahora, no un periodo.',
-      },
-      soloVencidas: {
-        type: 'BOOLEAN',
-        description: 'Opcional. SOLO para "paradas_por_columna". En el resto se rechaza.',
-      },
-      topN: {
-        type: 'INTEGER',
-        description:
-          'Opcional, de 2 a 20. Quedarse con las N mayores y agrupar el resto en ' +
-          '"Otras". Solo para etiquetas y personas, que son las que pueden ser muchas.',
-      },
-      titulo: {
-        type: 'STRING',
-        description:
-          'Como se llamara la tarjeta. Corto y en el idioma de la conversacion. ' +
-          'Maximo 80 caracteres. Que diga QUE se ve, no "Grafico 1".',
-      },
-      porQue: {
-        type: 'STRING',
-        description:
-          'Obligatorio. Una frase sobre que pregunta responde este grafico y por que ' +
-          'esa forma. La tarjeta lo enseña junto a la propuesta.',
-      },
-    },
-    required: ['metrica', 'forma', 'titulo', 'porQue'],
   },
 };
 
@@ -488,7 +389,7 @@ const PROPONER_GRAFICO: FunctionDeclaration = {
  * - y la tarjeta es destructiva a la vista, con su propia confirmación. Ver
  *   `DeleteProposalCard`.
  */
-const PROPONER_BORRADO: FunctionDeclaration = {
+export const PROPONER_BORRADO: FunctionDeclaration = {
   name: 'proponer_borrado',
   description:
     'Prepara una propuesta para BORRAR una tarea. NO la borra: la persona tiene que ' +
@@ -548,7 +449,7 @@ const COLORES_DE_COLUMNA = ['primary', 'accent', 'info', 'warning', 'error', 'su
  * columnas no sirve para nada: aceptar dos tarjetas para tener algo utilizable
  * es partir una decisión que es una sola.
  */
-const PROPONER_TABLERO: FunctionDeclaration = {
+export const PROPONER_TABLERO: FunctionDeclaration = {
   name: 'proponer_tablero',
   description:
     'Prepara la propuesta de un tablero nuevo con sus columnas. NO lo crea: la ' +
@@ -626,7 +527,7 @@ const PROPONER_TABLERO: FunctionDeclaration = {
  * escribiendo, ni para pedir confirmación de algo que ya va a salir como
  * propuesta con su propio botón.
  */
-const PROPONER_PREGUNTA: FunctionDeclaration = {
+export const PROPONER_PREGUNTA: FunctionDeclaration = {
   name: 'proponer_pregunta',
   description:
     'Hazle una o varias preguntas a la persona con opciones que pueda PULSAR en vez ' +
@@ -704,7 +605,7 @@ const PROPONER_PREGUNTA: FunctionDeclaration = {
  * ocurre una vez y es definitivo, exactamente como cuando se elige en la
  * pantalla de arranque.
  */
-const PROPONER_ABRIR_PROYECTO: FunctionDeclaration = {
+export const PROPONER_ABRIR_PROYECTO: FunctionDeclaration = {
   name: 'proponer_abrir_proyecto',
   description:
     'Ofrece cargar uno de los proyectos de la persona para poder hablar de el con ' +
@@ -751,72 +652,6 @@ export function herramientasSinProyecto(): FunctionDeclaration[] {
 }
 
 /**
- * Las herramientas que le tocan a esta persona.
- *
- * `canEditTask` implica `canMoveTask` y demás por jerarquía, y el mapa que llega
- * del gateway viene **ya expandido** (`project_effective_permissions`), así que
- * aquí se leen las claves tal cual sin volver a razonar la jerarquía.
- *
- * Devolver un array vacío es válido y es lo que le pasa a un rol de solo
- * lectura: el asistente responde preguntas y no propone nada.
- */
-export function herramientasPara(permisos: Record<string, boolean>): FunctionDeclaration[] {
-  /**
-   * Preguntar **no depende de ningún permiso**, y es la única así.
-   *
-   * Las demás preparan un cambio, así que se filtran por lo que esa persona
-   * puede hacer. Esta solo pide un dato: negársela a un rol de solo lectura
-   * dejaría al asistente sin forma de desambiguar justo con quien más falta hace
-   * —quien no puede tocar nada solo puede preguntar— y le obligaría a adivinar.
-   */
-  const tools: FunctionDeclaration[] = [PROPONER_PREGUNTA];
-  if (permisos.canCreateTask) tools.push(PROPONER_TAREA);
-  if (permisos.canEditTask) tools.push(PROPONER_ASIGNACION, PROPONER_EDICION, PROPONER_CHECKLIST);
-  /**
-   * Mover cuelga de `canMoveTask` y no de `canEditTask`, igual que su endpoint.
-   *
-   * Es la **única herramienta que alcanza a un colaborador**: quien ejecuta el
-   * trabajo puede decir que lo terminó sin poder redefinir en qué consistía, y
-   * eso vale también cuando lo pide por el chat. Como `canEditTask` implica
-   * `canMoveTask` por jerarquía, quien edita la recibe igual sin repetirla
-   * arriba.
-   */
-  if (permisos.canMoveTask) tools.push(PROPONER_MOVIMIENTO, PROPONER_MARCAR_PASOS);
-  if (permisos.canComment) tools.push(PROPONER_COMENTARIO, PROPONER_MENSAJE);
-  /**
-   * El gráfico va con `canViewReports`, que **lo tiene todo el que llega aquí**
-   * desde §29.1: las dos rutas del asistente lo exigen. No es una comprobación
-   * de adorno — es la que dice de qué permiso depende esta capacidad el día que
-   * alguien abra otra puerta al asistente, igual que `incluirPersonas` se dejó
-   * puesta por eso mismo.
-   *
-   * Y es la única que le queda a un rol de solo lectura, que hasta ahora no
-   * podía proponer absolutamente nada. Tiene sentido que sea justo esta: mirar
-   * los datos de otra forma no es tocar el trabajo de nadie.
-   */
-  if (permisos.canViewReports) tools.push(PROPONER_GRAFICO);
-  /**
-   * El borrado cuelga de `canDeleteTask`, igual que su endpoint.
-   *
-   * ⚠️ **Y va aparte, no colgado de `canEditTask`.** `canDeleteTask` sí implica
-   * `canEditTask`, `canMoveTask`, `canComment` y `canCreateTask` por jerarquía,
-   * así que quien llega aquí ya tiene todas las demás. Lo que no pasa al revés:
-   * quien edita **no** borra.
-   */
-  if (permisos.canDeleteTask) tools.push(PROPONER_BORRADO);
-  /**
-   * El tablero pide `canCreateBoard` **y** `canCreateColumn`, no uno de los dos.
-   *
-   * Un tablero sin columnas no sirve para nada, así que proponerlo a quien solo
-   * puede lo primero acabaría en una tarjeta que crea un cascarón vacío. Y
-   * `canCreateColumn` no implica `canCreateBoard` ni al revés: son ramas
-   * distintas de la jerarquía, así que hay que exigir las dos.
-   */
-  if (permisos.canCreateBoard && permisos.canCreateColumn) tools.push(PROPONER_TABLERO);
-  return tools;
-}
-
-/**
  * ⚠️ **Aquí hay exactamente UNA herramienta destructiva, y solo una.**
  *
  * Este bloque decía que no había ninguna ni la iba a haber. Cambió el
@@ -843,10 +678,4 @@ export function herramientasPara(permisos: Record<string, boolean>): FunctionDec
  * diferencia está en la interfaz —la tarjeta es destructiva, lleva confirmación
  * propia y dice qué se lleva por delante— y en la descripción de la herramienta,
  * que le prohíbe proponerlo por iniciativa propia.
- *
- * **`proponer_grafico` no es la excepción**, aunque sea la primera que no toca
- * el tablero. Solo **añade** al lienzo de quien habla; no existe la de quitar, y
- * no se va a añadir por lo mismo que las demás: quitar un gráfico es un clic en
- * su aspa, y darle al asistente la capacidad de vaciarle el panel a alguien solo
- * abre una forma de que se lo vacíe sin querer.
  */

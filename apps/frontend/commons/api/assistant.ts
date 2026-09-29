@@ -199,30 +199,6 @@ export interface CheckStepsProposal extends SobreTarea {
 }
 
 /**
- * `proponer_grafico`. Un gráfico para **el lienzo de quien acepta**.
- *
- * ⚠️ **La única propuesta que no toca el proyecto.** Aceptarla no cambia
- * ninguna tarea, ningún comentario y nada de lo que ve el resto del equipo: el
- * lienzo de Análisis es de cada persona. La tarjeta lo dice, porque «el
- * asistente quiere añadir algo» se lee peor de lo que es.
- *
- * `grafico` viene **ya validado contra el conjunto cerrado** por el servicio, y
- * se vuelve a validar en el gateway al guardarlo. El modelo eligió la forma y la
- * métrica; los números salen de los agregados de siempre.
- */
-export interface ChartProposal {
-  grafico: {
-    forma: string;
-    metrica: string;
-    dias?: number;
-    soloVencidas?: boolean;
-    topN?: number;
-    titulo: string;
-  };
-  porQue?: string;
-}
-
-/**
  * `proponer_pregunta`. **La única propuesta que no propone ningún cambio.**
  *
  * Las otras diez preparan algo que se acepta o se descarta; esta es una
@@ -545,16 +521,6 @@ export function isCheckStepsProposal(
   propuesta: AssistantProposal,
 ): propuesta is AssistantProposal & { args: CheckStepsProposal } {
   return propuesta.tool === 'proponer_marcar_pasos' && Array.isArray(propuesta.args.itemIds);
-}
-
-export function isChartProposal(
-  propuesta: AssistantProposal,
-): propuesta is AssistantProposal & { args: ChartProposal } {
-  return (
-    propuesta.tool === 'proponer_grafico' &&
-    typeof propuesta.args.grafico === 'object' &&
-    propuesta.args.grafico !== null
-  );
 }
 
 export function isMessageProposal(

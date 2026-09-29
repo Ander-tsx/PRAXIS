@@ -15,10 +15,7 @@ import {
   QUOTA_EXCEEDED_CODE,
   type QuotaExceededDetails,
   QuotaKind,
-  type ReportChartShape,
-  type ReportMetric,
   tokensPrax,
-  validarGrafico,
 } from '@praxis/contracts';
 import { opcionesDeCliente } from '@praxis/local-transport';
 import { Observable, firstValueFrom } from 'rxjs';
@@ -37,7 +34,8 @@ import { instruccionSinProyecto, systemInstruction } from './prompt';
 import { QuotaService } from './quota.service';
 import { RouterDeContexto } from './router';
 import { PROPONER_PLANTILLA, instruccionDePlantilla, validarPlantilla } from './template';
-import { herramientasPara, herramientasSinProyecto } from './tools';
+import { catalogoDeCapacidades, herramientasPara } from './capabilities';
+import { herramientasSinProyecto } from './tools';
 
 /** Lo que el gateway manda en cada turno. Todo lo de permisos llega resuelto. */
 interface ChatPayload {
@@ -163,7 +161,6 @@ const NOMBRE_DE_PROPUESTA: Record<string, string> = {
   proponer_marcar_pasos: 'dar unos pasos por hechos',
   proponer_comentario: 'un comentario',
   proponer_mensaje: 'un mensaje para el equipo',
-  proponer_grafico: 'un grafico para tu panel',
   proponer_borrado: 'borrar una tarea',
   proponer_tablero: 'un tablero con sus columnas',
   proponer_abrir_proyecto: 'abrir uno de tus proyectos',
@@ -439,6 +436,7 @@ export class AssistantService {
           herramientas.map((herramienta) => herramienta.name),
           payload.chat ?? [],
           quienPregunta,
+          catalogoDeCapacidades(payload.permisos),
         )
       : instruccionSinProyecto(
           payload.proyectos ?? [],
@@ -1347,49 +1345,6 @@ export class AssistantService {
           items: (tarea.pasos ?? [])
             .filter((paso) => itemIds.includes(paso.id))
             .map((paso) => paso.texto),
-          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
-        },
-      };
-    }
-
-    /**
-     * Un gráfico para el lienzo de quien pregunta.
-     *
-     * ⚠️ **Aquí es donde se cierra el conjunto cerrado.** El `enum` que se le
-     * declara a Gemini es una sugerencia con muy buena tasa de acierto, no una
-     * garantía: nada impide que devuelva una métrica inventada o una
-     * combinación que no se puede dibujar. `validarGrafico` es la comprobación
-     * de verdad, y es la **misma función** que aplica el DTO del gateway al
-     * guardar el lienzo — dos puertas, una sola definición de qué es válido.
-     *
-     * Cuando no pasa se descarta la propuesta y se registra el motivo. No se
-     * «arregla» cayendo a una forma que sí valga, al contrario que
-     * `proponer_tarea` con su columna: ahí el destino es un matiz de algo que
-     * se pidió, aquí la forma **es** lo que se pidió, y dibujar otra cosa
-     * distinta de la que dice la tarjeta sería mentir en la propia tarjeta.
-     */
-    if (call.name === 'proponer_grafico') {
-      const grafico = {
-        forma: String(call.args.forma ?? '') as ReportChartShape,
-        metrica: String(call.args.metrica ?? '') as ReportMetric,
-        ...(Number.isInteger(call.args.dias) ? { dias: Number(call.args.dias) } : {}),
-        ...(call.args.soloVencidas === true ? { soloVencidas: true } : {}),
-        ...(Number.isInteger(call.args.topN) ? { topN: Number(call.args.topN) } : {}),
-        titulo: String(call.args.titulo ?? '')
-          .trim()
-          .slice(0, 80),
-      };
-
-      const problema = validarGrafico(grafico);
-      if (problema) {
-        this.log.warn(`El modelo propuso un grafico que no se puede dibujar: ${problema}`);
-        return null;
-      }
-
-      return {
-        tool: call.name,
-        args: {
-          grafico,
           ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
         },
       };
