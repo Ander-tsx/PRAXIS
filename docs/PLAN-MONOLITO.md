@@ -344,3 +344,9 @@ Las sesiones abiertas siguen valiendo, porque `JWT_SECRET` no cambia.
     `CONFIG SET tcp-keepalive 0` en su Redis al arrancar, y cada despertar es un
     arranque. Si Railway no deja usar `CONFIG`, se avisa en el log y todo sigue
     igual, sin dormir.
+- **2026-09-29, 14:35 UTC** — **El primer arreglo de Redis no bastó.** El
+  `CONFIG SET tcp-keepalive 0` salió bien a las 11:37, pero a las 14:28 Redis
+  seguía sondeando las mismas conexiones cada 5 minutos. **Redis aplica
+  `tcp-keepalive` al aceptar cada conexión**, y el monolito lo cambiaba al final
+  del arranque, con los ocho servicios ya conectados. Ahora es lo primero que
+  hace `arrancar()`, antes de cargar ningún servicio.

@@ -36,6 +36,12 @@ const SERVICIOS = [
 ] as const;
 
 async function arrancar(): Promise<void> {
+  /* Lo primero, antes de que ningún servicio conecte (docs/PLAN-MONOLITO.md,
+     M-K). Redis aplica `tcp-keepalive` al **aceptar** cada conexión: hecho
+     después, las que ya estaban abiertas seguían sondeadas cada 5 minutos y
+     Railway no dormía el servicio. Pasó en el primer despliegue de esto. */
+  await quitarSondeoDeRedis(process.env.REDIS_URL);
+
   const { LocalClient, LocalServer } = require('@praxis/local-transport') as typeof Transporte;
 
   const servicios: { nombre: string; app: INestMicroservice }[] = [];
@@ -77,10 +83,6 @@ async function arrancar(): Promise<void> {
   console.log(
     `[monolito] ${servicios.length} servicios, collab y gateway en un proceso · ${schemasEnUso()}`,
   );
-
-  /* Sin esto, Redis sondea cada conexión cada 5 minutos y Railway no duerme el
-     servicio nunca (docs/PLAN-MONOLITO.md, M-K). */
-  await quitarSondeoDeRedis(process.env.REDIS_URL);
 
   /*
    * El apagado lo lleva el monolito, no cada contexto. `enableShutdownHooks` en

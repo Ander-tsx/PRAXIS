@@ -26,6 +26,12 @@ import Redis from 'ioredis';
  * no importa: su único cliente es este proceso, y cuando muere se lleva todas
  * las conexiones con él.
  *
+ * 🔴 **Tiene que ir antes de que conecte nadie.** Redis aplica `tcp-keepalive`
+ * a cada socket **al aceptarlo**, no a los que ya tiene. La primera versión lo
+ * hacía al final del arranque, con los ocho servicios ya conectados: el `CONFIG`
+ * salía bien, el log lo celebraba y las conexiones abiertas seguían sondeadas
+ * cada 5 minutos (medido en Railway el 2026-09-29).
+ *
  * ⚠️ Si Railway no deja usar `CONFIG`, se avisa y se sigue. El backend funciona
  * igual; solo que no se dormirá.
  */
