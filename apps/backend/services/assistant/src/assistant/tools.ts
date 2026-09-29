@@ -148,7 +148,7 @@ export const PROPONER_EDICION: FunctionDeclaration = {
   name: 'proponer_edicion',
   description:
     'Prepara una propuesta para cambiar los datos de una tarea que YA existe: ' +
-    'titulo, descripcion, prioridad, fecha limite o etiquetas. NO la cambia: la ' +
+    'titulo, descripcion, prioridad, fecha limite, etiquetas o puntos. NO la cambia: la ' +
     'persona tiene que aceptarla. Manda SOLO los campos que cambian; lo que no ' +
     'mandes se queda como esta. Para cambiar de columna usa proponer_movimiento, ' +
     'y para cambiar encargados usa proponer_asignacion.',
@@ -174,6 +174,12 @@ export const PROPONER_EDICION: FunctionDeclaration = {
         description:
           'Opcional. La lista COMPLETA de etiquetas que quedan, no solo las que ' +
           'anades: lo que mandes sustituye a las que tuviera. id de "etiquetas".',
+      },
+      puntos: {
+        type: 'INTEGER',
+        description:
+          'Opcional. Estimacion en puntos, de 0 a 999, para tableros con Scrum. Solo si ' +
+          'te la piden o la razonas con tareas parecidas ya estimadas; nunca al azar.',
       },
       porQue: {
         type: 'STRING',
@@ -417,6 +423,84 @@ export const PROPONER_BORRADO: FunctionDeclaration = {
       },
     },
     required: ['taskId', 'porQue'],
+  },
+};
+
+/**
+ * Los sprints (D16 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+ *
+ * Tres propuestas y ninguna para **cerrar**: cerrar un sprint obliga a decidir
+ * qué pasa con cada tarea sin terminar (D6 de PLAN-SCRUM-KANBAN), y esa
+ * decisión, tarea a tarea, es justo lo que una tarjeta no puede recoger bien.
+ * PRAX puede ayudar a pensarla; se cierra desde la franja del sprint.
+ *
+ * Todas cuelgan de `canManageSprint`, que es lo que piden sus endpoints. Los ids
+ * de sprint no están en el briefing: salen de `consultar_sprints`, y la
+ * validación solo acepta los que esa consulta enseñó en el mismo turno.
+ */
+export const PROPONER_SPRINT: FunctionDeclaration = {
+  name: 'proponer_sprint',
+  description:
+    'Prepara un sprint NUEVO, planeado y sin empezar, en un tablero con Scrum. NO lo ' +
+    'crea: la persona lo acepta. Para empezarlo despues usa proponer_iniciar_sprint.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      tableroId: {
+        type: 'STRING',
+        description: 'id de un tablero de "tableros" que traiga "scrum".',
+      },
+      nombre: { type: 'STRING', description: 'De 2 a 100 caracteres ("Sprint 4").' },
+      meta: { type: 'STRING', description: 'Opcional. Que se quiere conseguir, en una frase.' },
+      porQue: { type: 'STRING', description: 'Obligatorio. Por que este sprint ahora.' },
+    },
+    required: ['tableroId', 'nombre', 'porQue'],
+  },
+};
+
+export const PROPONER_INICIAR_SPRINT: FunctionDeclaration = {
+  name: 'proponer_iniciar_sprint',
+  description:
+    'Prepara la propuesta de EMPEZAR un sprint planeado, con sus fechas. NO lo empieza: ' +
+    'la persona lo acepta. Solo sprints en estado PLANNED vistos con consultar_sprints, ' +
+    'y solo si el tablero no tiene ya uno ACTIVE.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      sprintId: { type: 'STRING', description: 'id de un sprint PLANNED de consultar_sprints.' },
+      desde: { type: 'STRING', description: 'Fecha de inicio, YYYY-MM-DD. Normalmente hoy.' },
+      hasta: {
+        type: 'STRING',
+        description: 'Fecha de fin, YYYY-MM-DD, posterior a "desde". Si no la dan, pregunta.',
+      },
+      porQue: { type: 'STRING', description: 'Obligatorio. Una frase.' },
+    },
+    required: ['sprintId', 'desde', 'hasta', 'porQue'],
+  },
+};
+
+export const PROPONER_PLANIFICACION: FunctionDeclaration = {
+  name: 'proponer_planificacion',
+  description:
+    'Prepara la propuesta de METER tareas del backlog en un sprint, o de DEVOLVER tareas ' +
+    'de un sprint al backlog. NO las mueve: la persona lo acepta. Ids de tarea y de ' +
+    'sprint sacados de consultar_sprints. Al planear, compara lo que metes con ' +
+    '"velocidadMedia" y dilo en el texto.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      sprintId: {
+        type: 'STRING',
+        description: 'id del sprint destino (PLANNED o ACTIVE). Vacio si las devuelves al backlog.',
+      },
+      taskIds: {
+        type: 'ARRAY',
+        items: { type: 'STRING' },
+        description: 'De 1 a 30 ids de tarea, todas del mismo tablero que el sprint.',
+      },
+      porQue: { type: 'STRING', description: 'Obligatorio. Por que estas y no otras.' },
+    },
+    required: ['taskIds', 'porQue'],
   },
 };
 

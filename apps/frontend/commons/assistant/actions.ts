@@ -13,6 +13,9 @@ import type {
   EditProposal,
   FullConversation,
   MoveProposal,
+  PlanningProposal,
+  SprintProposal,
+  StartSprintProposal,
   TaskProposal,
 } from '../api/assistant';
 import type {
@@ -582,6 +585,16 @@ export async function aceptarEdicionAction(
   if (propuesta.priority !== undefined) cuerpo.priority = propuesta.priority;
   if (propuesta.dueDate !== undefined) cuerpo.dueDate = toIsoDueDate(propuesta.dueDate);
   if (propuesta.labelIds !== undefined) cuerpo.labelIds = propuesta.labelIds;
+  if (propuesta.estimatePoints !== undefined) {
+    if (
+      !Number.isInteger(propuesta.estimatePoints) ||
+      propuesta.estimatePoints < 0 ||
+      propuesta.estimatePoints > 999
+    ) {
+      return { error: 'Los puntos tienen que ser un entero de 0 a 999.', hecha: null };
+    }
+    cuerpo.estimatePoints = propuesta.estimatePoints;
+  }
 
   if (Object.keys(cuerpo).length === 0) {
     return { error: 'La propuesta no cambia nada.', hecha: null };
@@ -987,6 +1000,153 @@ export async function aceptarTableroAction(
 }
 
 /**
+ * El tablero es de este proyecto y tiene Scrum.
+ *
+ * Mismo motivo que `tareaDelProyecto`: la propuesta ha pasado por el navegador,
+ * y un id de otro proyecto daría un 403 que se leería como falta de permisos.
+ */
+async function tableroConScrum(
+  api: NonNullable<Awaited<ReturnType<typeof requireApi>>>,
+  projectId: string,
+  tableroId: string,
+): Promise<{ tablero: Board } | { error: string }> {
+  const proyecto = await api.get<ProjectDetail>(`/projects/${projectId}`).catch(() => null);
+  const tablero = (proyecto?.workspaces ?? [])
+    .flatMap((espacio) => espacio.boards ?? [])
+    .find((candidato) => candidato.id === tableroId);
+  if (!tablero) return { error: 'Ese tablero ya no existe en este proyecto.' };
+  if (!tablero.scrumEnabled) return { error: 'Ese tablero ya no trabaja con sprints.' };
+  return { tablero };
+}
+
+/**
+ * Un sprint nuevo, planeado y sin fechas.
+ *
+ * `POST /boards/:id/sprints`, que pide `canManageSprint` — el mismo que el «+»
+ * de la franja del sprint.
+ */
+export async function aceptarSprintAction(
+  projectId: string,
+  propuesta: SprintProposal,
+): Promise<{ error: string | null; hecho: string | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', hecho: null };
+
+  const nombre = String(propuesta.nombre ?? '').trim();
+  if (nombre.length < 2 || nombre.length > 100) {
+    return { error: 'El nombre tiene que tener entre 2 y 100 caracteres.', hecho: null };
+  }
+  const encontrado = await tableroConScrum(api, projectId, String(propuesta.tableroId ?? ''));
+  if ('error' in encontrado) return { error: encontrado.error, hecho: null };
+
+  try {
+    const meta = propuesta.meta?.trim();
+    const creado = await api.post<{ id: string; name: string }>(
+      `/boards/${encontrado.tablero.id}/sprints`,
+      { name: nombre, ...(meta ? { goal: meta.slice(0, 500) } : {}) },
+    );
+    if (!creado?.id) return { error: 'El servidor no guardó el sprint.', hecho: null };
+    return { error: null, hecho: `Se creó «${creado.name}» en ${encontrado.tablero.name}.` };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo crear el sprint.'), hecho: null };
+  }
+}
+
+/**
+ * Empezar un sprint planeado con sus fechas.
+ *
+ * `POST /boards/:id/sprints/:sprintId/start`. El gateway rechaza empezarlo si el
+ * tablero ya tiene uno en curso; el mensaje llega tal cual.
+ */
+export async function aceptarInicioSprintAction(
+  projectId: string,
+  propuesta: StartSprintProposal,
+  /** `getTimezoneOffset()` del navegador: el día empieza y acaba en SU hora. */
+  tzOffset = 0,
+): Promise<{ error: string | null; hecho: string | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', hecho: null };
+
+  const desde = String(propuesta.desde ?? '');
+  const hasta = String(propuesta.hasta ?? '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta) || hasta <= desde) {
+    return { error: 'Las fechas del sprint no son válidas.', hecho: null };
+  }
+  const encontrado = await tableroConScrum(api, projectId, String(propuesta.tableroId ?? ''));
+  if ('error' in encontrado) return { error: encontrado.error, hecho: null };
+
+  try {
+    const empezado = await api.post<{ id: string; status: string; name: string }>(
+      `/boards/${encontrado.tablero.id}/sprints/${propuesta.sprintId}/start`,
+      /* Igual que `fechasDelFormulario` de la franja del sprint: principio y
+         final del día en la hora de quien acepta, no en la del servidor. */
+      {
+        startDate: diaAIso(desde, '00:00:00.000', tzOffset),
+        endDate: diaAIso(hasta, '23:59:59.999', tzOffset),
+      },
+    );
+    /* Contra el `data`: el estado tiene que haber cambiado de verdad. */
+    if (empezado?.status !== 'ACTIVE') {
+      return { error: 'El servidor no empezó el sprint.', hecho: null };
+    }
+    return { error: null, hecho: `«${empezado.name}» está en curso.` };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo empezar el sprint.'), hecho: null };
+  }
+}
+
+/**
+ * Repartir tareas entre backlog y sprint.
+ *
+ * - **Al sprint**: `POST /boards/:id/sprints/:sprintId/tasks`, en bloque y con
+ *   `canManageSprint`, que es como lo hace el panel Backlog.
+ * - **Al backlog**: `PATCH /tasks/:id` con `sprintId: null`, una a una, como
+ *   «devolver al backlog» desde el tablero. Si alguna falla, se dice cuáles.
+ */
+export async function aceptarPlanificacionAction(
+  projectId: string,
+  propuesta: PlanningProposal,
+): Promise<{ error: string | null; hecho: string | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', hecho: null };
+
+  const taskIds = (Array.isArray(propuesta.taskIds) ? propuesta.taskIds : []).map(String);
+  if (taskIds.length === 0) return { error: 'La propuesta no trae tareas.', hecho: null };
+  const encontrado = await tableroConScrum(api, projectId, String(propuesta.tableroId ?? ''));
+  if ('error' in encontrado) return { error: encontrado.error, hecho: null };
+
+  try {
+    if (propuesta.sprintId) {
+      await api.post(`/boards/${encontrado.tablero.id}/sprints/${propuesta.sprintId}/tasks`, {
+        taskIds,
+      });
+      return {
+        error: null,
+        hecho: `${taskIds.length} ${taskIds.length === 1 ? 'tarea entró' : 'tareas entraron'} en «${propuesta.sprint ?? 'el sprint'}».`,
+      };
+    }
+
+    const fallidas: string[] = [];
+    for (const id of taskIds) {
+      const guardada = await api.patch<Task>(`/tasks/${id}`, { sprintId: null }).catch(() => null);
+      if (!guardada?.id || guardada.projectId !== projectId) fallidas.push(id);
+    }
+    if (fallidas.length === taskIds.length) {
+      return { error: 'No se pudo devolver ninguna tarea al backlog.', hecho: null };
+    }
+    const vueltas = taskIds.length - fallidas.length;
+    return {
+      error: null,
+      hecho:
+        `${vueltas} ${vueltas === 1 ? 'tarea volvió' : 'tareas volvieron'} al backlog.` +
+        (fallidas.length > 0 ? ` ${fallidas.length} no se pudieron mover.` : ''),
+    };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo repartir las tareas.'), hecho: null };
+  }
+}
+
+/**
  * Enviar un mensaje al chat del equipo.
  *
  * Va a `POST /projects/:id/chat/messages`, que pide `canComment` — el mismo
@@ -1065,6 +1225,10 @@ export async function aceptarPlantillaAction(plantilla: ProjectTemplate): Promis
  * Igual que en el tablero: una fecha de vencimiento se cumple **durante** el día,
  * no a las 00:00. Sin esto, «para el viernes» vence el jueves por la noche.
  */
+function diaAIso(dia: string, hora: string, tzOffset: number): string {
+  return new Date(new Date(`${dia}T${hora}Z`).getTime() + tzOffset * 60_000).toISOString();
+}
+
 function toIsoDueDate(value: string): string {
   const [year = 0, month = 1, day = 1] = value.split('-').map(Number);
   return new Date(year, month - 1, day, 23, 59, 59).toISOString();

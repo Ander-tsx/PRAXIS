@@ -109,7 +109,34 @@ export const CONSULTAR_ANALISIS: FunctionDeclaration = {
   },
 };
 
-export const HERRAMIENTAS_DE_CONSULTA = [CONSULTAR_TAREAS, CONSULTAR_TAREA, CONSULTAR_ANALISIS];
+/** Tareas del backlog de un tablero que se devuelven como mucho. */
+const CONSULTA_MAX_BACKLOG = 30;
+
+export const CONSULTAR_SPRINTS: FunctionDeclaration = {
+  name: 'consultar_sprints',
+  description:
+    'LEE los sprints y el backlog de los tableros con Scrum de un proyecto: cada sprint con ' +
+    'su id, estado (PLANNED, ACTIVE, CLOSED), meta y fechas, y las tareas del backlog con ' +
+    'sus puntos. No cambia nada. Usala antes de proponer crear o iniciar un sprint o ' +
+    `repartir tareas entre backlog y sprint. Del backlog devuelve como mucho ${CONSULTA_MAX_BACKLOG}.`,
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      proyectoId: {
+        type: 'STRING',
+        description: 'id del proyecto. Sin el, el proyecto de la conversacion.',
+      },
+      tableroId: { type: 'STRING', description: 'Opcional. Solo ese tablero.' },
+    },
+  },
+};
+
+export const HERRAMIENTAS_DE_CONSULTA = [
+  CONSULTAR_TAREAS,
+  CONSULTAR_TAREA,
+  CONSULTAR_ANALISIS,
+  CONSULTAR_SPRINTS,
+];
 const NOMBRES = new Set(HERRAMIENTAS_DE_CONSULTA.map((h) => h.name));
 
 export function esConsulta(nombre: string): boolean {
@@ -135,6 +162,17 @@ export interface AmbitoDeConsulta {
    * porque las propuestas se ejecutan con los permisos de ese proyecto.
    */
   vistas?: Map<string, TareaVista>;
+  /** Los sprints **del foco** que ha visto el modelo, por id. Mismo motivo. */
+  sprintsVistos?: Map<string, SprintVisto>;
+}
+
+/** Lo justo de un sprint visto para validar una propuesta sobre él. */
+export interface SprintVisto {
+  id: string;
+  nombre: string;
+  estado: 'PLANNED' | 'ACTIVE' | 'CLOSED';
+  boardId: string;
+  tablero: string;
 }
 
 /** Lo justo de una tarea vista para validar una propuesta sobre ella. */
@@ -142,6 +180,7 @@ export interface TareaVista {
   id: string;
   titulo: string;
   columnId: string;
+  boardId?: string;
   cerrada: boolean;
   /** Solo si se leyó entera (`consultar_tarea`). */
   pasos?: { id: string; texto: string; hecho: boolean }[];
@@ -150,6 +189,7 @@ export interface TareaVista {
 interface TareaEnLista {
   id: string;
   title: string;
+  boardId?: string;
   description?: string | null;
   columnId: string;
   priority?: string | null;
@@ -164,8 +204,10 @@ export class ConsultasService {
   private readonly tasks: ClientProxy;
   private readonly reports: ClientProxy;
   private readonly credentials: ClientProxy;
+  private readonly projects: ClientProxy;
 
   constructor(config: ConfigService) {
+    this.projects = ClientProxyFactory.create(opcionesDeCliente('PROJECTS', config));
     this.tasks = ClientProxyFactory.create(opcionesDeCliente('TASKS', config));
     this.reports = ClientProxyFactory.create(opcionesDeCliente('REPORTS', config));
     this.credentials = ClientProxyFactory.create(opcionesDeCliente('CREDENTIALS', config));
@@ -175,6 +217,8 @@ export class ConsultasService {
   descripcion(nombre: string, args: Record<string, unknown>, ambito: AmbitoDeConsulta): string {
     const proyecto = this.nombreDeProyecto(args.proyectoId, ambito);
     if (nombre === 'consultar_tarea') return 'Leyendo una tarea';
+    if (nombre === 'consultar_sprints')
+      return `Mirando los sprints${proyecto ? ` de ${proyecto}` : ''}`;
     if (nombre === 'consultar_analisis') {
       return `Consultando el informe «${String(args.informe ?? '')}»${proyecto ? ` de ${proyecto}` : ''}`;
     }
@@ -195,6 +239,7 @@ export class ConsultasService {
       if (nombre === 'consultar_tareas') return await this.tareas(args, ambito);
       if (nombre === 'consultar_tarea') return await this.tarea(args, ambito);
       if (nombre === 'consultar_analisis') return await this.analisis(args, ambito);
+      if (nombre === 'consultar_sprints') return await this.sprints(args, ambito);
       return { error: `No existe la consulta ${nombre}.` };
     } catch (error) {
       this.log.warn(`prax_consulta_fallida ${nombre}: ${(error as Error)?.message ?? error}`);
@@ -276,6 +321,7 @@ export class ConsultasService {
           id: t.id,
           titulo: t.title,
           columnId: t.columnId,
+          ...(t.boardId ? { boardId: t.boardId } : {}),
           cerrada: Boolean(t.completedAt),
         });
       }
@@ -324,6 +370,7 @@ export class ConsultasService {
         id: tarea.id,
         titulo: tarea.title,
         columnId: tarea.columnId,
+        boardId: tarea.boardId,
         cerrada: Boolean(tarea.completedAt),
         pasos,
       });
@@ -363,6 +410,113 @@ export class ConsultasService {
       })),
       comentariosOmitidos: Math.max(0, (tarea.comments ?? []).length - comentarios.length),
     };
+  }
+
+  /**
+   * Los sprints y el backlog de los tableros con Scrum.
+   *
+   * Los tableros salen de `project_find_one`, que es lo que ve la persona en el
+   * proyecto; los sprints, de `sprint_find_by_board` —la misma ruta que la
+   * franja del tablero—, y el backlog de `task_find_all` con `onlyBacklog`.
+   */
+  private async sprints(args: Record<string, unknown>, ambito: AmbitoDeConsulta) {
+    const projectId = this.proyectoPermitido(args.proyectoId, ambito);
+    if (!projectId) return this.sinAcceso();
+
+    const proyecto = await firstValueFrom(
+      this.projects.send<{
+        workspaces?: { boards?: { id: string; name: string; scrumEnabled?: boolean }[] }[];
+      }>({ cmd: 'project_find_one' }, { id: projectId }),
+    );
+    const tableros = (proyecto?.workspaces ?? [])
+      .flatMap((w) => w.boards ?? [])
+      .filter((b) => b.scrumEnabled)
+      .filter((b) => !args.tableroId || b.id === args.tableroId);
+    if (tableros.length === 0) {
+      return {
+        proyecto: this.nombreDeProyecto(projectId, ambito),
+        tableros: [],
+        nota: 'Ningun tablero de este proyecto tiene Scrum activado.',
+      };
+    }
+
+    const delFoco = projectId === ambito.foco;
+    const resultado: Record<string, unknown>[] = [];
+    for (const tablero of tableros) {
+      const [sprints, backlog] = await Promise.all([
+        firstValueFrom(
+          this.projects.send<
+            {
+              id: string;
+              name: string;
+              status: 'PLANNED' | 'ACTIVE' | 'CLOSED';
+              goal?: string | null;
+              startDate?: string | null;
+              endDate?: string | null;
+            }[]
+          >({ cmd: 'sprint_find_by_board' }, { boardId: tablero.id }),
+        ),
+        firstValueFrom(
+          this.tasks.send<{
+            items: (TareaEnLista & { estimatePoints?: number | null })[];
+            total?: number;
+          }>(
+            { cmd: 'task_find_all' },
+            { boardId: tablero.id, onlyBacklog: true, query: { limit: CONSULTA_MAX_BACKLOG } },
+          ),
+        ),
+      ]);
+      const abiertas = (backlog?.items ?? []).filter((t) => !t.completedAt);
+      if (delFoco) {
+        for (const sprint of sprints ?? []) {
+          ambito.sprintsVistos?.set(sprint.id, {
+            id: sprint.id,
+            nombre: sprint.name,
+            estado: sprint.status,
+            boardId: tablero.id,
+            tablero: tablero.name,
+          });
+        }
+        for (const t of abiertas) {
+          ambito.vistas?.set(t.id, {
+            ...ambito.vistas.get(t.id),
+            id: t.id,
+            titulo: t.title,
+            columnId: t.columnId,
+            boardId: tablero.id,
+            cerrada: false,
+          });
+        }
+      }
+      resultado.push({
+        id: tablero.id,
+        nombre: tablero.name,
+        /* Los cerrados, solo los tres últimos: sirven para la velocidad, y el
+           briefing ya la trae calculada. */
+        sprints: (sprints ?? [])
+          .filter((s) => s.status !== 'CLOSED')
+          .concat((sprints ?? []).filter((s) => s.status === 'CLOSED').slice(-3))
+          .map((s) => ({
+            id: s.id,
+            nombre: s.name,
+            estado: s.status,
+            meta: s.goal ?? null,
+            desde: s.startDate?.slice(0, 10) ?? null,
+            hasta: s.endDate?.slice(0, 10) ?? null,
+          })),
+        backlog: {
+          total: backlog?.total ?? abiertas.length,
+          omitidas: Math.max(0, (backlog?.total ?? abiertas.length) - abiertas.length),
+          tareas: abiertas.map((t) => ({
+            id: t.id,
+            titulo: t.title,
+            prioridad: t.priority ?? null,
+            puntos: t.estimatePoints ?? null,
+          })),
+        },
+      });
+    }
+    return { proyecto: this.nombreDeProyecto(projectId, ambito), tableros: resultado };
   }
 
   private async analisis(args: Record<string, unknown>, ambito: AmbitoDeConsulta) {

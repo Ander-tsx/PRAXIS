@@ -24,6 +24,7 @@ import { bloqueDeArchivo } from './attachment-text';
 import { AttachmentsService } from './attachments.service';
 import {
   type AmbitoDeConsulta,
+  type SprintVisto,
   type TareaVista,
   ConsultasService,
   HERRAMIENTAS_DE_CONSULTA,
@@ -164,6 +165,9 @@ const NOMBRE_DE_PROPUESTA: Record<string, string> = {
   proponer_mensaje: 'un mensaje para el equipo',
   proponer_borrado: 'borrar una tarea',
   proponer_tablero: 'un tablero con sus columnas',
+  proponer_sprint: 'un sprint nuevo',
+  proponer_iniciar_sprint: 'empezar un sprint',
+  proponer_planificacion: 'repartir tareas entre backlog y sprint',
   proponer_abrir_proyecto: 'abrir uno de tus proyectos',
   proponer_plantilla: 'la estructura de un proyecto nuevo',
 };
@@ -205,7 +209,15 @@ interface Briefing {
     nombre: string;
     espacio: string;
     columnas: { id: string; nombre: string; orden: number }[];
+    /** Solo en los tableros con Scrum. */
+    scrum?: { sprintEnCurso: { nombre: string } | null };
   }[];
+  /**
+   * Los sprints que `consultar_sprints` enseñó en este turno. **No viene de
+   * reports-service**: lo añade `conLoVisto` para validar, porque los ids de
+   * sprint no están en el briefing.
+   */
+  sprintsVistos?: Map<string, SprintVisto>;
   etiquetas: { id: string; nombre: string }[];
   /** El inventario con ids: lo que permite validar un `taskId` antes de enseñarlo. */
   tareas?: {
@@ -474,6 +486,7 @@ export class AssistantService {
         : (payload.proyectos ?? []),
       nombres: Object.fromEntries(payload.miembros.map((m) => [m.userId, m.nombre])),
       vistas: new Map(),
+      sprintsVistos: new Map(),
     };
     const conConsultas = ambito.proyectos.length > 0;
     const todasLasHerramientas = conConsultas
@@ -633,7 +646,7 @@ export class AssistantService {
 
     const respuesta = { calls: llamadas, text: escrito.trim() };
     const briefingParaValidar = briefing
-      ? this.conTareasVistas(briefing, ambito.vistas ?? new Map())
+      ? this.conLoVisto(briefing, ambito.vistas ?? new Map(), ambito.sprintsVistos ?? new Map())
       : null;
     let validadas = respuesta.calls
       .map((call) =>
@@ -715,7 +728,14 @@ export class AssistantService {
           )
           .filter((propuesta): propuesta is AssistantProposal => propuesta !== null);
 
-        validadas = [...validadas, ...nuevasValidadas];
+        /* Sin repetidas: el turno de recuperación ve la llamada anterior y a
+           menudo vuelve a emitir también las que ya habían pasado, y salían dos
+           tarjetas iguales —aceptar las dos crea la tarea dos veces—. */
+        const yaEstan = new Set(validadas.map((p) => `${p.tool}:${JSON.stringify(p.args)}`));
+        validadas = [
+          ...validadas,
+          ...nuevasValidadas.filter((p) => !yaEstan.has(`${p.tool}:${JSON.stringify(p.args)}`)),
+        ];
         reply = reply + (reply && segundaRespuesta.text ? '\n\n' : '') + segundaRespuesta.text;
       } catch (err) {
         this.log.warn(`Fallo en el turno de recuperación: ${err}`);
@@ -1356,6 +1376,10 @@ export class AssistantService {
       };
     }
 
+    if (call.name === 'proponer_sprint') return this.validarSprint(call, briefing);
+    if (call.name === 'proponer_iniciar_sprint') return this.validarInicioDeSprint(call, briefing);
+    if (call.name === 'proponer_planificacion') return this.validarPlanificacion(call, briefing);
+
     /* Las cuatro de la capa 2 comparten la misma puerta: todas apuntan a una
        tarea que ya existe, y ninguna vale sin ella. */
     const sobreTarea = this.tareaDeLaPropuesta(call, briefing);
@@ -1417,6 +1441,17 @@ export class AssistantService {
           new Set(briefing.etiquetas.map((l) => l.id)),
         );
       }
+      /* Los puntos: entero de 0 a 999, el rango del DTO. Fuera de él se ignora
+         el campo, no la propuesta. */
+      const puntos = Number(call.args.puntos);
+      if (
+        call.args.puntos !== undefined &&
+        Number.isInteger(puntos) &&
+        puntos >= 0 &&
+        puntos <= 999
+      ) {
+        cambios.estimatePoints = puntos;
+      }
 
       /* Una edición que no cambia nada es una tarjeta que promete algo y no
          hace nada al aceptarla. Pasa cuando el modelo manda solo el porQue. */
@@ -1477,12 +1512,139 @@ export class AssistantService {
   }
 
   /**
+   * Un sprint nuevo: en un tablero **con Scrum** del proyecto.
+   *
+   * El tablero sale del briefing, que solo trae `scrum` en los que lo tienen:
+   * un sprint en un tablero sin Scrum existiría y nadie lo vería.
+   */
+  private validarSprint(
+    call: { name: string; args: Record<string, unknown> },
+    briefing: Briefing,
+  ): AssistantProposal | null {
+    const tablero = briefing.tableros?.find((t) => t.id === String(call.args.tableroId ?? ''));
+    if (!tablero?.scrum) {
+      this.log.warn('El modelo propuso un sprint en un tablero sin Scrum o que no existe');
+      return null;
+    }
+    const nombre = String(call.args.nombre ?? '').trim();
+    if (nombre.length < 2) return null;
+    const meta = String(call.args.meta ?? '').trim();
+    return {
+      tool: call.name,
+      args: {
+        tableroId: tablero.id,
+        tablero: tablero.nombre,
+        nombre: nombre.slice(0, 100),
+        ...(meta ? { meta: meta.slice(0, 500) } : {}),
+        ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+      },
+    };
+  }
+
+  /**
+   * Empezar un sprint: planeado, visto en este turno y sin otro en curso.
+   *
+   * ⚠️ «Sin otro en curso» se mira **en las dos fuentes**: lo que enseñó la
+   * consulta y el `sprintEnCurso` del briefing. El gateway lo rechazaría igual,
+   * pero una tarjeta que va a fallar al aceptarla es peor que ninguna.
+   */
+  private validarInicioDeSprint(
+    call: { name: string; args: Record<string, unknown> },
+    briefing: Briefing,
+  ): AssistantProposal | null {
+    const sprint = briefing.sprintsVistos?.get(String(call.args.sprintId ?? ''));
+    if (!sprint || sprint.estado !== 'PLANNED') {
+      this.log.warn('El modelo propuso empezar un sprint que no vio o que no esta planeado');
+      return null;
+    }
+    const otroEnCurso =
+      [...(briefing.sprintsVistos?.values() ?? [])].some(
+        (s) => s.boardId === sprint.boardId && s.estado === 'ACTIVE',
+      ) || Boolean(briefing.tableros?.find((t) => t.id === sprint.boardId)?.scrum?.sprintEnCurso);
+    if (otroEnCurso) {
+      this.log.warn('El modelo propuso empezar un sprint con otro en curso en el mismo tablero');
+      return null;
+    }
+    const desde = String(call.args.desde ?? '');
+    const hasta = String(call.args.hasta ?? '');
+    if (!this.fechaValida(desde) || !this.fechaValida(hasta) || hasta <= desde) return null;
+    return {
+      tool: call.name,
+      args: {
+        sprintId: sprint.id,
+        sprint: sprint.nombre,
+        tableroId: sprint.boardId,
+        tablero: sprint.tablero,
+        desde,
+        hasta,
+        ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+      },
+    };
+  }
+
+  /**
+   * Meter tareas del backlog en un sprint, o devolverlas al backlog.
+   *
+   * Las tareas tienen que ser conocidas —del inventario o de una consulta— y,
+   * cuando van a un sprint, **del mismo tablero** que el sprint: el gateway las
+   * reasigna dentro de un tablero y las de otro no se moverían, sin error.
+   * Las que no cumplen se quitan; si no queda ninguna, no hay propuesta.
+   */
+  private validarPlanificacion(
+    call: { name: string; args: Record<string, unknown> },
+    briefing: Briefing,
+  ): AssistantProposal | null {
+    const sprintId = String(call.args.sprintId ?? '').trim();
+    const sprint = sprintId ? briefing.sprintsVistos?.get(sprintId) : undefined;
+    if (sprintId && (!sprint || sprint.estado === 'CLOSED')) {
+      this.log.warn('El modelo propuso planificar en un sprint que no vio o ya cerrado');
+      return null;
+    }
+    const pedidas = Array.isArray(call.args.taskIds) ? call.args.taskIds.map(String) : [];
+    const tareas = [...new Set(pedidas)]
+      .map((id) => briefing.tareas?.find((t) => t.id === id))
+      .filter((t): t is TareaDelBriefing => Boolean(t))
+      .filter((t) => !t.cerrada)
+      .filter((t) => !sprint || !t.boardId || t.boardId === sprint.boardId)
+      .slice(0, 30);
+    if (tareas.length === 0) {
+      this.log.warn('El modelo propuso planificar sin ninguna tarea valida');
+      return null;
+    }
+    /* Devolver al backlog: todas del mismo tablero, para que la tarjeta pueda
+       decir de cuál. Con varios, se queda el del primero. */
+    const tableroId = sprint?.boardId ?? tareas[0].boardId ?? '';
+    const deOtroTablero = tareas.filter((t) => t.boardId && t.boardId !== tableroId);
+    const validas = tareas.filter((t) => !deOtroTablero.includes(t));
+    return {
+      tool: call.name,
+      args: {
+        sprintId: sprint?.id ?? null,
+        ...(sprint ? { sprint: sprint.nombre } : {}),
+        tableroId,
+        tareas: validas.map((t) => ({ id: t.id, titulo: t.titulo })),
+        taskIds: validas.map((t) => t.id),
+        ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+      },
+    };
+  }
+
+  /**
    * El briefing con las tareas que PRAX vio consultando en este turno.
    *
    * Solo para validar: el modelo ya las tiene delante por la consulta. Se
    * añaden las que no estaban en el inventario, con la columna y el tablero
    * resueltos contra las columnas del briefing, que son las de todo el proyecto.
    */
+  private conLoVisto(
+    briefing: Briefing,
+    vistas: Map<string, TareaVista>,
+    sprintsVistos: Map<string, SprintVisto>,
+  ): Briefing {
+    const conSprints = sprintsVistos.size > 0 ? { ...briefing, sprintsVistos } : briefing;
+    return this.conTareasVistas(conSprints, vistas);
+  }
+
   private conTareasVistas(briefing: Briefing, vistas: Map<string, TareaVista>): Briefing {
     if (!briefing.tareas || vistas.size === 0) return briefing;
     const conocidas = new Set(briefing.tareas.map((t) => t.id));
@@ -1495,6 +1657,7 @@ export class AssistantService {
         titulo: vista.titulo,
         cerrada: vista.cerrada,
         columnId: vista.columnId,
+        ...(vista.boardId ? { boardId: vista.boardId } : {}),
         columna: columna?.nombre ?? '',
         ...(columna?.tablero ? { tablero: columna.tablero } : {}),
         ...(vista.pasos ? { pasos: vista.pasos } : {}),

@@ -659,8 +659,9 @@ const REGLAS: Regla[] = [
    * Un tablero con Scrum trae un bloque `scrum` en el CONTEXTO. Sin esta regla
    * el modelo tiene los números y no sabe para qué sirven; con ella puede
    * contestar «¿nos cabe esto?» comparando lo comprometido con la velocidad.
-   * No tiene herramienta para iniciar, cerrar ni mover entre sprints — a
-   * propósito: el asistente propone, nunca ejecuta, y aquí ni siquiera propone.
+   * Desde F7 de docs/PLAN-PRAX-SEMIAGENTICO.md **propone** crear, empezar y
+   * repartir (con `canManageSprint`); cerrar sigue siendo a mano, porque obliga
+   * a decidir tarea a tarea qué pasa con lo pendiente.
    *
    * ⚠️ Viaja en cada turno de todos los proyectos, tengan Scrum o no. Por eso
    * es corta.
@@ -670,8 +671,8 @@ const REGLAS: Regla[] = [
     texto:
       'Si un tablero trae "scrum", trabaja por sprints. Para planear o si preguntan si ' +
       'algo cabe, compara "comprometido" con "velocidadMedia" (misma unidad) y dilo en una ' +
-      'frase. No inicias, cierras ni mueves tareas entre sprints: eso se hace desde la ' +
-      'franja del sprint y el panel Backlog del tablero.',
+      'frase. Para proponer sobre sprints o backlog, consulta primero con consultar_sprints: ' +
+      'sus ids no estan en el contexto. Cerrar un sprint no lo propones: se hace a mano.',
   },
 ];
 

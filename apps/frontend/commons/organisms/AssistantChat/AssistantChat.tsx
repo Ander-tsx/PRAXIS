@@ -24,6 +24,9 @@ import {
   isDeleteProposal,
   isEditProposal,
   isMessageProposal,
+  isPlanningProposal,
+  isSprintProposal,
+  isStartSprintProposal,
   isMoveProposal,
   isOpenProjectProposal,
   isQuestionProposal,
@@ -54,6 +57,9 @@ import {
   EditProposalCard,
   MarkStepsProposalCard,
   MessageProposalCard,
+  PlanningProposalCard,
+  SprintProposalCard,
+  StartSprintProposalCard,
   MoveProposalCard,
   OpenProjectProposalCard,
   QuestionProposalCard,
@@ -1363,6 +1369,45 @@ export function AssistantChat({
                         /* Preguntar no propone ningún cambio, así que ninguna
                            de las guardas de abajo la reclama: el orden aquí solo
                            ahorra recorrerlas. */
+                        if (isSprintProposal(propuesta)) {
+                          return (
+                            <SprintProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId ?? ''}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
+                        if (isStartSprintProposal(propuesta)) {
+                          return (
+                            <StartSprintProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId ?? ''}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
+                        if (isPlanningProposal(propuesta)) {
+                          return (
+                            <PlanningProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId ?? ''}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
                         if (isBoardProposal(propuesta)) {
                           return (
                             <BoardProposalCard

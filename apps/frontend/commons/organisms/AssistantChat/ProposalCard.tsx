@@ -14,7 +14,10 @@ import type {
   MessageProposal,
   MoveProposal,
   OpenProjectProposal,
+  PlanningProposal,
   QuestionProposal,
+  SprintProposal,
+  StartSprintProposal,
   TaskProposal,
   TemplateProposal,
 } from '../../api/assistant';
@@ -31,10 +34,13 @@ import {
   aceptarChecklistAction,
   aceptarComentarioAction,
   aceptarEdicionAction,
+  aceptarInicioSprintAction,
   aceptarMarcarPasosAction,
   aceptarMensajeAction,
   aceptarMovimientoAction,
+  aceptarPlanificacionAction,
   aceptarPlantillaAction,
+  aceptarSprintAction,
   aceptarTableroAction,
   aceptarTareaAction,
   resolverPropuestaAction,
@@ -443,6 +449,12 @@ export function EditProposalCard({
         {propuesta.dueDate !== undefined && (
           <Campo termino="Vence" valor={formatoFecha(propuesta.dueDate)} />
         )}
+        {propuesta.estimatePoints !== undefined && (
+          <Campo
+            termino="Estimación"
+            valor={`${propuesta.estimatePoints} ${propuesta.estimatePoints === 1 ? 'punto' : 'puntos'}`}
+          />
+        )}
       </dl>
 
       {propuesta.description !== undefined && (
@@ -825,6 +837,164 @@ export function BoardProposalCard({
         )}
       </div>
     </Marco>
+  );
+}
+
+/**
+ * El marco de las propuestas cuyo resultado es una frase: los sprints.
+ *
+ * Las de tarea tienen `CambioSobreTarea`, que enlaza a la tarea; estas no
+ * tienen una tarea a la que llevar, así que el resultado es lo que pasó y un
+ * enlace al proyecto.
+ */
+function AccionConFrase({
+  titulo,
+  sinAplicar,
+  porQue,
+  ejecutar,
+  projectId,
+  proposalId,
+  estadoGuardado,
+  children,
+}: {
+  titulo: string;
+  sinAplicar: string;
+  porQue?: string | undefined;
+  ejecutar: () => Promise<{ error: string | null; hecho: string | null }>;
+  projectId: string;
+  proposalId?: string | undefined;
+  estadoGuardado?: EstadoPropuesta | undefined;
+  children: React.ReactNode;
+}) {
+  const [estado, setEstado] = useState<Estado>('pendiente');
+  const [error, setError] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
+
+  async function aceptar() {
+    setEstado('enviando');
+    setError(null);
+    const respuesta = await ejecutar();
+    if (respuesta.error || !respuesta.hecho) {
+      setError(respuesta.error ?? 'No se pudo aplicar.');
+      setEstado('pendiente');
+      return;
+    }
+    setResultado({ texto: respuesta.hecho, href: `/projects/${projectId}` });
+    setEstado('hecho');
+  }
+
+  return (
+    <Marco
+      titulo={titulo}
+      sinAplicar={sinAplicar}
+      porQue={porQue}
+      estado={estado}
+      error={error}
+      resultado={resultado}
+      onAceptar={aceptar}
+      onDescartar={() => setEstado('descartada')}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+    >
+      {children}
+    </Marco>
+  );
+}
+
+export function SprintProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: SprintProposal }) {
+  return (
+    <AccionConFrase
+      titulo="Sprint propuesto"
+      sinAplicar="Todavía no existe."
+      porQue={propuesta.porQue}
+      ejecutar={() => aceptarSprintAction(projectId, propuesta)}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+    >
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+        <Campo termino="Sprint" valor={propuesta.nombre} />
+        <Campo termino="En el tablero" valor={propuesta.tablero} />
+      </dl>
+      {propuesta.meta && (
+        <p className="font-sans text-sm leading-relaxed text-text-secondary">
+          Meta: <span className="text-text-primary">{propuesta.meta}</span>
+        </p>
+      )}
+      <p className="font-sans text-xs text-text-secondary">
+        Nace planeado y sin fechas: empezarlo es otro paso.
+      </p>
+    </AccionConFrase>
+  );
+}
+
+export function StartSprintProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: StartSprintProposal }) {
+  return (
+    <AccionConFrase
+      titulo="Empezar el sprint"
+      sinAplicar="Todavía no ha empezado."
+      porQue={propuesta.porQue}
+      ejecutar={() =>
+        aceptarInicioSprintAction(projectId, propuesta, new Date().getTimezoneOffset())
+      }
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+    >
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+        <Campo termino="Sprint" valor={propuesta.sprint} />
+        <Campo termino="Tablero" valor={propuesta.tablero} />
+        <Campo termino="Desde" valor={formatoFecha(propuesta.desde)} />
+        <Campo termino="Hasta" valor={formatoFecha(propuesta.hasta)} />
+      </dl>
+      <p className="font-sans text-xs text-text-secondary">
+        Desde ese momento el tablero enseña solo las tareas de este sprint.
+      </p>
+    </AccionConFrase>
+  );
+}
+
+export function PlanningProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: PlanningProposal }) {
+  const tareas = propuesta.tareas ?? [];
+  const alSprint = Boolean(propuesta.sprintId);
+  return (
+    <AccionConFrase
+      titulo={alSprint ? `Planificar «${propuesta.sprint ?? 'el sprint'}»` : 'Devolver al backlog'}
+      sinAplicar="Todavía no se ha movido ninguna."
+      porQue={propuesta.porQue}
+      ejecutar={() => aceptarPlanificacionAction(projectId, propuesta)}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+    >
+      <p className="font-sans text-sm text-text-secondary">
+        {tareas.length} {tareas.length === 1 ? 'tarea' : 'tareas'}{' '}
+        {alSprint ? 'entrarían en el sprint:' : 'saldrían del sprint y volverían al backlog:'}
+      </p>
+      <ul className="flex flex-col gap-1">
+        {tareas.map((tarea) => (
+          <li key={tarea.id} className="font-sans text-sm text-text-primary">
+            {tarea.titulo}
+          </li>
+        ))}
+      </ul>
+    </AccionConFrase>
   );
 }
 

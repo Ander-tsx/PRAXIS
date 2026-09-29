@@ -113,6 +113,8 @@ export interface EditProposal extends SobreTarea {
   dueDate?: string;
   /** La lista completa que queda, no las que se añaden. */
   labelIds?: string[];
+  /** Puntos de estimación (tableros con Scrum), 0–999. */
+  estimatePoints?: number;
 }
 
 /** `proponer_movimiento`. */
@@ -270,6 +272,40 @@ export interface OpenProjectProposal {
  * nuevo enseñan y crean exactamente lo mismo.
  */
 export type TemplateProposal = ProjectTemplate;
+
+/**
+ * Los sprints (F7 de docs/PLAN-PRAX-SEMIAGENTICO.md). Los nombres viajan con la
+ * propuesta —sprint y tablero— para que la tarjeta se lea igual dentro de una
+ * semana; los ids, para ejecutar. Cerrar un sprint no se propone.
+ */
+export interface SprintProposal {
+  tableroId: string;
+  tablero: string;
+  nombre: string;
+  meta?: string;
+  porQue?: string;
+}
+
+export interface StartSprintProposal {
+  sprintId: string;
+  sprint: string;
+  tableroId: string;
+  tablero: string;
+  /** YYYY-MM-DD. */
+  desde: string;
+  hasta: string;
+  porQue?: string;
+}
+
+/** Meter tareas del backlog en un sprint (`sprintId`) o devolverlas (`null`). */
+export interface PlanningProposal {
+  sprintId: string | null;
+  sprint?: string;
+  tableroId: string;
+  tareas: { id: string; titulo: string }[];
+  taskIds: string[];
+  porQue?: string;
+}
 
 export interface BoardProposal {
   /** Nombre del espacio de trabajo. Se resuelve o se crea al aceptar. */
@@ -521,6 +557,26 @@ export function isCheckStepsProposal(
   propuesta: AssistantProposal,
 ): propuesta is AssistantProposal & { args: CheckStepsProposal } {
   return propuesta.tool === 'proponer_marcar_pasos' && Array.isArray(propuesta.args.itemIds);
+}
+
+export function isSprintProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: SprintProposal } {
+  return propuesta.tool === 'proponer_sprint' && typeof propuesta.args.tableroId === 'string';
+}
+
+export function isStartSprintProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: StartSprintProposal } {
+  return (
+    propuesta.tool === 'proponer_iniciar_sprint' && typeof propuesta.args.sprintId === 'string'
+  );
+}
+
+export function isPlanningProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: PlanningProposal } {
+  return propuesta.tool === 'proponer_planificacion' && Array.isArray(propuesta.args.taskIds);
 }
 
 export function isMessageProposal(

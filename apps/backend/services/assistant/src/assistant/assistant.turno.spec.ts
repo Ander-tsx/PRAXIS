@@ -229,6 +229,98 @@ describe('El turno de PRAX: bucle de consultas', () => {
     });
   });
 
+  /**
+   * Los sprints (F7): sus ids no están en el briefing, así que solo valen los
+   * que enseñó `consultar_sprints` en el turno. Empezar uno con otro en curso
+   * en el mismo tablero se descarta, y al planificar se quitan las tareas de
+   * otro tablero, que el gateway no movería.
+   */
+  it('sprints: solo los vistos, ninguno a la vez que otro en curso, tareas del mismo tablero', async () => {
+    const m = montar([
+      respuesta({ calls: [{ name: 'consultar_sprints', args: {} }] }),
+      respuesta({
+        text: 'Te propongo esto.',
+        calls: [
+          {
+            name: 'proponer_iniciar_sprint',
+            args: { sprintId: 's1', desde: '2026-10-01', hasta: '2026-10-14', porQue: 'x' },
+          },
+          {
+            name: 'proponer_planificacion',
+            args: { sprintId: 's2', taskIds: ['t1', 't2', 'inventada'], porQue: 'x' },
+          },
+          { name: 'proponer_sprint', args: { tableroId: 'b2', nombre: 'Sprint 9', porQue: 'x' } },
+        ],
+      }),
+    ]);
+    m.consultas.ejecutar.mockImplementation((async (_n: string, _a: unknown, ambito: any) => {
+      ambito.sprintsVistos.set('s1', {
+        id: 's1',
+        nombre: 'Sprint 5',
+        estado: 'PLANNED',
+        boardId: 'b1',
+        tablero: 'Web',
+      });
+      ambito.sprintsVistos.set('s2', {
+        id: 's2',
+        nombre: 'Sprint 4',
+        estado: 'ACTIVE',
+        boardId: 'b1',
+        tablero: 'Web',
+      });
+      ambito.vistas.set('t1', {
+        id: 't1',
+        titulo: 'Una',
+        columnId: 'c1',
+        boardId: 'b1',
+        cerrada: false,
+      });
+      ambito.vistas.set('t2', {
+        id: 't2',
+        titulo: 'Otra',
+        columnId: 'c2',
+        boardId: 'b2',
+        cerrada: false,
+      });
+      return { tableros: [] };
+    }) as any);
+    (m.servicio as any).reportsClient = {
+      send: () =>
+        of({
+          proyecto: { nombre: 'Web' },
+          columnas: [
+            { id: 'c1', nombre: 'Por hacer', orden: 0, tableroId: 'b1', tablero: 'Web' },
+            { id: 'c2', nombre: 'Por hacer', orden: 0, tableroId: 'b2', tablero: 'Kanban' },
+          ],
+          tableros: [
+            { id: 'b1', nombre: 'Web', espacio: 'G', columnas: [], scrum: { sprintEnCurso: null } },
+            { id: 'b2', nombre: 'Kanban', espacio: 'G', columnas: [] },
+          ],
+          etiquetas: [],
+          tareas: [],
+        }),
+    };
+
+    await m.servicio.chat({
+      ...payload,
+      projectId: PROYECTO.id,
+      proyectos: [],
+      permisos: { canManageSprint: true },
+    } as any);
+
+    const guardado = m.conversaciones.guardarTurno.mock.calls[0] as unknown as [
+      { proposals: { tool: string; args: Record<string, unknown> }[] },
+    ];
+    /* Ni el inicio (hay otro en curso) ni el sprint en un tablero sin Scrum. */
+    expect(guardado[0].proposals.map((p) => p.tool)).toEqual(['proponer_planificacion']);
+    expect(guardado[0].proposals[0].args).toMatchObject({
+      sprintId: 's2',
+      sprint: 'Sprint 4',
+      tableroId: 'b1',
+      taskIds: ['t1'],
+    });
+  });
+
   it('una propuesta no se ejecuta: se recoge y se guarda con el turno', async () => {
     const m = montar([
       respuesta({

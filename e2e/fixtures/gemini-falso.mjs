@@ -24,8 +24,78 @@ function trozo(parts, extra = {}) {
   return { candidates: [{ content: { role: 'model', parts }, ...extra }] };
 }
 
+/**
+ * Directivas en el mensaje, para que una prueba decida qué hace el modelo.
+ *
+ *     #consulta consultar_sprints {}
+ *     #propon proponer_planificacion {"sprintId":"$r.tableros.0.sprints.0.id","taskIds":"$r.tableros.0.backlog.tareas.*.id","porQue":"x"}
+ *
+ * `#consulta` se pide en la primera vuelta; `#propon` sale en la siguiente (o en
+ * la primera, si no hay consulta). Un valor que empieza por `$r.` se lee de la
+ * respuesta de la consulta, con `*` para recorrer una lista: así la prueba
+ * puede proponer sobre ids que solo existen en el servidor.
+ */
+function directivas(peticion) {
+  const usuario = [...(peticion.contents ?? [])]
+    .reverse()
+    .find((c) => c.role === 'user' && (c.parts ?? []).some((p) => typeof p.text === 'string'));
+  const texto = (usuario?.parts ?? []).map((p) => p.text ?? '').join('\n');
+  const leer = (prefijo) =>
+    texto
+      .split('\n')
+      .filter((l) => l.startsWith(prefijo))
+      .map((l) => {
+        const [, nombre, ...resto] = l.split(' ');
+        return { name: nombre, args: JSON.parse(resto.join(' ') || '{}') };
+      });
+  return { consultas: leer('#consulta '), propuestas: leer('#propon ') };
+}
+
+function resolver(valor, respuesta) {
+  if (typeof valor === 'string' && valor.startsWith('$r.')) {
+    const camino = valor.slice(3).split('.');
+    const bajar = (actual, pasos) => {
+      if (pasos.length === 0) return actual;
+      const [paso, ...resto] = pasos;
+      if (paso === '*') return (actual ?? []).map((x) => bajar(x, resto));
+      return bajar(actual?.[paso], resto);
+    };
+    return bajar(respuesta, camino);
+  }
+  if (Array.isArray(valor)) return valor.map((v) => resolver(v, respuesta));
+  if (valor && typeof valor === 'object') {
+    return Object.fromEntries(Object.entries(valor).map(([k, v]) => [k, resolver(v, respuesta)]));
+  }
+  return valor;
+}
+
 function guion(peticion) {
   const contenidos = peticion.contents ?? [];
+  const pedido = directivas(peticion);
+  if (pedido.consultas.length > 0 || pedido.propuestas.length > 0) {
+    const respuestas = contenidos
+      .flatMap((c) => c.parts ?? [])
+      .filter((p) => p.functionResponse)
+      .map((p) => p.functionResponse.response);
+    if (pedido.consultas.length > 0 && respuestas.length === 0) {
+      return [
+        trozo(
+          pedido.consultas.map((c) => ({ functionCall: c })),
+          { finishReason: 'STOP' },
+        ),
+      ];
+    }
+    const ultima = respuestas[respuestas.length - 1] ?? {};
+    return [
+      trozo([{ text: 'Te propongo esto.' }]),
+      trozo(
+        pedido.propuestas.map((p) => ({
+          functionCall: { name: p.name, args: resolver(p.args, ultima) },
+        })),
+        { finishReason: 'STOP' },
+      ),
+    ];
+  }
   const respuestaDeConsulta = contenidos
     .flatMap((c) => c.parts ?? [])
     .find((p) => p.functionResponse);
