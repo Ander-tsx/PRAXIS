@@ -10,7 +10,7 @@
  * Al contenedor se le pasan pocas variables y aquí se derivan las muchas:
  *
  *   POSTGRES_HOST · POSTGRES_PORT · POSTGRES_USER · POSTGRES_PASSWORD
- *   POSTGRES_DB   · REDIS_URL     · JWT_SECRET    · VOICE_JWT_SECRET
+ *   POSTGRES_DB   · REDIS_URL     · JWT_SECRET
  *   GEMINI_API_KEY
  *
  * ⚠️ `permissions` es 3002 y `projects` es 3003. Invertirlos no da un error
@@ -28,7 +28,6 @@ const {
   JWT_SECRET = '',
   JWT_EXPIRES_IN = '15m',
   REFRESH_TOKEN_EXPIRES_IN = '7d',
-  VOICE_JWT_SECRET = '',
   GEMINI_API_KEY = '',
   GEMINI_MODEL = 'gemini-flash-latest',
   /* ID de cliente de OAuth. No es un secreto —viaja en el JavaScript del
@@ -125,8 +124,6 @@ const rutas = {
   REPORTS_SERVICE_PORT: 3005,
   ASSISTANT_SERVICE_HOST: LOCAL,
   ASSISTANT_SERVICE_PORT: 3006,
-  ALEXA_SERVICE_HOST: LOCAL,
-  ALEXA_SERVICE_PORT: 3007,
   /* ⚠️ Sin esto el gateway levanta igual y responde 500 en las siete rutas de
      `/automations`: `ClientsModule` no falla al registrarse contra un host
      `undefined`, falla al primer `send`. */
@@ -242,22 +239,6 @@ module.exports = {
       REPORTS_SERVICE_PORT: rutas.REPORTS_SERVICE_PORT,
       GEMINI_API_KEY,
       GEMINI_MODEL,
-    }),
-
-    /* El token de voz lleva secreto propio: es de solo lectura y dura 90 días,
-       así que no se reutiliza el JWT_SECRET de la plataforma. */
-    proceso('alexa', '/app/apps/backend/services/alexa', {
-      ...comun,
-      TCP_PORT: 3007,
-      DATABASE_URL: databaseUrl('alexa'),
-      REDIS_URL,
-      VOICE_JWT_SECRET,
-      CREDENTIALS_SERVICE_HOST: rutas.CREDENTIALS_SERVICE_HOST,
-      CREDENTIALS_SERVICE_PORT: rutas.CREDENTIALS_SERVICE_PORT,
-      PROJECTS_SERVICE_HOST: rutas.PROJECTS_SERVICE_HOST,
-      PROJECTS_SERVICE_PORT: rutas.PROJECTS_SERVICE_PORT,
-      TASKS_SERVICE_HOST: rutas.TASKS_SERVICE_HOST,
-      TASKS_SERVICE_PORT: rutas.TASKS_SERVICE_PORT,
     }),
 
     /* Automatización. Lee el flujo de hechos de dominio de Redis y habla con

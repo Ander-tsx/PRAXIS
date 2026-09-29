@@ -8,7 +8,6 @@ import { RedisService } from '../redis/redis.service';
 
 import {
   CreateProjectDto,
-  FindProjectsByMemberDto,
   FindProjectsDto,
   UpdateProjectDto,
 } from '@praxis/contracts';
@@ -16,7 +15,6 @@ import { expandPermissions, normalizePermissions } from '../project-roles/permis
 import { generarSlugUnico } from './slug.util';
 
 const PROJECT_CACHE_TTL = 300; // 5 min
-const MEMBER_PROJECTS_TTL = 60; // 1 min — proyectos visibles por usuario
 
 /** Rol que se crea con el proyecto para que el dueño pueda operar y delegar. */
 const DEFAULT_ROLE_NAME = 'Administrador';
@@ -119,8 +117,6 @@ export class ProjectsService {
         return project;
       });
 
-      /* El dueño acaba de ganar un proyecto: su lista cambió. */
-      await this.invalidarListasDe([dto.ownerId]);
       return project;
     } catch (error) {
       /**
@@ -253,84 +249,6 @@ export class ProjectsService {
     return { items, total };
   }
 
-  /**
-   * Proyectos donde el usuario es dueño o miembro.
-   *
-   * ⚠️ **Hoy solo lo consume la capa de voz** (`project_find_by_member`, desde
-   * `PraxisDataService`). El selector de Análisis dejó de usarlo: pide
-   * `GET /projects` con `permission`, que resuelve `findAllProjects` y no
-   * cachea. Conviene saberlo antes de razonar sobre la frescura de esta clave —
-   * alexa-service cachea encima con su propio TTL, así que invalidar aquí acorta
-   * la ventana pero no la cierra.
-   */
-  async findProjectsByMember(dto: FindProjectsByMemberDto) {
-    const cacheKey = this.claveDeListaDe(dto.userId);
-    const cached = await this.redis.get(cacheKey);
-    if (cached) return cached;
-
-    const projects = await this.prisma.project.findMany({
-      where: {
-        /* Igual que en `findAllProjects`: los archivados no salen, los
-           suspendidos sí. */
-        status: { not: 'DELETED' },
-        OR: [{ ownerId: dto.userId }, { members: { some: { userId: dto.userId } } }],
-      },
-      orderBy: { updatedAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        /* Sin esto, el selector de proyectos de Análisis recibe filas sin slug
-           y sigue construyendo enlaces con el UUID. Es un `select` explícito:
-           añadir la columna al modelo no la trae sola. */
-        slug: true,
-        description: true,
-        ownerId: true,
-        /* El estado va en el `select` explícito o no llega: sin él, el selector
-           de proyectos de Análisis no puede marcar los suspendidos y ofrece
-           acciones que van a fallar. */
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    await this.redis.set(cacheKey, projects, MEMBER_PROJECTS_TTL);
-    return projects;
-  }
-
-  /** La clave de la lista de proyectos de una persona. En un solo sitio. */
-  private claveDeListaDe(userId: string): string {
-    return `projects:member:${userId}`;
-  }
-
-  /**
-   * Retira de la caché la lista de proyectos de quien corresponda.
-   *
-   * ⚠️ **Se invalidaba en un solo sitio de los cinco que cambian su contenido.**
-   * `setStatus` lo hacía con cuidado —y con la nota explicando por qué— pero
-   * crear, renombrar, borrar y el alta y baja de miembros no, aunque los cinco
-   * cambian exactamente lo mismo que esa clave guarda. El resultado era una lista
-   * que se quedaba hasta un minuto por detrás de la realidad según por qué camino
-   * hubiera cambiado, que es la peor forma de estar mal: intermitente.
-   *
-   * No es un agujero —el guard sigue negando el acceso a un proyecto que ya no se
-   * tiene— sino una lista que miente durante un minuto.
-   */
-  private async invalidarListasDe(userIds: Iterable<string>): Promise<void> {
-    const unicos = [...new Set([...userIds])].filter(Boolean);
-    if (unicos.length === 0) return;
-    await Promise.all(unicos.map((userId) => this.redis.del(this.claveDeListaDe(userId))));
-  }
-
-  /** Quién ve un proyecto en su lista: su dueño y sus miembros. */
-  private async quienesLoVen(projectId: string): Promise<string[]> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { ownerId: true, members: { select: { userId: true } } },
-    });
-    if (!project) return [];
-    return [project.ownerId, ...project.members.map((m) => m.userId)];
-  }
 
   /**
    * Proyectos donde este usuario es miembro **con un rol que concede
@@ -464,11 +382,6 @@ export class ProjectsService {
 
     await this.redis.del(`project:${dto.id}`);
 
-    /* El nombre y el slug viajan dentro de la lista cacheada, así que un
-       renombrado que no la invalide deja el nombre viejo —y un enlace que ya no
-       resuelve, porque el slug se regenera— hasta que caduque. */
-    await this.invalidarListasDe(await this.quienesLoVen(dto.id));
-
     return updated;
   }
 
@@ -481,11 +394,6 @@ export class ProjectsService {
    * para decidir si deja pasar. Sin invalidarla, suspender no surtiría efecto
    * hasta pasados esos minutos: el administrador pulsa, comprueba, todo sigue
    * funcionando, y vuelve a pulsar.
-   *
-   * `projects:member:<userId>` dura 60 s y es la lista de proyectos de cada
-   * persona. Se invalida la del dueño y la de todos los miembros, porque un
-   * proyecto archivado tiene que desaparecer de sus listas y no dentro de un
-   * minuto.
    *
    * ## `suspendedReason` se guarda en el proyecto
    *
@@ -503,11 +411,7 @@ export class ProjectsService {
   }) {
     const project = await this.prisma.project.findUnique({
       where: { id: dto.id },
-      select: {
-        id: true,
-        ownerId: true,
-        members: { select: { userId: true } },
-      },
+      select: { id: true },
     });
 
     if (!project) {
@@ -564,8 +468,6 @@ export class ProjectsService {
     });
 
     await this.redis.del(`project:${dto.id}`);
-
-    await this.invalidarListasDe([project.ownerId, ...project.members.map((m) => m.userId)]);
 
     return { ...updated.saved, previousStatus: updated.previousStatus };
   }
@@ -734,14 +636,8 @@ export class ProjectsService {
       throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
     }
 
-    /* Se leen **antes** de borrar: después la fila y sus miembros ya no existen
-       y no habría forma de saber a quién retirarle la lista. Es el mismo motivo
-       por el que `purgeTasks` lee las tareas afectadas antes del `deleteMany`. */
-    const afectados = await this.quienesLoVen(id);
-
     await this.prisma.project.delete({ where: { id } });
     await this.redis.del(`project:${id}`);
-    await this.invalidarListasDe(afectados);
 
     return { success: true };
   }

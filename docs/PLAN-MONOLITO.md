@@ -176,9 +176,45 @@ queda**: decide el acceso a PRAX.
   con `exec node`. `docs/deploy/RAILWAY.md` actualizado.
   ⚠️ **Desplegar es fusionar a `main`**, y eso lo decide el dueño del producto.
 - [ ] **M-I — Lo muerto de `reports`** (M10).
+- [ ] **M-K — Que `praxis-api` se pueda dormir** (opcional, medir antes).
+  `sleepApplication` **ya está activado** en Railway, y el servicio no se duerme
+  nunca. Railway lo duerme tras 10 minutos sin tráfico saliente, y el backend
+  habla con Postgres y Redis cada pocos segundos aunque no haya nadie:
+  - el `setInterval` del buzón de salida de tasks y projects;
+  - el `XREADGROUP BLOCK` de automation;
+  - la suscripción pub/sub del gateway.
+
+  Si esas tareas se detienen sin peticiones y reanudan con la primera, el coste
+  en reposo baja casi a cero. Los hechos de dominio esperan en el stream de Redis
+  y se procesan al despertar.
+  ⚠️ **Contra:** la primera petición tras dormir tarda lo que tarda en arrancar
+  el proceso, y una automatización con fecha no salta mientras duerme. Se decide
+  con números.
 - [ ] **M-J — Documentación**: `CLAUDE.md` (puertos, comandos, «los 10
   servicios», trampa 14), `STRUCTURE`, `ESTADO-ACTUAL` y el plan de PRAX
   (§1 cambia de sitio, no de fondo).
+
+## 3.1 El despliegue (lo hace Claude, por encargo)
+
+Praxis tiene usuarios reales. Todo lo de aquí va **en este orden**:
+
+1. **Traer `main`.** En Railway, `praxis-api` y `praxis-web` despliegan desde
+   `main`, y hay más gente empujando: el despliegue activo el 2026-09-29 era un
+   commit de `joseman11`. Se fusiona `main` en la rama y se resuelven los
+   conflictos antes de nada.
+2. **Probar la imagen de verdad.** `docker build` del `backend.Dockerfile`, y
+   arrancarla en local contra una copia de la base.
+3. **Copia de seguridad.** `pg_dump` de `praxis-db` con la CLI de Railway,
+   ya instalada y con sesión; el repo está enlazado a «KYLOO SPACE /
+   production». Se guarda fuera del repositorio.
+4. **Avisar al dueño del producto** y hacer el push a `main`.
+5. **Vigilar**: logs del arranque, healthcheck en `/api`, la RAM de las
+   primeras horas y un recorrido a mano por `usepraxis.space`.
+6. **Vuelta atrás**: *Redeploy* del despliegue anterior desde Railway. Solo si
+   hiciera falta, la copia del paso 3.
+
+Datos que no se tocan: `praxis-db` y `praxis-redis` siguen siendo los mismos.
+Las sesiones abiertas siguen valiendo, porque `JWT_SECRET` no cambia.
 
 ## 4. Registro
 

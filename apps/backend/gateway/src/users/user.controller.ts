@@ -132,8 +132,8 @@ export class UserController {
     /**
      * `?ids=a,b,c` resuelve varios perfiles concretos en **una** petición.
      *
-     * El `cmd` ya existía —lo usan el panel de administración y alexa-service—
-     * y lo único que faltaba era la puerta HTTP. Sin ella, cada pantalla que
+     * El `cmd` ya existía —lo usa el panel de administración— y lo único que
+     * faltaba era la puerta HTTP. Sin ella, cada pantalla que
      * tiene una lista de `userId` (la bandeja de avisos, el equipo de un
      * proyecto, el chat, la rejilla de proyectos) pedía **un `GET /users/:id`
      * por persona**.

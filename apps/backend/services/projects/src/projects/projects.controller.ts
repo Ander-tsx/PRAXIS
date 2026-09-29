@@ -5,7 +5,6 @@ import {
   CreateProjectDto,
   DeleteProjectDto,
   FindOneProjectDto,
-  FindProjectsByMemberDto,
   FindProjectsDto,
   type ProjectStatus,
   SetProjectStatusDto,
@@ -28,12 +27,6 @@ export class ProjectsController {
   @MessagePattern({ cmd: 'project_find_all' })
   findAll(@Payload() dto: FindProjectsDto) {
     return this.projectsService.findAllProjects(dto);
-  }
-
-  /** Proyectos donde el usuario es dueño o miembro */
-  @MessagePattern({ cmd: 'project_find_by_member' })
-  findByMember(@Payload() dto: FindProjectsByMemberDto) {
-    return this.projectsService.findProjectsByMember(dto);
   }
 
   @MessagePattern({ cmd: 'project_find_one' })
@@ -74,7 +67,7 @@ export class ProjectsController {
   /**
    * Los proyectos de los que esta cuenta es **dueña**, sin paginar.
    *
-   * ⚠️ **No es `project_find_by_member`.** Ser miembro se resuelve borrando la
+   * ⚠️ **Solo la propiedad, no la membresía.** Ser miembro se resuelve borrando la
    * membresía; ser dueña, no: `ownerId` es lo que resuelve los permisos y lo
    * que decide a quién avisan las automatizaciones. Existe para que
    * administración pueda negarse a borrar una cuenta que dejaría proyectos sin

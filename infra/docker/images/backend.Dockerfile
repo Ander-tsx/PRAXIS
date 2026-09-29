@@ -50,7 +50,6 @@ COPY apps/backend/commons/observability/package.json    apps/backend/commons/obs
 # estaba duplicado en tasks y projects. Sin esta línea, `pnpm install` no lo
 # enlaza y los dos servicios fallan al importarlo.
 COPY apps/backend/commons/domain-events/package.json    apps/backend/commons/domain-events/
-COPY apps/backend/services/alexa/package.json           apps/backend/services/alexa/
 COPY apps/backend/services/automation/package.json      apps/backend/services/automation/
 COPY apps/backend/services/billing/package.json         apps/backend/services/billing/
 COPY apps/backend/services/assistant/package.json       apps/backend/services/assistant/
@@ -82,7 +81,7 @@ COPY packages/ packages/
 RUN pnpm build:shared
 
 # ⚠️ `prisma generate` no se conecta a nada, pero **exige** que DATABASE_URL
-# exista: cuatro de los seis servicios (credentials, projects, tasks, alexa)
+# exista: cuatro de los servicios (credentials, projects, tasks, billing)
 # llevan `prisma.config.ts` con `env('DATABASE_URL')`, y ese archivo se evalúa
 # antes de mirar el schema. En local la resuelve el `.env` de cada servicio; en
 # el contenedor no hay ninguno y el build muere con PrismaConfigEnvError.

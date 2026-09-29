@@ -65,10 +65,6 @@ export const envValidationSchema = Joi.object({
   ASSISTANT_SERVICE_HOST: Joi.string().default('localhost'),
   ASSISTANT_SERVICE_PORT: Joi.number().default(3006),
 
-  // alexa-service (capa de voz, solo lectura) — TCP 3007
-  ALEXA_SERVICE_HOST: Joi.string().default('localhost'),
-  ALEXA_SERVICE_PORT: Joi.number().default(3007),
-
   // automation-service — TCP 3008. El cliente no se usa hasta bloques posteriores.
   AUTOMATION_SERVICE_HOST: Joi.string().default('localhost'),
   AUTOMATION_SERVICE_PORT: Joi.number().default(3008),

@@ -7,7 +7,6 @@ import { envValidationSchema } from './common/config/env.validation';
 import { IdentityThrottlerGuard } from './common/guards/identity-throttler.guard';
 
 import { AdminModule } from './admin/admin.module';
-import { AlexaModule } from './alexa/alexa.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AssistantModule } from './assistant/assistant.module';
@@ -76,7 +75,6 @@ import { UserModule } from './users/user.module';
     NotificationsModule,
     ReportsModule,
     AssistantModule,
-    AlexaModule,
     AutomationModule,
     AdminModule,
     BillingModule,

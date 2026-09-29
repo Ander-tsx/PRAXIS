@@ -72,7 +72,7 @@ url_para() {
 # migraciones; sin esta línea, el despliegue arranca con `automation.*` sin
 # crear y el servicio muere en bucle contra una tabla que no existe — con la
 # sección de Automatización caída y ningún otro síntoma.
-SERVICIOS=(permissions credentials projects tasks assistant alexa automation billing)
+SERVICIOS=(permissions credentials projects tasks assistant automation billing)
 
 echo "──────────────────────────────────────────────"
 echo " Migraciones contra $POSTGRES_HOST/$POSTGRES_DB"

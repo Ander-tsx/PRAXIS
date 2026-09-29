@@ -96,7 +96,6 @@ export class AdminUsersController {
   constructor(
     @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
     @Inject('PERMISSIONS_SERVICE') private readonly permissionsClient: ClientProxy,
-    @Inject('ALEXA_SERVICE') private readonly alexaClient: ClientProxy,
     @Inject('ASSISTANT_SERVICE') private readonly assistantClient: ClientProxy,
     /* Para comprobar si la cuenta todavía es dueña de algún proyecto: ver
        `delete`. Un proyecto sin dueño no se puede administrar desde ningún
@@ -163,10 +162,8 @@ export class AdminUsersController {
    * afectada, que solo ve «credenciales inválidas», ni el siguiente
    * administrador que mire el registro.
    *
-   * Al dejar de estar activa se le cierran **las dos** sesiones: la web
-   * (`auth:session:<id>` en credentials) y las de voz (`alexa_link_revoke`). La
-   * segunda es la que faltaba y la que más duraba: el token de voz vive 90 días,
-   * y `verifyToken` solo comprobaba que el perfil existiera.
+   * Al dejar de estar activa se le cierran las sesiones (`auth:sessions:<id>` en
+   * credentials).
    */
   @Patch(':id/status')
   @HttpCode(HttpStatus.OK)
@@ -201,10 +198,6 @@ export class AdminUsersController {
         { id, status: body.status },
       ),
     );
-
-    if (body.status !== UserStatus.ACTIVE) {
-      await this.revocarSesionesDeVoz(id, body.status);
-    }
 
     await this.actividad.record({
       actorId,
@@ -435,30 +428,6 @@ export class AdminUsersController {
         `No se pudieron resolver los roles del listado: ${(error as Error).message}`,
       );
       return {};
-    }
-  }
-
-  /**
-   * Las sesiones de voz, revocadas.
-   *
-   * `alexa_link_revoke` sin `linkId` revoca todas las de esa persona. El fallo no
-   * corta la suspensión —la cuenta ya está suspendida y `verifyToken` comprueba
-   * el estado por su cuenta— pero se registra, porque es la diferencia entre que
-   * el token deje de valer ahora o en la siguiente frase.
-   */
-  private async revocarSesionesDeVoz(userId: string, status: UserStatus): Promise<void> {
-    try {
-      await firstValueFrom(
-        this.alexaClient.send(
-          { cmd: 'alexa_link_revoke' },
-          { userId, reason: `account_${status.toLowerCase()}` },
-        ),
-      );
-    } catch (error) {
-      this.logger.warn(
-        `No se pudieron revocar las sesiones de voz de ${userId}: ${(error as Error).message}. ` +
-          'El token dejará de valer en la siguiente consulta, que ya comprueba el estado.',
-      );
     }
   }
 

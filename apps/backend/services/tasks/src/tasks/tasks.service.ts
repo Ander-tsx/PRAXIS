@@ -866,7 +866,7 @@ export class TasksService {
     return { items, total };
   }
 
-  /** Resuelve todas las tareas de un proyecto (para alexa) */
+  /** Resuelve todas las tareas de un proyecto, sin paginar. */
   async findTasksByProject(dto: FindTasksByProjectDto) {
     const cacheKey = `tasks:project:${dto.projectId}`;
     const cached = await this.redis.get(cacheKey);
