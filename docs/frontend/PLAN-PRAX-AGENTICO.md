@@ -1,5 +1,9 @@
 # Plan — PRAX agéntico, y un modelo barato de decisión delante del real
 
+> 🚫 **Sustituido por [PLAN-PRAX-SEMIAGENTICO](../PLAN-PRAX-SEMIAGENTICO.md)**
+> (2026-09-29). Se conserva por el diagnóstico en frío de §1 y la ficha de Jev
+> de §2; las decisiones están en el plan nuevo.
+>
 > Etapa **por empezar**. Nace de un encargo dictado el 2026-09-25, sin
 > investigación previa de código más allá del diagnóstico de abajo (hecho esa
 > misma sesión, en frío). Se lee entero al retomar; nada de esto está decidido
@@ -97,10 +101,44 @@ conviene mirarlas:
 2. Logs del gateway en `assistant/chat` alrededor de la hora del reporte:
    código de estado, y los `error`/`warn` de `QuotaService`
    («billing-service no contestó» es el que delata la hipótesis 2).
-3. Confirmar que el proyecto afectado tiene `organizationId` no nulo.
+3. ~~Confirmar que el proyecto afectado tiene `organizationId` no nulo~~ — ya
+   descartado por lectura, ver más abajo.
 4. Confirmar que la clave/cuota de Gemini no cambió junto con los commits de
    la migración de organizaciones (coincidencia de fecha, no necesariamente
    de causa).
+
+### Hipótesis 2 y 3, revisadas por lectura (2026-09-28, sin reproducir aún)
+
+**Hipótesis 3 — descartada.** `Project.organizationId` es `NOT NULL` desde el
+primer día, sin fase nullable: la migración
+`20260826250000_proyecto_pertenece_a_organizacion` (`apps/backend/services/projects/prisma/migrations/.../migration.sql:20-22`)
+añade la columna `NOT NULL` con un `DEFAULT` que se retira acto seguido, y el
+propio comentario de la migración explica por qué no hizo falta backfill: la
+base se reinició, no había proyectos previos que conservar. `schema.prisma:72`
+lo confirma hoy (`organizationId String`, sin `?`). Postgres rechazaría
+cualquier `INSERT` sin ese campo — no es posible que un proyecto real tenga
+`organizationId` nulo.
+
+**Hipótesis 2 — matizada, no descartada del todo.** Sí existe una caché de
+permisos/organizaciones en Redis
+(`apps/backend/services/billing/src/organizations/organizations.service.ts:68-69`,
+`PERMISOS_TTL = 30`, `ORGS_TTL = 30`), y **sí se invalida explícitamente** al
+mover, expulsar o cambiar de rol a alguien (`olvidar()`, líneas 1721-1722,
+invocado en alta de miembro, cambio de rol, traspaso y expulsión — línea 938
+justo después del `delete` de la línea 937). No se encontró ninguna mutación
+de membresía sin su `olvidar()` correspondiente. Lo que sí sigue vivo: una
+ventana de hasta 30s entre escritura e invalidación si Redis falla, o si
+existiera alguna ruta de mutación de membresía fuera de ese archivo — el
+propio código lo señala («Treinta segundos no es "un poco de retraso", es un
+agujero con reloj», línea ~1714). Como explicación de un «PRAX no responde»
+**persistente**, ya es poco probable; como explicación de un fallo
+**transitorio** de segundos justo tras un cambio de organización, sigue en
+pie.
+
+**Con esto, la hipótesis 1 (Gemini falla y se ve como burbuja degradada, no
+como "no responde") sube de prioridad** — es la única de las tres que no se ha
+podido descartar ni matizar por lectura, y necesita reproducción en vivo o
+logs del gateway para confirmarse o descartarse.
 
 ---
 
@@ -116,12 +154,44 @@ mandar** (qué documentos, qué parte del inventario de tareas, qué adjuntos,
 qué tramo del historial) en vez de mandarlo todo o mandarlo a ojo, para gastar
 menos contexto —y menos dinero— en cada turno real.
 
-⚠️ **No se ha verificado qué modelo es «jev» en concreto.** El nombre puede
-ser una forma abreviada u oral de otra cosa. Antes de escribir una sola línea
-de integración, una sesión nueva tiene que confirmar con el usuario: proveedor,
-nombre real del modelo/API, precio, límites de la entrada (¿cuántas opciones
-admite?, ¿cuánto texto de contexto por opción?), y si ya existe una cuenta o
-hay que darla de alta. Nada de esto se inventa aquí.
+✅ **Identificado (2026-09-28, investigación web).** «Jev» es un producto
+real: el modelo «System One» de **TypeSafe AI** (fundador Diogo Almeida,
+ex-OpenAI, coautor del paper de RLHF de 2022), lanzado el 2026-09-15. No genera
+texto/código — devuelve **decisiones tipadas y calibradas**, exactamente lo
+que describe el encargo:
+
+- **Endpoint:** `POST https://api.typesafe.ai/v1/systemone`, `Authorization:
+  Bearer <API_KEY>`, body con `state` (lo que se evalúa: string/objeto/array),
+  `model: "jev-latest"` y `questions` (mapa de preguntas tipadas).
+- **Tres tipos de pregunta**, cada una con `type` + `instructions`:
+  - `noul` — probabilidad (0-1) de un sí/no.
+  - `choice` — elige una opción de un conjunto fijo, **hasta 255**.
+  - `score` — puntúa contra una rúbrica ordenada, **2 a 10 niveles**.
+- **Respuesta:** `answers` (por id de pregunta, con `probabilities` y
+  `confidence` en `choice`/`score`) + `usage.input_tokens`/`output_tokens`.
+- **Precio:** $0.042 por millón de tokens de entrada; **la salida no cuesta**
+  (no genera prosa). Latencia reportada 70-500 ms.
+- **Presupuesto por petición:** ~32.000 tokens de entrada (~150.000
+  caracteres en inglés) — ojo, el inventario de tareas o el histórico de una
+  conversación larga puede acercarse a ese límite si se manda entero como
+  `state`.
+- También disponible vía **OpenRouter** y **Cloudflare AI** como proveedor
+  alternativo, si alguna vez conviene no depender directo de TypeSafe.
+- Fuente primaria: `docs.typesafe.ai/api` (no se ha leído el resto de la
+  documentación —autenticación de cuenta, SDKs por lenguaje, si hace falta
+  alta nueva— eso queda para cuando se decida integrar de verdad).
+
+Encaja con el patrón que ya sugería la sección de abajo: el `state` sería el
+mensaje del usuario + el contexto candidato (documentos, tramos de
+inventario), y las `questions` tipo `choice` o varias `noul` en paralelo
+decidirían qué incluir. El límite de 255 opciones en `choice` alcanza de sobra
+para «qué documentos incluir» o «qué tramo de historial»; para «inventario de
+tareas, sí/no, y si sí cuánto» probablemente hagan falta varias preguntas
+`noul`/`score` en la misma llamada en vez de una sola `choice`.
+
+Sigue pendiente, antes de integrar: dar de alta la cuenta/API key de
+TypeSafe, y decidir si se llama directo o vía OpenRouter (que ya podría
+simplificar si en algún momento se usa OpenRouter para algo más).
 
 ### Mi opinión, con matices
 
