@@ -422,6 +422,39 @@ export const ASSISTANT_ATTACHMENT_ALLOWED_MIME = [
  */
 export const ASSISTANT_ATTACHMENT_ACCEPT = `${ASSISTANT_ATTACHMENT_ALLOWED_MIME.join(',')},.md,.markdown,.txt`;
 
+/** Espejos de `contracts` (`assistant.dto.ts`). Una prueba de `web` los compara. */
+export const ASSISTANT_PDF_MAX_INLINE_PAGES = 25;
+export const ASSISTANT_TEXT_MAX_CHARS = 40_000;
+
+/**
+ * Los tres tipos que ofrece el «+» del compositor, cada uno con **lo que PRAX
+ * lee de verdad** (D17 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+ *
+ * El botón de imagen aceptaba GIF, que el modelo no lee y el servidor rechaza:
+ * un menú que ofrece lo que luego no funciona enseña a no fiarse de él. Aquí
+ * cada tipo dice su límite, y `accept` sale de la misma lista.
+ */
+export const TIPOS_DE_ADJUNTO = [
+  {
+    id: 'imagen',
+    etiqueta: 'Imagen',
+    detalle: 'PNG, JPEG o WebP',
+    accept: 'image/png,image/jpeg,image/webp',
+  },
+  {
+    id: 'pdf',
+    etiqueta: 'PDF',
+    detalle: `Lo lee entero hasta ${ASSISTANT_PDF_MAX_INLINE_PAGES} páginas; más, solo su texto`,
+    accept: 'application/pdf',
+  },
+  {
+    id: 'texto',
+    etiqueta: 'Texto',
+    detalle: `.md o .txt, hasta ${(ASSISTANT_TEXT_MAX_CHARS / 1000).toFixed(0)} mil caracteres`,
+    accept: 'text/plain,text/markdown,text/x-markdown,.md,.markdown,.txt',
+  },
+] as const;
+
 /**
  * Un archivo ya subido, tal y como lo ve el chat.
  *

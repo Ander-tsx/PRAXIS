@@ -137,7 +137,7 @@ export function ProposalGroup({ children }: ProposalGroupProps) {
         </span>
 
         {enviando ? (
-          <span className="ml-auto font-sans text-xs text-white">Aceptando…</span>
+          <span className="ml-auto font-sans text-xs text-text-secondary">Aceptando…</span>
         ) : (
           pendientes > 1 && (
             <button
@@ -250,7 +250,7 @@ function Flecha({
       disabled={disabled}
       aria-label={texto}
       title={texto}
-      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-white transition-colors hover:bg-surface hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
     >
       <svg
         className="h-4 w-4"

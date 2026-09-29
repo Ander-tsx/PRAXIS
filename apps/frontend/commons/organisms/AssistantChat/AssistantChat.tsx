@@ -6,6 +6,7 @@ import {
   ASSISTANT_ATTACHMENT_ALLOWED_MIME,
   ASSISTANT_ATTACHMENT_MAX_BYTES,
   ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE,
+  TIPOS_DE_ADJUNTO,
   type AssistantAttachment,
   type AssistantProposal,
   type AssistantQuota,
@@ -62,9 +63,11 @@ import {
   EditProposalCard,
   MarkStepsProposalCard,
   DocumentProposalCard,
+  FamiliaDePropuesta,
   DocumentRevisionProposalCard,
   AutomationProposalCard,
   AutomationStateProposalCard,
+  familiaDe,
   MessageProposalCard,
   PrivateMessageProposalCard,
   PlanningProposalCard,
@@ -202,17 +205,17 @@ export interface AssistantChatProps {
    * hacerlo cuatro veces.
    */
   /**
-   * - `panel` — tarjeta con borde, para incrustar en una página.
    * - `pantalla` — ocupa el alto, la conversación **es** la pantalla (zona
    *   `/assistant`).
-   * - `cajon` — como `pantalla`, dentro de la columna lateral del armazón
-   *   (Análisis).
    * - `flotante` — dentro de la ventana arrastrable de PRAX global
    *   (`PraxWindow`). Como `pantalla` en mecánica, con cabecera propia: el
    *   nombre a la izquierda con desplegable de conversaciones recientes, y a la
    *   derecha nueva conversación, cambio de modo y cerrar.
    */
-  variante?: 'panel' | 'pantalla' | 'cajon' | 'flotante';
+  /* `panel` y `cajon` se retiraron en F8 de PLAN-PRAX-SEMIAGENTICO: no las
+     montaba nadie desde que Análisis se archivó, y cada rama muerta era un
+     sitio más donde un cambio de diseño se podía quedar a medias. */
+  variante?: 'pantalla' | 'flotante';
   /** Oculta el botón de historial, usado cuando no queremos que el usuario recupere conversaciones anteriores en un contexto específico. */
   sinHistorial?: boolean;
   /**
@@ -291,15 +294,13 @@ export function AssistantChat({
   onElegirProyecto,
   conversacionInicial = null,
   sugerenciaExterna = null,
-  variante = 'panel',
+  variante = 'pantalla',
   sinHistorial = false,
   userName,
   organizacionActivaId = null,
 }: AssistantChatProps) {
-  /* Las variantes «altas» comparten toda la mecánica de alto y scroll; lo que
+  /* Las dos variantes comparten toda la mecánica de alto y scroll; lo que
      cambia es la carcasa y la cabecera. */
-  const aPantalla = variante === 'pantalla' || variante === 'cajon' || variante === 'flotante';
-  const enCajon = variante === 'cajon';
   const esFlotante = variante === 'flotante';
   /* `projectId` → nombre, para que el historial diga de qué iba cada
      conversación sin abrirla. Se construye aquí y no en la page porque el
@@ -524,28 +525,11 @@ export function AssistantChat({
   const campoId = useId();
 
   /** Abre el selector de archivos, con `accept` de imagen o el general. */
-  const abrirSelector = useCallback((soloImagenes: boolean) => {
+  const abrirSelector = useCallback((accept: string) => {
     const el = archivoRef.current;
     if (!el) return;
-    el.accept = soloImagenes
-      ? 'image/png,image/jpeg,image/webp,image/gif'
-      : ASSISTANT_ATTACHMENT_ACCEPT;
+    el.accept = accept;
     el.click();
-  }, []);
-
-  /** Mete un fragmento en el cursor del campo y devuelve el foco. */
-  const insertarEnCampo = useCallback((fragmento: string) => {
-    const el = campoRef.current;
-    if (!el) return;
-    const inicio = el.selectionStart ?? el.value.length;
-    const fin = el.selectionEnd ?? el.value.length;
-    const nuevo = `${el.value.slice(0, inicio)}${fragmento}${el.value.slice(fin)}`;
-    setTexto(nuevo);
-    requestAnimationFrame(() => {
-      el.focus();
-      const cursor = inicio + fragmento.length;
-      el.setSelectionRange(cursor, cursor);
-    });
   }, []);
 
   /**
@@ -893,29 +877,16 @@ export function AssistantChat({
   return (
     <section
       ref={seccionRef}
-      className={
-        aPantalla
-          ? /* Sin tarjeta y sin borde: aquí no hay nada de lo que separarse,
-                 porque la conversación **es** la pantalla. `min-h-0` es lo que
-                 permite que el hilo de dentro se desplace en vez de estirar el
-                 contenedor — sin él, un `flex-1` con contenido largo crece y el
-                 scroll se lo queda la página entera, que es justo lo que se
-                 quiere evitar en un chat. */
-            /* `esFlotante` ya no se acolcha aquí: vive dentro de un
-                 `SlideOver` sin cabecera propia (ver `SlideOver.tsx`) y es
-                 ESE panel quien pone el margen alrededor — acolcharlo también
-                 aquí era el doble espacio que se veía arriba del todo. */
-            `flex min-h-0 flex-1 flex-col gap-4 ${enCajon ? 'p-4' : ''}`
-          : 'flex flex-col gap-4 rounded-sm border p-5'
-      }
+      className="flex min-h-0 flex-1 flex-col gap-4"
       style={
         esFlotante
           ? /* El minichat comparte el tono de la barra lateral. */
             { background: '#202020' }
-          : aPantalla
-            ? undefined
-            : { borderColor: alpha(colors.primary, 25), background: colors.surface }
+          : undefined
       }
+      /* La paleta casi negra de la aplicación (theme.css, `data-tone`), no la
+         azulada de `:root`: el dueño del producto la pidió para PRAX. */
+      data-tone="dark"
       aria-label={`${PRAX_NAME}, el asistente`}
     >
       {/* ⚠️ `shrink-0`: en una columna flex, un hijo se encoge por defecto
@@ -998,7 +969,7 @@ export function AssistantChat({
              */}
             {vista === 'chat' &&
               projectId &&
-              (enBlanco && !enCajon ? (
+              (enBlanco ? (
                 <button
                   type="button"
                   onClick={() => onElegirProyecto?.('', null)}
@@ -1040,7 +1011,7 @@ export function AssistantChat({
               ))}
 
             {vista === 'historial' && (
-              <p className="font-sans text-sm text-white">
+              <p className="font-sans text-sm text-text-secondary">
                 Tus conversaciones. Abre una para seguir donde la dejaste.
               </p>
             )}
@@ -1077,8 +1048,8 @@ export function AssistantChat({
               disabled={mensajes.length === 0}
               className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 esFlotante
-                  ? 'text-white enabled:hover:bg-white/5 enabled:hover:text-white'
-                  : 'h-10 w-10 rounded-sm border text-white enabled:hover:bg-surface-elevated enabled:hover:text-text-primary'
+                  ? 'text-text-secondary enabled:hover:bg-white/5 enabled:hover:text-text-primary'
+                  : 'h-10 w-10 rounded-sm border text-text-secondary enabled:hover:bg-surface-elevated enabled:hover:text-text-primary'
               }`}
               style={esFlotante ? undefined : { borderColor: colors.border }}
             >
@@ -1115,7 +1086,7 @@ export function AssistantChat({
               className={`flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 vista === 'historial'
                   ? 'bg-surface-elevated text-text-primary'
-                  : 'text-white hover:bg-surface-elevated hover:text-text-primary'
+                  : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
               }`}
               style={{ borderColor: colors.border }}
             >
@@ -1166,7 +1137,7 @@ export function AssistantChat({
                 onClick={prax.aPantallaCompleta}
                 title="Pantalla completa"
                 aria-label="Abrir PRAX a pantalla completa"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/5 hover:text-white"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary"
               >
                 <svg
                   className="h-4 w-4"
@@ -1188,7 +1159,7 @@ export function AssistantChat({
                 onClick={prax.cerrar}
                 title="Cerrar"
                 aria-label="Cerrar PRAX"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/5 hover:text-white"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary"
               >
                 <svg
                   className="h-4 w-4"
@@ -1221,20 +1192,18 @@ export function AssistantChat({
             setConversationId(null);
             setMensajes([]);
           }}
-          filtroProyectoId={enCajon ? projectId : null}
+          filtroProyectoId={null}
         />
       ) : (
         /* En pantalla completa esto tiene que ser una columna que crezca: el
              hilo se lleva el alto sobrante y el compositor se queda abajo. Un
              fragmento no puede llevar clases, así que aquí sí hace falta un
              `div` — en modo panel es transparente porque no lleva ninguna. */
-        <div className={aPantalla ? 'flex min-h-0 flex-1 flex-col gap-4' : 'contents'}>
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
           {mensajes.length > 0 && (
             <div
               ref={hiloRef}
-              className={`scrollbar-slim flex flex-col gap-4 overflow-y-auto pr-1 ${
-                aPantalla ? 'min-h-0 flex-1' : 'max-h-[28rem]'
-              }`}
+              className="scrollbar-slim flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1"
               aria-live="polite"
             >
               {mensajes.map((mensaje) => (
@@ -1252,7 +1221,7 @@ export function AssistantChat({
                   {mensaje.role === 'model' && mensaje.uso && (
                     /* Lo que costó esta respuesta (D9). Discreto: está para quien lo
                          busque, no para distraer de lo que dijo. */
-                    <p className="-mt-1 font-sans text-[11px] text-text-disabled tabular-nums">
+                    <p className="-mt-3 pl-9 font-sans text-[11px] text-text-disabled tabular-nums">
                       {formatearTokens(mensaje.uso.tokensPrax)} tokens PRAX
                       {mensaje.uso.vueltas > 1 &&
                         ` · consultó ${mensaje.uso.vueltas - 1} ${mensaje.uso.vueltas === 2 ? 'vez' : 'veces'}`}
@@ -1265,304 +1234,311 @@ export function AssistantChat({
                        las que se acepten o descarten aquí mismo, no solo las que
                        ya vinieran decididas de una conversación vieja. */
                     <ProposalGroup>
-                      {(mensaje.proposals ?? []).map((propuesta, indice) => {
-                        if (isTaskProposal(propuesta)) {
-                          return (
-                            <TaskProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isAssignmentProposal(propuesta)) {
-                          return (
-                            <AssignProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isEditProposal(propuesta)) {
-                          return (
-                            <EditProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isMoveProposal(propuesta)) {
-                          return (
-                            <MoveProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isChecklistProposal(propuesta)) {
-                          return (
-                            <ChecklistProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isCommentProposal(propuesta)) {
-                          return (
-                            <CommentProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isCheckStepsProposal(propuesta)) {
-                          return (
-                            <MarkStepsProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isPrivateMessageProposal(propuesta)) {
-                          return (
-                            <PrivateMessageProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                              conversationId={conversationId}
-                            />
-                          );
-                        }
-                        if (isMessageProposal(propuesta)) {
-                          return (
-                            <MessageProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                              conversationId={conversationId}
-                            />
-                          );
-                        }
-                        /* El borrado es el único destructivo, así que su guarda
+                      {(mensaje.proposals ?? []).map((propuesta, indice) => (
+                        <FamiliaDePropuesta.Provider
+                          key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                          value={{ familia: familiaDe(propuesta.tool), indice }}
+                        >
+                          {((): React.ReactNode => {
+                            if (isTaskProposal(propuesta)) {
+                              return (
+                                <TaskProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isAssignmentProposal(propuesta)) {
+                              return (
+                                <AssignProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isEditProposal(propuesta)) {
+                              return (
+                                <EditProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isMoveProposal(propuesta)) {
+                              return (
+                                <MoveProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isChecklistProposal(propuesta)) {
+                              return (
+                                <ChecklistProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isCommentProposal(propuesta)) {
+                              return (
+                                <CommentProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isCheckStepsProposal(propuesta)) {
+                              return (
+                                <MarkStepsProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isPrivateMessageProposal(propuesta)) {
+                              return (
+                                <PrivateMessageProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                  conversationId={conversationId}
+                                />
+                              );
+                            }
+                            if (isMessageProposal(propuesta)) {
+                              return (
+                                <MessageProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                  conversationId={conversationId}
+                                />
+                              );
+                            }
+                            /* El borrado es el único destructivo, así que su guarda
                            es la más estrecha de la cadena: `proponer_borrado`
                            **y** un `taskId` de verdad. Lo que no puede pasar
                            nunca es lo contrario —que una guarda ancha se coma un
                            borrado y lo pinte como un cambio inocuo—, y ninguna
                            de las de arriba mira este `tool`. */
-                        /* Preguntar no propone ningún cambio, así que ninguna
+                            /* Preguntar no propone ningún cambio, así que ninguna
                            de las guardas de abajo la reclama: el orden aquí solo
                            ahorra recorrerlas. */
-                        if (isDocumentProposal(propuesta)) {
-                          return (
-                            <DocumentProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isDocumentRevisionProposal(propuesta)) {
-                          return (
-                            <DocumentRevisionProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isAutomationProposal(propuesta)) {
-                          return (
-                            <AutomationProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isAutomationStateProposal(propuesta)) {
-                          return (
-                            <AutomationStateProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isSprintProposal(propuesta)) {
-                          return (
-                            <SprintProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isStartSprintProposal(propuesta)) {
-                          return (
-                            <StartSprintProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isPlanningProposal(propuesta)) {
-                          return (
-                            <PlanningProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isBoardProposal(propuesta)) {
-                          return (
-                            <BoardProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        /**
-                         * Las dos de una conversación **sin proyecto**.
-                         *
-                         * Van antes que las demás porque son las únicas que
-                         * pueden llegar sin foco, y las dos acaban en el mismo
-                         * gesto: cargar un proyecto en esta misma conversación
-                         * —uno que ya existía, o el que se acaba de crear— sin
-                         * perder lo que se lleva hablado.
-                         */
-                        if (isOpenProjectProposal(propuesta)) {
-                          return (
-                            <OpenProjectProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              onAbrir={(elegido) => onElegirProyecto?.(elegido, conversationId)}
-                            />
-                          );
-                        }
-                        if (isTemplateProposal(propuesta)) {
-                          return (
-                            <TemplateProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                            />
-                          );
-                        }
-                        if (isQuestionProposal(propuesta)) {
-                          return (
-                            <QuestionProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                              /* Responder es mandar un turno más, no llamar a
+                            if (isDocumentProposal(propuesta)) {
+                              return (
+                                <DocumentProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isDocumentRevisionProposal(propuesta)) {
+                              return (
+                                <DocumentRevisionProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isAutomationProposal(propuesta)) {
+                              return (
+                                <AutomationProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isAutomationStateProposal(propuesta)) {
+                              return (
+                                <AutomationStateProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isSprintProposal(propuesta)) {
+                              return (
+                                <SprintProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isStartSprintProposal(propuesta)) {
+                              return (
+                                <StartSprintProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isPlanningProposal(propuesta)) {
+                              return (
+                                <PlanningProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            if (isBoardProposal(propuesta)) {
+                              return (
+                                <BoardProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            /**
+                             * Las dos de una conversación **sin proyecto**.
+                             *
+                             * Van antes que las demás porque son las únicas que
+                             * pueden llegar sin foco, y las dos acaban en el mismo
+                             * gesto: cargar un proyecto en esta misma conversación
+                             * —uno que ya existía, o el que se acaba de crear— sin
+                             * perder lo que se lleva hablado.
+                             */
+                            if (isOpenProjectProposal(propuesta)) {
+                              return (
+                                <OpenProjectProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  onAbrir={(elegido) => onElegirProyecto?.(elegido, conversationId)}
+                                />
+                              );
+                            }
+                            if (isTemplateProposal(propuesta)) {
+                              return (
+                                <TemplateProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                />
+                              );
+                            }
+                            if (isQuestionProposal(propuesta)) {
+                              return (
+                                <QuestionProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                  /* Responder es mandar un turno más, no llamar a
                                  ningún endpoint. Ver `QuestionProposalCard`. */
-                              onResponder={enviar}
-                            />
-                          );
-                        }
-                        if (isDeleteProposal(propuesta)) {
-                          return (
-                            <DeleteProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId ?? ''}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        /* Una herramienta que el servicio conozca y esta pantalla no.
+                                  onResponder={enviar}
+                                />
+                              );
+                            }
+                            if (isDeleteProposal(propuesta)) {
+                              return (
+                                <DeleteProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
+                            /* Una herramienta que el servicio conozca y esta pantalla no.
                    Se ignora en silencio: la burbuja de texto ya está pintada. */
-                        return null;
-                      })}
+                            return null;
+                          })()}
+                        </FamiliaDePropuesta.Provider>
+                      ))}
                     </ProposalGroup>
                   )}
                 </div>
@@ -1570,126 +1546,107 @@ export function AssistantChat({
 
               {pendiente &&
                 (enVivo?.texto ? (
-                  /* El texto según lo escribe PRAX, con un cursor al final. La
-                       burbuja definitiva la pone el `fin` del turno. */
-                  <div className="max-w-[85%] whitespace-pre-wrap font-sans text-sm text-text-primary">
-                    {enVivo.texto}
-                    <span
-                      className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-pulse bg-text-primary"
-                      aria-hidden="true"
-                    />
-                  </div>
+                  /* El texto según lo escribe PRAX. La respuesta definitiva la
+                     pone el `fin` del turno, en el mismo marco. */
+                  <MensajeDePrax>
+                    <TextoEnVivo texto={enVivo.texto} />
+                  </MensajeDePrax>
                 ) : (
                   <FlujoDePensamiento pasos={enVivo?.pasos ?? []} alAvanzar={irAlFondo} />
                 ))}
             </div>
           )}
 
-          {mensajes.length === 0 &&
-            (aPantalla ? (
-              /**
-               * El recibimiento, **dentro del hilo y en el sitio donde va a
-               * aparecer la primera respuesta**.
-               *
-               * Antes esto era una portada aparte encima del chat: la cara
-               * grande, cuatro tarjetas de capacidades y un aviso. Ocupaba
-               * media pantalla para decir algo que solo hace falta leer una
-               * vez, y empujaba la conversación —que es a lo que se viene—
-               * hacia abajo.
-               *
-               * Ahora vive donde estaba el vacío: se lee al entrar, y en
-               * cuanto se escribe la primera pregunta desaparece solo, sin
-               * dejar hueco. Es la diferencia entre una pantalla con un chat
-               * dentro y una pantalla que **es** un chat.
-               */
-              <div className="flex flex-1 flex-col items-center justify-center gap-5 py-8 text-center">
-                <PraxAvatar mood="idle" size="xl" />
+          {mensajes.length === 0 && (
+            /**
+             * El recibimiento, **dentro del hilo y en el sitio donde va a
+             * aparecer la primera respuesta**.
+             *
+             * Antes esto era una portada aparte encima del chat: la cara
+             * grande, cuatro tarjetas de capacidades y un aviso. Ocupaba
+             * media pantalla para decir algo que solo hace falta leer una
+             * vez, y empujaba la conversación —que es a lo que se viene—
+             * hacia abajo.
+             *
+             * Ahora vive donde estaba el vacío: se lee al entrar, y en
+             * cuanto se escribe la primera pregunta desaparece solo, sin
+             * dejar hueco. Es la diferencia entre una pantalla con un chat
+             * dentro y una pantalla que **es** un chat.
+             */
+            <div className="flex flex-1 flex-col items-center justify-center gap-5 py-8 text-center">
+              <PraxAvatar mood="idle" size="xl" />
 
-                <div className="flex max-w-lg flex-col gap-2">
-                  <p className="font-display text-2xl text-text-primary">
-                    {projectId
-                      ? 'Pregúntame por este proyecto'
-                      : userName
-                        ? `Hola ${userName}, ¿qué tal todo?`
-                        : 'Hola, ¿qué tal todo?'}
-                  </p>
-                  {/**
-                   * ⚠️ **Sin foco esto decía «elige un proyecto», y era una
-                   * puerta cerrada.** Con el compositor detrás de esa
-                   * elección, el saludo no daba la bienvenida: daba un
-                   * requisito. Ahora dice lo que de verdad se puede hacer
-                   * aquí, que es hablar — y elegir proyecto pasa a ser una de
-                   * las opciones, no el peaje.
-                   */}
-                  <p className="font-serif text-base italic text-white">
-                    {projectId
-                      ? 'Dime lo que necesitas de este proyecto y yo te lo facilito.'
-                      : 'Pregúntame lo que quieras, o empecemos hablando de alguno de tus proyectos.'}
-                  </p>
-                </div>
-
-                {/**
-                 * Con foco, preguntas de arranque. Sin foco, **los proyectos**.
-                 *
-                 * Es el mismo gesto —pulsar en vez de escribir— y por eso
-                 * comparten sitio: lo primero que hace falta decidir no es qué
-                 * preguntar, es de qué proyecto. Elegir aquí navega, y el
-                 * contexto lo recalcula el servidor (ver `onElegirProyecto`).
-                 */}
-                <div className="flex max-w-2xl flex-wrap justify-center gap-2">
+              <div className="flex max-w-lg flex-col gap-2">
+                <p className="font-display text-2xl text-text-primary">
                   {projectId
-                    ? SUGERENCIAS.map((sugerencia) => (
-                        <Sugerencia
-                          key={sugerencia}
-                          texto={sugerencia}
-                          agotada={agotada}
-                          onElegir={enviar}
-                        />
-                      ))
-                    : proyectos.map((proyecto) => (
-                        <button
-                          key={proyecto.id}
-                          type="button"
-                          onClick={() => onElegirProyecto?.(proyecto.id, conversationId)}
-                          className="rounded-full border border-border px-4 py-2 font-sans text-sm text-white transition-colors hover:border-primary hover:bg-surface-elevated hover:text-text-primary"
-                        >
-                          {proyecto.name}
-                        </button>
-                      ))}
-                </div>
-
+                    ? 'Pregúntame por este proyecto'
+                    : userName
+                      ? `Hola ${userName}, ¿qué tal todo?`
+                      : 'Hola, ¿qué tal todo?'}
+                </p>
                 {/**
-                 * Sin proyectos que ofrecer, decirlo.
-                 *
-                 * ⚠️ Y decir **otra cosa** que antes: la frase era «todavía no
-                 * tengo datos de los que hablar», que con el compositor
-                 * apagado describía una pantalla inútil. Ahora se puede
-                 * escribir, así que lo que falta no es con quién hablar sino
-                 * qué mirar — y montar el primer proyecto es justo lo que PRAX
-                 * sabe hacer sin ninguno.
+                 * ⚠️ **Sin foco esto decía «elige un proyecto», y era una
+                 * puerta cerrada.** Con el compositor detrás de esa
+                 * elección, el saludo no daba la bienvenida: daba un
+                 * requisito. Ahora dice lo que de verdad se puede hacer
+                 * aquí, que es hablar — y elegir proyecto pasa a ser una de
+                 * las opciones, no el peaje.
                  */}
-                {!projectId && proyectos.length === 0 && (
-                  <p className="max-w-md font-sans text-sm text-white">
-                    No tienes ningún proyecto cuyo análisis puedas abrir. Cuéntame en qué estás
-                    trabajando y te propongo cómo montarlo.
-                  </p>
-                )}
+                <p className="font-serif text-base italic text-text-secondary">
+                  {projectId
+                    ? 'Dime lo que necesitas de este proyecto y yo te lo facilito.'
+                    : 'Pregúntame lo que quieras, o empecemos hablando de alguno de tus proyectos.'}
+                </p>
               </div>
-            ) : (
-              /* En el panel de Análisis no hay sitio para un recibimiento: el
-                   chat comparte pantalla con los gráficos y su cabecera ya dice
-                   qué es. Solo las sugerencias, que son lo accionable. */
-              <div className="flex flex-wrap gap-2">
-                {SUGERENCIAS.map((sugerencia) => (
-                  <Sugerencia
-                    key={sugerencia}
-                    texto={sugerencia}
-                    agotada={agotada}
-                    onElegir={enviar}
-                  />
-                ))}
+
+              {/**
+               * Con foco, preguntas de arranque. Sin foco, **los proyectos**.
+               *
+               * Es el mismo gesto —pulsar en vez de escribir— y por eso
+               * comparten sitio: lo primero que hace falta decidir no es qué
+               * preguntar, es de qué proyecto. Elegir aquí navega, y el
+               * contexto lo recalcula el servidor (ver `onElegirProyecto`).
+               */}
+              <div className="flex max-w-2xl flex-wrap justify-center gap-2">
+                {projectId
+                  ? SUGERENCIAS.map((sugerencia) => (
+                      <Sugerencia
+                        key={sugerencia}
+                        texto={sugerencia}
+                        agotada={agotada}
+                        onElegir={enviar}
+                      />
+                    ))
+                  : proyectos.map((proyecto) => (
+                      <button
+                        key={proyecto.id}
+                        type="button"
+                        onClick={() => onElegirProyecto?.(proyecto.id, conversationId)}
+                        className="rounded-full border border-border px-4 py-2 font-sans text-sm text-text-secondary transition-colors hover:border-primary hover:bg-surface-elevated hover:text-text-primary"
+                      >
+                        {proyecto.name}
+                      </button>
+                    ))}
               </div>
-            ))}
+
+              {/**
+               * Sin proyectos que ofrecer, decirlo.
+               *
+               * ⚠️ Y decir **otra cosa** que antes: la frase era «todavía no
+               * tengo datos de los que hablar», que con el compositor
+               * apagado describía una pantalla inútil. Ahora se puede
+               * escribir, así que lo que falta no es con quién hablar sino
+               * qué mirar — y montar el primer proyecto es justo lo que PRAX
+               * sabe hacer sin ninguno.
+               */}
+              {!projectId && proyectos.length === 0 && (
+                <p className="max-w-md font-sans text-sm text-text-secondary">
+                  No tienes ningún proyecto cuyo análisis puedas abrir. Cuéntame en qué estás
+                  trabajando y te propongo cómo montarlo.
+                </p>
+              )}
+            </div>
+          )}
 
           {/**
            * ⚠️ **Antes esto era `!projectId ? null : …` y esa era la reja.**
@@ -1750,7 +1707,7 @@ export function AssistantChat({
                             chip no cambia de tamaño al terminar. */}
                       {adjunto.id === null ? (
                         <span
-                          className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent text-white"
+                          className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent text-text-secondary"
                           aria-label="Subiendo"
                         />
                       ) : (
@@ -1759,14 +1716,14 @@ export function AssistantChat({
                       <span className="max-w-48 truncate font-sans text-xs text-text-primary">
                         {adjunto.name}
                       </span>
-                      <span className="shrink-0 font-sans text-[11px] text-white">
+                      <span className="shrink-0 font-sans text-[11px] text-text-secondary">
                         {enKilobytes(adjunto.bytes)}
                       </span>
                       <button
                         type="button"
                         onClick={() => quitarAdjunto(adjunto.localId)}
                         aria-label={`Quitar ${adjunto.name}`}
-                        className="shrink-0 rounded text-white transition-colors hover:text-error"
+                        className="shrink-0 rounded text-text-secondary transition-colors hover:text-error"
                       >
                         <svg
                           className="h-3.5 w-3.5"
@@ -1831,7 +1788,7 @@ export function AssistantChat({
                     area.style.height = 'auto';
                     area.style.height = `${Math.min(area.scrollHeight, 160)}px`;
                   }}
-                  className="max-h-40 w-full resize-none bg-transparent px-1.5 py-1 font-sans text-sm text-text-primary outline-none placeholder:text-white disabled:cursor-not-allowed"
+                  className="max-h-40 w-full resize-none bg-transparent px-1.5 py-1 font-sans text-sm text-text-primary outline-none placeholder:text-text-secondary disabled:cursor-not-allowed"
                 />
 
                 {/* La fila de acciones, debajo del campo: a la izquierda el
@@ -1840,10 +1797,7 @@ export function AssistantChat({
                   <ComposerMasMenu
                     disabled={pendiente}
                     alTope={adjuntos.length >= ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE}
-                    onAdjuntarImagen={() => abrirSelector(true)}
-                    onAdjuntarArchivo={() => abrirSelector(false)}
-                    onEtiquetarProyecto={() => insertarEnCampo('#')}
-                    onEtiquetarPersona={() => insertarEnCampo('@')}
+                    onAdjuntar={abrirSelector}
                   />
 
                   <RecursosMenu organizacionActivaId={organizacionActivaId ?? null} />
@@ -1895,7 +1849,7 @@ export function AssistantChat({
                 </div>
               </div>
 
-              <p className="font-sans text-xs text-white">
+              <p className="font-sans text-xs text-text-secondary">
                 {PRAX_NAME} puede equivocarse. Revisa cada propuesta antes de aceptarla.
               </p>
 
@@ -1979,7 +1933,7 @@ function Sugerencia({
       type="button"
       disabled={agotada}
       onClick={() => onElegir(texto)}
-      className="rounded-full border border-border px-3.5 py-2 font-sans text-sm text-white transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+      className="rounded-full border border-border px-3.5 py-2 font-sans text-sm text-text-secondary transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
     >
       {texto}
     </button>
@@ -2037,28 +1991,47 @@ function Burbuja({
      Un `<p>` vacío debajo de la miniatura se ve como un hueco raro. */
   const conTexto = mensaje.text.trim().length > 0;
 
+  /**
+   * Quien pregunta, en burbuja; PRAX, sin ella (D11 de
+   * docs/PLAN-PRAX-SEMIAGENTICO.md).
+   *
+   * La burbuja era igual para los dos y la conversación se leía como un chat
+   * entre dos personas. PRAX escribe respuestas largas —listas, tablas,
+   * propuestas debajo—, y en una burbuja del 85 % todo eso quedaba apretado.
+   * Sin ella, su texto ocupa el ancho del hilo y lo que es tuyo se distingue
+   * de un vistazo.
+   */
+  if (mio) {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <div
+          className="flex max-w-[80%] min-w-0 flex-col gap-2 rounded-2xl rounded-br-md px-4 py-2.5 font-sans text-sm leading-relaxed text-text-primary"
+          style={{ background: `color-mix(in srgb, ${colors.primary} 22%, ${colors.surface})` }}
+        >
+          {adjuntos.map((adjunto) => (
+            <AdjuntoEnLaBurbuja key={adjunto.id} adjunto={adjunto} gatewayPath={gatewayPath} />
+          ))}
+          {conTexto && <ModelText texto={mensaje.text} />}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`flex flex-col gap-1 ${mio ? 'items-end' : 'items-start'}`}>
+    <MensajeDePrax>
       <div
-        className={[
-          /* `flex flex-col gap-2` y no `whitespace-pre-wrap`: desde que
-             `ModelText` devuelve bloques —párrafos, listas, código— el salto de
-             línea lo pone el propio bloque. Manteniendo los dos, cada párrafo
-             quedaba separado dos veces. */
-          'flex max-w-[85%] min-w-0 flex-col gap-2 rounded-sm px-3.5 py-2 font-sans text-sm leading-relaxed text-text-primary',
-          /* La esquina de dentro, cuadrada: es lo que da el pico hacia quien
-             habla sin necesidad de dibujar ninguno. Igual que en Mensajes. */
-          mio ? 'rounded-br-md' : 'rounded-bl-md',
-        ].join(' ')}
-        style={{
-          /* La degradada no es del modelo, así que no puede parecerlo: el tinte
-             de aviso la separa de una respuesta de verdad sin sacarla del hilo. */
-          background: mensaje.degradado
-            ? `color-mix(in srgb, ${colors.warning} 14%, ${colors.background})`
-            : mio
-              ? `color-mix(in srgb, ${colors.primary} 16%, ${colors.background})`
-              : colors.surfaceElevated,
-        }}
+        className={
+          mensaje.degradado
+            ? /* La degradada no es del modelo, así que no puede parecerlo: el
+                 tinte de aviso la separa de una respuesta de verdad. */
+              'flex flex-col gap-2 rounded-xl px-3.5 py-2.5'
+            : 'flex flex-col gap-2'
+        }
+        style={
+          mensaje.degradado
+            ? { background: `color-mix(in srgb, ${colors.warning} 14%, ${colors.surface})` }
+            : undefined
+        }
       >
         {adjuntos.map((adjunto) => (
           <AdjuntoEnLaBurbuja key={adjunto.id} adjunto={adjunto} gatewayPath={gatewayPath} />
@@ -2075,6 +2048,77 @@ function Burbuja({
           </button>
         )}
       </div>
+    </MensajeDePrax>
+  );
+}
+
+/**
+ * El marco de lo que dice PRAX: su icono y su nombre a la izquierda, el texto
+ * a todo el ancho. Lo comparten la respuesta terminada y la que se está
+ * escribiendo, para que al terminar el turno no salte nada de sitio.
+ */
+function MensajeDePrax({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-w-0 gap-3">
+      <div className="mt-0.5 shrink-0">
+        <PraxAvatar mood="idle" size="sm" animate={false} />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 font-sans text-[15px] leading-relaxed text-text-primary">
+        <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-text-secondary">
+          {PRAX_NAME}
+        </span>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * El texto según llega, **a ritmo constante** (D11).
+ *
+ * Gemini entrega a golpes: nada durante medio segundo y luego cuarenta
+ * palabras. Pintar cada golpe tal cual se lee como un texto que salta, no como
+ * alguien escribiendo. Esto va soltando caracteres en cada fotograma, más
+ * deprisa cuanto más atrás se ha quedado —así nunca se retrasa más de medio
+ * segundo—, y termina con un cursor de bloque.
+ *
+ * Con `prefers-reduced-motion` enseña lo que haya, sin animar.
+ */
+function TextoEnVivo({ texto }: { texto: string }) {
+  const [mostrado, setMostrado] = useState(0);
+  const objetivo = useRef(texto.length);
+  objetivo.current = texto.length;
+
+  useEffect(() => {
+    const sinMovimiento =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (sinMovimiento) {
+      setMostrado(Number.MAX_SAFE_INTEGER);
+      return;
+    }
+    let marco = 0;
+    const paso = () => {
+      setMostrado((actual) => {
+        const falta = objetivo.current - actual;
+        if (falta <= 0) return actual;
+        /* ~2 caracteres por fotograma (120/s) de base; si hay más de medio
+           segundo de atraso, lo recorta en ese medio segundo. */
+        return actual + Math.max(2, Math.ceil(falta / 30));
+      });
+      marco = requestAnimationFrame(paso);
+    };
+    marco = requestAnimationFrame(paso);
+    return () => cancelAnimationFrame(marco);
+  }, []);
+
+  return (
+    <div className="whitespace-pre-wrap">
+      {texto.slice(0, mostrado)}
+      <span
+        className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-pulse bg-text-primary"
+        aria-hidden="true"
+      />
     </div>
   );
 }
@@ -2136,13 +2180,15 @@ function AdjuntoEnLaBurbuja({
             className="h-full w-full object-cover"
           />
         ) : (
-          <IconoDeArchivo mime={adjunto.mimeType} className="h-4 w-4 text-white" />
+          <IconoDeArchivo mime={adjunto.mimeType} className="h-4 w-4 text-text-secondary" />
         )}
       </span>
 
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-sans text-xs text-text-primary">{adjunto.filename}</span>
-        <span className="font-sans text-[11px] text-white">{enKilobytes(adjunto.size)}</span>
+        <span className="font-sans text-[11px] text-text-secondary">
+          {enKilobytes(adjunto.size)}
+        </span>
       </span>
     </a>
   );
@@ -2339,11 +2385,11 @@ function NombreConRecientes({
         onClick={onAlternar}
         aria-expanded={abierto}
         aria-haspopup="menu"
-        className="flex max-w-full items-center gap-1.5 rounded-md py-0.5 pr-1 font-sans text-sm font-semibold text-white transition-colors hover:text-white"
+        className="flex max-w-full items-center gap-1.5 rounded-md py-0.5 pr-1 font-sans text-sm font-semibold text-text-primary transition-colors hover:text-text-primary"
       >
         <span className="truncate">{titulo}</span>
         <svg
-          className={`h-3.5 w-3.5 shrink-0 text-white transition-transform ${abierto ? 'rotate-180' : ''}`}
+          className={`h-3.5 w-3.5 shrink-0 text-text-secondary transition-transform ${abierto ? 'rotate-180' : ''}`}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -2360,7 +2406,9 @@ function NombreConRecientes({
           className="absolute left-0 top-full z-20 mt-1.5 w-64 overflow-hidden rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl"
         >
           {recientes.length === 0 ? (
-            <p className="px-3 py-3 font-sans text-xs text-white">Todavía no hay conversaciones.</p>
+            <p className="px-3 py-3 font-sans text-xs text-text-secondary">
+              Todavía no hay conversaciones.
+            </p>
           ) : (
             recientes.map((c) => (
               <button
@@ -2370,14 +2418,14 @@ function NombreConRecientes({
                 onClick={() => onElegir(c.id)}
                 className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
                   c.id === activaId
-                    ? 'bg-white/10 text-white'
-                    : 'text-white hover:bg-white/5 hover:text-white'
+                    ? 'bg-white/10 text-text-primary'
+                    : 'text-text-secondary hover:bg-white/5 hover:text-text-primary'
                 }`}
               >
                 <span className="min-w-0 flex-1 truncate font-sans text-[13px]">
                   {c.title || 'Sin título'}
                 </span>
-                <span className="shrink-0 font-sans text-[10px] text-white">
+                <span className="shrink-0 font-sans text-[10px] text-text-secondary">
                   {cuandoCorto(c.updatedAt)}
                 </span>
               </button>
@@ -2392,26 +2440,23 @@ function NombreConRecientes({
 // ─── El «+» del compositor ──────────────────────────────────────────────────
 
 /**
- * El botón «+» del compositor y su desplegable: adjuntar imagen o archivo, y
- * etiquetar un proyecto o una persona (que de momento solo mete `#` o `@` en el
- * campo — el picker con resolución real es más adelante).
+ * El botón «+» del compositor: **solo lo que PRAX sabe leer** (D17 de
+ * docs/PLAN-PRAX-SEMIAGENTICO.md), cada tipo con su límite escrito.
+ *
+ * Tenía además «Etiquetar proyecto» y «Etiquetar persona», que metían un `#` o
+ * un `@` en el campo y nada más: PRAX no los resolvía. Se fueron.
  *
  * El menú se abre **hacia arriba**: el compositor vive pegado al fondo.
  */
 function ComposerMasMenu({
   disabled,
   alTope,
-  onAdjuntarImagen,
-  onAdjuntarArchivo,
-  onEtiquetarProyecto,
-  onEtiquetarPersona,
+  onAdjuntar,
 }: {
   disabled: boolean;
   alTope: boolean;
-  onAdjuntarImagen: () => void;
-  onAdjuntarArchivo: () => void;
-  onEtiquetarProyecto: () => void;
-  onEtiquetarPersona: () => void;
+  /** Abre el selector con el `accept` del tipo elegido. */
+  onAdjuntar: (accept: string) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -2432,10 +2477,11 @@ function ComposerMasMenu({
     };
   }, [abierto]);
 
-  function elegir(accion: () => void) {
-    setAbierto(false);
-    accion();
-  }
+  const ICONOS: Record<string, string> = {
+    imagen: 'M4 5h16v14H4zM4 16l4-4 3 3 4-5 5 6M9 9.5a1 1 0 11-2 0 1 1 0 012 0z',
+    pdf: 'M14 3v5h5M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z',
+    texto: 'M4 6h16M4 10h16M4 14h10M4 18h7',
+  };
 
   return (
     <div ref={ref} className="relative">
@@ -2445,9 +2491,9 @@ function ComposerMasMenu({
         onClick={() => setAbierto((v) => !v)}
         aria-expanded={abierto}
         aria-haspopup="menu"
-        aria-label="Añadir al mensaje"
-        title="Añadir"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors enabled:hover:bg-white/5 enabled:hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+        aria-label="Adjuntar un archivo"
+        title="Adjuntar"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-secondary transition-colors enabled:hover:bg-white/5 enabled:hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
       >
         <svg
           className={`h-5 w-5 transition-transform ${abierto ? 'rotate-45' : ''}`}
@@ -2464,31 +2510,26 @@ function ComposerMasMenu({
       {abierto && (
         <div
           role="menu"
-          className="absolute bottom-full left-0 z-30 mb-2 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl"
+          className="absolute bottom-full left-0 z-30 mb-2 w-72 overflow-hidden rounded-xl border border-border bg-surface-elevated p-1 shadow-2xl"
         >
-          <ItemMas
-            etiqueta="Adjuntar imagen"
-            disabled={alTope}
-            onClick={() => elegir(onAdjuntarImagen)}
-            d="M4 5h16v14H4zM4 16l4-4 3 3 4-5 5 6M9 9.5a1 1 0 11-2 0 1 1 0 012 0z"
-          />
-          <ItemMas
-            etiqueta="Adjuntar archivo"
-            disabled={alTope}
-            onClick={() => elegir(onAdjuntarArchivo)}
-            d="M14 3v5h5M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z"
-          />
-          <div className="my-1 border-t border-white/5" />
-          <ItemMas
-            etiqueta="Etiquetar proyecto"
-            onClick={() => elegir(onEtiquetarProyecto)}
-            d="M3 7h18M3 12h18M3 17h18"
-          />
-          <ItemMas
-            etiqueta="Etiquetar persona"
-            onClick={() => elegir(onEtiquetarPersona)}
-            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM4 21a8 8 0 0116 0"
-          />
+          {TIPOS_DE_ADJUNTO.map((tipo) => (
+            <ItemMas
+              key={tipo.id}
+              etiqueta={tipo.etiqueta}
+              detalle={tipo.detalle}
+              disabled={alTope}
+              onClick={() => {
+                setAbierto(false);
+                onAdjuntar(tipo.accept);
+              }}
+              d={ICONOS[tipo.id] ?? ''}
+            />
+          ))}
+          <p className="border-t border-border px-3 pb-1.5 pt-2 font-sans text-[11px] text-text-secondary">
+            {alTope
+              ? `Ya llevas ${ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE}: es el máximo por mensaje.`
+              : `Hasta ${ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE} por mensaje, de ${enKilobytes(ASSISTANT_ATTACHMENT_MAX_BYTES)} cada uno.`}
+          </p>
         </div>
       )}
     </div>
@@ -2497,11 +2538,13 @@ function ComposerMasMenu({
 
 function ItemMas({
   etiqueta,
+  detalle,
   d,
   onClick,
   disabled = false,
 }: {
   etiqueta: string;
+  detalle?: string;
   d: string;
   onClick: () => void;
   disabled?: boolean;
@@ -2512,10 +2555,10 @@ function ItemMas({
       role="menuitem"
       disabled={disabled}
       onClick={onClick}
-      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-sans text-[13px] text-white transition-colors enabled:hover:bg-white/5 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-sans text-[13px] text-text-secondary transition-colors enabled:hover:bg-white/5 enabled:hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
     >
       <svg
-        className="h-4 w-4 shrink-0 text-white"
+        className="h-4 w-4 shrink-0 text-text-secondary"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -2524,7 +2567,10 @@ function ItemMas({
       >
         <path strokeLinecap="round" strokeLinejoin="round" d={d} />
       </svg>
-      {etiqueta}
+      <span className="flex min-w-0 flex-col">
+        <span className="text-text-primary">{etiqueta}</span>
+        {detalle && <span className="text-[11px] text-text-secondary">{detalle}</span>}
+      </span>
     </button>
   );
 }

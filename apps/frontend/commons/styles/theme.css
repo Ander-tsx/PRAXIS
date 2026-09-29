@@ -730,3 +730,61 @@ body.arrastrando-en-tablero {
 .arrastrando-en-tablero {
   touch-action: none !important;
 }
+
+/* ============================================================
+   PRAX — propuestas (D12 de docs/PLAN-PRAX-SEMIAGENTICO.md)
+
+   `prax-entrada`: cada tarjeta llega con un fundido y un desplazamiento corto;
+   el retraso lo pone la tarjeta según su posición, así que varias llegan
+   escalonadas en vez de aparecer de golpe.
+
+   `prax-aceptada`: al aceptar, el borde **recorre** un degradado de morado a
+   verde y se queda en verde. Es un borde de dos fondos —el de dentro es la
+   superficie, el de fuera el degradado— porque `border-color` no admite
+   degradados.
+
+   Sin movimiento para quien lo pide al sistema: las dos animaciones se quedan
+   en su estado final.
+   ============================================================ */
+@keyframes prax-entrada {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes prax-borde {
+  from {
+    background-position: 0 0, 100% 0;
+  }
+  to {
+    background-position: 0 0, 0 0;
+  }
+}
+
+.prax-entrada {
+  animation: prax-entrada 320ms ease-out both;
+}
+
+.prax-aceptada {
+  border-color: transparent !important;
+  background:
+    linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
+    linear-gradient(90deg, var(--color-success) 0%, var(--color-success) 45%, var(--color-primary) 55%, var(--color-primary) 100%) border-box;
+  background-size: 100% 100%, 220% 100%;
+  animation: prax-borde 900ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prax-entrada,
+  .prax-aceptada {
+    animation: none;
+  }
+  .prax-aceptada {
+    background-position: 0 0, 0 0;
+  }
+}

@@ -531,11 +531,11 @@ que tocan esquema llevan migración (`prisma:deploy`, **nunca `reset`**).
     automatizaciones.
   - Mensajes de «falta permiso».
   - Revisión de documento aplicada por el editor.
-- [ ] **F8 — Interfaz de PRAX** (D11, D12, D17).
+- [x] **F8 — Interfaz de PRAX** (D11, D12, D17). Ver el registro.
   - Burbujas, texto sin burbuja, cursor y escritura.
   - Propuestas por familia, con animaciones.
   - Menú de adjuntos.
-- [ ] **F9 — Chats de personas** (D14).
+- [x] **F9 — Chats de personas** (D14). Ver el registro.
   - Cabecera y burbuja, agrupación por tiempo.
   - Divisor de automatización, marca «enviado con PRAX».
   - Fuera los `text-white` literales.
@@ -859,3 +859,43 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
       19 propuestas y 7 consultas, **~25 mil caracteres por vuelta** (unos 6-7
       mil tokens), más ~2 mil del catálogo. Un colaborador, ~9 mil. Es lo que
       pedía D10 con Jev eligiendo qué herramientas declarar; queda abierto.
+  - **F9 cerrada** (`64678651`).
+    - `AUTOMATION` se pinta como **divisor** centrado entre líneas punteadas:
+      «⚡ Regla «X» · hora» y el texto que publicó. Era lo que vio el dueño del
+      producto al probarlo: el aviso salía como una burbuja suya.
+    - `ASSISTANT` lleva «con PRAX» en el pie de la burbuja, junto a la hora.
+    - Los bloques del mismo autor se cortan por `CORTE_DE_BLOQUE_MS`: la
+      constante estaba declarada y no la usaba nadie.
+    - Fuera los 43 `text-white` del chat (hallazgo E4).
+    - **Lo que no se cambió, a propósito**: la hora sigue **dentro de cada
+      burbuja** y no en la cabecera, como en la referencia. Está así por los
+      checks de lectura —cada mensaje dice su propio estado—, y el comentario
+      de `MessageBubble` lo explica.
+  - **F8 cerrada.**
+    - **Paleta**: PRAX va bajo `data-tone="dark"`, la casi negra de la
+      aplicación; el gris azulado de `:root` se quedó fuera, como pidió el
+      dueño del producto (2026-09-29).
+    - **Mensajes**: tú en burbuja `rounded-2xl` a la derecha; PRAX sin
+      burbuja, con su icono y la etiqueta, a todo el ancho (`MensajeDePrax`,
+      el mismo marco para el texto en vivo y el terminado). El texto en vivo
+      sale **a ritmo constante** (`TextoEnVivo`: ~120 caracteres/s y nunca más
+      de medio segundo de atraso), con cursor de bloque; sin animación con
+      `prefers-reduced-motion`.
+    - **Propuestas por familia**: crear, cambiar, mover, comunicar, analizar y
+      destruir, cada una con su icono y su acento (`familiaDe`, en un contexto
+      que pone `AssistantChat`, así que ninguna de las veinte tarjetas lo sabe).
+      Cabecera «PROPUESTA · título», borde morado (rojo solo el borrado),
+      entrada escalonada (`prax-entrada`) y, al aceptar, un borde que recorre
+      de morado a verde (`prax-aceptada`, en `theme.css`). Debajo, la nota «con
+      tus permisos, por el mismo botón que usarías tú».
+    - **Adjuntos** (D17): el «+» ofrece Imagen, PDF y Texto, cada uno con su
+      límite escrito. Fuera «Etiquetar proyecto» y «Etiquetar persona», que
+      solo metían un `#` o un `@`. El selector de imagen **aceptaba GIF**, que
+      PRAX no lee y el servidor rechaza. Los topes siguen escritos dos veces
+      (`commons` no puede importar `contracts`), así que
+      `web/src/lib/limites-de-prax.spec.ts` los compara leyendo el contrato.
+    - Fuera las variantes muertas `panel` y `cajon`, y los `text-white` del
+      chat de PRAX.
+    - Verificado en el navegador contra el monolito local y el Gemini falso: la
+      propuesta de mensaje se acepta, el borde pasa a verde y el mensaje aparece
+      en el chat del proyecto con «con PRAX».

@@ -115,6 +115,63 @@ export const RegistroDeEstado = createContext<((estado: Estado) => void) | null>
  */
 export const SenalDeAceptarTodas = createContext(0);
 
+/**
+ * Las seis familias de propuesta (D12 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+ *
+ * Cada una con su acento y su icono, para que en una fila de tarjetas se
+ * distinga de un vistazo qué crea, qué cambia y qué borra. El borde es morado
+ * en todas —es PRAX proponiendo— menos en el borrado, que es rojo: el rojo solo
+ * significa «no se deshace» mientras lo lleve una sola familia.
+ */
+export type Familia = 'crear' | 'cambiar' | 'mover' | 'comunicar' | 'analizar' | 'destruir';
+
+const FAMILIA_DE_HERRAMIENTA: Record<string, Familia> = {
+  proponer_tarea: 'crear',
+  proponer_tablero: 'crear',
+  proponer_sprint: 'crear',
+  proponer_documento: 'crear',
+  proponer_plantilla: 'crear',
+  proponer_automatizacion: 'crear',
+  proponer_edicion: 'cambiar',
+  proponer_asignacion: 'cambiar',
+  proponer_checklist: 'cambiar',
+  proponer_revision_documento: 'cambiar',
+  proponer_estado_automatizacion: 'cambiar',
+  proponer_movimiento: 'mover',
+  proponer_marcar_pasos: 'mover',
+  proponer_planificacion: 'mover',
+  proponer_iniciar_sprint: 'mover',
+  proponer_comentario: 'comunicar',
+  proponer_mensaje: 'comunicar',
+  proponer_mensaje_privado: 'comunicar',
+  proponer_pregunta: 'analizar',
+  proponer_abrir_proyecto: 'analizar',
+  proponer_borrado: 'destruir',
+};
+
+export function familiaDe(tool: string): Familia {
+  return FAMILIA_DE_HERRAMIENTA[tool] ?? 'cambiar';
+}
+
+const ESTILO_DE_FAMILIA: Record<Familia, { acento: string; icono: string; nombre: string }> = {
+  crear: { acento: colors.primary, icono: '+', nombre: 'Crear' },
+  cambiar: { acento: colors.info, icono: '✎', nombre: 'Cambiar' },
+  mover: { acento: colors.accent, icono: '→', nombre: 'Mover' },
+  comunicar: { acento: colors.info, icono: '✉', nombre: 'Comunicar' },
+  analizar: { acento: colors.accent, icono: '?', nombre: 'Preguntar' },
+  destruir: { acento: colors.error, icono: '×', nombre: 'Borrar' },
+};
+
+/**
+ * Qué familia es la tarjeta y en qué puesto llega. Lo pone `AssistantChat` una
+ * vez por propuesta, y lo lee `Marco`: así ninguna de las veinte tarjetas tiene
+ * que saberlo.
+ */
+export const FamiliaDePropuesta = createContext<{ familia: Familia; indice: number }>({
+  familia: 'cambiar',
+  indice: 0,
+});
+
 interface Resultado {
   texto: string;
   href: string | null;
@@ -218,7 +275,9 @@ export function TaskProposalCard({
       <p className="font-sans text-base font-semibold text-text-primary">{propuesta.title}</p>
 
       {propuesta.description && (
-        <p className="font-sans text-sm leading-relaxed text-white">{propuesta.description}</p>
+        <p className="font-sans text-sm leading-relaxed text-text-secondary">
+          {propuesta.description}
+        </p>
       )}
 
       <dl className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -298,7 +357,7 @@ export function AssignProposalCard({
       proposalId={proposalId}
       estadoGuardado={estadoGuardado}
     >
-      <p className="font-sans text-sm text-white">
+      <p className="font-sans text-sm text-text-secondary">
         {/* Con el inventario en el contexto la propuesta ya viaja con el
             título. El id recortado se queda de reserva: identificaba la tarea
             para quien la escribió a mano, no para quien decide si acepta. */}
@@ -322,7 +381,7 @@ export function AssignProposalCard({
       </p>
       {/* La lista sustituye, no añade: hay que decirlo antes de aceptar, no
           después de que alguien desaparezca de una tarea sin enterarse. */}
-      <p className="font-sans text-xs text-white">
+      <p className="font-sans text-xs text-text-secondary">
         {quedan.length > 0
           ? 'Quien no esté en esa lista deja de estar asignado.'
           : 'La tarea se quedaría sin nadie asignado.'}
@@ -402,7 +461,7 @@ function CambioSobreTarea({
       proposalId={proposalId}
       estadoGuardado={estadoGuardado}
     >
-      <p className="font-sans text-sm text-white">
+      <p className="font-sans text-sm text-text-secondary">
         {taskTitle ? (
           <strong className="text-text-primary">{taskTitle}</strong>
         ) : (
@@ -473,7 +532,9 @@ export function EditProposalCard({
       </dl>
 
       {propuesta.description !== undefined && (
-        <p className="font-sans text-sm leading-relaxed text-white">{propuesta.description}</p>
+        <p className="font-sans text-sm leading-relaxed text-text-secondary">
+          {propuesta.description}
+        </p>
       )}
 
       {propuesta.labelIds !== undefined &&
@@ -486,12 +547,12 @@ export function EditProposalCard({
             ))}
           </div>
         ) : (
-          <p className="font-sans text-xs text-white">Se quedaría sin etiquetas.</p>
+          <p className="font-sans text-xs text-text-secondary">Se quedaría sin etiquetas.</p>
         ))}
 
       {propuesta.labelIds !== undefined && marcas.length > 0 && (
         /* Misma advertencia que en los encargados: la lista sustituye. */
-        <p className="font-sans text-xs text-white">
+        <p className="font-sans text-xs text-text-secondary">
           Esas serían todas sus etiquetas; las demás se quitan.
         </p>
       )}
@@ -516,7 +577,7 @@ export function MoveProposalCard({
       estadoGuardado={estadoGuardado}
       ejecutar={() => aceptarMovimientoAction(projectId, propuesta)}
     >
-      <p className="font-sans text-sm text-white">
+      <p className="font-sans text-sm text-text-secondary">
         {propuesta.columnaActual ? (
           <>
             Pasaría de <strong className="text-text-primary">{propuesta.columnaActual}</strong> a{' '}
@@ -542,8 +603,8 @@ export function MoveProposalCard({
             <strong>{propuesta.boardName}</strong>.
           </p>
         ) : (
-          <p className="font-sans text-xs text-white">
-            En el tablero <strong className="text-white">{propuesta.boardName}</strong>.
+          <p className="font-sans text-xs text-text-secondary">
+            En el tablero <strong className="text-text-primary">{propuesta.boardName}</strong>.
           </p>
         ))}
     </CambioSobreTarea>
@@ -572,16 +633,16 @@ export function ChecklistProposalCard({
           <li
             // biome-ignore lint/suspicious/noArrayIndexKey: son textos sin id, y la lista no se reordena
             key={`${indice}-${paso}`}
-            className="flex gap-2 font-sans text-sm text-white"
+            className="flex gap-2 font-sans text-sm text-text-secondary"
           >
-            <span className="text-white tabular-nums">{indice + 1}.</span>
+            <span className="text-text-secondary tabular-nums">{indice + 1}.</span>
             {paso}
           </li>
         ))}
       </ol>
       {/* Se suman: hay que decirlo, porque «proponer un checklist» suena a
           reemplazarlo entero. */}
-      <p className="font-sans text-xs text-white">
+      <p className="font-sans text-xs text-text-secondary">
         Se añaden a los pasos que ya tenga. No se borra ninguno.
       </p>
     </CambioSobreTarea>
@@ -613,7 +674,7 @@ export function CommentProposalCard({
       >
         {propuesta.body}
       </p>
-      <p className="font-sans text-xs text-white">
+      <p className="font-sans text-xs text-text-secondary">
         Se publicaría a tu nombre, no al del asistente.
       </p>
     </CambioSobreTarea>
@@ -712,7 +773,7 @@ export function DeleteProposalCard({
       <p className="font-sans text-sm text-text-primary">
         <strong>{propuesta.taskTitle ?? 'Una tarea'}</strong>
         {detalles.length > 0 && (
-          <span className="font-normal text-white"> — {detalles.join(' · ')}</span>
+          <span className="font-normal text-text-secondary"> — {detalles.join(' · ')}</span>
         )}
       </p>
 
@@ -729,7 +790,7 @@ export function DeleteProposalCard({
           <Button size="sm" variant="danger" onClick={() => setConfirmando(true)}>
             Sí, quiero borrarla
           </Button>
-          <span className="font-sans text-xs text-white">
+          <span className="font-sans text-xs text-text-secondary">
             Te lo preguntamos otra vez antes de hacerlo.
           </span>
         </div>
@@ -817,7 +878,7 @@ export function BoardProposalCard({
       </dl>
 
       <div className="flex flex-col gap-1.5">
-        <span className="font-sans text-xs text-white">
+        <span className="font-sans text-xs text-text-secondary">
           {columnas.length} {columnas.length === 1 ? 'columna' : 'columnas'}, en este orden
         </span>
 
@@ -825,7 +886,7 @@ export function BoardProposalCard({
           {columnas.map((columna, indice) => (
             <Fragment key={`${columna.nombre}-${indice}`}>
               {indice > 0 && (
-                <span aria-hidden="true" className="font-sans text-xs text-white">
+                <span aria-hidden="true" className="font-sans text-xs text-text-secondary">
                   ›
                 </span>
               )}
@@ -845,7 +906,7 @@ export function BoardProposalCard({
 
         {/* El verde tiene consecuencias fuera del tablero, así que se dice. */}
         {columnas.some((columna) => columna.color === 'success') && (
-          <span className="font-sans text-xs text-white">
+          <span className="font-sans text-xs text-text-secondary">
             La última es la <strong className="text-text-primary">columna de cierre</strong>: lo que
             llegue ahí cuenta como terminado en los informes y deja de avisar aunque esté vencido.
           </span>
@@ -1351,7 +1412,7 @@ export function QuestionProposalCard({
               {/* Solo cuando se pueden marcar varias: en las de una, decir «elige
                   una» al lado de opciones excluyentes es explicar lo evidente. */}
               {!unaSola && (
-                <span className="font-sans text-xs text-white">Puedes marcar varias.</span>
+                <span className="font-sans text-xs text-text-secondary">Puedes marcar varias.</span>
               )}
             </fieldset>
           );
@@ -1363,7 +1424,7 @@ export function QuestionProposalCard({
               Responder
             </Button>
             {!completo && (
-              <span className="font-sans text-xs text-white">
+              <span className="font-sans text-xs text-text-secondary">
                 {propuesta.preguntas.length === 1
                   ? 'Elige una respuesta.'
                   : 'Responde a todas para enviar.'}
@@ -1417,7 +1478,7 @@ export function MarkStepsProposalCard({
           </li>
         ))}
       </ul>
-      <p className="font-sans text-xs text-white">
+      <p className="font-sans text-xs text-text-secondary">
         Solo se marcan. El asistente no puede desmarcar ni borrar pasos.
       </p>
     </CambioSobreTarea>
@@ -1486,7 +1547,7 @@ export function MessageProposalCard({
       >
         {propuesta.body}
       </p>
-      <p className="font-sans text-xs text-white">
+      <p className="font-sans text-xs text-text-secondary">
         Lo verá todo el equipo del proyecto y les llegará un aviso. Se enviaría a tu nombre, no al
         del asistente.
       </p>
@@ -1612,6 +1673,7 @@ function Marco({
    * Una tarjeta que ya se envió, ya se hizo o se descartó no reacciona: aceptar
    * todas significa «las que siguen pendientes».
    */
+  const contexto = useContext(FamiliaDePropuesta);
   const senal = useContext(SenalDeAceptarTodas);
   const senalAtendida = useRef(senal);
   useEffect(() => {
@@ -1642,11 +1704,11 @@ function Marco({
   if (estado === 'pendiente' && decididaAntes) {
     return (
       <article
-        className="flex flex-col gap-3 rounded-sm border border-dashed px-4 py-3"
+        className="flex flex-col gap-3 rounded-xl border border-dashed px-4 py-3"
         style={{ borderColor: colors.border }}
       >
         <header className="flex items-center gap-2">
-          <span className="font-sans text-[11px] uppercase tracking-wider text-white">
+          <span className="font-sans text-[11px] uppercase tracking-wider text-text-secondary">
             {titulo}
           </span>
           <span
@@ -1663,7 +1725,7 @@ function Marco({
 
   if (estado === 'descartada') {
     return (
-      <p className="rounded-sm border border-dashed border-border px-4 py-3 font-sans text-sm text-white">
+      <p className="rounded-xl border border-dashed border-border px-4 py-3 font-sans text-sm text-text-secondary">
         {/* «No se ha creado nada» solo valía para la tarea nueva: al descartar
             un cambio de encargado no había nada que crear. */}
         Propuesta descartada. No se ha aplicado nada.
@@ -1672,21 +1734,37 @@ function Marco({
   }
 
   /* El rojo se reserva para lo que no se deshace. Ver la nota de `tono`. */
-  const acento = tono === 'destructivo' ? colors.error : colors.primary;
+  const borde = tono === 'destructivo' ? colors.error : colors.primary;
+  const familia = ESTILO_DE_FAMILIA[tono === 'destructivo' ? 'destruir' : contexto.familia];
 
   return (
     <article
-      className="flex flex-col gap-3 rounded-sm border p-4"
+      className={`prax-entrada flex flex-col gap-3 rounded-xl border bg-surface p-4 ${
+        estado === 'hecho' ? 'prax-aceptada' : ''
+      }`}
       style={{
-        borderColor: alpha(acento, tono === 'destructivo' ? 45 : 30),
-        background: alpha(acento, 6),
+        borderColor: alpha(borde, tono === 'destructivo' ? 55 : 45),
+        /* Escalonadas: la segunda llega un poco después de la primera. */
+        animationDelay: estado === 'hecho' ? undefined : `${contexto.indice * 70}ms`,
       }}
     >
-      <header className="flex items-center gap-2">
-        <span className="font-sans text-[11px] uppercase tracking-wider" style={{ color: acento }}>
-          {titulo}
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span
+          className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em]"
+          style={{ color: familia.acento }}
+          title={familia.nombre}
+        >
+          <span
+            aria-hidden="true"
+            className="flex h-4 w-4 items-center justify-center rounded-sm text-[11px] leading-none"
+            style={{ background: alpha(familia.acento, 16) }}
+          >
+            {familia.icono}
+          </span>
+          Propuesta
         </span>
-        <span className="font-sans text-[11px] text-white">
+        <span className="font-sans text-sm font-medium text-text-primary">{titulo}</span>
+        <span className="ml-auto font-sans text-[11px] text-text-secondary">
           {estado === 'hecho' ? 'aceptada' : sinAplicar}
         </span>
       </header>
@@ -1702,7 +1780,7 @@ function Marco({
           borde izquierdo se perdía a partir del primer salto de línea. */}
       {porQue && (
         <div
-          className="flex flex-col gap-2 border-l-2 pl-3 font-sans text-sm leading-relaxed text-white"
+          className="flex flex-col gap-2 border-l-2 pl-3 font-sans text-sm leading-relaxed text-text-secondary"
           style={{ borderColor: alpha(colors.primary, 35) }}
         >
           <ModelText texto={porQue} />
@@ -1746,6 +1824,13 @@ function Marco({
             {etiquetaDescartar}
           </Button>
           {error && <span className="font-sans text-sm text-error">{error}</span>}
+          {/* Lo que la tarjeta no dice y conviene saber: aceptar no le da a PRAX
+              ningún poder, lo hace quien pulsa. */}
+          {!error && onAceptar && (
+            <span className="ml-auto hidden font-sans text-[11px] text-text-disabled sm:inline">
+              con tus permisos, por el mismo botón que usarías tú
+            </span>
+          )}
         </div>
       )}
     </article>
@@ -1755,8 +1840,10 @@ function Marco({
 function Campo({ termino, valor }: { termino: string; valor: string }) {
   return (
     <div className="flex items-baseline gap-1.5">
-      <dt className="font-sans text-[11px] uppercase tracking-wider text-white">{termino}</dt>
-      <dd className="font-sans text-sm text-white">{valor}</dd>
+      <dt className="font-sans text-[11px] uppercase tracking-wider text-text-secondary">
+        {termino}
+      </dt>
+      <dd className="font-sans text-sm text-text-primary">{valor}</dd>
     </div>
   );
 }
@@ -1835,7 +1922,7 @@ export function OpenProjectProposalCard({
         <Campo termino="Proyecto" valor={propuesta.nombre} />
       </dl>
 
-      <p className="font-sans text-xs text-white">
+      <p className="font-sans text-xs text-text-secondary">
         Seguimos en esta misma conversación, pero con sus tareas, sus tableros y su gente delante.{' '}
         <strong className="text-text-primary">A partir de ahí es su conversación</strong>: para
         hablar de otro proyecto se empieza una nueva.
@@ -1944,7 +2031,7 @@ export function TemplateProposalCard({
           />
 
           <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
-            <span className="mr-auto font-sans text-xs text-white">
+            <span className="mr-auto font-sans text-xs text-text-secondary">
               Quita lo que no quieras antes de crearlo.
             </span>
             <Button
