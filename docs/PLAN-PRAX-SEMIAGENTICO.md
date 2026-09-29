@@ -779,6 +779,12 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
       instrucción pasa de **26 854 a 14 632 caracteres** en un turno de
       charla, un 45 % menos. En preguntas y cambios no cambia nada. El
       Gemini falso ahora escribe en su log el tamaño de cada instrucción.
+    - **Lo que D10 pedía y queda fuera, a propósito**: la relevancia `noul`
+      por proyecto y documento, y elegir qué consultas se declaran. Hoy el
+      alcance tiene como mucho `ASSISTANT_SCOPE_MAX_PROJECTS` proyectos y
+      ningún documento, así que no hay nada grande que filtrar: entra con F7,
+      cuando los documentos lleguen al índice. El umbral de «~8k tokens» para
+      preguntar a Jev tampoco hace falta: una decisión cuesta ~$0,00002.
     - **Sigue apagado** (`PRAX_ROUTER=heuristic`). Encenderlo en producción
       es poner `PRAX_ROUTER=jev` y `OPENROUTER_API_KEY` en Railway; lo decide
       el dueño, que además va a rotar la clave provisional.
