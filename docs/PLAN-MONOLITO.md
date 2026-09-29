@@ -1,6 +1,6 @@
 # Plan — Monolito modular: un proceso en vez de once
 
-> **Etapa abierta** (2026-09-29, rama `feature/prax-semiagentico`). Va
+> **Etapa cerrada y desplegada** (2026-09-29, `f5532d08` en `main`, rama `feature/prax-semiagentico`). Va
 > **antes** de [PLAN-PRAX-SEMIAGENTICO](PLAN-PRAX-SEMIAGENTICO.md), que queda en
 > pausa hasta cerrar esta.
 >
@@ -299,3 +299,33 @@ Las sesiones abiertas siguen valiendo, porque `JWT_SECRET` no cambia.
       acceso, así que ninguna prueba falla.
     - Con nombres reales es improbable. Lo arreglaría un sufijo más largo y un
       reintento.
+- **2026-09-29, 11:07 UTC** — **Desplegado** (`f5532d08`).
+  - **Antes de desplegar**:
+    - `main` fusionado en la rama, con los dos commits de documentos de otra
+      persona.
+    - e2e: API 167/167; interfaz 59/70, con los mismos fallos que da el backend
+      anterior (abajo).
+    - Imagen de Railway probada en local.
+    - **0 bytes salientes en 11 minutos de reposo.**
+  - **En producción**:
+    - `start-backend.sh` dijo «Migraciones ya aplicadas; sin Prisma».
+    - El monolito arrancó con cada servicio en su schema.
+    - La landing y `/auth/login` responden 200, y un login falso llega hasta
+      credentials y vuelve 401.
+  - **Sin copia de la base.** `praxis-db` no tiene URL pública, y `railway ssh`
+    pedía registrar una clave SSH en la cuenta del dueño, cosa que no se hace
+    sin él. El despliegue **no cambia el esquema**: solo desaparecen los
+    archivos de migración de Alexa, ya aplicados, y un comentario de Prisma. La
+    vuelta atrás es redesplegar la versión anterior desde Railway.
+- **Los 11 fallos de interfaz que no son del monolito.** Con los once procesos
+  separados fallan las mismas pruebas:
+  - 9 de `07-reglas`;
+  - `04-invitaciones:22`;
+  - `09-scrum:55`.
+
+  Sueltas pasan: por ejemplo, la de crear una regla, en 5 s. La del estado
+  vacío de reglas ve **dos** párrafos idénticos durante el streaming de la
+  página (una sonda en el DOM encuentra uno solo pasados 3 s).
+
+  Son fragilidad de las pruebas escritas para `next dev` al correr contra la
+  build de producción. Quedan para arreglarse aparte.
