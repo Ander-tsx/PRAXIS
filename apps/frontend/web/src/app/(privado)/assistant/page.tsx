@@ -12,7 +12,7 @@ import {
   personName,
   resolveProfiles,
 } from '@praxis/commons';
-import { createServerApiClient } from '@praxis/commons/auth';
+import { createServerApiClient, loadPrivateChrome } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 
 /**
@@ -84,7 +84,17 @@ export default async function AssistantPage({ searchParams }: PageProps) {
    * gestión equivocada. Que lance y lo recoja `error.tsx`, que dice que fue un
    * corte y ofrece reintentar. Mismo criterio que la puerta de Análisis.
    */
-  const listaPromesa = api.get<Paginated<Project>>('/projects?limit=100&permission=canViewReports');
+  /* 🔴 **Solo los de la organización activa** (O4 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+     Sin el filtro, el selector mezclaba proyectos de todas las organizaciones,
+     y hablar desde una de un proyecto de otra ahora da 403 `NOT_IN_ORG`: el
+     selector ofrecía puertas cerradas. `loadPrivateChrome` ya lo resolvió el
+     layout y no cuesta otra petición. */
+  const { organizacionActivaId } = await loadPrivateChrome();
+  const listaPromesa = api.get<Paginated<Project>>(
+    `/projects?limit=100&permission=canViewReports${
+      organizacionActivaId ? `&organizationId=${organizacionActivaId}` : ''
+    }`,
+  );
 
   /**
    * Con qué saludar.
@@ -184,6 +194,7 @@ export default async function AssistantPage({ searchParams }: PageProps) {
           nombres={nombres}
           etiquetas={nombresDeEtiquetas}
           userName={nombreCorto}
+          organizacionActivaId={organizacionActivaId}
         />
       </div>
     </AppHeader>

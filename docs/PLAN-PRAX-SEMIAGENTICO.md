@@ -486,7 +486,7 @@ que tocan esquema llevan migración (`prisma:deploy`, **nunca `reset`**).
   - Que `medir-prompt` cuente historial y adjuntos y use `countTokens`, no
     caracteres ÷ 4.
   - **Sale**: tokens reales por turno típico → cifras de D8 por plan.
-- [ ] **F1 — Organización activa en todo PRAX** (O1–O5).
+- [x] **F1 — Organización activa en todo PRAX** (O1–O5). Ver el registro.
   - `Conversation.organizationId` con migración.
   - Listado filtrado; `proyectosQuePuedeAbrir` con organización y sin tragar
     errores.
@@ -653,3 +653,26 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
     usuarios reales. Las fases siguientes se prueban con Gemini simulado.
   - **Sin cifras de D8 todavía.** Salen de `gemini_uso` en cuanto esto llegue a
     producción, o de una clave local que funcione.
+  - **F1 cerrada.** Las cinco fugas:
+    - **O1**: la lista de proyectos que PRAX ofrece sin foco se filtra por la
+      organización del turno, y un fallo deja `prax_sin_proyectos` en el log en
+      vez de tragarse.
+    - **O2**: `Conversation.organizationId`, con migración
+      `20260929120000_conversacion_por_organizacion`. Listado y detalle se
+      acotan a la activa. Continuar una de otra organización da 403
+      `NOT_IN_ORG`.
+    - **O3**: la ruta de proyecto compara la organización del proyecto con la
+      activa que manda el cliente, y si no coinciden, 403 `NOT_IN_ORG`.
+    - **O4**: `/assistant` pide solo los proyectos de la activa.
+    - **O5**: `PraxScreen` pasa `organizacionActivaId`.
+    - **Prueba**: e2e `20-prax-organizacion` (5 casos). No depende de Gemini:
+      la conversación se crea antes de llamarlo y los 403 se deciden antes.
+  - **Dos desvíos de D6, decididos esta noche:**
+    - **Sin backfill en la migración.** Rellenar las viejas con la organización
+      personal obligaba a una migración que cruzara al schema de billing, y los
+      servicios no se tocan la base. Quedan con `''` (nunca `NULL`, trampa 20):
+      salen en la organización **personal** y **adoptan** la del primer turno
+      que reciban, igual que ya adoptaban proyecto.
+    - **La comprobación de O3 solo corre si el cliente manda `organizationId`.**
+      Así un cliente sin actualizar no se queda sin PRAX. El nuestro la manda
+      siempre, desde `loadPrivateChrome()` (trampa 21).

@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
+  Logger,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -93,6 +94,8 @@ import { QuotaService } from '../billing/quota.service';
 @UseGuards(JwtGuard)
 @Controller('me/assistant')
 export class MyAssistantController {
+  private readonly log = new Logger(MyAssistantController.name);
+
   constructor(
     @Inject('ASSISTANT_SERVICE') private readonly assistantClient: ClientProxy,
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
@@ -146,7 +149,7 @@ export class MyAssistantController {
     const organizationId = await this.cuotas.organizacionElegida(userId, body.organizationId);
 
     const [proyectos, quien, ia] = await Promise.all([
-      this.proyectosQuePuedeAbrir(userId),
+      this.proyectosQuePuedeAbrir(userId, organizationId),
       this.nombreDe(userId),
       /* `iaDe` y no `limiteDeIa`: esta ruta **gasta** cuota, así que puede
          acabar en un 402 que tiene que decir qué plan puso ese tope. Los dos
@@ -224,20 +227,37 @@ export class MyAssistantController {
    * permiso. Ofrecer uno sin él sería ofrecer una conversación que responde 403 a
    * la primera pregunta — la misma consulta que ya hace la pantalla al pintar el
    * selector.
+   *
+   * 🔴 **Solo los de la organización activa** (docs/PLAN-PRAX-SEMIAGENTICO.md,
+   * O1 y D6). Iba sin `organizationId` y devolvía los de **todas** las
+   * organizaciones de la persona: PRAX podía proponer abrir un proyecto de otra,
+   * que es el malentendido que la organización activa existe para evitar.
+   *
+   * Y un fallo ya no se traga en silencio. Sin lista, `abrir_proyecto` se
+   * descarta en cada turno, y eso tiene que poder verse en el log.
    */
-  private async proyectosQuePuedeAbrir(userId: string): Promise<{ id: string; nombre: string }[]> {
+  private async proyectosQuePuedeAbrir(
+    userId: string,
+    organizationId: string | null,
+  ): Promise<{ id: string; nombre: string }[]> {
     const pagina = await firstValueFrom(
       this.projectsClient.send<{ items?: { id: string; name: string }[] }>(
         { cmd: 'project_find_all' },
         {
           userId,
+          ...(organizationId ? { organizationId } : {}),
           permission: 'canViewReports',
           /* Cien es de sobra para nombrarlos y es el mismo tope que usa la
              pantalla. Lo que no cabe aquí tampoco cabría en el prompt. */
           query: { limit: 100 },
         },
       ),
-    ).catch(() => null);
+    ).catch((error: unknown) => {
+      this.log.warn(
+        `prax_sin_proyectos userId=${userId} organizationId=${organizationId}: ${(error as Error)?.message ?? error}`,
+      );
+      return null;
+    });
 
     return (pagina?.items ?? []).map((proyecto) => ({ id: proyecto.id, nombre: proyecto.name }));
   }
@@ -258,27 +278,44 @@ export class MyAssistantController {
     return nombre ? { userId, nombre } : null;
   }
 
+  /**
+   * Mis conversaciones **de la organización activa** (D6).
+   *
+   * `?organizationId=` es la activa; se valida la pertenencia como en el chat. Las
+   * conversaciones de antes de que existiera la columna salen en la personal.
+   */
   @Get('conversations')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Mis conversaciones con el asistente, la última arriba' })
-  conversaciones(@Request() req: Express.Request) {
+  @ApiOperation({ summary: 'Mis conversaciones de la organización activa, la última arriba' })
+  async conversaciones(
+    @Request() req: Express.Request,
+    @Query('organizationId', new ParseUUIDPipe({ optional: true })) organizationId?: string,
+  ) {
+    const userId = req.user!.userId;
+    const ambito = await this.cuotas.ambitoDePrax(userId, organizationId);
     return firstValueFrom(
-      this.assistantClient.send({ cmd: 'assistant_conversations' }, { userId: req.user!.userId }),
+      this.assistantClient.send(
+        { cmd: 'assistant_conversations' },
+        { userId, ...(ambito ? { ambito } : {}) },
+      ),
     );
   }
 
   @Get('conversations/:conversationId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Una conversación con sus mensajes y propuestas' })
-  @ApiResponse({ status: 404, description: 'No existe, o no es tuya' })
-  conversacion(
+  @ApiResponse({ status: 404, description: 'No existe, no es tuya o es de otra organización' })
+  async conversacion(
     @Param('conversationId', ParseUUIDPipe) conversationId: string,
     @Request() req: Express.Request,
+    @Query('organizationId', new ParseUUIDPipe({ optional: true })) organizationId?: string,
   ) {
+    const userId = req.user!.userId;
+    const ambito = await this.cuotas.ambitoDePrax(userId, organizationId);
     return firstValueFrom(
       this.assistantClient.send(
         { cmd: 'assistant_conversation' },
-        { userId: req.user!.userId, conversationId },
+        { userId, conversationId, ...(ambito ? { ambito } : {}) },
       ),
     );
   }

@@ -106,6 +106,14 @@ model Conversation {
   projectId String?
   /// Las primeras palabras del primer mensaje. Se puede renombrar a mano.
   title     String
+  /// La organización en la que se tuvo (docs/PLAN-PRAX-SEMIAGENTICO.md, D6).
+  ///
+  /// Todo PRAX cuelga de la organización activa: el listado solo trae las suyas y
+  /// una conversación de otra no se continúa. **Cadena vacía, nunca `NULL`**, igual
+  /// que `AssistantUsage` (trampa 20): `''` son las de antes de esta columna, que
+  /// se enseñan en la organización personal y **adoptan** la del primer turno que
+  /// reciban.
+  organizationId String @default("")
   messages    Message[]
   attachments Attachment[]
   createdAt DateTime  @default(now())
@@ -113,6 +121,8 @@ model Conversation {
 
   /// El listado es «mis conversaciones, la última arriba». Sin el proyecto.
   @@index([userId, updatedAt])
+  /// Y desde D6, las de una organización.
+  @@index([userId, organizationId, updatedAt])
   @@schema("assistant")
   @@map("assistant_conversations")
 }

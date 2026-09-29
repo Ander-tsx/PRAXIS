@@ -3,6 +3,7 @@ import { MessagePattern, Payload } from '@nestjs/microservices';
 
 import { AssistantService } from './assistant.service';
 import { AttachmentsService } from './attachments.service';
+import type { AmbitoDeOrganizacion } from './conversations.service';
 
 /**
  * ⚠️ **Ninguna comprueba permisos.** Lo hizo el gateway contra el `projectId` de
@@ -103,14 +104,16 @@ export class AssistantController {
    * de verdad protegía algo.
    */
   @MessagePattern({ cmd: 'assistant_conversations' })
-  conversaciones(@Payload() dto: { userId: string }) {
-    return this.assistant.listarConversaciones(dto.userId);
+  conversaciones(@Payload() dto: { userId: string; ambito?: AmbitoDeOrganizacion }) {
+    return this.assistant.listarConversaciones(dto.userId, dto.ambito);
   }
 
   @MessagePattern({ cmd: 'assistant_conversation' })
-  async conversacion(@Payload() dto: { userId: string; conversationId: string }) {
+  async conversacion(
+    @Payload() dto: { userId: string; conversationId: string; ambito?: AmbitoDeOrganizacion },
+  ) {
     try {
-      return await this.assistant.detalleConversacion(dto.userId, dto.conversationId);
+      return await this.assistant.detalleConversacion(dto.userId, dto.conversationId, dto.ambito);
     } catch (error) {
       throw AssistantService.comoRpc(error);
     }

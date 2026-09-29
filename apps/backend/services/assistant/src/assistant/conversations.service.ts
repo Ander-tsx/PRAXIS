@@ -29,6 +29,25 @@ const MAX_TITULO = 60;
  * Una conversación ajena responde **404, no 403**: un 403 confirmaría que ese
  * id existe y es de otra persona, que es justo lo que no hace falta saber.
  */
+/**
+ * Desde qué organización se mira (D6 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+ *
+ * `incluirLegado` es para la organización **personal**: ahí se enseñan también
+ * las conversaciones de antes de que existiera la columna (`organizationId: ''`),
+ * que de otro modo no saldrían en ninguna.
+ */
+export interface AmbitoDeOrganizacion {
+  organizationId: string;
+  incluirLegado: boolean;
+}
+
+function filtroDeOrganizacion(ambito?: AmbitoDeOrganizacion) {
+  if (!ambito) return {};
+  return ambito.incluirLegado
+    ? { organizationId: { in: [ambito.organizationId, ''] } }
+    : { organizationId: ambito.organizationId };
+}
+
 @Injectable()
 export class ConversationsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -45,9 +64,9 @@ export class ConversationsService {
    * lista pueda decir de qué iba cada una sin abrirla. Es `null` en las que nunca
    * llegaron a elegir foco.
    */
-  async listar(userId: string) {
+  async listar(userId: string, ambito?: AmbitoDeOrganizacion) {
     const conversaciones = await this.prisma.conversation.findMany({
-      where: { userId },
+      where: { userId, ...filtroDeOrganizacion(ambito) },
       orderBy: { updatedAt: 'desc' },
       select: {
         id: true,
@@ -75,12 +94,16 @@ export class ConversationsService {
    * Las propuestas viajan con su `status` porque de eso depende si la tarjeta
    * lleva botones al releer: solo las `PENDING` se pueden aplicar todavía.
    */
-  async detalle(userId: string, conversationId: string) {
+  async detalle(userId: string, conversationId: string, ambito?: AmbitoDeOrganizacion) {
     const conversacion = await this.prisma.conversation.findFirst({
       /* Sin `projectId`: la conversación es de la persona y puede haber pasado
          por varios. El `userId` sigue siendo la clave de acceso, y una ajena
-         responde 404 y no 403 — un 403 confirmaría que ese id existe. */
-      where: { id: conversationId, userId },
+         responde 404 y no 403 — un 403 confirmaría que ese id existe.
+
+         Y la de **otra organización** también responde 404 (D6): desde la
+         organización activa no existe, igual que un proyecto de otra no sale en
+         la lista. */
+      where: { id: conversationId, userId, ...filtroDeOrganizacion(ambito) },
       include: {
         messages: {
           orderBy: { createdAt: 'asc' },
@@ -200,6 +223,8 @@ export class ConversationsService {
     projectId: string | null,
     mensaje: string,
     conversationId?: string,
+    /** La organización del turno. `null` solo si el gateway no pudo resolverla. */
+    organizationId?: string | null,
   ) {
     if (conversationId) {
       const existente = await this.prisma.conversation.findFirst({
@@ -208,10 +233,36 @@ export class ConversationsService {
            justo al preguntar por otro proyecto — que es el gesto que todo esto
            viene a permitir. Lo que sigue protegiendo el hilo es el `userId`. */
         where: { id: conversationId, userId },
-        select: { id: true, projectId: true },
+        select: { id: true, projectId: true, organizationId: true },
       });
       if (!existente) {
         throw new RpcException({ statusCode: 404, message: 'Conversación no encontrada' });
+      }
+
+      /**
+       * 🔴 **Una conversación no cruza de organización** (D6), por lo mismo que no
+       * cambia de proyecto: lo que se dijo en una empresa no se reenvía al modelo
+       * en el turno de otra. 403 `NOT_IN_ORG`, que es lo que dice cualquier otra
+       * ruta cuando lo que no encaja es la organización.
+       */
+      if (
+        existente.organizationId &&
+        organizationId &&
+        existente.organizationId !== organizationId
+      ) {
+        throw new RpcException({
+          statusCode: 403,
+          code: 'NOT_IN_ORG',
+          message: 'Esta conversación es de otra organización. Cámbiate a ella para seguirla.',
+        });
+      }
+
+      /* Una de antes de la columna adopta la organización de su primer turno. */
+      if (!existente.organizationId && organizationId) {
+        await this.prisma.conversation.update({
+          where: { id: existente.id },
+          data: { organizationId },
+        });
       }
 
       /**
@@ -276,7 +327,12 @@ export class ConversationsService {
     }
 
     const creada = await this.prisma.conversation.create({
-      data: { userId, projectId, title: this.titulo(mensaje) },
+      data: {
+        userId,
+        projectId,
+        organizationId: organizationId ?? '',
+        title: this.titulo(mensaje),
+      },
       select: { id: true },
     });
     return creada.id;

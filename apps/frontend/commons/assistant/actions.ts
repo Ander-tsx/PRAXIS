@@ -214,9 +214,12 @@ export async function preguntarAction(
        Sigue sin ser una llave: el gateway comprueba la pertenencia antes de
        usarla (`QuotaService.organizacionElegida`). Es un filtro, como siempre.
 
-       En la ruta de proyecto no se manda: allí la organización sale del propio
-       proyecto, que es lo que no se puede falsificar. */
-    const organizationId = projectId ? null : (await loadPrivateChrome()).organizacionActivaId;
+       En la ruta de proyecto la organización sale del propio proyecto, que es
+       lo que no se puede falsificar; allí se manda solo para que el gateway
+       compruebe que ese proyecto es de la activa (D6 de
+       docs/PLAN-PRAX-SEMIAGENTICO.md): hablar desde una organización de un
+       proyecto de otra da 403 `NOT_IN_ORG`. */
+    const organizationId = (await loadPrivateChrome()).organizacionActivaId;
 
     const resultado = await api.post<AssistantChatResult>(
       ruta,
@@ -287,7 +290,17 @@ export async function preguntarAction(
 export async function conversacionesAction(): Promise<ConversationSummary[]> {
   const api = await requireApi();
   if (!api) return [];
-  return api.get<ConversationSummary[]>('/me/assistant/conversations').catch(() => []);
+  /* Solo las de la organización activa (D6): las de otra no se continúan, así
+     que ofrecerlas sería ofrecer un 403. */
+  return api
+    .get<ConversationSummary[]>(`/me/assistant/conversations${await conOrganizacion()}`)
+    .catch(() => []);
+}
+
+/** `?organizationId=<activa>`, la resuelta y no la cookie en crudo (trampa 21). */
+async function conOrganizacion(): Promise<string> {
+  const { organizacionActivaId } = await loadPrivateChrome();
+  return organizacionActivaId ? `?organizationId=${organizacionActivaId}` : '';
 }
 
 /** Una conversación entera, para volver a pintarla. */
@@ -297,7 +310,9 @@ export async function cargarConversacionAction(
   const api = await requireApi();
   if (!api) return null;
   return api
-    .get<FullConversation>(`/me/assistant/conversations/${conversationId}`)
+    .get<FullConversation>(
+      `/me/assistant/conversations/${conversationId}${await conOrganizacion()}`,
+    )
     .catch(() => null);
 }
 

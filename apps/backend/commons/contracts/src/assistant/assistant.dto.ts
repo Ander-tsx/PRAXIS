@@ -312,13 +312,16 @@ export class AssistantChatBodyDto {
   attachmentIds?: string[];
 
   /**
-   * Desde qué organización se pregunta. **Solo lo usa PRAX sin proyecto.**
+   * Desde qué organización se pregunta: la **activa**.
    *
    * ⚠️ Desde 2026-08-28 la cuota del asistente es de una organización: el tope lo
-   * pone su plan y el gasto se cuenta con esa clave. En la ruta de proyecto la
-   * organización sale del proyecto y **este campo se ignora**; en
-   * `/me/assistant/chat` no hay proyecto del que sacarla, así que la elige quien
-   * llama.
+   * pone su plan y el gasto se cuenta con esa clave. En `/me/assistant/chat` no hay
+   * proyecto del que sacarla, así que la elige quien llama.
+   *
+   * En la ruta de proyecto la organización sale **del proyecto**, nunca de aquí;
+   * este campo solo sirve para comprobar que es la activa. Si no coincide, 403
+   * `NOT_IN_ORG` (D6 de docs/PLAN-PRAX-SEMIAGENTICO.md): no se habla con PRAX de
+   * un proyecto de otra organización.
    *
    * 🔴 **Y por eso se valida.** El gateway comprueba la pertenencia antes de
    * usarla (`QuotaService.organizacionElegida`): sin este paso, escribir aquí el
@@ -326,7 +329,8 @@ export class AssistantChatBodyDto {
    * organización personal.
    */
   @ApiPropertyOptional({
-    description: 'Organización desde la que se pregunta. Solo en la ruta sin proyecto',
+    description:
+      'Organización activa. Sin proyecto, la elige; con proyecto, tiene que ser la del proyecto',
   })
   @IsOptional()
   @IsUUID('4')

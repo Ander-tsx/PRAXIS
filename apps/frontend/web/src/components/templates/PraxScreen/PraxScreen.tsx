@@ -15,6 +15,8 @@ export interface PraxScreenProps {
   etiquetas: Record<string, string>;
   /** El nombre de pila, para el saludo de la pantalla vacía. Ver `AssistantChatProps`. */
   userName?: string;
+  /** La organización activa, resuelta (trampa 21). La necesita «Recursos» (O5). */
+  organizacionActivaId?: string | null;
 }
 
 /**
@@ -63,6 +65,7 @@ export function PraxScreen({
   nombres,
   etiquetas,
   userName,
+  organizacionActivaId = null,
 }: PraxScreenProps) {
   const router = useRouter();
 
@@ -129,6 +132,7 @@ export function PraxScreen({
            disponible y con el compositor abajo del todo. En Análisis el mismo
            organismo va en modo `cajon`. */
         variante="pantalla"
+        organizacionActivaId={organizacionActivaId}
       />
     </div>
   );

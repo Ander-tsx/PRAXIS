@@ -24,7 +24,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { bloqueDeArchivo } from './attachment-text';
 import { AttachmentsService } from './attachments.service';
-import { ConversationsService } from './conversations.service';
+import { type AmbitoDeOrganizacion, ConversationsService } from './conversations.service';
 import { GeminiClient, GeminiError } from './gemini.client';
 import { instruccionSinProyecto, systemInstruction } from './prompt';
 import { QuotaService } from './quota.service';
@@ -295,6 +295,7 @@ export class AssistantService {
       payload.projectId,
       payload.message,
       payload.conversationId,
+      payload.organizationId,
     );
     const history = await this.conversaciones.historial(conversationId);
 
@@ -637,12 +638,12 @@ export class AssistantService {
    * proyecto es el foco de cada turno y puede cambiar a mitad. La clave de acceso
    * sigue siendo el `userId`, que es lo que impide leer un hilo ajeno.
    */
-  listarConversaciones(userId: string) {
-    return this.conversaciones.listar(userId);
+  listarConversaciones(userId: string, ambito?: AmbitoDeOrganizacion) {
+    return this.conversaciones.listar(userId, ambito);
   }
 
-  detalleConversacion(userId: string, conversationId: string) {
-    return this.conversaciones.detalle(userId, conversationId);
+  detalleConversacion(userId: string, conversationId: string, ambito?: AmbitoDeOrganizacion) {
+    return this.conversaciones.detalle(userId, conversationId, ambito);
   }
 
   renombrarConversacion(userId: string, conversationId: string, title: string) {

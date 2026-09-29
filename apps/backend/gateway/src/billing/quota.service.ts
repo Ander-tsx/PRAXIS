@@ -263,6 +263,33 @@ export class QuotaService {
   }
 
   /**
+   * La organización desde la que se mira PRAX, y si es la personal.
+   *
+   * Lo pide el listado de conversaciones (D6 de docs/PLAN-PRAX-SEMIAGENTICO.md):
+   * cada una es de una organización, y las de antes de que existiera la columna
+   * se enseñan en la **personal**. Valida la pertenencia como
+   * {@link organizacionElegida}, de la que parte, y responde `null` si no hay
+   * ninguna que resolver: entonces no se filtra, que es lo que hacía antes.
+   */
+  async ambitoDePrax(
+    userId: string,
+    organizationId?: string | null,
+  ): Promise<{ organizationId: string; incluirLegado: boolean } | null> {
+    const elegida = await this.organizacionElegida(userId, organizationId);
+    if (!elegida) return null;
+
+    const suyas = await firstValueFrom(
+      this.billingClient.send<{ id: string; kind: string }[]>(
+        { cmd: 'billing_orgs_of' },
+        { userId },
+      ),
+    ).catch(() => [] as { id: string; kind: string }[]);
+
+    const personal = suyas.find((organizacion) => organizacion.id === elegida)?.kind === 'PERSONAL';
+    return { organizationId: elegida, incluirLegado: personal };
+  }
+
+  /**
    * ¿Comparten estas dos personas alguna organización?
    *
    * Es la puerta del chat privado desde 2026-08-28. Antes lo era «compartís
@@ -563,7 +590,10 @@ export class QuotaService {
        dos servicios que no se hablan, y la suma solo la puede hacer aquí. */
     const [adjuntos, imagenes] = await Promise.all([
       firstValueFrom(
-        this.tasksClient.send<number>({ cmd: 'attachment_bytes_of_projects' }, { projectIds: vivos }),
+        this.tasksClient.send<number>(
+          { cmd: 'attachment_bytes_of_projects' },
+          { projectIds: vivos },
+        ),
       ).catch(() => null),
       firstValueFrom(
         this.projectsClient.send<number>(

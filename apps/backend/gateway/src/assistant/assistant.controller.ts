@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -17,6 +18,7 @@ import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   AssistantChatBodyDto,
+  NOT_IN_ORG_CODE,
   ProjectPermission,
   RenameConversationBodyDto,
   ResolveProposalBodyDto,
@@ -149,19 +151,35 @@ export class AssistantController {
   ) {
     const userId = req.user!.userId;
 
+    /* La organización sale del proyecto: es el recurso el que dice dónde se
+       está trabajando, y por tanto qué plan aplica y contra qué cubo se cuenta.
+
+       🔴 **Y tiene que ser la activa** (D6 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+       Tener acceso a un proyecto de otra organización no basta para hablar de
+       él con PRAX desde esta: es el malentendido que la organización activa
+       existe para evitar. El cliente dice desde cuál pregunta, y si no es la
+       del proyecto, 403 `NOT_IN_ORG`. Sin el campo, como antes: un cliente sin
+       actualizar no se queda sin PRAX. */
+    const organizacionDelProyecto = await this.cuotas.organizacionDelProyecto(projectId);
+    if (
+      body.organizationId &&
+      organizacionDelProyecto &&
+      body.organizationId !== organizacionDelProyecto
+    ) {
+      throw new ForbiddenException({
+        code: NOT_IN_ORG_CODE,
+        message:
+          'Este proyecto es de otra organización. Cámbiate a ella para hablar de él con PRAX.',
+      });
+    }
+
     const [permisos, miembros, chat, ia] = await Promise.all([
       this.permisosEfectivos(userId, projectId),
       this.miembrosConNombre(projectId),
       this.chatReciente(projectId, userId),
       /* `iaDe` y no `limiteDeIa`: esta ruta **gasta** cuota, así que puede
-         acabar en un 402 que tiene que decir qué plan puso ese tope.
-
-         La organización sale del proyecto: es el recurso el que dice dónde se
-         está trabajando, y por tanto qué plan aplica y contra qué cubo se
-         cuenta. */
-      this.cuotas
-        .organizacionDelProyecto(projectId)
-        .then((organizationId) => this.cuotas.iaDe(userId, organizationId)),
+         acabar en un 402 que tiene que decir qué plan puso ese tope. */
+      this.cuotas.iaDe(userId, organizacionDelProyecto),
     ]);
 
     return firstValueFrom(
