@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ClientsModule } from '@nestjs/microservices';
+import { clienteDeServicio } from '@praxis/local-transport';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
 import { MyReportsController } from './my-reports.controller';
@@ -30,42 +30,9 @@ import { ReportsController } from './reports.controller';
        puede mirar un informe. Ver `ReportsController.acotar`. */
     BillingModule,
     ClientsModule.registerAsync([
-      {
-        name: 'REPORTS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('REPORTS_SERVICE_HOST'),
-            port: config.get<number>('REPORTS_SERVICE_PORT'),
-          },
-        }),
-      },
-      {
-        name: 'PROJECTS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('PROJECTS_SERVICE_HOST'),
-            port: config.get<number>('PROJECTS_SERVICE_PORT'),
-          },
-        }),
-      },
-      {
-        name: 'TASKS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('TASKS_SERVICE_HOST'),
-            port: config.get<number>('TASKS_SERVICE_PORT'),
-          },
-        }),
-      },
+      clienteDeServicio('REPORTS'),
+      clienteDeServicio('PROJECTS'),
+      clienteDeServicio('TASKS'),
     ]),
   ],
   controllers: [ReportsController, ReportLayoutController, MyReportsController],

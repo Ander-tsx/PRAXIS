@@ -182,7 +182,9 @@ describe('transporte en proceso frente a TCP', () => {
   });
 
   it('una promesa se espera', async () => {
-    const [tcp, local] = await enLosDos((c) => firstValueFrom(c.send({ cmd: 'promesa' }, { n: 21 })));
+    const [tcp, local] = await enLosDos((c) =>
+      firstValueFrom(c.send({ cmd: 'promesa' }, { n: 21 })),
+    );
     expect(local).toEqual(tcp);
     expect(local).toBe(42);
   });

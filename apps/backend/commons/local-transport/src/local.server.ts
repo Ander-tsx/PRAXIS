@@ -58,11 +58,11 @@ export class LocalServer extends Server implements CustomTransportStrategy, Rece
     }
 
     const responder = (packet: WritePacket) => {
-      this.onProcessingEndHook?.(this.transportId!, contexto);
+      this.onProcessingEndHook?.(LOCAL_TRANSPORT_ID, contexto);
       respond(copiaJson(packet));
     };
 
-    return this.onProcessingStartHook(this.transportId!, contexto, async () => {
+    return this.onProcessingStartHook(LOCAL_TRANSPORT_ID, contexto, async () => {
       try {
         const response$ = this.transformToObservable(await handler(data, contexto));
         if (response$) this.send(response$, responder);

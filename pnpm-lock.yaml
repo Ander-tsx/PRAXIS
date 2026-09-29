@@ -171,6 +171,9 @@ importers:
       '@praxis/contracts':
         specifier: workspace:*
         version: link:../commons/contracts
+      '@praxis/local-transport':
+        specifier: workspace:*
+        version: link:../commons/local-transport
       '@praxis/observability':
         specifier: workspace:*
         version: link:../commons/observability
@@ -310,6 +313,9 @@ importers:
       '@praxis/contracts':
         specifier: workspace:*
         version: link:../../commons/contracts
+      '@praxis/local-transport':
+        specifier: workspace:*
+        version: link:../../commons/local-transport
       '@praxis/observability':
         specifier: workspace:*
         version: link:../../commons/observability
@@ -434,6 +440,9 @@ importers:
       '@praxis/contracts':
         specifier: workspace:*
         version: link:../../commons/contracts
+      '@praxis/local-transport':
+        specifier: workspace:*
+        version: link:../../commons/local-transport
       '@praxis/observability':
         specifier: workspace:*
         version: link:../../commons/observability
@@ -1073,6 +1082,9 @@ importers:
       '@praxis/contracts':
         specifier: workspace:*
         version: link:../../commons/contracts
+      '@praxis/local-transport':
+        specifier: workspace:*
+        version: link:../../commons/local-transport
       '@praxis/observability':
         specifier: workspace:*
         version: link:../../commons/observability
@@ -1191,6 +1203,9 @@ importers:
       '@praxis/domain-events':
         specifier: workspace:*
         version: link:../../commons/domain-events
+      '@praxis/local-transport':
+        specifier: workspace:*
+        version: link:../../commons/local-transport
       '@praxis/observability':
         specifier: workspace:*
         version: link:../../commons/observability

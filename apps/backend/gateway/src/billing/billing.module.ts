@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ClientsModule } from '@nestjs/microservices';
+import { clienteDeServicio } from '@praxis/local-transport';
 import { AuthModule } from '../auth/auth.module';
 import { BillingController } from './billing.controller';
 import { MyOrganizationsController, OrganizationsController } from './organizations.controller';
@@ -42,83 +42,17 @@ import { StripeService } from './stripe.service';
   imports: [
     AuthModule,
     ClientsModule.registerAsync([
-      {
-        name: 'BILLING_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('BILLING_SERVICE_HOST'),
-            port: config.get<number>('BILLING_SERVICE_PORT'),
-          },
-        }),
-      },
-      {
-        name: 'ASSISTANT_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('ASSISTANT_SERVICE_HOST'),
-            port: config.get<number>('ASSISTANT_SERVICE_PORT'),
-          },
-        }),
-      },
-      {
-        name: 'PROJECTS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('PROJECTS_SERVICE_HOST'),
-            port: config.get<number>('PROJECTS_SERVICE_PORT'),
-          },
-        }),
-      },
+      clienteDeServicio('BILLING'),
+      clienteDeServicio('ASSISTANT'),
+      clienteDeServicio('PROJECTS'),
       /* Para soltar las tareas de quien sale de una organización
          (`OrganizationsController.quitar`) y para sumar los bytes de los
          adjuntos de una organización (`QuotaService.exigirAlmacenamiento`). */
-      {
-        name: 'TASKS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('TASKS_SERVICE_HOST'),
-            port: config.get<number>('TASKS_SERVICE_PORT'),
-          },
-        }),
-      },
+      clienteDeServicio('TASKS'),
       /* Para contar las reglas activas de un proyecto contra el tope del plan.
          Ver `QuotaService.exigirAutomatizacion`. */
-      {
-        name: 'AUTOMATION_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('AUTOMATION_SERVICE_HOST'),
-            port: config.get<number>('AUTOMATION_SERVICE_PORT'),
-          },
-        }),
-      },
-      {
-        name: 'CREDENTIALS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('CREDENTIALS_SERVICE_HOST'),
-            port: config.get<number>('CREDENTIALS_SERVICE_PORT'),
-          },
-        }),
-      },
+      clienteDeServicio('AUTOMATION'),
+      clienteDeServicio('CREDENTIALS'),
     ]),
   ],
   controllers: [

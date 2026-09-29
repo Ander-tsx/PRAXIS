@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ClientsModule } from '@nestjs/microservices';
+import { clienteDeServicio } from '@praxis/local-transport';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
 import { AssistantController } from './assistant.controller';
@@ -23,54 +23,10 @@ import { MyAssistantController } from './my-assistant.controller';
        venir de la organización de una empresa — que assistant-service no ve. */
     BillingModule,
     ClientsModule.registerAsync([
-      {
-        name: 'ASSISTANT_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('ASSISTANT_SERVICE_HOST'),
-            port: config.get<number>('ASSISTANT_SERVICE_PORT'),
-          },
-        }),
-      },
-      {
-        name: 'CREDENTIALS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('CREDENTIALS_SERVICE_HOST'),
-            port: config.get<number>('CREDENTIALS_SERVICE_PORT'),
-          },
-        }),
-      },
-      {
-        name: 'PROJECTS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('PROJECTS_SERVICE_HOST'),
-            port: config.get<number>('PROJECTS_SERVICE_PORT'),
-          },
-        }),
-      },
-      {
-        name: 'TASKS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('TASKS_SERVICE_HOST'),
-            port: config.get<number>('TASKS_SERVICE_PORT'),
-          },
-        }),
-      },
+      clienteDeServicio('ASSISTANT'),
+      clienteDeServicio('CREDENTIALS'),
+      clienteDeServicio('PROJECTS'),
+      clienteDeServicio('TASKS'),
     ]),
   ],
   controllers: [AssistantController, MyAssistantController],
