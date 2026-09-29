@@ -9,6 +9,8 @@ import type {
   ChecklistProposal,
   CommentProposal,
   DeleteProposal,
+  DocumentProposal,
+  DocumentRevisionProposal,
   EditProposal,
   EstadoPropuesta,
   MessageProposal,
@@ -21,6 +23,7 @@ import type {
   TaskProposal,
   TemplateProposal,
 } from '../../api/assistant';
+import { claveDeRevisionDePrax } from '../../api/assistant';
 import {
   PRIORITY_LABELS,
   type Priority,
@@ -33,6 +36,7 @@ import {
   aceptarBorradoAction,
   aceptarChecklistAction,
   aceptarComentarioAction,
+  aceptarDocumentoAction,
   aceptarEdicionAction,
   aceptarInicioSprintAction,
   aceptarMarcarPasosAction,
@@ -860,7 +864,7 @@ function AccionConFrase({
   titulo: string;
   sinAplicar: string;
   porQue?: string | undefined;
-  ejecutar: () => Promise<{ error: string | null; hecho: string | null }>;
+  ejecutar: () => Promise<{ error: string | null; hecho: string | null; href?: string }>;
   projectId: string;
   proposalId?: string | undefined;
   estadoGuardado?: EstadoPropuesta | undefined;
@@ -879,7 +883,7 @@ function AccionConFrase({
       setEstado('pendiente');
       return;
     }
-    setResultado({ texto: respuesta.hecho, href: `/projects/${projectId}` });
+    setResultado({ texto: respuesta.hecho, href: respuesta.href ?? `/projects/${projectId}` });
     setEstado('hecho');
   }
 
@@ -994,6 +998,90 @@ export function PlanningProposalCard({
           </li>
         ))}
       </ul>
+    </AccionConFrase>
+  );
+}
+
+export function DocumentProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: DocumentProposal }) {
+  return (
+    <AccionConFrase
+      titulo="Documento propuesto"
+      sinAplicar="Todavía no existe."
+      porQue={propuesta.porQue}
+      ejecutar={() => aceptarDocumentoAction(projectId, propuesta)}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+    >
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+        <Campo termino="Documento" valor={propuesta.titulo} />
+        <Campo termino="En el espacio" valor={propuesta.espacio} />
+      </dl>
+      {/* El contenido tal cual va a quedar, pintado como lo pinta el documento. */}
+      <div className="max-h-64 overflow-y-auto rounded-lg border border-border px-3 py-2">
+        <ModelText texto={propuesta.contenido} />
+      </div>
+    </AccionConFrase>
+  );
+}
+
+/**
+ * Una revisión de un documento que ya existe.
+ *
+ * ⚠️ **Aceptar no escribe nada**: abre el documento con la revisión esperando
+ * arriba, y el editor la aplica cuando la persona lo confirma allí. El
+ * contenido solo entra por el tiempo real (E4 de PLAN-DOCUMENTOS); aplicarlo
+ * desde aquí sería un `PATCH` que el siguiente guardado de Yjs se comería.
+ */
+export function DocumentRevisionProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: DocumentRevisionProposal }) {
+  const router = useRouter();
+  const href = `/projects/${projectId}?tab=espacios&ws=${propuesta.workspaceId}&doc=${propuesta.documentoId}`;
+  return (
+    <AccionConFrase
+      titulo="Revisión de un documento"
+      sinAplicar="El documento no ha cambiado."
+      porQue={propuesta.porQue}
+      ejecutar={async () => {
+        try {
+          sessionStorage.setItem(
+            claveDeRevisionDePrax(propuesta.documentoId),
+            JSON.stringify({ contenido: propuesta.contenido, cambios: propuesta.cambios }),
+          );
+        } catch {
+          return { error: 'Este navegador no deja guardar la revisión para abrirla.', hecho: null };
+        }
+        router.push(href);
+        return { error: null, hecho: 'Abierta en el documento: aplícala desde allí.', href };
+      }}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+    >
+      <dl className="grid grid-cols-1 gap-y-2">
+        <Campo termino="Documento" valor={propuesta.titulo} />
+      </dl>
+      <p className="font-sans text-sm leading-relaxed text-text-primary">{propuesta.cambios}</p>
+      <details className="rounded-lg border border-border px-3 py-2">
+        <summary className="cursor-pointer font-sans text-xs text-text-secondary">
+          Ver cómo quedaría
+        </summary>
+        <div className="mt-2 max-h-64 overflow-y-auto">
+          <ModelText texto={propuesta.contenido} />
+        </div>
+      </details>
+      <p className="font-sans text-xs text-text-secondary">
+        Se aplica desde el editor y queda en el historial de versiones: se puede deshacer.
+      </p>
     </AccionConFrase>
   );
 }

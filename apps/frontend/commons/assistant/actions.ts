@@ -9,6 +9,7 @@ import type {
   ChecklistProposal,
   CommentProposal,
   ConversationSummary,
+  DocumentProposal,
   DeleteProposal,
   EditProposal,
   FullConversation,
@@ -996,6 +997,57 @@ export async function aceptarTableroAction(
     };
   } catch (error) {
     return { error: describe(error, 'No se pudo crear el tablero.'), creado: null };
+  }
+}
+
+/**
+ * Un documento nuevo, con su contenido.
+ *
+ * `POST /workspaces/:id/documents` con `content` en Markdown —la única vez que el
+ * contenido entra por REST (E4 de PLAN-DOCUMENTOS)—, y `canEditDocuments`. El
+ * espacio va por nombre, como el del tablero: el de documentos que se llame así,
+ * o uno nuevo. Nunca uno de tableros: el backend lo rechaza con 400 (D7).
+ */
+export async function aceptarDocumentoAction(
+  projectId: string,
+  propuesta: DocumentProposal,
+): Promise<{ error: string | null; hecho: string | null; href?: string }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', hecho: null };
+
+  const titulo = String(propuesta.titulo ?? '').trim();
+  if (!titulo || titulo.length > 200) {
+    return { error: 'El título tiene que tener entre 1 y 200 caracteres.', hecho: null };
+  }
+  const nombreEspacio = String(propuesta.espacio ?? '').trim() || 'Documentos';
+
+  try {
+    const proyecto = await api.get<ProjectDetail>(`/projects/${projectId}`);
+    const normalizar = (texto: string) => texto.trim().toLocaleLowerCase('es');
+    let espacio = (proyecto.workspaces ?? []).find(
+      (candidato) =>
+        candidato.kind === 'DOCUMENTS' && normalizar(candidato.name) === normalizar(nombreEspacio),
+    );
+    if (!espacio) {
+      espacio = await api.post<Workspace>(`/projects/${projectId}/workspaces`, {
+        name: nombreEspacio,
+        kind: 'DOCUMENTS',
+      });
+      if (!espacio?.id) return { error: 'El servidor no guardó el espacio.', hecho: null };
+    }
+
+    const creado = await api.post<{ id: string; title: string }>(
+      `/workspaces/${espacio.id}/documents`,
+      { title: titulo, content: String(propuesta.contenido ?? '') },
+    );
+    if (!creado?.id) return { error: 'El servidor no guardó el documento.', hecho: null };
+    return {
+      error: null,
+      hecho: `Se creó «${creado.title}» en ${espacio.name}.`,
+      href: `/projects/${projectId}?tab=espacios&ws=${espacio.id}&doc=${creado.id}`,
+    };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo crear el documento.'), hecho: null };
   }
 }
 

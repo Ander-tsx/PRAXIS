@@ -3,6 +3,7 @@ import {
   PROPONER_BORRADO,
   PROPONER_CHECKLIST,
   PROPONER_COMENTARIO,
+  PROPONER_DOCUMENTO,
   PROPONER_EDICION,
   PROPONER_INICIAR_SPRINT,
   PROPONER_MARCAR_PASOS,
@@ -10,6 +11,7 @@ import {
   PROPONER_MOVIMIENTO,
   PROPONER_PLANIFICACION,
   PROPONER_PREGUNTA,
+  PROPONER_REVISION_DOCUMENTO,
   PROPONER_SPRINT,
   PROPONER_TABLERO,
   PROPONER_TAREA,
@@ -152,9 +154,9 @@ export const CAPACIDADES: Capacidad[] = [
     donde: 'la franja del sprint del tablero',
   },
   {
-    que: 'Crear y editar documentos',
+    que: 'Crear documentos y mejorar los que existen',
     permisos: ['canEditDocuments'],
-    herramientas: [],
+    herramientas: [PROPONER_DOCUMENTO, PROPONER_REVISION_DOCUMENTO],
     donde: 'la pestaña Espacios, dentro de un espacio de documentos',
   },
   {

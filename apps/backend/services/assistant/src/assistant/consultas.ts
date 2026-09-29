@@ -131,11 +131,57 @@ export const CONSULTAR_SPRINTS: FunctionDeclaration = {
   },
 };
 
+/**
+ * Cuánto de un documento se le enseña al modelo. Lo que sobra se dice
+ * (`recortado`), como todo recorte (I3).
+ */
+export const CONSULTA_MAX_DOCUMENTO = 20_000;
+/**
+ * Hasta qué tamaño PRAX puede proponer una revisión **entera** de un documento.
+ * La revisión es el Markdown completo, y sale como tokens de salida —los que
+ * pesan ×8—; por encima de esto, ni cabe en `MAX_TOKENS_REVISION` ni compensa.
+ */
+export const REVISION_MAX_CARACTERES = 12_000;
+
+export const CONSULTAR_DOCUMENTOS: FunctionDeclaration = {
+  name: 'consultar_documentos',
+  description:
+    'LEE la lista de documentos de un proyecto: titulo, espacio, cuando se toco y el ' +
+    'principio del texto. No cambia nada. Usala para encontrar un documento antes de leerlo.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      proyectoId: {
+        type: 'STRING',
+        description: 'id del proyecto. Sin el, el proyecto de la conversacion.',
+      },
+      texto: { type: 'STRING', description: 'Opcional. Busca en titulo y contenido.' },
+    },
+  },
+};
+
+export const CONSULTAR_DOCUMENTO: FunctionDeclaration = {
+  name: 'consultar_documento',
+  description:
+    'LEE un documento entero, en Markdown. No cambia nada. Hace falta haberlo leido en ' +
+    `este turno para proponer una revision. Enseña como mucho ${CONSULTA_MAX_DOCUMENTO} ` +
+    'caracteres y dice si recorto.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      documentoId: { type: 'STRING', description: 'id de consultar_documentos.' },
+    },
+    required: ['documentoId'],
+  },
+};
+
 export const HERRAMIENTAS_DE_CONSULTA = [
   CONSULTAR_TAREAS,
   CONSULTAR_TAREA,
   CONSULTAR_ANALISIS,
   CONSULTAR_SPRINTS,
+  CONSULTAR_DOCUMENTOS,
+  CONSULTAR_DOCUMENTO,
 ];
 const NOMBRES = new Set(HERRAMIENTAS_DE_CONSULTA.map((h) => h.name));
 
@@ -164,6 +210,21 @@ export interface AmbitoDeConsulta {
   vistas?: Map<string, TareaVista>;
   /** Los sprints **del foco** que ha visto el modelo, por id. Mismo motivo. */
   sprintsVistos?: Map<string, SprintVisto>;
+  /**
+   * Los documentos **del foco** que ha visto, por id. `leido` solo cuando pasó
+   * por `consultar_documento`: una revisión se escribe sobre lo leído, no sobre
+   * el principio que enseña la lista.
+   */
+  documentosVistos?: Map<string, DocumentoVisto>;
+}
+
+export interface DocumentoVisto {
+  id: string;
+  titulo: string;
+  workspaceId: string;
+  espacio: string;
+  largo: number;
+  leido: boolean;
 }
 
 /** Lo justo de un sprint visto para validar una propuesta sobre él. */
@@ -219,6 +280,13 @@ export class ConsultasService {
     if (nombre === 'consultar_tarea') return 'Leyendo una tarea';
     if (nombre === 'consultar_sprints')
       return `Mirando los sprints${proyecto ? ` de ${proyecto}` : ''}`;
+    if (nombre === 'consultar_documentos') {
+      return `Buscando documentos${proyecto ? ` en ${proyecto}` : ''}`;
+    }
+    if (nombre === 'consultar_documento') {
+      const titulo = ambito.documentosVistos?.get(String(args.documentoId ?? ''))?.titulo;
+      return titulo ? `Leyendo «${titulo}»` : 'Leyendo un documento';
+    }
     if (nombre === 'consultar_analisis') {
       return `Consultando el informe «${String(args.informe ?? '')}»${proyecto ? ` de ${proyecto}` : ''}`;
     }
@@ -240,6 +308,8 @@ export class ConsultasService {
       if (nombre === 'consultar_tarea') return await this.tarea(args, ambito);
       if (nombre === 'consultar_analisis') return await this.analisis(args, ambito);
       if (nombre === 'consultar_sprints') return await this.sprints(args, ambito);
+      if (nombre === 'consultar_documentos') return await this.documentos(args, ambito);
+      if (nombre === 'consultar_documento') return await this.documento(args, ambito);
       return { error: `No existe la consulta ${nombre}.` };
     } catch (error) {
       this.log.warn(`prax_consulta_fallida ${nombre}: ${(error as Error)?.message ?? error}`);
@@ -517,6 +587,129 @@ export class ConsultasService {
       });
     }
     return { proyecto: this.nombreDeProyecto(projectId, ambito), tableros: resultado };
+  }
+
+  /** Los espacios de documentos de un proyecto, con su nombre. */
+  private async espaciosDeDocumentos(projectId: string) {
+    const proyecto = await firstValueFrom(
+      this.projects.send<{ workspaces?: { id: string; name: string; kind?: string }[] }>(
+        { cmd: 'project_find_one' },
+        { id: projectId },
+      ),
+    );
+    return (proyecto?.workspaces ?? []).filter((w) => w.kind === 'DOCUMENTS');
+  }
+
+  /**
+   * La lista de documentos, sin el contenido entero: el principio basta para
+   * reconocerlo, y un proyecto con veinte documentos largos no cabe en un turno.
+   */
+  private async documentos(args: Record<string, unknown>, ambito: AmbitoDeConsulta) {
+    const projectId = this.proyectoPermitido(args.proyectoId, ambito);
+    if (!projectId) return this.sinAcceso();
+
+    const texto = typeof args.texto === 'string' ? args.texto.trim().toLowerCase() : '';
+    const delFoco = projectId === ambito.foco;
+    const lista: Record<string, unknown>[] = [];
+    for (const espacio of await this.espaciosDeDocumentos(projectId)) {
+      const documentos = await firstValueFrom(
+        this.projects.send<
+          { id: string; title: string; content?: string | null; updatedAt: string }[]
+        >({ cmd: 'document_find_by_workspace' }, { workspaceId: espacio.id }),
+      );
+      for (const d of documentos ?? []) {
+        const contenido = d.content ?? '';
+        if (texto && !`${d.title} ${contenido}`.toLowerCase().includes(texto)) continue;
+        if (delFoco) {
+          ambito.documentosVistos?.set(d.id, {
+            id: d.id,
+            titulo: d.title,
+            workspaceId: espacio.id,
+            espacio: espacio.name,
+            largo: contenido.length,
+            leido: ambito.documentosVistos.get(d.id)?.leido ?? false,
+          });
+        }
+        lista.push({
+          id: d.id,
+          titulo: d.title,
+          espacio: espacio.name,
+          tocado: d.updatedAt?.slice(0, 10) ?? null,
+          caracteres: contenido.length,
+          principio: contenido.slice(0, 200),
+        });
+      }
+    }
+    return {
+      proyecto: this.nombreDeProyecto(projectId, ambito),
+      total: lista.length,
+      documentos: lista.slice(0, 30),
+      omitidos: Math.max(0, lista.length - 30),
+    };
+  }
+
+  /**
+   * Un documento entero, en su copia Markdown (E2 de PLAN-DOCUMENTOS): la que
+   * regenera el tiempo real en cada guardado.
+   */
+  private async documento(args: Record<string, unknown>, ambito: AmbitoDeConsulta) {
+    const id = String(args.documentoId ?? '');
+    if (!id) return { error: 'Falta el id del documento.' };
+
+    /* El espacio hace falta para leerlo; sale de la lista si se consultó, y si
+       no, de buscarlo en los proyectos del ámbito. Un id de fuera no aparece. */
+    let conocido = ambito.documentosVistos?.get(id);
+    let proyectoDelDocumento = conocido ? ambito.foco : null;
+    if (!conocido) {
+      for (const proyecto of ambito.proyectos) {
+        for (const espacio of await this.espaciosDeDocumentos(proyecto.id)) {
+          const lista = await firstValueFrom(
+            this.projects.send<{ id: string; title: string }[]>(
+              { cmd: 'document_find_by_workspace' },
+              { workspaceId: espacio.id },
+            ),
+          );
+          const hallado = (lista ?? []).find((d) => d.id === id);
+          if (hallado) {
+            conocido = {
+              id,
+              titulo: hallado.title,
+              workspaceId: espacio.id,
+              espacio: espacio.name,
+              largo: 0,
+              leido: false,
+            };
+            proyectoDelDocumento = proyecto.id;
+            break;
+          }
+        }
+        if (conocido) break;
+      }
+    }
+    if (!conocido) {
+      return { error: 'No encuentro ese documento entre los proyectos que puedes consultar.' };
+    }
+
+    const documento = await firstValueFrom(
+      this.projects.send<{ id: string; title: string; content?: string | null; updatedAt: string }>(
+        { cmd: 'document_find_one' },
+        { id, workspaceId: conocido.workspaceId },
+      ),
+    );
+    const contenido = documento?.content ?? '';
+    if (proyectoDelDocumento === ambito.foco) {
+      ambito.documentosVistos?.set(id, { ...conocido, largo: contenido.length, leido: true });
+    }
+    return {
+      id,
+      titulo: documento?.title ?? conocido.titulo,
+      espacio: conocido.espacio,
+      tocado: documento?.updatedAt?.slice(0, 10) ?? null,
+      contenido: contenido.slice(0, CONSULTA_MAX_DOCUMENTO),
+      recortado: Math.max(0, contenido.length - CONSULTA_MAX_DOCUMENTO),
+      /* Dicho aquí para que PRAX no lo intente y se lo descarten: */
+      admiteRevision: contenido.length <= REVISION_MAX_CARACTERES,
+    };
   }
 
   private async analisis(args: Record<string, unknown>, ambito: AmbitoDeConsulta) {

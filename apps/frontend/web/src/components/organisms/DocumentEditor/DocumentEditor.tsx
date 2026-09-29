@@ -27,6 +27,7 @@ import { VistaTarjeta } from './VistaTarjeta';
 import { crearBarra } from './barra';
 import { bloquesDisponibles } from './bloques';
 import { Contexto, type ContextoDelDocumento, rutaDeDocumento } from './contexto';
+import { RevisionDePrax } from './RevisionDePrax';
 import './editor.css';
 
 /** Tope y formatos de las imágenes: los mismos que comprueba el gateway (E6). */
@@ -462,6 +463,7 @@ function EditorVivo({
           <LineasFantasma />
         ) : (
           <>
+            {editor && editable && <RevisionDePrax documentId={documentId} editor={editor} />}
             {editor && editable && (
               <>
                 <Burbuja editor={editor} />

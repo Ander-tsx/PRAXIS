@@ -24,6 +24,8 @@ import { bloqueDeArchivo } from './attachment-text';
 import { AttachmentsService } from './attachments.service';
 import {
   type AmbitoDeConsulta,
+  type DocumentoVisto,
+  REVISION_MAX_CARACTERES,
   type SprintVisto,
   type TareaVista,
   ConsultasService,
@@ -168,6 +170,8 @@ const NOMBRE_DE_PROPUESTA: Record<string, string> = {
   proponer_sprint: 'un sprint nuevo',
   proponer_iniciar_sprint: 'empezar un sprint',
   proponer_planificacion: 'repartir tareas entre backlog y sprint',
+  proponer_documento: 'un documento nuevo',
+  proponer_revision_documento: 'una revision del documento',
   proponer_abrir_proyecto: 'abrir uno de tus proyectos',
   proponer_plantilla: 'la estructura de un proyecto nuevo',
 };
@@ -218,6 +222,8 @@ interface Briefing {
    * sprint no están en el briefing.
    */
   sprintsVistos?: Map<string, SprintVisto>;
+  /** Lo mismo con los documentos. */
+  documentosVistos?: Map<string, DocumentoVisto>;
   etiquetas: { id: string; nombre: string }[];
   /** El inventario con ids: lo que permite validar un `taskId` antes de enseñarlo. */
   tareas?: {
@@ -487,8 +493,13 @@ export class AssistantService {
       nombres: Object.fromEntries(payload.miembros.map((m) => [m.userId, m.nombre])),
       vistas: new Map(),
       sprintsVistos: new Map(),
+      documentosVistos: new Map(),
     };
     const conConsultas = ambito.proyectos.length > 0;
+    /* Un documento entero sale como tokens de salida, y con los 2048 de
+       siempre una revisión llega cortada y se descarta sin ruido. El techo solo
+       sube si puede proponerlo; lo que no se escribe no se paga. */
+    const escribeDocumentos = herramientas.some((h) => h.name === 'proponer_documento');
     const todasLasHerramientas = conConsultas
       ? [...HERRAMIENTAS_DE_CONSULTA, ...herramientas]
       : herramientas;
@@ -554,7 +565,7 @@ export class AssistantService {
             message: mensajeConArchivos,
             tools: agotado ? herramientas : todasLasHerramientas,
             extra,
-            ...(briefing ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
+            ...(briefing && !escribeDocumentos ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
           },
           alTexto,
         );
@@ -645,9 +656,7 @@ export class AssistantService {
     }
 
     const respuesta = { calls: llamadas, text: escrito.trim() };
-    const briefingParaValidar = briefing
-      ? this.conLoVisto(briefing, ambito.vistas ?? new Map(), ambito.sprintsVistos ?? new Map())
-      : null;
+    const briefingParaValidar = briefing ? this.conLoVisto(briefing, ambito) : null;
     let validadas = respuesta.calls
       .map((call) =>
         briefingParaValidar
@@ -1376,6 +1385,8 @@ export class AssistantService {
       };
     }
 
+    if (call.name === 'proponer_documento') return this.validarDocumento(call);
+    if (call.name === 'proponer_revision_documento') return this.validarRevision(call, briefing);
     if (call.name === 'proponer_sprint') return this.validarSprint(call, briefing);
     if (call.name === 'proponer_iniciar_sprint') return this.validarInicioDeSprint(call, briefing);
     if (call.name === 'proponer_planificacion') return this.validarPlanificacion(call, briefing);
@@ -1512,6 +1523,61 @@ export class AssistantService {
   }
 
   /**
+   * Un documento nuevo. El espacio va **por nombre**, como en el tablero: se
+   * resuelve o se crea al aceptar, así que no hace falta haberlo consultado.
+   */
+  private validarDocumento(call: {
+    name: string;
+    args: Record<string, unknown>;
+  }): AssistantProposal | null {
+    const titulo = String(call.args.titulo ?? '').trim();
+    const contenido = String(call.args.contenido ?? '').trim();
+    if (!titulo || !contenido) return null;
+    const espacio = String(call.args.espacio ?? '').trim() || 'Documentos';
+    return {
+      tool: call.name,
+      args: {
+        espacio: espacio.slice(0, 80),
+        titulo: titulo.slice(0, 200),
+        contenido: contenido.slice(0, 20_000),
+        ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+      },
+    };
+  }
+
+  /**
+   * Una revisión: **sobre un documento leído entero en este turno**.
+   *
+   * La revisión sustituye el contenido, así que una escrita sin haberlo leído
+   * —o sobre la parte que enseñó la lista— borraría lo que el modelo no vio. Y
+   * con tope: por encima de `REVISION_MAX_CARACTERES` la respuesta ni cabe en la
+   * salida ni compensa en tokens.
+   */
+  private validarRevision(
+    call: { name: string; args: Record<string, unknown> },
+    briefing: Briefing,
+  ): AssistantProposal | null {
+    const documento = briefing.documentosVistos?.get(String(call.args.documentoId ?? ''));
+    if (!documento?.leido || documento.largo > REVISION_MAX_CARACTERES) {
+      this.log.warn('El modelo propuso revisar un documento que no leyo entero o que es largo');
+      return null;
+    }
+    const contenido = String(call.args.contenido ?? '').trim();
+    if (!contenido || contenido.length > REVISION_MAX_CARACTERES * 1.5) return null;
+    return {
+      tool: call.name,
+      args: {
+        documentoId: documento.id,
+        workspaceId: documento.workspaceId,
+        titulo: documento.titulo,
+        contenido,
+        cambios: String(call.args.cambios ?? '').slice(0, 500),
+        ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+      },
+    };
+  }
+
+  /**
    * Un sprint nuevo: en un tablero **con Scrum** del proyecto.
    *
    * El tablero sale del briefing, que solo trae `scrum` en los que lo tienen:
@@ -1636,13 +1702,13 @@ export class AssistantService {
    * añaden las que no estaban en el inventario, con la columna y el tablero
    * resueltos contra las columnas del briefing, que son las de todo el proyecto.
    */
-  private conLoVisto(
-    briefing: Briefing,
-    vistas: Map<string, TareaVista>,
-    sprintsVistos: Map<string, SprintVisto>,
-  ): Briefing {
-    const conSprints = sprintsVistos.size > 0 ? { ...briefing, sprintsVistos } : briefing;
-    return this.conTareasVistas(conSprints, vistas);
+  private conLoVisto(briefing: Briefing, ambito: AmbitoDeConsulta): Briefing {
+    const conVistos = {
+      ...briefing,
+      ...(ambito.sprintsVistos?.size ? { sprintsVistos: ambito.sprintsVistos } : {}),
+      ...(ambito.documentosVistos?.size ? { documentosVistos: ambito.documentosVistos } : {}),
+    };
+    return this.conTareasVistas(conVistos, ambito.vistas ?? new Map());
   }
 
   private conTareasVistas(briefing: Briefing, vistas: Map<string, TareaVista>): Briefing {

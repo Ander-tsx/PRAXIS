@@ -169,3 +169,89 @@ test.describe('PRAX — sprints', () => {
     expect((await data<{ status: string }>(empezado)).status).toBe('ACTIVE');
   });
 });
+
+test.describe('PRAX — documentos', () => {
+  async function documento(request: APIRequestContext, mundo: Mundo, contenido: string) {
+    const headers = comoBearer(mundo.duenno.accessToken);
+    const espacio = await request.post(`/api/projects/${mundo.proyecto.id}/workspaces`, {
+      headers,
+      data: { name: 'Notas', kind: 'DOCUMENTS' },
+    });
+    expect(espacio.status(), 'Crear espacio de documentos').toBe(201);
+    const workspaceId = (await data<{ id: string }>(espacio)).id;
+    const creado = await request.post(`/api/workspaces/${workspaceId}/documents`, {
+      headers,
+      data: { title: 'Acta del lunes', content: contenido },
+    });
+    expect(creado.status(), 'Crear documento').toBe(201);
+    return { workspaceId, id: (await data<{ id: string }>(creado)).id };
+  }
+
+  test('una revisión solo sale sobre un documento leído en el turno', async ({ request }) => {
+    const mundo = await crearMundo(request);
+    const doc = await documento(request, mundo, '# Acta\n\nsin ortografia');
+    const revision = `#propon proponer_revision_documento {"documentoId":"${doc.id}","contenido":"# Acta\\n\\nSin ortografía.","cambios":"Ortografía.","porQue":"Lo pediste."}`;
+
+    const sinLeer = await turno(request, mundo, ['Corrígelo', revision].join('\n'));
+    expect(sinLeer, 'Sin leerlo, la revisión borraría lo que no vio').toEqual([]);
+
+    const leido = await turno(
+      request,
+      mundo,
+      ['Corrígelo', `#consulta consultar_documento {"documentoId":"${doc.id}"}`, revision].join(
+        '\n',
+      ),
+    );
+    expect(leido).toHaveLength(1);
+    expect(leido[0]).toMatchObject({
+      tool: 'proponer_revision_documento',
+      args: {
+        documentoId: doc.id,
+        workspaceId: doc.workspaceId,
+        titulo: 'Acta del lunes',
+        contenido: '# Acta\n\nSin ortografía.',
+      },
+    });
+  });
+
+  test('un documento nuevo se propone con su contenido y se crea por la ruta de siempre', async ({
+    request,
+  }) => {
+    const mundo = await crearMundo(request);
+    const propuestas = await turno(
+      request,
+      mundo,
+      [
+        'Escribe el acta',
+        '#propon proponer_documento {"espacio":"Documentos","titulo":"Acta","contenido":"# Acta\\n\\n- [ ] Revisar","porQue":"Lo pediste."}',
+      ].join('\n'),
+    );
+    expect(propuestas).toHaveLength(1);
+    expect(propuestas[0].args).toMatchObject({
+      espacio: 'Documentos',
+      titulo: 'Acta',
+      contenido: '# Acta\n\n- [ ] Revisar',
+    });
+
+    /* Aceptar es `aceptarDocumentoAction`: espacio de documentos y POST con contenido. */
+    const headers = comoBearer(mundo.duenno.accessToken);
+    const espacio = await data<{ id: string }>(
+      await request.post(`/api/projects/${mundo.proyecto.id}/workspaces`, {
+        headers,
+        data: { name: 'Documentos', kind: 'DOCUMENTS' },
+      }),
+    );
+    const creado = await request.post(`/api/workspaces/${espacio.id}/documents`, {
+      headers,
+      data: { title: 'Acta', content: propuestas[0].args.contenido },
+    });
+    expect(creado.status()).toBe(201);
+    const leido = await data<{ content: string }>(
+      await request.get(
+        `/api/workspaces/${espacio.id}/documents/${(await data<{ id: string }>(creado)).id}`,
+        { headers },
+      ),
+    );
+    expect(leido.content).toContain('- [ ] Revisar');
+  });
+});

@@ -23,6 +23,8 @@ import {
   isCommentProposal,
   isDeleteProposal,
   isEditProposal,
+  isDocumentProposal,
+  isDocumentRevisionProposal,
   isMessageProposal,
   isPlanningProposal,
   isSprintProposal,
@@ -56,6 +58,8 @@ import {
   DeleteProposalCard,
   EditProposalCard,
   MarkStepsProposalCard,
+  DocumentProposalCard,
+  DocumentRevisionProposalCard,
   MessageProposalCard,
   PlanningProposalCard,
   SprintProposalCard,
@@ -1369,6 +1373,32 @@ export function AssistantChat({
                         /* Preguntar no propone ningún cambio, así que ninguna
                            de las guardas de abajo la reclama: el orden aquí solo
                            ahorra recorrerlas. */
+                        if (isDocumentProposal(propuesta)) {
+                          return (
+                            <DocumentProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId ?? ''}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
+                        if (isDocumentRevisionProposal(propuesta)) {
+                          return (
+                            <DocumentRevisionProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId ?? ''}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
                         if (isSprintProposal(propuesta)) {
                           return (
                             <SprintProposalCard

@@ -307,6 +307,32 @@ export interface PlanningProposal {
   porQue?: string;
 }
 
+/**
+ * Los documentos (F7 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+ *
+ * Crear va por REST como todo lo demás. La revisión **no**: el contenido de un
+ * documento solo se escribe por el tiempo real (E4 de PLAN-DOCUMENTOS), así que
+ * aceptarla abre el documento y es el editor quien la aplica.
+ */
+export interface DocumentProposal {
+  /** Nombre del espacio de documentos. Se resuelve o se crea al aceptar. */
+  espacio: string;
+  titulo: string;
+  /** Markdown. */
+  contenido: string;
+  porQue?: string;
+}
+
+export interface DocumentRevisionProposal {
+  documentoId: string;
+  workspaceId: string;
+  titulo: string;
+  /** El Markdown completo tal como quedaría. */
+  contenido: string;
+  cambios: string;
+  porQue?: string;
+}
+
 export interface BoardProposal {
   /** Nombre del espacio de trabajo. Se resuelve o se crea al aceptar. */
   espacio: string;
@@ -577,6 +603,32 @@ export function isPlanningProposal(
   propuesta: AssistantProposal,
 ): propuesta is AssistantProposal & { args: PlanningProposal } {
   return propuesta.tool === 'proponer_planificacion' && Array.isArray(propuesta.args.taskIds);
+}
+
+export function isDocumentProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: DocumentProposal } {
+  return propuesta.tool === 'proponer_documento' && typeof propuesta.args.contenido === 'string';
+}
+
+export function isDocumentRevisionProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: DocumentRevisionProposal } {
+  return (
+    propuesta.tool === 'proponer_revision_documento' &&
+    typeof propuesta.args.documentoId === 'string'
+  );
+}
+
+/**
+ * Dónde deja la tarjeta una revisión para que la recoja el editor.
+ *
+ * Va por `sessionStorage` y no por la URL: son hasta 12 000 caracteres de
+ * Markdown, y una URL con eso dentro acaba en el historial, en los registros
+ * del servidor y en el portapapeles de quien la comparta. Muere con la pestaña.
+ */
+export function claveDeRevisionDePrax(documentoId: string): string {
+  return `praxis:revision-prax:${documentoId}`;
 }
 
 export function isMessageProposal(

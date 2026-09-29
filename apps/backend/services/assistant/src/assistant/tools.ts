@@ -504,6 +504,70 @@ export const PROPONER_PLANIFICACION: FunctionDeclaration = {
   },
 };
 
+/**
+ * Los documentos (D16 de docs/PLAN-PRAX-SEMIAGENTICO.md).
+ *
+ * ## Crear sí va por REST; mejorar, no
+ *
+ * `POST /workspaces/:id/documents` acepta contenido inicial, así que crear es
+ * una propuesta como cualquier otra. **Cambiar el contenido de uno que existe
+ * no tiene ruta REST** (E4 de PLAN-DOCUMENTOS: un `PATCH` con `content` da 400,
+ * porque se lo comería el siguiente guardado de Yjs de quien lo tenga abierto).
+ * La revisión la aplica **el editor**, en el navegador de quien acepta, como
+ * entra una versión restaurada: un cambio más que los demás ven llegar y que se
+ * deshace desde el historial.
+ */
+export const PROPONER_DOCUMENTO: FunctionDeclaration = {
+  name: 'proponer_documento',
+  description:
+    'Prepara un documento NUEVO con su contenido en Markdown (titulos con #, listas, ' +
+    'tablas, "- [ ]" para tareas). NO lo crea: la persona lo acepta. Usala para actas, ' +
+    'especificaciones, resumenes o planes que te pidan escribir.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      espacio: {
+        type: 'STRING',
+        description:
+          'Nombre del espacio de DOCUMENTOS donde va. Usa uno que exista si lo sabes ' +
+          '(consultar_documentos); si no hay ninguno, propon "Documentos".',
+      },
+      titulo: { type: 'STRING', description: 'De 1 a 200 caracteres.' },
+      contenido: {
+        type: 'STRING',
+        description: 'El documento entero en Markdown. Como mucho unos 20000 caracteres.',
+      },
+      porQue: { type: 'STRING', description: 'Obligatorio. Una frase.' },
+    },
+    required: ['espacio', 'titulo', 'contenido', 'porQue'],
+  },
+};
+
+export const PROPONER_REVISION_DOCUMENTO: FunctionDeclaration = {
+  name: 'proponer_revision_documento',
+  description:
+    'Prepara una REVISION de un documento que ya existe: su Markdown entero, mejorado. ' +
+    'NO lo cambia: la persona la revisa y la aplica desde el editor, y queda en el ' +
+    'historial de versiones. Solo documentos que hayas leido con consultar_documento EN ' +
+    'ESTE TURNO y que digan "admiteRevision": true. Conserva lo que no te pidan cambiar.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      documentoId: { type: 'STRING', description: 'id del documento leido.' },
+      contenido: {
+        type: 'STRING',
+        description: 'El Markdown COMPLETO tal como debe quedar, no solo lo que cambia.',
+      },
+      cambios: {
+        type: 'STRING',
+        description: 'Obligatorio. Que has cambiado, en una o dos frases.',
+      },
+      porQue: { type: 'STRING', description: 'Obligatorio. Por que.' },
+    },
+    required: ['documentoId', 'contenido', 'cambios', 'porQue'],
+  },
+};
+
 /** Los colores de columna del design system. Espejo de `COLUMN_COLORS`. */
 const COLORES_DE_COLUMNA = ['primary', 'accent', 'info', 'warning', 'error', 'success'];
 
