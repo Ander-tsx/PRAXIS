@@ -11,18 +11,19 @@ Dos contenedores, un Postgres, un Redis. Nada más.
 |---|---|---|---|
 | **Postgres** | plugin de Railway | — | privado |
 | **Redis** | plugin de Railway | — | privado |
-| **`api`** | gateway + los 10 microservicios (pm2, se hablan por `127.0.0.1:300x`), incluido `collab` (tiempo real de documentos, WebSocket en `127.0.0.1:3010`) | `infra/docker/images/backend.Dockerfile` | `:3000` |
+| **`api`** | **un solo proceso Node**: el gateway, los 8 servicios y `collab` (tiempo real de documentos, WebSocket en `127.0.0.1:3010`), que se hablan en memoria. Ver [PLAN-MONOLITO](../PLAN-MONOLITO.md) | `infra/docker/images/backend.Dockerfile` | `:3000` |
 | **`web`** | la aplicación Next, **un solo proceso** bajo pm2 | `infra/docker/images/frontend.Dockerfile` | `:4100` |
 
-Los Dockerfiles y los supervisores pm2 (`*.pm2.config.cjs`) ya existían para GCP y
-sirven tal cual: no hacen nada específico de Google. `api` y `web` se comunican por
+Los Dockerfiles ya existían para GCP y sirven tal cual: no hacen nada específico
+de Google. El de `api` ya no usa pm2: arranca el monolito con `exec node` desde
+`start-backend.sh`, y si el proceso muere lo reinicia Railway. `api` y `web` se comunican por
 la **red privada** de Railway (`<servicio>.railway.internal`), que no cuesta egress.
 
 ## Requisitos previos
 
 - Cuenta de Railway (plan Hobby, $5/mes, incluye $5 de uso).
 - El repo en GitHub con la app de Railway instalada (se hace desde el dashboard).
-- Un `JWT_SECRET` y un `VOICE_JWT_SECRET` nuevos. Genéralos con:
+- Un `JWT_SECRET` nuevo. Genéralo con:
   ```bash
   openssl rand -hex 48
   ```
@@ -51,10 +52,11 @@ Railway les da variables propias (`DATABASE_URL`, `PGHOST`, `PGPORT`, `PGUSER`,
    - **Dockerfile Path:** `infra/docker/images/backend.Dockerfile`
    - **Root Directory:** `/` (la raíz del repo — el Dockerfile hace `COPY` desde ahí)
 3. **Settings → Deploy:**
-   - **Start Command:** vacío (lo pone el Dockerfile: `pm2-runtime`)
+   - **Start Command:** vacío (lo pone el Dockerfile: `start-backend.sh`, que aplica las
+     migraciones y hace `exec node` del monolito)
    - **Healthcheck Path:** `/api`  ← con el prefijo global; `/` da 404
    - **Pre-Deploy Command:** `bash infra/docker/images/migrar.sh`
-     (aplica `prisma migrate deploy` de los 8 servicios con schema antes de cada
+     (aplica `prisma migrate deploy` de los 7 servicios con schema antes de cada
      release; es idempotente)
 4. **Settings → Networking:**
    - **Public Networking → Generate Domain.** Anota la URL: `https://api-XXXX.up.railway.app`.
@@ -64,7 +66,6 @@ Railway les da variables propias (`DATABASE_URL`, `PGHOST`, `PGPORT`, `PGUSER`,
    ```
    NODE_ENV=production
    JWT_SECRET=<el que generaste>
-   VOICE_JWT_SECRET=<otro distinto>
 
    # Postgres — referencia a las del plugin
    POSTGRES_HOST=${{Postgres.PGHOST}}
@@ -175,7 +176,6 @@ build y el deploy. El `migrar.sh` del pre-deploy corre en cada release.
 | Variable | `api` | `web` | De dónde sale |
 |---|:-:|:-:|---|
 | `JWT_SECRET` | ✅ | ✅ | `openssl rand -hex 48`, **idéntica en los dos** |
-| `VOICE_JWT_SECRET` | ✅ | — | `openssl rand -hex 48` |
 | `POSTGRES_*` | ✅ | — | plugin Postgres (`${{Postgres.PG*}}`) |
 | `REDIS_URL` | ✅ | — | plugin Redis (`${{Redis.REDIS_URL}}`) |
 | `GATEWAY_URL` | — | ✅ | `http://api.railway.internal:3000` |

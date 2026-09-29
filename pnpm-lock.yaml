@@ -290,6 +290,61 @@ importers:
         specifier: ^8.20.0
         version: 8.65.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
 
+  apps/backend/monolith:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.0.1
+        version: 11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.0.1
+        version: 11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.1.28)(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/microservices':
+        specifier: ^11.0.1
+        version: 11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(ioredis@5.11.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@praxis/assistant-service':
+        specifier: workspace:*
+        version: link:../services/assistant
+      '@praxis/automation-service':
+        specifier: workspace:*
+        version: link:../services/automation
+      '@praxis/billing-service':
+        specifier: workspace:*
+        version: link:../services/billing
+      '@praxis/collab-service':
+        specifier: workspace:*
+        version: link:../services/collab
+      '@praxis/credentials-service':
+        specifier: workspace:*
+        version: link:../services/credentials
+      '@praxis/gateway':
+        specifier: workspace:*
+        version: link:../gateway
+      '@praxis/local-transport':
+        specifier: workspace:*
+        version: link:../commons/local-transport
+      '@praxis/permissions-service':
+        specifier: workspace:*
+        version: link:../services/permissions
+      '@praxis/projects-service':
+        specifier: workspace:*
+        version: link:../services/projects
+      '@praxis/reports-service':
+        specifier: workspace:*
+        version: link:../services/reports
+      '@praxis/tasks-service':
+        specifier: workspace:*
+        version: link:../services/tasks
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   apps/backend/services/assistant:
     dependencies:
       '@google-cloud/storage':

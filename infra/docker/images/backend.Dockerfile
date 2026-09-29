@@ -1,10 +1,8 @@
 # syntax=docker/dockerfile:1.7
 #
-# Imagen del backend: el gateway y los 7 microservicios en un solo contenedor.
-#
-# Van juntos porque se hablan por TCP y así ese tráfico no sale de la máquina:
-# el gateway abre el único puerto público (3000) y los servicios escuchan en
-# 127.0.0.1. Escalar añade copias autocontenidas — no hay estado en el proceso.
+# Imagen del backend: el gateway, los servicios y collab en **un solo proceso**
+# (docs/PLAN-MONOLITO.md). Se hablan en memoria por `@praxis/local-transport`;
+# el gateway abre el único puerto público (3000) y collab escucha en loopback.
 #
 # Se construye desde la RAÍZ del repo, no desde este directorio:
 #   docker build -f infra/docker/images/backend.Dockerfile -t praxis-backend .
@@ -44,6 +42,7 @@ FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 
 COPY apps/backend/gateway/package.json                  apps/backend/gateway/
+COPY apps/backend/monolith/package.json                 apps/backend/monolith/
 COPY apps/backend/commons/contracts/package.json        apps/backend/commons/contracts/
 COPY apps/backend/commons/observability/package.json    apps/backend/commons/observability/
 # ⚠️ Este paquete es nuevo: lleva el publicador del buzón de salida, que antes
@@ -88,7 +87,8 @@ RUN pnpm build:shared
 # el contenedor no hay ninguno y el build muere con PrismaConfigEnvError.
 #
 # El valor es de relleno y no sobrevive a esta etapa: la de runtime parte de
-# `base`, no de aquí, y las cadenas reales las compone pm2 por servicio.
+# `base`, no de aquí, y las cadenas reales las compone el monolito por
+# servicio (`apps/backend/monolith/src/entorno.ts`).
 ENV DATABASE_URL=postgresql://relleno:relleno@127.0.0.1:5432/relleno
 
 # El cliente de Prisma, generado AQUÍ para que el motor sea el de Linux.
@@ -99,18 +99,16 @@ RUN pnpm prisma:generate
 # nest-cli.json copia `generated/prisma-client/**` a dist como asset, así que el
 # cliente viaja junto al código compilado.
 RUN pnpm --filter "@praxis/gateway" --filter "@praxis/*-service" run build
+RUN pnpm --filter "@praxis/monolith" run build
 
 # ───────────────────────── runtime ──────────────────────────
 FROM base AS runtime
 
 ENV NODE_ENV=production
 
-# pm2 supervisa los 9 procesos: reinicia el que muera y mantiene el contenedor
-# atado al ciclo de vida del grupo, en vez de a un `node` suelto.
-RUN npm install --global pm2@5 && npm cache clean --force
-
+# Sin pm2: con un solo proceso, si muere, Railway reinicia el contenedor
+# (restartPolicyType ON_FAILURE), que es lo que pm2 hacía proceso a proceso.
 COPY --from=build /app /app
-COPY infra/docker/images/backend.pm2.config.cjs /app/pm2.config.cjs
 
 # Las migraciones se aplican desde dentro del contenedor porque Cloud SQL no
 # tiene IP pública. La imagen conserva node_modules completo (incluidas las
@@ -118,10 +116,8 @@ COPY infra/docker/images/backend.pm2.config.cjs /app/pm2.config.cjs
 COPY --chmod=0755 infra/docker/images/migrar.sh /app/migrar.sh
 COPY --chmod=0755 infra/docker/images/start-backend.sh /app/start-backend.sh
 
-# El único puerto que sale de la máquina. Los otros siete (3001-3007) escuchan
-# en localhost y no se publican.
+# El único puerto que sale de la máquina. collab escucha en 127.0.0.1:3010 y
+# entra por el gateway.
 EXPOSE 3000
 
-# Sin sesión de login ni shell interactiva: si un proceso muere en bucle, pm2
-# lo dice por stdout y ahí lo recoge Cloud Logging.
 CMD ["/app/start-backend.sh"]

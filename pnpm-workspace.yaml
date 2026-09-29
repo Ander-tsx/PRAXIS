@@ -1,5 +1,6 @@
 packages:
   - "apps/backend/gateway"
+  - "apps/backend/monolith"
   - "apps/backend/services/*"
   - "apps/backend/commons/*"
   - "apps/frontend/*"

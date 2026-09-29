@@ -152,11 +152,11 @@ queda**: decide el acceso a PRAX.
 
 ## 3. Orden
 
-- [ ] **M-A — Fuera Alexa** (M9). Primero, porque quita un servicio y dos
+- [x] **M-A — Fuera Alexa** (`ea954e9d`) (M9). Primero, porque quita un servicio y dos
   clientes que ya no hay que convertir.
-- [ ] **M-B — Una sola copia de NestJS** (M8). `pnpm why @nestjs/core` tiene
+- [x] **M-B — Una sola copia de NestJS** (`173538e4`) (M8). `pnpm why @nestjs/core` tiene
   que dar una ruta.
-- [ ] **M-C — `@praxis/local-transport`** (M2) y pruebas unitarias propias:
+- [x] **M-C — `@praxis/local-transport`** (`06d38e5a`) (M2) y pruebas unitarias propias:
   - fechas a cadena;
   - `undefined` fuera;
   - sin referencias compartidas;
@@ -164,15 +164,15 @@ queda**: decide el acceso a PRAX.
   - un `Observable` de varios valores;
   - un error lanzado a mano;
   - un patrón que no existe.
-- [ ] **M-D — La factoría de clientes** (M3) en los ~40 sitios. Con TCP por
+- [x] **M-D — La factoría de clientes** (`c2b3b97e`) (M3) en los ~40 sitios. Con TCP por
   defecto: `pnpm test` y `e2e:regresion` sin cambios.
-- [ ] **M-E — URL de base de datos por servicio** (M4) y la fuga de conexiones
+- [x] **M-E — URL de base de datos por servicio** (`a4e0d6ee`) (M4) y la fuga de conexiones
   de `automation` y `billing`.
-- [ ] **M-F — collab como función** (M6); arranque del gateway exportable.
-- [ ] **M-G — `apps/backend/monolith`**: el arranque único. `start:backend` pasa
+- [x] **M-F — collab como función** (`1637a60f`) (M6); arranque del gateway exportable.
+- [x] **M-G — `apps/backend/monolith`**: el arranque único. `start:backend` pasa
   a usarlo. Medir la RAM con el mismo método de §0. `e2e:regresion` contra el
   monolito.
-- [ ] **M-H — Imagen y Railway** (M7): Dockerfile sin pm2 y `start-backend.sh`
+- [x] **M-H — Imagen y Railway** (falta probar la imagen) (M7): Dockerfile sin pm2 y `start-backend.sh`
   con `exec node`. `docs/deploy/RAILWAY.md` actualizado.
   ⚠️ **Desplegar es fusionar a `main`**, y eso lo decide el dueño del producto.
 - [ ] **M-I — Lo muerto de `reports`** (M10).
@@ -181,7 +181,11 @@ queda**: decide el acceso a PRAX.
   nunca. Railway lo duerme tras 10 minutos sin tráfico saliente, y el backend
   habla con Postgres y Redis cada pocos segundos aunque no haya nadie:
   - el `setInterval` del buzón de salida de tasks y projects;
-  - el `XREADGROUP BLOCK` de automation;
+  - el consumidor de automation (`inbound-event.consumer.ts:81`), **cada
+    segundo**. En cada vuelta hace `xautoclaim`, `xreadgroup`, evalúa
+    pendientes y purga en Postgres, y escribe una línea
+    `inbound_event_metrics` en el log, también en producción: son 86.400
+    líneas al día sin que pase nada;
   - la suscripción pub/sub del gateway.
 
   Si esas tareas se detienen sin peticiones y reanudan con la primera, el coste
@@ -221,3 +225,19 @@ Las sesiones abiertas siguen valiendo, porque `JWT_SECRET` no cambia.
 - **2026-09-29** — Plan escrito tras medir la RAM en local, un inventario de
   arranques, clientes, configuración y globales, y la evaluación de `reports`.
   Alexa fuera por decisión del dueño del producto.
+- **2026-09-29** — M-A a M-H.
+  - **RAM**: el monolito en local, construido y en reposo, ocupa **189 MB**,
+    frente a 1.335 MB. Tras las 167 e2e de API, **150 MB**: no crece.
+  - **e2e de API**: **167/167** contra los once procesos TCP, sin Alexa, y
+    **167/167** contra el monolito.
+  - **Encontrado de paso, anterior a esta etapa y sin arreglar aquí**: la
+    organización personal choca a veces por `slug` al registrarse
+    (`Unique constraint failed on the fields: (slug)`, 3 y 5 veces en unas 190
+    altas de e2e):
+    - `slugLibre` (`billing/.../organizations.service.ts:574`) desempata con
+      solo 2 bytes aleatorios y comprueba una sola vez. Con cientos de
+      «mi-espacio-xxxx» en la base de pruebas, choca.
+    - `personalDe` relanza el error y la organización se crea en el siguiente
+      acceso, así que ninguna prueba falla.
+    - Con nombres reales es improbable. Lo arreglaría un sufijo más largo y un
+      reintento.

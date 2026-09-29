@@ -4,7 +4,7 @@
 #
 # En GCP las migraciones se aplicaban a mano por SSH (Cloud SQL sin IP pública).
 # En Railway el contenedor sí llega a Postgres por la red privada, así que se
-# aplican aquí, en el arranque, antes de pm2.
+# aplican aquí, en el arranque, antes del monolito.
 #
 # ⚠️ **Idempotente y para 1 réplica.** `prisma migrate deploy` solo aplica lo
 # pendiente, pero toma un bloqueo en la base: con varias réplicas arrancando a
@@ -23,5 +23,9 @@ else
   echo "!! [start-backend] migrar.sh terminó con error; el contenedor arranca igual."
 fi
 
-echo "==> [start-backend] Arrancando pm2…"
-exec pm2-runtime start /app/pm2.config.cjs
+# Un solo proceso (docs/PLAN-MONOLITO.md). `exec` para que reciba él el SIGTERM
+# de Railway y cierre ordenado: gateway, collab y servicios en orden inverso.
+# 512 MB de techo de heap para todo; la huella en reposo ronda los 200 MB.
+echo "==> [start-backend] Arrancando el monolito…"
+cd /app/apps/backend/monolith
+exec node --max-old-space-size=512 dist/main.js

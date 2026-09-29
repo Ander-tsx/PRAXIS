@@ -31,6 +31,7 @@ FROM base AS deps
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 
 COPY apps/backend/gateway/package.json                  apps/backend/gateway/
+COPY apps/backend/monolith/package.json                 apps/backend/monolith/
 COPY apps/backend/commons/contracts/package.json        apps/backend/commons/contracts/
 COPY apps/backend/commons/observability/package.json    apps/backend/commons/observability/
 COPY apps/backend/commons/domain-events/package.json    apps/backend/commons/domain-events/
