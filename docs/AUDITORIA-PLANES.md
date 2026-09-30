@@ -83,7 +83,7 @@ siguiente.
 | `iaMensualPorPersona` | ✅ | `iaDe` → payload → `assistant-service` | **Correcto**, y personal (ver arriba) |
 | `automatizacionesPorProyecto` | ✅ | `exigirAutomatizacion`, en **las dos** puertas: crear con `ENABLED` y reactivar una pausada | **Correcto.** La segunda es la que se olvida y aquí está |
 | `almacenamientoOrgMb` | ⚠️ Parcial | `exigirAlmacenamiento` ← solo adjuntos de **tarea** | **P4** |
-| `historialAnalisisDias` | ✅ | `ventanaDeAnalisis`, recorta en las once rutas y devuelve `ventana` para que la pantalla lo diga | **Correcto.** Recorta, no rechaza, que es lo acordado |
+| `historialAnalisisDias` | ❌ desde 2026-09-29 | `ventanaDeAnalisis` existe y **no la llama nadie**: recortaba en las once rutas de análisis del gateway, y M10 de [PLAN-MONOLITO](PLAN-MONOLITO.md) las borró (`66cce9f9`) | **Abierto, sin decidir.** La fila «Historial de Análisis» de `PlanCatalog` sigue prometiendo 90 / 180 / 365 días sobre una pantalla archivada. O se retira la fila, o se recortan las consultas de PRAX a `reports-service`. Era correcto hasta esa fecha: recortaba, no rechazaba |
 
 ---
 

@@ -143,6 +143,53 @@
 > compilar `web`, el filtro de pnpm, nunca `npx`: con dependencias instaladas
 > da igual, sin ellas el primero dice la verdad y el segundo despista.
 >
+> **Reverificación del 2026-09-30 (vigesimosegunda vez).** `99b2f6d`,
+> `461ddd1`, `b35661d`, `963f1d8`, `155bdda` y la punta de `feature/enterprise`
+> (`659b5567`) son ancestros de `main`; `billing/src` conserva `organizations/`
+> y `subscriptions/`. **No se re-ejecutó ni R9 ni Enterprise.** Rama activa:
+> `feature/prax-pulido`, dos commits por delante de `main`, sin subir.
+>
+> 🔴 **Esta vez uno de los tres comandos cambió de respuesta, y es a
+> propósito.** `report_column_time` ya no sale en dos controladores sino en
+> uno: **M10 de [PLAN-MONOLITO](../PLAN-MONOLITO.md) borró las once rutas de
+> análisis del gateway** (`66cce9f9`, 2026-09-29, en `main` y desplegado) porque
+> no las llamaba nadie desde que se archivó la pantalla. Lo que queda de R9:
+>
+> - `report_dynamics` (R9.1), `report_column_time` (R9.2) y `report_matrix`
+>   (R9.4) siguen en `reports-service` **sin un solo llamador**. PRAX usa los
+>   siete informes clásicos (`INFORMES` en `assistant/consultas.ts`) y
+>   `report_briefing`; esos tres, no. Es código huérfano, no una regresión.
+> - Las formas de R9.3 se fueron con `reports-front` el 2026-09-04.
+>
+> Es decir: el Bloque 1 del prompt pide ampliar algo cuya pantalla se archivó
+> y cuya entrada HTTP se borró, las dos veces por decisión explícita. Rehacerlo
+> sería deshacer M10, no completar un pendiente.
+>
+> ⚠️ **Hallazgo que M10 dejó sin anotar: `historialAnalisisDias` vuelve a ser
+> una cuota que no aplica nadie.** `QuotaService.ventanaDeAnalisis` se quedó sin
+> llamadores al borrar esas rutas, y las consultas de PRAX a `reports-service`
+> no pasan por ella. La tabla de precios (`PlanCatalog`, fila «Historial de
+> Análisis»: 90 / 180 / 365 días) sigue vendiendo un tope sobre una pantalla que
+> da 404. Es la trampa 23 de `CLAUDE.md` por cuarta vez, al revés: no se añadió
+> un número sin comprobar, se quitó la comprobación y se dejó el número. **No se
+> tocó**: decidir entre retirar la fila o recortar las consultas de PRAX es
+> cambiar lo que promete la tabla de precios, y eso es del dueño. Anotado
+> también en [AUDITORIA-PLANES](../AUDITORIA-PLANES.md).
+>
+> **No se lanzó `next build`**, a propósito: hay un `next start` vivo en el
+> 4100 sirviendo desde `.next/` (8 h 45 min arriba, con el monolito en el 3000)
+> y un build encima lo deja sin directorio de compilación; además quedaban
+> 1,9 GB libres en disco. En su lugar, `tsc --noEmit` de `web` sobre
+> `feature/prax-pulido`: verde. ⚠️ `docker ps` no respondía (colgado más de dos
+> minutos): el demonio de Docker está atascado o parado, y habrá que mirarlo
+> antes de levantar nada que pida Postgres.
+>
+> **Quinta vez que se deja escrito**: el prompt de arranque vive fuera del
+> repositorio y sigue diciendo «R9 es lo siguiente». Las etapas vivas hoy son
+> [PLAN-PRAX-SEMIAGENTICO](../PLAN-PRAX-SEMIAGENTICO.md) (pulido en
+> `feature/prax-pulido`, pendiente de revisión) y
+> [PLAN-MONOLITO](../PLAN-MONOLITO.md).
+>
 > **Reverificación del 2026-09-25 (decimoctava vez).** Mismos tres comandos,
 > misma respuesta; árbol limpio en `feature/scrum-kanban`. No se re-ejecutó ni
 > R9 ni Enterprise, y **no se lanzó `next build`**: `next dev` vivo en el 4100

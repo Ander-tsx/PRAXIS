@@ -491,7 +491,7 @@ salió como 200 y Next lo degrada a una redirección de cliente: **44 KB de HTML
 dos llamadas al gateway para una pantalla que nadie ve**. Desde
 `REDIRECCIONES_EXACTAS` en `web/src/proxy.ts` son 9 bytes y un 307.
 
-🚫 **El 4104 quedó libre: `reports-front` se archivó** (F1 de [PLAN-FUSION-ZONAS](docs/PLAN-FUSION-ZONAS.md)). `/reports` responde 404. Lo que **no** se tocó: `reports-service` en el 3005 y las once rutas de análisis del gateway, que PRAX sigue usando para contestar. No se reutiliza el 4104 para una zona nueva mientras dure la fusión: la etapa va a dejar **una sola** aplicación de frontend.
+🚫 **El 4104 quedó libre: `reports-front` se archivó** (F1 de [PLAN-FUSION-ZONAS](docs/PLAN-FUSION-ZONAS.md)). `/reports` responde 404. Lo que sigue vivo es `reports-service` en el 3005, que PRAX consulta por TCP para contestar. ⚠️ **Las once rutas de análisis del gateway ya no existen**: las borró M10 de [PLAN-MONOLITO](docs/PLAN-MONOLITO.md) (`66cce9f9`, 2026-09-29), así que lo que más abajo habla de «las once rutas» o «las ocho rutas» describe el servicio, no una entrada HTTP — y `QuotaService.ventanaDeAnalisis` se quedó sin llamadores. No se reutiliza el 4104 para una zona nueva mientras dure la fusión: la etapa va a dejar **una sola** aplicación de frontend.
 
 ⚠️ **`permissions` es 3002 y `projects` es 3003**, no al revés. Este documento los tuvo invertidos, y equivocarse no da un error claro: el servicio arranca, el gateway le habla al otro y las respuestas salen vacías o con `BAD_GATEWAY`. La lista de verdad está en `scripts/dev-cli/config/services.mjs`, que además la valida contra los `package.json` reales.
 
