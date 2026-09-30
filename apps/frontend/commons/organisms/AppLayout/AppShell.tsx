@@ -3,7 +3,7 @@
 import { FileText, NotebookText, Plus, SquareKanban } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   type ReactNode,
   createContext,
@@ -41,7 +41,7 @@ import { alpha, colors } from '../../tokens';
 import { KylooWordmark } from '../KylooWordmark';
 import { CrearEnProyecto, type TipoDeEspacio } from './CrearEnProyecto';
 import { DirectorioDeChatsProvider, useDirectorioDeChats } from './DirectorioDeChats';
-import { MenuDeProyecto } from './MenuDeProyecto';
+import { MenuDeContenido } from './MenuDeContenido';
 import { DockColumn, DockProvider } from './DockPanel';
 import { NavList } from './NavList';
 import { OrgSwitcher } from './OrgSwitcher';
@@ -1355,6 +1355,7 @@ function SidebarProjectsTree({
   activePath: string;
   organizacionActivaId: string | null;
 }) {
+  const router = useRouter();
   const [projects, setProjects] = useState<SidebarProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(() => desplegadosGuardados());
@@ -1666,14 +1667,6 @@ function SidebarProjectsTree({
                   {project.name}
                 </Link>
 
-                {/* Cambiar nombre o eliminar, sin entrar al proyecto. */}
-                <MenuDeProyecto
-                  proyecto={project}
-                  gatewayPath={`${zonePath}/api/gateway`}
-                  activo={isActiveProject}
-                  onCambiado={cargar}
-                />
-
                 {/* Crear sin entrar al proyecto: documento, tablero o espacio. */}
                 <button
                   type="button"
@@ -1714,34 +1707,77 @@ function SidebarProjectsTree({
                         const Icono = ws.kind === 'DOCUMENTS' ? NotebookText : SquareKanban;
                         return (
                           <div key={ws.id} className="flex flex-col gap-0.5">
-                            <Link
-                              href={wsHref}
-                              aria-current={isActiveWs ? 'page' : undefined}
-                              className={`flex items-center gap-2 rounded-md px-2 py-[5px] text-[12px] transition-colors ${
+                            <div
+                              className={`group flex items-center gap-1 rounded-md pr-1 transition-colors ${
                                 isActiveWs
                                   ? 'bg-white/10 text-white font-medium'
                                   : 'text-text-secondary hover:text-white hover:bg-white/[0.06]'
                               }`}
                             >
-                              <Icono className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                              <span className="truncate">{ws.name}</span>
-                            </Link>
+                              <Link
+                                href={wsHref}
+                                aria-current={isActiveWs ? 'page' : undefined}
+                                className="flex min-w-0 flex-1 items-center gap-2 px-2 py-[5px] text-[12px]"
+                              >
+                                <Icono className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span className="truncate">{ws.name}</span>
+                              </Link>
+                              <MenuDeContenido
+                                projectId={project.id}
+                                gatewayPath={`${zonePath}/api/gateway`}
+                                activo={isActiveWs}
+                                onCambiado={() => refrescarProyecto(project.id)}
+                                alEliminar={() => router.push(projectHref)}
+                                objetivo={{
+                                  tipo: 'espacio',
+                                  name: ws.name,
+                                  path: `/workspaces/${ws.id}`,
+                                  cuerpoDeNombre: (name) => ({ name }),
+                                  permisoRenombrar: 'canEditBoard',
+                                  permisoEliminar: 'canDeleteBoard',
+                                  confirmarEscribiendo: true,
+                                }}
+                              />
+                            </div>
                             {ws.documents.map((doc) => {
                               const docActivo = activePath.includes(`doc=${doc.id}`);
                               return (
-                                <Link
+                                <div
                                   key={doc.id}
-                                  href={`${wsHref}&doc=${doc.id}`}
-                                  aria-current={docActivo ? 'page' : undefined}
-                                  className={`ml-4 flex items-center gap-2 rounded-md px-2 py-[4px] text-[12px] transition-colors ${
+                                  className={`group ml-4 flex items-center gap-1 rounded-md pr-1 transition-colors ${
                                     docActivo
                                       ? 'bg-white/10 text-white'
                                       : 'text-text-secondary hover:text-white hover:bg-white/[0.06]'
                                   }`}
                                 >
-                                  <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                  <span className="truncate">{doc.title || 'Sin título'}</span>
-                                </Link>
+                                  <Link
+                                    href={`${wsHref}&doc=${doc.id}`}
+                                    aria-current={docActivo ? 'page' : undefined}
+                                    className="flex min-w-0 flex-1 items-center gap-2 px-2 py-[4px] text-[12px]"
+                                  >
+                                    <FileText
+                                      className="h-3.5 w-3.5 shrink-0"
+                                      aria-hidden="true"
+                                    />
+                                    <span className="truncate">{doc.title || 'Sin título'}</span>
+                                  </Link>
+                                  <MenuDeContenido
+                                    projectId={project.id}
+                                    gatewayPath={`${zonePath}/api/gateway`}
+                                    activo={docActivo}
+                                    onCambiado={() => refrescarProyecto(project.id)}
+                                    alEliminar={() => router.push(wsHref)}
+                                    objetivo={{
+                                      tipo: 'documento',
+                                      name: doc.title || 'Sin título',
+                                      path: `/workspaces/${ws.id}/documents/${doc.id}`,
+                                      cuerpoDeNombre: (title) => ({ title }),
+                                      permisoRenombrar: 'canEditDocuments',
+                                      permisoEliminar: 'canEditDocuments',
+                                      confirmarEscribiendo: false,
+                                    }}
+                                  />
+                                </div>
                               );
                             })}
                           </div>
