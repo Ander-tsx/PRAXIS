@@ -247,7 +247,9 @@ export class OpenRouterClient {
       reasoning: { effort: this.esfuerzo, exclude: true },
       /* Solo proveedores que admitan todo lo que se pide: sin esto, OpenRouter
          puede mandar el turno a uno que ignora las herramientas. */
-      provider: { require_parameters: true },
+      /* `throughput`: el más rápido de los que lo sirven. Sin ordenar, un turno
+         llegó a tardar 106 s en un proveedor lento (2026-09-30). */
+      provider: { require_parameters: true, sort: 'throughput' },
     };
     if (params.tools.length > 0) {
       cuerpo.tools = params.tools.map((herramienta) => ({
@@ -489,7 +491,10 @@ const REGLAS_DE_FORMATO =
   '\n\nREGLAS DE FORMATO (obligatorias):\n' +
   '- Para proponer algo, LLAMA a la herramienta proponer_* que toque. Para ofrecer ' +
   'opciones a elegir, LLAMA a "proponer_pregunta". Nunca escribas en el texto JSON, ' +
-  'argumentos de herramientas ni listas de opciones para que la persona elija.\n' +
+  'argumentos de herramientas ni listas de opciones para que la persona elija, ' +
+  'y nunca escribas el nombre de una herramienta (como "(proponer_pregunta)").\n' +
+  '- Si hay que crear dos o mas tareas, UNA sola llamada a "proponer_tareas" con ' +
+  'todas; nunca de una en una.\n' +
   '- Si necesitas datos que no tienes y hay una consulta consultar_* que los da, ' +
   'consultala antes de responder.\n' +
   '- Escribe en espanol de Mexico y tutea: "tu", "tienes", "quieres"; nunca "vos".\n' +

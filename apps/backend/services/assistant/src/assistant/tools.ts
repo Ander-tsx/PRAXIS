@@ -39,9 +39,10 @@ const PRIORIDADES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 export const PROPONER_TAREA: FunctionDeclaration = {
   name: 'proponer_tarea',
   description:
-    'Prepara una propuesta de tarea nueva para que la persona la revise y la acepte. ' +
+    'Prepara una propuesta de UNA tarea nueva para que la persona la revise y la acepte. ' +
     'NO crea nada: nada existe hasta que la acepte. Usala cuando te pidan crear, ' +
-    'anadir o abrir una tarea, o cuando propongas tu una a partir de los reportes.',
+    'anadir o abrir una tarea, o cuando propongas tu una a partir de los reportes. ' +
+    'Para DOS O MAS tareas usa "proponer_tareas", en una sola llamada.',
   parameters: {
     type: 'OBJECT',
     properties: {
@@ -86,6 +87,12 @@ export const PROPONER_TAREA: FunctionDeclaration = {
         items: { type: 'STRING' },
         description: 'Opcional. id de "etiquetas" del contexto. Nunca inventes uno.',
       },
+      estimatePoints: {
+        type: 'INTEGER',
+        description:
+          'Opcional. Puntos de estimacion (story points), entero de 0 a 999. Si la ' +
+          'tarea viene de un backlog con puntos, ponlos aqui, no en la descripcion.',
+      },
       /**
        * ⚠️ **Obligatorio, y aquí y no en el texto libre a propósito.**
        *
@@ -106,6 +113,70 @@ export const PROPONER_TAREA: FunctionDeclaration = {
       },
     },
     required: ['title', 'columnId', 'priority', 'porQue'],
+  },
+};
+
+/** Cuántas tareas caben en un lote. Más, y el modelo se corta o la tarjeta no se lee. */
+export const MAX_TAREAS_POR_LOTE = 60;
+
+/**
+ * Muchas tareas en **una** propuesta (2026-09-30).
+ *
+ * 🔴 Sin esto, «carga las 35 tareas de este backlog» salía de una en una: los
+ * dos modelos hacían una llamada, prometían «la siguiente» y había que decir
+ * «hazlo» 35 veces. Una llamada con la lista es además mucho más barata que 35.
+ *
+ * Sigue siendo «propone; nunca ejecuta»: al aceptar, el frontend crea cada una
+ * por `POST /boards/:id/tasks`, el mismo endpoint del «+» de la columna.
+ */
+export const PROPONER_TAREAS: FunctionDeclaration = {
+  name: 'proponer_tareas',
+  description:
+    'Prepara en UNA sola propuesta la creacion de VARIAS tareas nuevas en la misma ' +
+    'columna: un backlog, una lista, las tareas de un documento adjunto. NO crea ' +
+    'nada hasta que la persona acepte. Usala siempre que haya dos o mas tareas: ' +
+    `incluyelas TODAS en la misma llamada (hasta ${MAX_TAREAS_POR_LOTE}), nunca de ` +
+    'una en una ni prometiendo "la siguiente". Conserva la nomenclatura del origen ' +
+    'en el titulo si la hay (por ejemplo "HU-16: Ver rutinas").',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      columnId: {
+        type: 'STRING',
+        description:
+          'id de la columna donde van todas, de "tableros" del contexto. Elige el ' +
+          'tablero que te digan y, dentro, la columna de menor "orden" salvo que ' +
+          'digan otra.',
+      },
+      alBacklog: {
+        type: 'BOOLEAN',
+        description:
+          'Opcional. true si el tablero usa Scrum y piden cargarlas en el backlog ' +
+          '(no en el sprint en curso).',
+      },
+      tareas: {
+        type: 'ARRAY',
+        description: `Las tareas, en el orden del origen. Hasta ${MAX_TAREAS_POR_LOTE}.`,
+        items: {
+          type: 'OBJECT',
+          properties: {
+            title: { type: 'STRING', description: 'Titulo. Maximo 120 caracteres.' },
+            description: { type: 'STRING', description: 'Opcional. Que hay que hacer.' },
+            priority: { type: 'STRING', enum: PRIORIDADES },
+            estimatePoints: {
+              type: 'INTEGER',
+              description: 'Opcional. Puntos de estimacion, entero de 0 a 999.',
+            },
+          },
+          required: ['title'],
+        },
+      },
+      porQue: {
+        type: 'STRING',
+        description: 'Obligatorio. Una frase: de donde salen estas tareas.',
+      },
+    },
+    required: ['columnId', 'tareas', 'porQue'],
   },
 };
 

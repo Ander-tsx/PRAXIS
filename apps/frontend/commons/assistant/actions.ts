@@ -20,6 +20,7 @@ import type {
   PrivateMessageProposal,
   SprintProposal,
   StartSprintProposal,
+  TaskBatchProposal,
   TaskProposal,
 } from '../api/assistant';
 import type {
@@ -446,6 +447,9 @@ export async function aceptarTareaAction(
       ...(propuesta.priority && { priority: propuesta.priority }),
       ...(propuesta.assigneeIds?.length && { assigneeIds: propuesta.assigneeIds }),
       ...(propuesta.labelIds?.length && { labelIds: propuesta.labelIds }),
+      ...(typeof propuesta.estimatePoints === 'number' && {
+        estimatePoints: propuesta.estimatePoints,
+      }),
     });
 
     if (!created?.id || created.title !== title) {
@@ -459,6 +463,78 @@ export async function aceptarTareaAction(
   } catch (error) {
     return { error: describe(error, 'No se pudo crear la tarea.'), creada: null };
   }
+}
+
+export interface AceptarLoteState {
+  error: string | null;
+  creadas: number;
+  fallidas: string[];
+  boardId: string | null;
+}
+
+/**
+ * Crear un lote de tareas propuesto por PRAX (`proponer_tareas`).
+ *
+ * Una a una y **en orden**, por el mismo `POST /boards/:id/tasks` del «+» de la
+ * columna: así cada una pasa la validación y los permisos de siempre, y el orden
+ * del backlog de origen se conserva. El proyecto se lee una vez para resolver la
+ * columna y su tablero, no una vez por tarea.
+ *
+ * No se para al primer fallo: si una no entra (un título raro, un límite), las
+ * demás sí, y se dice cuáles faltaron. Reintentar el lote entero las duplicaría.
+ */
+export async function aceptarLoteDeTareasAction(
+  projectId: string,
+  propuesta: TaskBatchProposal,
+): Promise<AceptarLoteState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', creadas: 0, fallidas: [], boardId: null };
+
+  const project = await api.get<ProjectDetail>(`/projects/${projectId}`).catch(() => null);
+  const columna = (project?.workspaces ?? [])
+    .flatMap((workspace) => workspace.boards ?? [])
+    .flatMap((board) => (board.columns ?? []).map((column) => ({ column, board })))
+    .find(({ column }) => column.id === propuesta.columnId);
+  if (!columna) {
+    return {
+      error: 'La columna de la propuesta ya no existe en el tablero.',
+      creadas: 0,
+      fallidas: [],
+      boardId: null,
+    };
+  }
+
+  let creadas = 0;
+  const fallidas: string[] = [];
+  for (const tarea of propuesta.tareas) {
+    const title = String(tarea.title ?? '')
+      .trim()
+      .slice(0, 120);
+    if (!title) continue;
+    try {
+      const creada = await api.post<Task>(`/boards/${columna.board.id}/tasks`, {
+        columnId: columna.column.id,
+        title,
+        status: columna.column.name,
+        ...(tarea.description && { description: tarea.description }),
+        ...(tarea.priority && { priority: tarea.priority }),
+        ...(typeof tarea.estimatePoints === 'number' && { estimatePoints: tarea.estimatePoints }),
+        /* `null` explícito = backlog del tablero (D12 de PLAN-SCRUM-KANBAN). */
+        ...(propuesta.alBacklog && { sprintId: null }),
+      });
+      if (creada?.id) creadas += 1;
+      else fallidas.push(title);
+    } catch {
+      fallidas.push(title);
+    }
+  }
+
+  return {
+    error: creadas === 0 ? 'No se pudo crear ninguna tarea.' : null,
+    creadas,
+    fallidas,
+    boardId: columna.board.id,
+  };
 }
 
 export interface AceptarAsignacionState {

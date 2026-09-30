@@ -18,6 +18,7 @@ import {
   PROPONER_SPRINT,
   PROPONER_TABLERO,
   PROPONER_TAREA,
+  PROPONER_TAREAS,
   type FunctionDeclaration,
 } from './tools';
 
@@ -111,7 +112,7 @@ export const CAPACIDADES: Capacidad[] = [
   {
     que: 'Crear tareas',
     permisos: ['canCreateTask'],
-    herramientas: [PROPONER_TAREA],
+    herramientas: [PROPONER_TAREA, PROPONER_TAREAS],
     donde: 'el «+» de cualquier columna del tablero',
   },
   {

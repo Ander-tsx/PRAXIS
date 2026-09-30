@@ -50,7 +50,7 @@ import {
 } from './pensamiento';
 import { PROPONER_PLANTILLA, instruccionDePlantilla, validarPlantilla } from './template';
 import { catalogoDeCapacidades, herramientasPara } from './capabilities';
-import { herramientasSinProyecto } from './tools';
+import { MAX_TAREAS_POR_LOTE, herramientasSinProyecto } from './tools';
 
 /** Lo que el gateway manda en cada turno. Todo lo de permisos llega resuelto. */
 interface ChatPayload {
@@ -171,6 +171,7 @@ const MAX_OPCIONES = 8;
  */
 const NOMBRE_DE_PROPUESTA: Record<string, string> = {
   proponer_tarea: 'una tarea',
+  proponer_tareas: 'un lote de tareas',
   proponer_asignacion: 'un cambio de encargados',
   proponer_edicion: 'unos cambios en la tarea',
   proponer_movimiento: 'mover la tarea',
@@ -867,7 +868,8 @@ export class AssistantService {
             tools: herramientas,
             ...(briefing ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
           },
-          alTexto,
+          /* Sin streaming: su texto decide abajo si entra o no. */
+          undefined,
         );
         sumarUso(segundaRespuesta.uso);
 
@@ -891,7 +893,16 @@ export class AssistantService {
         };
         const yaEstan = new Set(validadas.map(huella));
         validadas = [...validadas, ...nuevasValidadas.filter((p) => !yaEstan.has(huella(p)))];
-        reply = reply + (reply && segundaRespuesta.text ? '\n\n' : '') + segundaRespuesta.text;
+        /* 🔴 Si ya había texto y la corrección solo venía a poner la tarjeta
+           que faltaba, su texto sobra: repetía la explicación y la respuesta
+           salía con el mismo párrafo dos veces (2026-09-30, Gemini). El texto
+           nuevo solo se añade si no había ninguno o si hay que explicar por qué
+           algo se descartó. */
+        const soloFaltabaLaTarjeta =
+          Boolean(reply) && invalidasCount === 0 && nuevasValidadas.length > 0;
+        if (!soloFaltabaLaTarjeta) {
+          reply = reply + (reply && segundaRespuesta.text ? '\n\n' : '') + segundaRespuesta.text;
+        }
       } catch (err) {
         this.log.warn(`Fallo en el turno de recuperación: ${err}`);
       }
@@ -1123,8 +1134,8 @@ export class AssistantService {
     if (propuestas.length === 1) {
       const que = NOMBRE_DE_PROPUESTA[propuestas[0].tool];
       return que
-        ? `Te propongo ${que}. Revisalo antes de aceptar.`
-        : 'Te propongo esto. Revisalo antes de aceptar.';
+        ? `Te propongo ${que}. Revísalo antes de aceptar.`
+        : 'Te propongo esto. Revísalo antes de aceptar.';
     }
     if (propuestas.length > 1) {
       return `Te propongo ${propuestas.length} cambios. Revisa cada uno antes de aceptarlo.`;
@@ -1359,6 +1370,48 @@ export class AssistantService {
           ...(this.fechaValida(call.args.dueDate) ? { dueDate: call.args.dueDate } : {}),
           ...(encargados.length > 0 ? { assigneeIds: encargados } : {}),
           ...(etiquetas.length > 0 ? { labelIds: etiquetas } : {}),
+          ...(this.puntosValidos(call.args.estimatePoints) !== null
+            ? { estimatePoints: this.puntosValidos(call.args.estimatePoints) }
+            : {}),
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+        },
+      };
+    }
+
+    /* El lote: misma columna para todas, validada igual que la de una tarea. */
+    if (call.name === 'proponer_tareas') {
+      const columnas = [...briefing.columnas].sort((a, b) => a.orden - b.orden);
+      const elegida = columnas.find((c) => c.id === String(call.args.columnId ?? ''));
+      const tableros = new Set(columnas.map((c) => c.tableroId ?? 'unico'));
+      const columna = elegida ?? (tableros.size === 1 ? columnas[0] : undefined);
+      if (!columna) {
+        this.log.warn('El modelo propuso un lote de tareas sin columna valida: se descarta');
+        return null;
+      }
+      const tareas = (Array.isArray(call.args.tareas) ? call.args.tareas : [])
+        .map((t) => (t && typeof t === 'object' ? (t as Record<string, unknown>) : {}))
+        .map((t) => {
+          const puntos = this.puntosValidos(t.estimatePoints);
+          return {
+            title: String(t.title ?? '')
+              .trim()
+              .slice(0, 120),
+            ...(t.description ? { description: String(t.description).slice(0, 5000) } : {}),
+            priority: this.prioridadValida(t.priority),
+            ...(puntos !== null ? { estimatePoints: puntos } : {}),
+          };
+        })
+        .filter((t) => t.title.length > 0)
+        .slice(0, MAX_TAREAS_POR_LOTE);
+      if (tareas.length === 0) return null;
+      return {
+        tool: call.name,
+        args: {
+          columnId: columna.id,
+          columnName: columna.nombre,
+          ...(columna.tablero ? { boardName: columna.tablero } : {}),
+          ...(call.args.alBacklog === true ? { alBacklog: true } : {}),
+          tareas,
           ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
         },
       };
@@ -2210,6 +2263,12 @@ export class AssistantService {
   private soloConocidos(valor: unknown, conocidos: Set<string>): string[] {
     if (!Array.isArray(valor)) return [];
     return valor.map(String).filter((id) => conocidos.has(id));
+  }
+
+  /** Puntos de estimación: entero de 0 a 999, o `null` si no hay o no vale. */
+  private puntosValidos(valor: unknown): number | null {
+    const n = typeof valor === 'string' ? Number(valor) : valor;
+    return typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 999 ? n : null;
   }
 
   private prioridadValida(valor: unknown): string {

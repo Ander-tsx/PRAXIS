@@ -73,7 +73,20 @@ export interface TaskProposal {
   dueDate?: string;
   assigneeIds?: string[];
   labelIds?: string[];
+  /** Puntos de estimación (Scrum). */
+  estimatePoints?: number;
   /** Por qué se propone. Es un parámetro obligatorio de la herramienta. */
+  porQue?: string;
+}
+
+/** `proponer_tareas`: un lote en la misma columna (2026-09-30). */
+export interface TaskBatchProposal {
+  columnId: string;
+  columnName: string;
+  boardName?: string;
+  /** Al backlog del tablero, no al sprint en curso. Solo con Scrum. */
+  alBacklog?: boolean;
+  tareas: { title: string; description?: string; priority: string; estimatePoints?: number }[];
   porQue?: string;
 }
 
@@ -586,6 +599,12 @@ export function isTaskProposal(
   propuesta: AssistantProposal,
 ): propuesta is AssistantProposal & { args: TaskProposal } {
   return propuesta.tool === 'proponer_tarea' && typeof propuesta.args.title === 'string';
+}
+
+export function isTaskBatchProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: TaskBatchProposal } {
+  return propuesta.tool === 'proponer_tareas' && Array.isArray(propuesta.args.tareas);
 }
 
 export function isAssignmentProposal(

@@ -253,6 +253,55 @@ describe('El turno de PRAX: bucle de consultas', () => {
     expect(m.llamadas[0].params.maxOutputTokens).toBe(8192);
   });
 
+  it('un backlog entero sale en UNA propuesta de lote, con puntos y sin títulos vacíos', async () => {
+    const m = montar([
+      respuesta({
+        text: 'Te dejo las tres.',
+        calls: [
+          {
+            name: 'proponer_tareas',
+            args: {
+              columnId: 'col-hacer',
+              porQue: 'Del backlog adjunto',
+              tareas: [
+                { title: 'HU-01: Registro', estimatePoints: 3, priority: 'HIGH' },
+                { title: '   ' },
+                { title: 'HU-02: Login', estimatePoints: 'no', description: 'Con correo' },
+              ],
+            },
+          },
+        ],
+      }),
+    ]);
+    (m.servicio as any).reportsClient = {
+      send: () =>
+        of({
+          proyecto: { nombre: 'Web' },
+          columnas: [{ id: 'col-hacer', nombre: 'To Do', orden: 0 }],
+          etiquetas: [],
+          tareas: [],
+        }),
+    };
+
+    await m.servicio.chat({
+      ...payload,
+      projectId: PROYECTO.id,
+      proyectos: [],
+      permisos: { canCreateTask: true },
+    } as any);
+
+    const [turno] = m.conversaciones.guardarTurno.mock.calls[0] as unknown as [
+      { proposals: { tool: string; args: Record<string, any> }[] },
+    ];
+    expect(turno.proposals).toHaveLength(1);
+    expect(turno.proposals[0].tool).toBe('proponer_tareas');
+    expect(turno.proposals[0].args.columnName).toBe('To Do');
+    expect(turno.proposals[0].args.tareas).toEqual([
+      { title: 'HU-01: Registro', priority: 'HIGH', estimatePoints: 3 },
+      { title: 'HU-02: Login', description: 'Con correo', priority: 'MEDIUM' },
+    ]);
+  });
+
   it('🔴 un modelo que no deja de consultar se corta, y la última vuelta va sin consultas', async () => {
     const m = montar([
       respuesta({ calls: [{ name: 'consultar_tareas', args: {} }] }),

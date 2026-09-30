@@ -25,6 +25,7 @@ import type {
   StartSprintProposal,
   TaskProposal,
   TemplateProposal,
+  TaskBatchProposal,
 } from '../../api/assistant';
 import { claveDeRevisionDePrax } from '../../api/assistant';
 import {
@@ -52,6 +53,7 @@ import {
   aceptarPlantillaAction,
   aceptarSprintAction,
   aceptarTableroAction,
+  aceptarLoteDeTareasAction,
   aceptarTareaAction,
   resolverPropuestaAction,
 } from '../../assistant/actions';
@@ -137,6 +139,7 @@ const FAMILIA_DE_HERRAMIENTA: Record<string, Familia> = {
   proponer_checklist: 'cambiar',
   proponer_revision_documento: 'cambiar',
   proponer_estado_automatizacion: 'cambiar',
+  proponer_tareas: 'crear',
   proponer_movimiento: 'mover',
   proponer_marcar_pasos: 'mover',
   proponer_planificacion: 'mover',
@@ -290,6 +293,9 @@ export function TaskProposalCard({
           valor={PRIORITY_LABELS[propuesta.priority as Priority] ?? propuesta.priority}
         />
         {propuesta.dueDate && <Campo termino="Vence" valor={formatoFecha(propuesta.dueDate)} />}
+        {typeof propuesta.estimatePoints === 'number' && (
+          <Campo termino="Puntos" valor={String(propuesta.estimatePoints)} />
+        )}
         {encargados.length > 0 && <Campo termino="Para" valor={encargados.join(', ')} />}
       </dl>
 
@@ -301,6 +307,113 @@ export function TaskProposalCard({
             </Badge>
           ))}
         </div>
+      )}
+    </Marco>
+  );
+}
+
+/**
+ * Un lote de tareas (`proponer_tareas`): una tarjeta, una fila por tarea.
+ *
+ * Filas y no tarjetas (kyloo-design §13): el título con su nomenclatura, los
+ * puntos y la prioridad, y la descripción debajo en pequeño. Con más de diez se
+ * enseñan las primeras y el resto se despliega, para que el lote no ocupe la
+ * conversación entera antes de decidir.
+ */
+export function TaskBatchProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: TaskBatchProposal }) {
+  const [estado, setEstado] = useState<Estado>('pendiente');
+  const [error, setError] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
+  const [todas, setTodas] = useState(false);
+  const total = propuesta.tareas.length;
+  const puntos = propuesta.tareas.reduce((suma, t) => suma + (t.estimatePoints ?? 0), 0);
+  const visibles = todas ? propuesta.tareas : propuesta.tareas.slice(0, 10);
+
+  async function aceptar() {
+    setEstado('enviando');
+    setError(null);
+    const respuesta = await aceptarLoteDeTareasAction(projectId, propuesta);
+    if (respuesta.error) {
+      setError(respuesta.error);
+      setEstado('pendiente');
+      return;
+    }
+    setResultado({
+      texto:
+        respuesta.fallidas.length === 0
+          ? `Creadas ${respuesta.creadas} tareas.`
+          : `Creadas ${respuesta.creadas}; no entraron: ${respuesta.fallidas.join(', ')}.`,
+      href: respuesta.boardId ? `/projects/${projectId}?board=${respuesta.boardId}` : null,
+    });
+    setEstado('hecho');
+  }
+
+  return (
+    <Marco
+      titulo={`Crear ${total} ${total === 1 ? 'tarea' : 'tareas'}`}
+      sinAplicar="nada existe todavía"
+      porQue={propuesta.porQue}
+      estado={estado}
+      error={error}
+      resultado={resultado}
+      onAceptar={aceptar}
+      onDescartar={() => setEstado('descartada')}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+    >
+      <dl className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {propuesta.boardName && <Campo termino="Tablero" valor={propuesta.boardName} />}
+        <Campo
+          termino={propuesta.alBacklog ? 'Backlog' : 'Columna'}
+          valor={propuesta.alBacklog ? 'sin sprint' : propuesta.columnName}
+        />
+        {puntos > 0 && <Campo termino="Puntos" valor={String(puntos)} />}
+      </dl>
+
+      <ol className="flex flex-col gap-1">
+        {visibles.map((tarea, i) => (
+          <li
+            // biome-ignore lint/suspicious/noArrayIndexKey: el lote no cambia de orden
+            key={i}
+            className="flex flex-col gap-0.5 rounded-lg px-3 py-2"
+            style={{ background: alpha(colors.textPrimary, 4) }}
+          >
+            <div className="flex items-baseline gap-2">
+              <span className="min-w-0 flex-1 font-sans text-sm font-medium text-text-primary">
+                {tarea.title}
+              </span>
+              {typeof tarea.estimatePoints === 'number' && (
+                <span className="shrink-0 font-mono text-[11px] tabular-nums text-text-secondary">
+                  {tarea.estimatePoints} pt
+                </span>
+              )}
+              <span className="shrink-0 font-sans text-[11px] text-text-disabled">
+                {PRIORITY_LABELS[tarea.priority as Priority] ?? tarea.priority}
+              </span>
+            </div>
+            {tarea.description && (
+              <p className="line-clamp-2 font-sans text-xs leading-relaxed text-text-secondary">
+                {tarea.description}
+              </p>
+            )}
+          </li>
+        ))}
+      </ol>
+
+      {total > 10 && (
+        <button
+          type="button"
+          onClick={() => setTodas((v) => !v)}
+          className="self-start font-sans text-xs font-medium text-text-secondary transition-colors hover:text-text-primary"
+        >
+          {todas ? 'Ver menos' : `Ver las ${total - 10} restantes`}
+        </button>
       )}
     </Marco>
   );

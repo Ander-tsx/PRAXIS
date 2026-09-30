@@ -66,6 +66,7 @@ export function resumenDeConsulta(nombre: string, resultado: Record<string, unkn
 
 const PROPUESTAS: Record<string, string> = {
   proponer_tarea: 'Crear tarea',
+  proponer_tareas: 'Crear tareas',
   proponer_asignacion: 'Asignar',
   proponer_edicion: 'Editar tarea',
   proponer_movimiento: 'Mover tarea',
@@ -90,6 +91,13 @@ const PROPUESTAS: Record<string, string> = {
 
 /** «Crear tarea · Revisar login»: la propuesta preparada, en una línea. */
 export function pasoDePropuesta(tool: string, args: Record<string, unknown>): PasoDePensamiento {
+  if (Array.isArray(args.tareas)) {
+    return paso(
+      'propuesta',
+      `Propuesta: ${PROPUESTAS[tool] ?? 'acción'}`,
+      `${args.tareas.length} tareas`,
+    );
+  }
   const titulo = [args.titulo, args.title, args.nombre, args.name].find(
     (v): v is string => typeof v === 'string' && v.trim().length > 0,
   );

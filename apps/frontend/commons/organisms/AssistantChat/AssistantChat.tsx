@@ -35,6 +35,7 @@ import {
   isMoveProposal,
   isOpenProjectProposal,
   isQuestionProposal,
+  isTaskBatchProposal,
   isTaskProposal,
   isTemplateProposal,
 } from '../../api/assistant';
@@ -75,6 +76,7 @@ import {
   StartSprintProposalCard,
   MoveProposalCard,
   OpenProjectProposalCard,
+  TaskBatchProposalCard,
   QuestionProposalCard,
   TaskProposalCard,
   TemplateProposalCard,
@@ -1374,6 +1376,19 @@ export function AssistantChat({
                           value={{ familia: familiaDe(propuesta.tool), indice }}
                         >
                           {((): React.ReactNode => {
+                            if (isTaskBatchProposal(propuesta)) {
+                              return (
+                                <TaskBatchProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
                             if (isTaskProposal(propuesta)) {
                               return (
                                 <TaskProposalCard
