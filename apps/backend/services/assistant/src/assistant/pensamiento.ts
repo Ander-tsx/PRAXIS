@@ -21,7 +21,7 @@ export function paso(clase: ClaseDePaso, texto: string, detalle?: string): PasoD
 const CHARLA =
   /^\s*(hola|buenas|hey|gracias|muchas gracias|ok|vale|genial|perfecto|adi[oó]s|buen[oa]s? (d[ií]as|tardes|noches))\b[\s!.,¡¿?]*$/i;
 const CAMBIO =
-  /\b(crea|cr[eé]ame|a[ñn]ade|a[ñn]ádeme|mueve|asigna|reasigna|borra|elimina|cambia|edita|renombra|planifica|reparte|programa|prepara|monta|escribe|manda|env[ií]a|marca|arranca|inicia|cierra)\w*\b/i;
+  /\b(crea|cr[eé]ame|a[ñn]ade|a[ñn]ádeme|mueve|asigna|reasigna|borra|elimina|cambia|edita|renombra|planifica|reparte|programa|prepara|monta|escribe|manda|env[ií]a|marca|arranca|inicia|cierra|carg|sube|import|mete|pon|agreg|estima)\w*\b/i;
 
 /**
  * La intención del mensaje sin preguntarle a nadie: una lectura rápida por

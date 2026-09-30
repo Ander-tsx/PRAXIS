@@ -882,11 +882,15 @@ export class AssistantService {
         /* Sin repetidas: el turno de recuperación ve la llamada anterior y a
            menudo vuelve a emitir también las que ya habían pasado, y salían dos
            tarjetas iguales —aceptar las dos crea la tarea dos veces—. */
-        const yaEstan = new Set(validadas.map((p) => `${p.tool}:${JSON.stringify(p.args)}`));
-        validadas = [
-          ...validadas,
-          ...nuevasValidadas.filter((p) => !yaEstan.has(`${p.tool}:${JSON.stringify(p.args)}`)),
-        ];
+        /* La huella va **sin `porQue`**: el segundo turno repite la misma
+           propuesta con otra explicación, y comparando el texto salían dos
+           «Abrir Aura» (2026-09-30, gpt-oss). */
+        const huella = (p: AssistantProposal) => {
+          const { porQue: _porQue, ...resto } = p.args as Record<string, unknown>;
+          return `${p.tool}:${JSON.stringify(resto)}`;
+        };
+        const yaEstan = new Set(validadas.map(huella));
+        validadas = [...validadas, ...nuevasValidadas.filter((p) => !yaEstan.has(huella(p)))];
         reply = reply + (reply && segundaRespuesta.text ? '\n\n' : '') + segundaRespuesta.text;
       } catch (err) {
         this.log.warn(`Fallo en el turno de recuperación: ${err}`);
