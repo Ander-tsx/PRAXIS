@@ -540,6 +540,7 @@ export class AssistantService {
           payload.proyectos ?? [],
           herramientas.map((herramienta) => herramienta.name),
           quienPregunta,
+          (payload.proyectos?.length ?? 0) > 0,
         );
 
     /* D9: el hilo se corta a los últimos mensajes y el modelo tiene que saberlo.
@@ -576,10 +577,6 @@ export class AssistantService {
       permisos: payload.permisos,
     };
     const conConsultas = ambito.proyectos.length > 0;
-    /* Un documento entero sale como tokens de salida, y con los 2048 de
-       siempre una revisión llega cortada y se descarta sin ruido. El techo solo
-       sube si puede proponerlo; lo que no se escribe no se paga. */
-    const escribeDocumentos = herramientas.some((h) => h.name === 'proponer_documento');
     const todasLasHerramientas = conConsultas
       ? [...HERRAMIENTAS_DE_CONSULTA, ...herramientas]
       : herramientas;
@@ -652,7 +649,12 @@ export class AssistantService {
               message: mensajeConArchivos,
               tools: agotado ? herramientas : todasLasHerramientas,
               extra,
-              ...(briefing && !escribeDocumentos ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
+              /* 🔴 Siempre el techo alto. Con 2048 en modo proyecto, el
+                 razonamiento de Gemini sale del mismo presupuesto: con un
+                 contexto grande pensaba mucho y la respuesta se cortaba a
+                 media frase («De las 35 tareas del documento,»). El techo no
+                 cuesta: se paga lo que se escribe, no lo que se permite. */
+              maxOutputTokens: MAX_TOKENS_PLANTILLA,
             },
             alTexto,
             (segundos) =>
@@ -680,6 +682,12 @@ export class AssistantService {
         }
         sumarUso(respuesta.uso);
         pendienteDeSeparar = true;
+        /* Cortada por longitud: se dice, en vez de dejar la frase a medias
+           como si hubiera terminado (I3: ningún recorte mudo). */
+        if (respuesta.cortada) {
+          this.log.warn(`prax_respuesta_cortada vuelta=${vuelta} salida=${respuesta.uso?.salida}`);
+          alTexto('\n\n_(Me he quedado sin espacio para terminar. Dime «sigue» y continúo.)_');
+        }
 
         const consultas = respuesta.calls.filter((call) => esConsulta(call.name));
         llamadas.push(...respuesta.calls.filter((call) => !esConsulta(call.name)));
@@ -852,6 +860,7 @@ export class AssistantService {
                   payload.proyectos ?? [],
                   herramientas.map((herramienta) => herramienta.name),
                   quienPregunta,
+                  (payload.proyectos?.length ?? 0) > 0,
                 ),
             history: historyRecuperacion,
             message: `[SISTEMA INTERNO]: ${feedback.join(' ')}`,

@@ -519,6 +519,8 @@ export function AssistantChat({
    * efecto que hay junto a `cargar`.
    */
   const [conversationId, setConversationId] = useState<string | null>(conversacionInicial ?? null);
+  /** Una conversación a medio cargar. Ver el efecto de la continuación. */
+  const cargando = useRef(false);
   /**
    * Qué enseña la tarjeta: el chat o el historial.
    *
@@ -650,10 +652,12 @@ export function AssistantChat({
    * sus botones: ver `ProposalCard`.
    */
   async function cargar(id: string) {
+    cargando.current = true;
     setError(null);
     setVista('chat');
     setPendiente(true);
     const conversacion = await cargarConversacionAction(id);
+    cargando.current = false;
     setPendiente(false);
 
     if (!conversacion) {
@@ -720,6 +724,34 @@ export function AssistantChat({
     void cargar(conversacionInicial);
   }, [conversacionInicial]);
 
+  /* La continuación de `abrirYContinuar`: con el foco ya en el proyecto
+     elegido y el hilo pintado, se manda sola. */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `enviar` cambia en cada render; el disparo es el cambio de foco.
+  useEffect(() => {
+    /* ⚠️ Nunca mientras se recarga el hilo: al navegar a pantalla completa la
+       URL trae la conversación, `cargar` la vuelve a pedir y su `setMensajes`
+       pisaba la burbuja de la continuación recién pintada. */
+    if (!projectId || !conversationId || pendiente || cargando.current || mensajes.length === 0) {
+      return;
+    }
+    const clave = `prax-continuar:${conversationId}`;
+    let guardado: string | null = null;
+    try {
+      guardado = window.sessionStorage.getItem(clave);
+    } catch {
+      return;
+    }
+    if (!guardado) return;
+    const [objetivo, texto] = JSON.parse(guardado) as [string, string];
+    if (objetivo !== projectId) return;
+    try {
+      window.sessionStorage.removeItem(clave);
+    } catch {
+      /* Si no se puede borrar, el objetivo ya no coincidirá en el siguiente. */
+    }
+    void enviar(texto);
+  }, [projectId, conversationId, pendiente, mensajes.length]);
+
   /**
    * Volver a mandar el turno que falló, sin que quede rastro del intento.
    *
@@ -735,6 +767,35 @@ export function AssistantChat({
       previos.filter((mensaje) => mensaje.id !== preguntaId && mensaje.id !== avisoId),
     );
     void enviar(pregunta);
+  }
+
+  /**
+   * Aceptar «abrir un proyecto» y **seguir**, no quedarse esperando.
+   *
+   * 🔴 Antes la tarjeta cargaba el proyecto y ahí se paraba: la persona había
+   * pedido «carga el backlog en Desarrollo», aceptaba abrir MOBILE… y tenía que
+   * volver a escribir para que PRAX hiciera lo que ya se le había pedido. En el
+   * panel flotante era peor: sin quien navegara, la tarjeta ni tenía «Aceptar».
+   *
+   * Ahora el hilo se ata al proyecto —en el panel, aquí mismo; en pantalla
+   * completa, navegando— y en cuanto el foco ha cambiado se manda un mensaje
+   * **visible**, como si lo hubiera escrito ella, para que PRAX retome. Se deja
+   * en `sessionStorage` porque en pantalla completa la navegación puede
+   * volver a montar este componente.
+   */
+  function abrirYContinuar(elegido: string, nombre: string) {
+    if (conversationId) {
+      try {
+        window.sessionStorage.setItem(
+          `prax-continuar:${conversationId}`,
+          JSON.stringify([elegido, `Listo, ya abrí «${nombre}». Sigue con lo que te pedí.`]),
+        );
+      } catch {
+        /* Sin almacenamiento: se abre igual, y hay que pedirle que siga. */
+      }
+    }
+    if (esFlotante) setProyectoDelHilo(elegido);
+    else onElegirProyecto?.(elegido, conversationId);
   }
 
   async function enviar(pregunta: string) {
@@ -1562,7 +1623,9 @@ export function AssistantChat({
                                   proposalId={propuesta.id}
                                   estadoGuardado={propuesta.status}
                                   propuesta={propuesta.args}
-                                  onAbrir={(elegido) => onElegirProyecto?.(elegido, conversationId)}
+                                  onAbrir={(elegido) =>
+                                    abrirYContinuar(elegido, propuesta.args.nombre)
+                                  }
                                 />
                               );
                             }

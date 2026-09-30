@@ -241,6 +241,18 @@ describe('El turno de PRAX: bucle de consultas', () => {
     expect(m.gemini.chat).toHaveBeenCalled();
   });
 
+  it('una respuesta cortada por longitud lo dice, en vez de acabar a media frase', async () => {
+    const m = montar([respuesta({ text: 'De las 35 tareas del documento,', cortada: true })]);
+
+    const eventos = await lastValueFrom(m.servicio.chatEnVivo(payload as any).pipe(toArray()));
+    const fin = eventos[eventos.length - 1] as Extract<EventoDeTurno, { tipo: 'fin' }>;
+
+    expect(fin.resultado.reply).toContain('De las 35 tareas del documento,');
+    expect(fin.resultado.reply).toContain('Dime «sigue»');
+    /* Y el techo es el alto también con proyecto: el de 2048 era el que cortaba. */
+    expect(m.llamadas[0].params.maxOutputTokens).toBe(8192);
+  });
+
   it('🔴 un modelo que no deja de consultar se corta, y la última vuelta va sin consultas', async () => {
     const m = montar([
       respuesta({ calls: [{ name: 'consultar_tareas', args: {} }] }),

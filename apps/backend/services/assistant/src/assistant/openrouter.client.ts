@@ -177,9 +177,11 @@ export class OpenRouterClient {
       config.get<string>('OPENROUTER_API_KEY')?.trim() ||
       undefined;
     this.modelo = config.get<string>('PRAX_OPENROUTER_MODEL')?.trim() || 'openai/gpt-oss-120b';
-    /* `low` por defecto: con `medium` tarda el doble en cada vuelta del bucle y
-       las respuestas de PRAX no lo necesitan. */
-    this.esfuerzo = config.get<string>('PRAX_OPENROUTER_REASONING')?.trim() || 'low';
+    /* `medium` por defecto. Con `low` (el primero que se probó) gpt-oss se
+       saltaba las herramientas: escribía las opciones como texto y un JSON en
+       vez de llamar a la propuesta, y no consultaba antes de responder
+       (2026-09-30). Tarda algo más, y sigue costando una fracción de Gemini. */
+    this.esfuerzo = config.get<string>('PRAX_OPENROUTER_REASONING')?.trim() || 'medium';
     this.baseUrl = (
       config.get<string>('PRAX_OPENROUTER_BASE_URL')?.trim() || 'https://openrouter.ai/api/v1'
     ).replace(/\/$/, '');
@@ -237,7 +239,7 @@ export class OpenRouterClient {
   ): Promise<GeminiReply> {
     const cuerpo: Record<string, unknown> = {
       model: this.modelo,
-      messages: mensajesOpenAI(params),
+      messages: conReglasDeFormato(mensajesOpenAI(params)),
       stream: true,
       usage: { include: true },
       temperature: 0.7,
@@ -284,7 +286,7 @@ export class OpenRouterClient {
       throw this.fallo(respuesta.status, respuesta.headers.get('retry-after'));
     }
 
-    return this.leer(respuesta, alTexto);
+    return this.leer(respuesta, params.tools, alTexto);
   }
 
   private fallo(status: number, retryAfter: string | null): GeminiError {
@@ -321,7 +323,11 @@ export class OpenRouterClient {
   }
 
   /** Lee el flujo SSE: el texto se entrega según llega; las llamadas, al final. */
-  private async leer(respuesta: Response, alTexto?: (delta: string) => void): Promise<GeminiReply> {
+  private async leer(
+    respuesta: Response,
+    herramientas: Parameters<GeminiClient['chat']>[0]['tools'],
+    alTexto?: (delta: string) => void,
+  ): Promise<GeminiReply> {
     const lector = respuesta.body?.getReader();
     if (!lector)
       throw new GeminiError('El proveedor de IA no ha respondido nada.', undefined, true);
@@ -329,6 +335,8 @@ export class OpenRouterClient {
     const decodificador = new TextDecoder();
     let pendiente = '';
     let texto = '';
+    /* Lo que se retiene sin pintar desde que asoma un JSON. Ver `inicioDeJson`. */
+    let retenido = '';
     const llamadas = new Map<number, { name: string; args: string }>();
     let uso: UsoDeGemini | undefined;
     let fin: string | null = null;
@@ -348,8 +356,22 @@ export class OpenRouterClient {
       const eleccion = trozo.choices?.[0];
       const delta = eleccion?.delta;
       if (delta?.content) {
-        texto += delta.content;
-        alTexto?.(delta.content);
+        if (retenido) {
+          retenido += delta.content;
+        } else {
+          const junto = texto + delta.content;
+          const corte = inicioDeJson(junto);
+          if (corte === -1) {
+            texto = junto;
+            alTexto?.(delta.content);
+          } else {
+            /* Se pinta lo de antes del JSON y se retiene el resto. */
+            const antes = junto.slice(texto.length, corte);
+            if (antes) alTexto?.(antes);
+            texto = junto.slice(0, corte);
+            retenido = junto.slice(corte);
+          }
+        }
       }
       for (const llamada of delta?.tool_calls ?? []) {
         const actual = llamadas.get(llamada.index) ?? { name: '', args: '' };
@@ -414,10 +436,151 @@ export class OpenRouterClient {
         return { name: llamada.name, args };
       });
 
+    /**
+     * 🔴 **El JSON que gpt-oss escribe en vez de llamar a la herramienta.**
+     *
+     * A veces vuelca los argumentos de una propuesta como texto —y en pantalla
+     * salía el JSON crudo—. Se retuvo sin pintar; aquí, si corresponde a una
+     * herramienta declarada, se convierte en la llamada que debió ser. Si no,
+     * se descarta: un JSON no es algo que la persona vaya a leer. Lo que no era
+     * JSON se devuelve al texto tal cual.
+     */
+    if (retenido) {
+      const rescate = llamadasDelTexto(retenido, herramientas);
+      if (rescate === null) {
+        texto += retenido;
+        alTexto?.(retenido);
+      } else {
+        this.log.warn(
+          `openrouter_json_en_texto rescatadas=${rescate.calls.map((c) => c.name).join(',') || 'ninguna'}`,
+        );
+        calls.push(...rescate.calls);
+        if (rescate.despues) {
+          const tras = `\n\n${rescate.despues}`;
+          texto += tras;
+          alTexto?.(tras);
+        }
+      }
+    }
+
     const partes: GeminiPart[] = [
       ...(texto ? [{ text: texto }] : []),
       ...calls.map((call) => ({ functionCall: call })),
     ];
-    return { text: texto.trim(), calls, partes, ...(uso ? { uso } : {}) };
+    return {
+      text: texto.trim(),
+      calls,
+      partes,
+      ...(uso ? { uso } : {}),
+      ...(fin === 'length' ? { cortada: true } : {}),
+    };
   }
+}
+
+/**
+ * Lo que se le añade a la instrucción de sistema solo con gpt-oss.
+ *
+ * Gemini sigue las reglas del prompt sin esto; gpt-oss, no del todo: escribía
+ * las opciones como texto («*Abrir MacroFit* *Abrir otro* (elige la opción)»)
+ * en vez de `proponer_pregunta`, volcaba JSON y hablaba de «vos». Va al final
+ * del sistema, donde este modelo le presta más atención.
+ */
+const REGLAS_DE_FORMATO =
+  '\n\nREGLAS DE FORMATO (obligatorias):\n' +
+  '- Para proponer algo, LLAMA a la herramienta proponer_* que toque. Para ofrecer ' +
+  'opciones a elegir, LLAMA a "proponer_pregunta". Nunca escribas en el texto JSON, ' +
+  'argumentos de herramientas ni listas de opciones para que la persona elija.\n' +
+  '- Si necesitas datos que no tienes y hay una consulta consultar_* que los da, ' +
+  'consultala antes de responder.\n' +
+  '- Escribe en espanol de Mexico y tutea: "tu", "tienes", "quieres"; nunca "vos".\n' +
+  '- Escribe solo lo que la persona va a leer.';
+
+export function conReglasDeFormato(mensajes: MensajeOpenAI[]): MensajeOpenAI[] {
+  return mensajes.map((m, i) =>
+    i === 0 && m.role === 'system' ? { ...m, content: m.content + REGLAS_DE_FORMATO } : m,
+  );
+}
+
+/**
+ * Dónde empieza un JSON en el texto: un bloque ```json o una línea que abre
+ * con `{"` o `[{`. `-1` si no hay. Solo al principio de una línea: un «{» a
+ * mitad de frase es texto.
+ */
+export function inicioDeJson(texto: string): number {
+  const bloque = texto.search(/```(json)?\s*[[{]/);
+  const m = /(^|\n)[ \t]*(?=\{\s*"|\[\s*\{)/.exec(texto);
+  const linea = m ? m.index + m[0].length : -1;
+  const candidatos = [bloque, linea].filter((n) => n !== -1);
+  return candidatos.length > 0 ? Math.min(...candidatos) : -1;
+}
+
+type Llamada = { name: string; args: Record<string, unknown> };
+
+/**
+ * Las llamadas que había dentro de un JSON escrito como texto, y lo que venía
+ * detrás del bloque.
+ *
+ * `null` si lo retenido no era JSON (se devuelve al texto entero). `calls`
+ * vacío si era JSON pero no encaja con ninguna herramienta (se descarta).
+ *
+ * Reconoce `{ "name", "arguments" }` (y `tool`/`args`), una lista de ellas, y
+ * los argumentos a secas: entonces se elige la herramienta cuyos obligatorios
+ * están todos y que más claves comparte.
+ */
+export function llamadasDelTexto(
+  retenido: string,
+  herramientas: Parameters<GeminiClient['chat']>[0]['tools'],
+): { calls: Llamada[]; despues: string } | null {
+  let cuerpo = retenido.trim();
+  let despues = '';
+  if (cuerpo.startsWith('```')) {
+    cuerpo = cuerpo.replace(/^```(json)?/, '');
+    const cierre = cuerpo.indexOf('```');
+    if (cierre !== -1) {
+      despues = cuerpo.slice(cierre + 3).trim();
+      cuerpo = cuerpo.slice(0, cierre);
+    }
+  } else {
+    /* Sin bloque: el JSON llega hasta la última llave o corchete. */
+    const fin = Math.max(cuerpo.lastIndexOf('}'), cuerpo.lastIndexOf(']'));
+    despues = cuerpo.slice(fin + 1).trim();
+    cuerpo = cuerpo.slice(0, fin + 1);
+  }
+
+  let valor: unknown;
+  try {
+    valor = JSON.parse(cuerpo.trim());
+  } catch {
+    return null;
+  }
+
+  const nombres = new Set(herramientas.map((h) => h.name));
+  const una = (v: unknown): Llamada | null => {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+    const o = v as Record<string, unknown>;
+    const nombre = o.name ?? o.tool ?? o.function;
+    if (typeof nombre === 'string' && nombres.has(nombre)) {
+      let args = o.arguments ?? o.args ?? o.parameters ?? {};
+      if (typeof args === 'string') {
+        try {
+          args = JSON.parse(args);
+        } catch {
+          args = {};
+        }
+      }
+      return { name: nombre, args: args as Record<string, unknown> };
+    }
+    let mejor: { name: string; comunes: number } | null = null;
+    for (const h of herramientas) {
+      const esquema = (h.parameters ?? {}) as { properties?: object; required?: string[] };
+      const props = Object.keys(esquema.properties ?? {});
+      if (!(esquema.required ?? []).every((k) => k in o)) continue;
+      const comunes = Object.keys(o).filter((k) => props.includes(k)).length;
+      if (comunes > 0 && (!mejor || comunes > mejor.comunes)) mejor = { name: h.name, comunes };
+    }
+    return mejor ? { name: mejor.name, args: o } : null;
+  };
+
+  const lista = Array.isArray(valor) ? valor : [valor];
+  return { calls: lista.map(una).filter((c): c is Llamada => c !== null), despues };
 }

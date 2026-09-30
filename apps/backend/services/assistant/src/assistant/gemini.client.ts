@@ -76,6 +76,8 @@ export interface GeminiReply {
    * función del modelo antes de su respuesta.
    */
   partes: GeminiPart[];
+  /** Se quedó sin tokens de salida a media respuesta (`MAX_TOKENS` / `length`). */
+  cortada?: boolean;
 }
 
 /** Lo que devuelve la API: una respuesta entera, o un trozo de una en streaming. */
@@ -555,6 +557,7 @@ export class GeminiClient {
         })),
       partes: parts,
       ...(uso ? { uso } : {}),
+      ...(finishReason === 'MAX_TOKENS' ? { cortada: true } : {}),
     };
   }
 

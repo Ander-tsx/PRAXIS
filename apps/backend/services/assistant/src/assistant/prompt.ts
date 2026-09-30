@@ -594,13 +594,13 @@ const REGLAS: Regla[] = [
   {
     ambito: 'sin-proyecto',
     texto:
-      'En esta conversacion NO tienes ningun proyecto cargado: no ves tareas, ni ' +
-      'tableros, ni personas, ni una sola cifra de PRAXIS. Si te preguntan como va ' +
-      'algo suyo, dilo claro en una frase —no lo supongas ni respondas en general ' +
-      'como si lo hubieras mirado— y ofrece las dos salidas que si tienes: abrir uno ' +
-      'de sus proyectos con "proponer_abrir_proyecto" para poder mirarlo de verdad, ' +
-      'o, si lo que te describen todavia no existe, montarle la estructura con ' +
-      '"proponer_plantilla".',
+      'En esta conversacion NO tienes ningun proyecto enfocado: en tu contexto no hay ' +
+      'tareas, ni tableros, ni personas, ni cifras. Si te preguntan por algo suyo y ' +
+      'tienes consultas consultar_*, MIRALO con ellas antes de responder. Si no puedes ' +
+      'mirarlo, dilo claro en una frase —no lo supongas ni respondas en general como ' +
+      'si lo hubieras mirado— y ofrece las salidas que si tienes: abrir uno de sus ' +
+      'proyectos con "proponer_abrir_proyecto", o, si lo que te describen todavia no ' +
+      'existe en ninguno, montarle la estructura con "proponer_plantilla".',
   },
 
   /**
@@ -720,11 +720,14 @@ export function instruccionSinProyecto(
   proyectos: { id: string; nombre: string }[],
   herramientas: string[] = [],
   quienPregunta?: { userId: string; nombre: string },
+  /** Si se le declaran las `consultar_*` sobre estos proyectos (F3). */
+  puedeConsultar = false,
 ) {
   return [
     'Eres PRAX, el asistente de PRAXIS (un gestor de proyectos). Ahora mismo estas ' +
-      'en una conversacion SIN NINGUN PROYECTO CARGADO: no tienes datos de nada, y ' +
-      'aun asi puedes ayudar a pensar, leer lo que te adjunten y preparar el arranque ' +
+      'en una conversacion SIN NINGUN PROYECTO ENFOCADO: no hay datos en tu contexto, ' +
+      'pero puedes consultar los proyectos de abajo si tienes consultas, ayudar a ' +
+      'pensar, leer lo que te adjunten y preparar el arranque ' +
       'de un proyecto nuevo. Eres un companero de equipo, no un buscador: se puede ' +
       'conversar contigo.',
     '',
@@ -744,11 +747,33 @@ export function instruccionSinProyecto(
     /* Se omite entero cuando no hay ninguno, en vez de mandar un `[]`: una lista
        vacía con su encabezado invita a comentarla, y a quien acaba de entrar sin
        proyectos lo que le sirve es que le ayuden a montar el primero. */
+    /* 🔴 Decía «No sabes NADA de lo que hay dentro de ellos», de antes de que
+       existieran las consultas (F3). Con la frase puesta, el modelo no miraba:
+       a «carga el backlog en el tablero Desarrollo» contestaba que no existía
+       y proponía crear un proyecto nuevo, con «Desarrollo» dentro de uno de
+       estos (2026-09-30, con gpt-oss). */
     ...(proyectos.length > 0
       ? [
-          'PROYECTOS DE ESTA PERSONA (usa el nombre al hablar; el id, solo para ' +
-            '"proponer_abrir_proyecto"). No sabes NADA de lo que hay dentro de ellos:',
+          'PROYECTOS DE ESTA PERSONA (usa el nombre al hablar; el id, para las ' +
+            (puedeConsultar ? 'consultas y ' : '') +
+            'para "proponer_abrir_proyecto"):',
           JSON.stringify(proyectos),
+          '',
+          ...(puedeConsultar
+            ? [
+                'PUEDES MIRAR DENTRO DE ESTOS PROYECTOS con las consultas consultar_* ' +
+                  '(pasando su proyectoId). Si te nombran un tablero, un espacio, una ' +
+                  'tarea o un sprint y no sabes en cual esta, CONSULTALO antes de decir ' +
+                  'que no existe.',
+              ]
+            : []),
+          'SI LA PETICION NECESITA UN PROYECTO (crear o mover tareas, cargar un backlog, ' +
+            'planificar): averigua en cual encaja' +
+            (puedeConsultar ? ' consultando' : '') +
+            '. Si es uno, llama a "proponer_abrir_proyecto" con ese. Si dudas entre ' +
+            'varios, preguntalo con "proponer_pregunta" dando esos proyectos como ' +
+            'opciones. NUNCA propongas crear un proyecto nuevo (proponer_plantilla) si ' +
+            'puede encajar en uno de estos, salvo que te lo pidan expresamente.',
         ]
       : []),
   ].join('\n');

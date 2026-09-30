@@ -117,7 +117,22 @@ export function createGatewayProxy(options: CreateGatewayProxyOptions = {}) {
       });
     }
 
-    const accessToken = request.cookies.get(SESSION_COOKIE)?.value;
+    const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
+    let accessToken = request.cookies.get(SESSION_COOKIE)?.value;
+    let renewedToken: string | null = null;
+
+    /**
+     * 🔴 **La cookie del access token caduca con él (15 min), y el navegador la
+     * borra.** Esto respondía «No hay sesión activa» en cuanto faltaba, sin
+     * mirar el refresh token: con PRAX abierto un rato, la siguiente pregunta
+     * daba 401 aunque la sesión siguiera viva. Solo se arreglaba navegando,
+     * porque el guard de página sí renueva — «cerré el chat, lo abrí desde el
+     * historial y ya respondió». Ahora se renueva aquí antes de rendirse.
+     */
+    if (!accessToken && autoRefresh && refreshToken) {
+      renewedToken = await refreshAccessToken(gatewayUrl, refreshToken);
+      accessToken = renewedToken ?? undefined;
+    }
 
     if (!accessToken) {
       return NextResponse.json(errorEnvelope('UNAUTHORIZED', 'No hay sesión activa.'), {
@@ -198,11 +213,8 @@ export function createGatewayProxy(options: CreateGatewayProxyOptions = {}) {
     }
 
     // El access token dura 15 minutos: si caducó, lo renovamos y reintentamos
-    // una única vez antes de rendirnos.
-    let renewedToken: string | null = null;
-    const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
-
-    if (autoRefresh && gatewayResponse.status === 401 && refreshToken) {
+    // una única vez antes de rendirnos. Si ya se renovó arriba, no se repite.
+    if (autoRefresh && gatewayResponse.status === 401 && refreshToken && !renewedToken) {
       renewedToken = await refreshAccessToken(gatewayUrl, refreshToken);
 
       if (renewedToken) {
@@ -251,10 +263,21 @@ export function createGatewayProxy(options: CreateGatewayProxyOptions = {}) {
       streamHeaders.set('cache-control', 'no-cache, no-transform');
       streamHeaders.set('x-accel-buffering', 'no');
 
-      return new NextResponse(gatewayResponse.body, {
+      const flujo = new NextResponse(gatewayResponse.body, {
         status: gatewayResponse.status,
         headers: streamHeaders,
       });
+      /* El token renovado se guarda también aquí: sin esto, el turno de PRAX
+         —que es un flujo— renovaba y tiraba la cookie, y la siguiente
+         petición volvía a empezar sin sesión. */
+      if (renewedToken) {
+        flujo.cookies.set(
+          SESSION_COOKIE,
+          renewedToken,
+          sessionCookieOptions(maxAgeFromJwt(renewedToken)),
+        );
+      }
+      return flujo;
     }
 
     /**

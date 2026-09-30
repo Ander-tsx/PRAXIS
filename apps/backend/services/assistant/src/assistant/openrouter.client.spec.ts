@@ -1,7 +1,14 @@
 import type { ConfigService } from '@nestjs/config';
 
 import { GeminiError } from './gemini.client';
-import { OpenRouterClient, esquemaJson, mensajesOpenAI } from './openrouter.client';
+import {
+  OpenRouterClient,
+  conReglasDeFormato,
+  esquemaJson,
+  inicioDeJson,
+  llamadasDelTexto,
+  mensajesOpenAI,
+} from './openrouter.client';
 
 function cliente(valores: Record<string, string> = { PRAX_OPENROUTER_API_KEY: 'k' }) {
   return new OpenRouterClient({
@@ -170,5 +177,74 @@ describe('OpenRouterClient', () => {
   it('sin clave propia usa la de OpenRouter de Jev; sin ninguna, no está disponible', () => {
     expect(cliente({ OPENROUTER_API_KEY: 'j' }).disponible).toBe(true);
     expect(cliente({}).disponible).toBe(false);
+  });
+});
+
+const pregunta = {
+  name: 'proponer_pregunta',
+  description: 'Pregunta con opciones.',
+  parameters: {
+    type: 'OBJECT',
+    properties: { pregunta: { type: 'STRING' }, opciones: { type: 'ARRAY' } },
+    required: ['pregunta', 'opciones'],
+  },
+};
+
+describe('gpt-oss: JSON escrito como texto', () => {
+  let fetchSpy: jest.SpyInstance;
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(global, 'fetch');
+  });
+  afterEach(() => fetchSpy.mockRestore());
+
+  it('encuentra un JSON solo al principio de línea o en un bloque', () => {
+    expect(inicioDeJson('Te propongo esto:\n{"a":1}')).toBe(18);
+    expect(inicioDeJson('Mira:\n```json\n{"a":1}\n```')).toBe(6);
+    expect(inicioDeJson('Un objeto {"a":1} a mitad de frase')).toBe(-1);
+  });
+
+  it('convierte los argumentos a secas en la herramienta que encaja, y guarda lo de detrás', () => {
+    const rescate = llamadasDelTexto(
+      '```json\n{"pregunta":"¿Cuál?","opciones":["Aura","Otro"]}\n```\nElige uno.',
+      [...turno.tools, pregunta],
+    );
+    expect(rescate).toEqual({
+      calls: [
+        { name: 'proponer_pregunta', args: { pregunta: '¿Cuál?', opciones: ['Aura', 'Otro'] } },
+      ],
+      despues: 'Elige uno.',
+    });
+  });
+
+  it('un JSON que no encaja con nada se descarta; lo que no es JSON se devuelve', () => {
+    expect(llamadasDelTexto('{"zzz":1}', [pregunta])).toEqual({ calls: [], despues: '' });
+    expect(llamadasDelTexto('{ esto no es json', [pregunta])).toBeNull();
+  });
+
+  it('en vivo: no pinta el JSON y lo entrega como llamada', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      flujo([
+        { choices: [{ delta: { content: '¿En cuál lo cargo?\n' } }] },
+        { choices: [{ delta: { content: '{"pregunta":"¿Cuál?",' } }] },
+        { choices: [{ delta: { content: '"opciones":["Aura"]}' } }] },
+      ]),
+    );
+    const pintado: string[] = [];
+
+    const r = await cliente().chat({ ...turno, tools: [pregunta] }, (d) => pintado.push(d));
+
+    expect(pintado.join('')).toBe('¿En cuál lo cargo?\n');
+    expect(r.calls).toEqual([
+      { name: 'proponer_pregunta', args: { pregunta: '¿Cuál?', opciones: ['Aura'] } },
+    ]);
+  });
+
+  it('añade las reglas de formato al sistema, y solo al sistema', () => {
+    const m = conReglasDeFormato(mensajesOpenAI(turno));
+    expect(m[0].content).toContain('REGLAS DE FORMATO');
+    expect(m[0].content).toContain('nunca "vos"');
+    expect(
+      m.slice(1).some((x) => String((x as { content?: string }).content).includes('REGLAS')),
+    ).toBe(false);
   });
 });
