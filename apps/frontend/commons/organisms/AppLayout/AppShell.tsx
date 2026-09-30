@@ -1017,6 +1017,7 @@ interface EspacioDeLaBarra {
   name: string;
   kind: TipoDeEspacio;
   documents: Array<{ id: string; title: string }>;
+  boards: Array<{ id: string; name: string }>;
 }
 
 /**
@@ -1108,6 +1109,7 @@ async function fetchWorkspaces(
             name: string;
             kind?: TipoDeEspacio;
             documents?: Array<{ id: string; title: string }>;
+            boards?: Array<{ id: string; name: string }>;
           }>;
         }>(`/projects/${id}`)
         .catch(() => null);
@@ -1118,6 +1120,7 @@ async function fetchWorkspaces(
           name: w.name,
           kind: w.kind ?? 'BOARDS',
           documents: (w.documents ?? []).map((d) => ({ id: d.id, title: d.title })),
+          boards: (w.boards ?? []).map((b) => ({ id: b.id, name: b.name })),
         })),
       ] as const;
     }),
@@ -1361,6 +1364,17 @@ function SidebarProjectsTree({
   const [expanded, setExpanded] = useState<Set<string>>(() => desplegadosGuardados());
   /** El proyecto en el que se está creando algo desde la barra, si hay uno. */
   const [creandoEn, setCreandoEn] = useState<string | null>(null);
+  /** Si se pulsó el «+» de un espacio: qué crear y dónde, ya elegido. */
+  const [presetDeCrear, setPresetDeCrear] = useState<{
+    que: 'documento' | 'tablero';
+    espacioId: string;
+  } | null>(null);
+  /**
+   * Los espacios abiertos o cerrados **por decisión de quien usa la barra**.
+   * Sin decisión, un espacio está cerrado salvo que tenga dentro lo que se está
+   * mirando: así el árbol ocupa poco y aun así enseña dónde estás.
+   */
+  const [espaciosAbiertos, setEspaciosAbiertos] = useState<Map<string, boolean>>(new Map());
 
   /**
    * Los proyectos cuyo detalle ya se pidió, para no volver a pedirlo.
@@ -1705,6 +1719,7 @@ function SidebarProjectsTree({
                         const wsHref = `/projects/${project.slug}?tab=espacios&ws=${ws.id}`;
                         const isActiveWs = activePath.includes(`ws=${ws.id}`);
                         const Icono = ws.kind === 'DOCUMENTS' ? NotebookText : SquareKanban;
+                        const wsAbierto = espaciosAbiertos.get(ws.id) ?? isActiveWs;
                         return (
                           <div key={ws.id} className="flex flex-col gap-0.5">
                             <div
@@ -1714,10 +1729,23 @@ function SidebarProjectsTree({
                                   : 'text-text-secondary hover:text-white hover:bg-white/[0.06]'
                               }`}
                             >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEspaciosAbiertos((previos) =>
+                                    new Map(previos).set(ws.id, !wsAbierto),
+                                  )
+                                }
+                                aria-expanded={wsAbierto}
+                                aria-label={wsAbierto ? `Colapsar ${ws.name}` : `Expandir ${ws.name}`}
+                                className="ml-1 flex h-4 w-4 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:text-white"
+                              >
+                                <ChevronIcon open={wsAbierto} />
+                              </button>
                               <Link
                                 href={wsHref}
                                 aria-current={isActiveWs ? 'page' : undefined}
-                                className="flex min-w-0 flex-1 items-center gap-2 px-2 py-[5px] text-[12px]"
+                                className="flex min-w-0 flex-1 items-center gap-2 py-[5px] pr-1 text-[12px]"
                               >
                                 <Icono className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 <span className="truncate">{ws.name}</span>
@@ -1739,7 +1767,49 @@ function SidebarProjectsTree({
                                 }}
                               />
                             </div>
-                            {ws.documents.map((doc) => {
+                            {wsAbierto &&
+                              ws.boards.map((tablero) => {
+                                const tableroActivo = activePath.includes(`board=${tablero.id}`);
+                                return (
+                                  <div
+                                    key={tablero.id}
+                                    className={`group ml-4 flex items-center gap-1 rounded-md pr-1 transition-colors ${
+                                      tableroActivo
+                                        ? 'bg-white/10 text-white'
+                                        : 'text-text-secondary hover:text-white hover:bg-white/[0.06]'
+                                    }`}
+                                  >
+                                    <Link
+                                      href={`${wsHref}&board=${tablero.id}`}
+                                      aria-current={tableroActivo ? 'page' : undefined}
+                                      className="flex min-w-0 flex-1 items-center gap-2 px-2 py-[4px] text-[12px]"
+                                    >
+                                      <SquareKanban
+                                        className="h-3.5 w-3.5 shrink-0"
+                                        aria-hidden="true"
+                                      />
+                                      <span className="truncate">{tablero.name}</span>
+                                    </Link>
+                                    <MenuDeContenido
+                                      projectId={project.id}
+                                      gatewayPath={`${zonePath}/api/gateway`}
+                                      activo={tableroActivo}
+                                      onCambiado={() => refrescarProyecto(project.id)}
+                                      alEliminar={() => router.push(wsHref)}
+                                      objetivo={{
+                                        tipo: 'tablero',
+                                        name: tablero.name,
+                                        path: `/boards/${tablero.id}`,
+                                        cuerpoDeNombre: (name) => ({ name }),
+                                        permisoRenombrar: 'canEditBoard',
+                                        permisoEliminar: 'canDeleteBoard',
+                                        confirmarEscribiendo: true,
+                                      }}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            {wsAbierto && ws.documents.map((doc) => {
                               const docActivo = activePath.includes(`doc=${doc.id}`);
                               return (
                                 <div
@@ -1780,6 +1850,26 @@ function SidebarProjectsTree({
                                 </div>
                               );
                             })}
+                            {wsAbierto && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  /* Los espacios se piden al desplegar; el formulario los necesita. */
+                                  refrescarProyecto(project.id);
+                                  setPresetDeCrear({
+                                    que: ws.kind === 'DOCUMENTS' ? 'documento' : 'tablero',
+                                    espacioId: ws.id,
+                                  });
+                                  setCreandoEn(project.id);
+                                }}
+                                className="ml-4 flex items-center gap-2 rounded-md px-2 py-[4px] text-left text-[12px] text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-white"
+                              >
+                                <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span className="truncate">
+                                  {ws.kind === 'DOCUMENTS' ? 'Nuevo documento' : 'Nuevo tablero'}
+                                </span>
+                              </button>
+                            )}
                           </div>
                         );
                       })
@@ -1797,7 +1887,12 @@ function SidebarProjectsTree({
         return (
           <CrearEnProyecto
             abierto
-            onCerrar={() => setCreandoEn(null)}
+            onCerrar={() => {
+              setCreandoEn(null);
+              setPresetDeCrear(null);
+            }}
+            queInicial={presetDeCrear?.que}
+            espacioInicialId={presetDeCrear?.espacioId}
             proyecto={proyecto}
             espacios={proyecto.workspaces}
             gatewayPath={`${zonePath}/api/gateway`}
