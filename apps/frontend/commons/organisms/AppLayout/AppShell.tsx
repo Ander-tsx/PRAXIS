@@ -41,6 +41,7 @@ import { alpha, colors } from '../../tokens';
 import { KylooWordmark } from '../KylooWordmark';
 import { CrearEnProyecto, type TipoDeEspacio } from './CrearEnProyecto';
 import { DirectorioDeChatsProvider, useDirectorioDeChats } from './DirectorioDeChats';
+import { MenuDeProyecto } from './MenuDeProyecto';
 import { DockColumn, DockProvider } from './DockPanel';
 import { NavList } from './NavList';
 import { OrgSwitcher } from './OrgSwitcher';
@@ -1664,6 +1665,14 @@ function SidebarProjectsTree({
                 >
                   {project.name}
                 </Link>
+
+                {/* Cambiar nombre o eliminar, sin entrar al proyecto. */}
+                <MenuDeProyecto
+                  proyecto={project}
+                  gatewayPath={`${zonePath}/api/gateway`}
+                  activo={isActiveProject}
+                  onCambiado={cargar}
+                />
 
                 {/* Crear sin entrar al proyecto: documento, tablero o espacio. */}
                 <button
