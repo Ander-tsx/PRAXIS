@@ -315,6 +315,7 @@ function ProyectosLista({
                   id={project.id}
                   name={project.name}
                   iconKey={project.iconKey ?? null}
+                  imageUrl={project.imageUrl ?? null}
                   color={project.color ?? null}
                   apagado={suspendido}
                 />
@@ -424,6 +425,7 @@ function ProyectosGrilla({
                   id={project.id}
                   name={project.name}
                   iconKey={project.iconKey ?? null}
+                  imageUrl={project.imageUrl ?? null}
                   color={project.color ?? null}
                   apagado={suspendido}
                 />

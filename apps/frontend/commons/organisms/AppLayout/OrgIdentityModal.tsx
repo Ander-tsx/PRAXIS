@@ -9,6 +9,7 @@ import {
   glyphByKey,
 } from '../../atoms';
 import { createApiClient } from '../../api/client';
+import { ImagePicker } from '../../molecules/ImagePicker';
 import { useRouter } from 'next/navigation';
 import type { OrgDelSelector } from './AppShell';
 
@@ -28,12 +29,52 @@ export function OrgIdentityModal({
     color: org.color || GLYPH_COLOR_DEFAULT,
   });
 
+  /* La imagen se sube y se quita al momento, sin esperar al «Guardar»: es otro
+     endpoint. `imageUrl` lleva la versión que devolvió el servidor. */
+  const [imageUrl, setImageUrl] = useState<string | null>(org.imageUrl ?? null);
+  const api = createApiClient({ gatewayPath: zonePath + '/api/gateway' });
+
+  async function subirImagen(file: File): Promise<string | null> {
+    const datos = new FormData();
+    datos.append('file', file);
+    try {
+      const actualizada = await api.post<{ imageUrl: string | null }>(
+        `/organizations/${org.id}/image`,
+        undefined,
+        { body: datos },
+      );
+      if (!actualizada?.imageUrl) return 'El servidor no guardó la imagen.';
+      setImageUrl(actualizada.imageUrl);
+      router.refresh();
+      return null;
+    } catch (err: any) {
+      return err.message || 'No se pudo subir la imagen.';
+    }
+  }
+
+  async function quitarImagen(): Promise<string | null> {
+    try {
+      await api.delete(`/organizations/${org.id}/image`);
+      setImageUrl(null);
+      router.refresh();
+      return null;
+    } catch (err: any) {
+      return err.message || 'No se pudo quitar la imagen.';
+    }
+  }
+
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const inicial = (name.trim() || org.name?.trim() || 'O').charAt(0).toUpperCase();
-  const preview = glyphByKey(seleccion.iconKey) ? (
-    <Glyph iconKey={seleccion.iconKey} color={seleccion.color} size="md" shape="square" />
+  const preview = imageUrl || glyphByKey(seleccion.iconKey) ? (
+    <Glyph
+      iconKey={seleccion.iconKey}
+      imageUrl={imageUrl}
+      color={seleccion.color}
+      size="md"
+      shape="square"
+    />
   ) : (
     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-elevated font-sans text-base font-semibold text-text-primary">
       {inicial}
@@ -45,7 +86,6 @@ export function OrgIdentityModal({
     setError(null);
     setPending(true);
     try {
-      const api = createApiClient({ gatewayPath: zonePath + '/api/gateway' });
       await api.patch(`/organizations/${org.id}`, {
         name: name.trim(),
         iconKey: seleccion.iconKey || null,
@@ -100,6 +140,13 @@ export function OrgIdentityModal({
                 />
               </div>
             </div>
+
+            <ImagePicker
+              tieneImagen={imageUrl !== null}
+              onUpload={subirImagen}
+              onRemove={quitarImagen}
+              disabled={pending}
+            />
 
             <GlyphPicker value={seleccion} onChange={setSeleccion} disabled={pending} />
 

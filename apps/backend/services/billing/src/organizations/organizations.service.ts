@@ -425,6 +425,7 @@ export class OrganizationsService {
       ownerUserId: string;
       iconKey: string | null;
       color: string | null;
+      imageUrl?: string | null;
       createdAt: Date;
       subscription: { tier: string; status: string; seats: number } | null;
       _count?: { members: number };
@@ -461,6 +462,7 @@ export class OrganizationsService {
       seatsUsed: organizacion._count?.members ?? 0,
       iconKey: organizacion.iconKey,
       color: organizacion.color,
+      imageUrl: organizacion.imageUrl ?? null,
       createdAt: organizacion.createdAt.toISOString(),
     };
   }
@@ -597,6 +599,88 @@ export class OrganizationsService {
       if (!tomado) return candidato;
     }
     return `${base}-${randomBytes(8).toString('hex')}`;
+  }
+
+  /**
+   * Guarda la imagen de la organización. Misma puerta que renombrar
+   * (`canManageOrganization`): es identidad igual que el nombre.
+   *
+   * ⚠️ La URL lleva `?v=<epoch>`: sin ella la imagen nueva no se vería, la
+   * caché del navegador seguiría sirviendo la vieja.
+   */
+  async ponerImagen(
+    organizationId: string,
+    userId: string,
+    mimeType: string,
+    bytes: Uint8Array<ArrayBuffer>,
+  ) {
+    const permiso = await this.exigirPermiso(
+      organizationId,
+      userId,
+      OrganizationPermission.CAN_MANAGE_ORGANIZATION,
+    );
+    if (esFallo(permiso)) return permiso;
+
+    const version = Date.now();
+    const [, organizacion] = await this.prisma.$transaction([
+      this.prisma.organizationImage.upsert({
+        where: { organizationId },
+        create: { organizationId, mimeType, size: bytes.length, bytes },
+        update: { mimeType, size: bytes.length, bytes },
+      }),
+      this.prisma.organization.update({
+        where: { id: organizationId },
+        data: { imageUrl: `/organizations/${organizationId}/image?v=${version}` },
+        include: { subscription: true, _count: { select: { members: true } } },
+      }),
+    ]);
+    await this.olvidar(organizationId, userId);
+    return this.vista(
+      organizacion,
+      { role: { name: permiso.roleName ?? '', permissions: permiso.permisos } },
+      userId,
+    );
+  }
+
+  /** Quita la imagen: la organización vuelve a su icono o monograma. */
+  async quitarImagen(organizationId: string, userId: string) {
+    const permiso = await this.exigirPermiso(
+      organizationId,
+      userId,
+      OrganizationPermission.CAN_MANAGE_ORGANIZATION,
+    );
+    if (esFallo(permiso)) return permiso;
+
+    await this.prisma.organizationImage.deleteMany({ where: { organizationId } });
+    const organizacion = await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { imageUrl: null },
+      include: { subscription: true, _count: { select: { members: true } } },
+    });
+    await this.olvidar(organizationId, userId);
+    return this.vista(
+      organizacion,
+      { role: { name: permiso.roleName ?? '', permissions: permiso.permisos } },
+      userId,
+    );
+  }
+
+  /**
+   * Los bytes, para la ruta que los sirve. Basta con ser miembro: la imagen se
+   * ve en el selector de cualquiera que esté dentro. `null` si no hay.
+   */
+  async leerImagen(organizationId: string, userId: string) {
+    const miembro = await this.prisma.organizationMember.findFirst({
+      where: { organizationId, userId, status: MembershipStatus.ACTIVE },
+      select: { id: true },
+    });
+    if (!miembro) {
+      return { error: 'No perteneces a esa organización.', codigo: 'NO_ERES_MIEMBRO' } as Fallo;
+    }
+    return this.prisma.organizationImage.findUnique({
+      where: { organizationId },
+      select: { mimeType: true, size: true, bytes: true },
+    });
   }
 
   async renombrar(

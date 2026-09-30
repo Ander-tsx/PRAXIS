@@ -1,5 +1,6 @@
 import { alpha, colors } from '../../tokens';
 import { type GlyphDef, glyphByKey } from './glyphs';
+import { IdentityImage } from './IdentityImage';
 
 export interface GlyphProps {
   /** La `key` guardada (`Project.iconKey` / `Organization.iconKey`). */
@@ -12,6 +13,11 @@ export interface GlyphProps {
   shape?: 'square' | 'circle';
   /** Apagado a gris, para un proyecto suspendido. */
   apagado?: boolean;
+  /**
+   * Imagen subida (ruta relativa al gateway). **Gana al icono**: si hay, se pinta
+   * ella y no el glifo, y el componente ya no devuelve `null` por falta de icono.
+   */
+  imageUrl?: string | null;
   className?: string;
 }
 
@@ -43,8 +49,20 @@ export function Glyph({
   size = 'sm',
   shape = 'square',
   apagado = false,
+  imageUrl = null,
   className = '',
 }: GlyphProps) {
+  if (imageUrl) {
+    return (
+      <IdentityImage
+        imageUrl={imageUrl}
+        size={size}
+        shape={shape}
+        apagado={apagado}
+        className={className}
+      />
+    );
+  }
   const def: GlyphDef | undefined = glyphByKey(iconKey);
   if (!def) return null;
 

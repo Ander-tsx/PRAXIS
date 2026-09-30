@@ -118,9 +118,10 @@ export function OrgSwitcher({
   /* Con icono elegido, esa es la cara; si no, la inicial sobre el cuadro
      neutro de siempre. La identidad la trae `OrgDelSelector` desde
      `GET /me/organizations`. */
-  const cuadro = glyphByKey(activa?.iconKey) ? (
+  const cuadro = activa?.imageUrl || glyphByKey(activa?.iconKey) ? (
     <Glyph
       iconKey={activa?.iconKey ?? null}
+      imageUrl={activa?.imageUrl ?? null}
       color={activa?.color ?? null}
       size="sm"
       shape="square"

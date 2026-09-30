@@ -245,6 +245,8 @@ export interface OrganizationView {
    */
   iconKey: string | null;
   color: string | null;
+  /** Imagen subida (ruta relativa al gateway). Gana al icono. */
+  imageUrl?: string | null;
   createdAt: string;
 }
 

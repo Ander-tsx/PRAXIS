@@ -1,6 +1,6 @@
 import { alpha, colors, serieColors } from '../../tokens';
 import { iniciales } from '../Avatar';
-import { Glyph } from '../GlyphPicker';
+import { Glyph, IdentityImage } from '../GlyphPicker';
 import { glyphByKey } from '../GlyphPicker/glyphs';
 
 export interface ProjectMonogramProps {
@@ -16,6 +16,8 @@ export interface ProjectMonogramProps {
    */
   iconKey?: string | null;
   color?: string | null;
+  /** Imagen subida (ruta relativa al gateway). Gana al icono y a las iniciales. */
+  imageUrl?: string | null;
   /**
    * `sm` (32 px) en listas y filas; `md` (44 px) en tarjetas.
    *
@@ -77,10 +79,24 @@ export function ProjectMonogram({
   name,
   iconKey = null,
   color = null,
+  imageUrl = null,
   size = 'sm',
   apagado = false,
   className = '',
 }: ProjectMonogramProps) {
+  if (imageUrl) {
+    return (
+      <IdentityImage
+        imageUrl={imageUrl}
+        label={name}
+        size={size}
+        shape="square"
+        apagado={apagado}
+        className={className}
+      />
+    );
+  }
+
   /* Con un icono elegido y válido, esa es la cara: mismo tamaño, misma caja,
      mismo tratamiento de color que las iniciales. Ver `Glyph`. */
   if (glyphByKey(iconKey)) {

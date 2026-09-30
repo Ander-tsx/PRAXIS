@@ -76,6 +76,7 @@ export default async function ChatDeProyectoPage({ params }: PageProps) {
       projectName={project.name}
       projectSlug={project.slug}
       projectIconKey={project.iconKey ?? null}
+      projectImageUrl={project.imageUrl ?? null}
       projectColor={project.color ?? null}
       page={page}
       directorio={directorio}

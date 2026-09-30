@@ -34,6 +34,21 @@ export class ProjectsController {
     return this.projectsService.findOneProject(dto.id);
   }
 
+  @MessagePattern({ cmd: 'project_set_image' })
+  setImage(@Payload() dto: { id: string; mimeType: string; base64: string }) {
+    return this.projectsService.setImage(dto);
+  }
+
+  @MessagePattern({ cmd: 'project_delete_image' })
+  deleteImage(@Payload() dto: { id: string }) {
+    return this.projectsService.deleteImage(dto);
+  }
+
+  @MessagePattern({ cmd: 'project_get_image' })
+  getImage(@Payload() dto: { id: string }) {
+    return this.projectsService.getImage(dto);
+  }
+
   @MessagePattern({ cmd: 'project_update' })
   update(@Payload() dto: UpdateProjectDto) {
     return this.projectsService.updateProject(dto);
