@@ -45,6 +45,7 @@ function montar(respuestas: GeminiReply[], opciones: { openrouter?: boolean } = 
   };
   const consultas = {
     descripcion: jest.fn(() => 'Buscando tareas en «Web»'),
+    indiceDeProyectos: jest.fn(async (proyectos: unknown[]) => proyectos),
     ejecutar: jest.fn(async () => ({ total: 3, omitidas: 0, tareas: [] })),
   };
   const quota = {
@@ -300,6 +301,26 @@ describe('El turno de PRAX: bucle de consultas', () => {
       { title: 'HU-01: Registro', priority: 'HIGH', estimatePoints: 3 },
       { title: 'HU-02: Login', description: 'Con correo', priority: 'MEDIUM' },
     ]);
+  });
+
+  it('si pregunta, solo pregunta: una pregunta y nada más en ese turno', async () => {
+    const pregunta = (texto: string) => ({
+      name: 'proponer_pregunta',
+      args: { preguntas: [{ pregunta: texto, opciones: ['APUNTES', 'MOBILE'] }], porQue: 'x' },
+    });
+    const m = montar([
+      respuesta({
+        text: '¿Dónde?',
+        calls: [pregunta('¿En qué proyecto?'), pregunta('¿Cuál de tus proyectos?')],
+      }),
+    ]);
+
+    await m.servicio.chat(payload as any);
+
+    const [turno] = m.conversaciones.guardarTurno.mock.calls[0] as unknown as [
+      { proposals: { tool: string }[] },
+    ];
+    expect(turno.proposals.length).toBeLessThanOrEqual(1);
   });
 
   it('🔴 un modelo que no deja de consultar se corta, y la última vuelta va sin consultas', async () => {

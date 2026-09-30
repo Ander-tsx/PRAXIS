@@ -294,7 +294,9 @@ const REGLAS: Regla[] = [
       'en el texto — la tarjeta son las opciones, el contexto lo pones tu. No lo ' +
       'uses para preguntas abiertas ("que quieres hacer?"), que se responden mejor ' +
       'escribiendo, ni para confirmar algo que ya va a salir como propuesta con su ' +
-      'propio boton. Como mucho una tarjeta de preguntas por respuesta.',
+      'propio boton. Como mucho una tarjeta de preguntas por respuesta, y si preguntas ' +
+      'NO propongas nada mas en esa respuesta: la propuesta va en la siguiente, cuando ' +
+      'sepas la respuesta.',
   },
 
   /**
@@ -717,7 +719,11 @@ function bloqueDeHerramientas(herramientas: string[], sinNinguna: string): strin
  * los mismos que ve en su pantalla, resueltos por el gateway con su sesión.
  */
 export function instruccionSinProyecto(
-  proyectos: { id: string; nombre: string }[],
+  proyectos: {
+    id: string;
+    nombre: string;
+    espacios?: { nombre: string; tableros: string[] }[];
+  }[],
   herramientas: string[] = [],
   quienPregunta?: { userId: string; nombre: string },
   /** Si se le declaran las `consultar_*` sobre estos proyectos (F3). */
@@ -754,7 +760,9 @@ export function instruccionSinProyecto(
        estos (2026-09-30, con gpt-oss). */
     ...(proyectos.length > 0
       ? [
-          'PROYECTOS DE ESTA PERSONA (usa el nombre al hablar; el id, para las ' +
+          'PROYECTOS DE ESTA PERSONA, con sus espacios y tableros (usa el nombre al ' +
+            'hablar; si te nombran un espacio o un tablero, ESTE indice te dice en que ' +
+            'proyecto esta: no preguntes lo que ya puedes ver aqui; el id, para las ' +
             (puedeConsultar ? 'consultas y ' : '') +
             'para "proponer_abrir_proyecto"):',
           JSON.stringify(proyectos),

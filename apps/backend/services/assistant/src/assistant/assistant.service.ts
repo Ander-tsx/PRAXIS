@@ -528,6 +528,22 @@ export class AssistantService {
           }
         : briefing;
 
+    /* Sin foco, los proyectos de «Recursos» van con sus espacios y tableros
+       por nombre: así «el tablero Desarrollo» se encuentra sin preguntar. */
+    const proyectosConIndice: {
+      id: string;
+      nombre: string;
+      espacios?: { nombre: string; tableros: string[] }[];
+    }[] =
+      !briefing && (payload.proyectos?.length ?? 0) > 0
+        ? await this.consultas.indiceDeProyectos(payload.proyectos ?? [])
+        : (payload.proyectos ?? []);
+    if (!briefing && proyectosConIndice.some((p) => p.espacios)) {
+      const tableros = proyectosConIndice
+        .flatMap((p) => p.espacios ?? [])
+        .reduce((n, e) => n + e.tableros.length, 0);
+      contar(paso('contexto', 'Mirando tus proyectos', `${tableros} tableros`));
+    }
     const instruccionBase = briefingParaPrompt
       ? systemInstruction(
           briefingParaPrompt,
@@ -538,7 +554,7 @@ export class AssistantService {
           catalogoDeCapacidades(payload.permisos),
         )
       : instruccionSinProyecto(
-          payload.proyectos ?? [],
+          proyectosConIndice,
           herramientas.map((herramienta) => herramienta.name),
           quienPregunta,
           (payload.proyectos?.length ?? 0) > 0,
@@ -858,7 +874,7 @@ export class AssistantService {
                   catalogoDeCapacidades(payload.permisos),
                 )
               : instruccionSinProyecto(
-                  payload.proyectos ?? [],
+                  proyectosConIndice,
                   herramientas.map((herramienta) => herramienta.name),
                   quienPregunta,
                   (payload.proyectos?.length ?? 0) > 0,
@@ -906,6 +922,22 @@ export class AssistantService {
       } catch (err) {
         this.log.warn(`Fallo en el turno de recuperación: ${err}`);
       }
+    }
+
+    /**
+     * 🔴 **Si pregunta, solo pregunta.** Una pregunta dice que todavía no sabe
+     * qué hacer, así que no puede venir con acciones al lado: salían «¿en qué
+     * tablero?» y las 35 tareas en la misma tarjeta, y al contestar se
+     * proponía otra cosa encima. Y dos preguntas iguales eran dos tarjetas con
+     * lo mismo. Queda la primera pregunta; la respuesta dispara el turno que
+     * propone (2026-09-30, gpt-oss).
+     */
+    const preguntas = validadas.filter((p) => p.tool === 'proponer_pregunta');
+    if (preguntas.length > 0 && validadas.length > 1) {
+      this.log.warn(
+        `prax_pregunta_con_mas_propuestas total=${validadas.length} preguntas=${preguntas.length}: queda una`,
+      );
+      validadas = [preguntas[0]];
     }
 
     reply = reply || this.textoPorDefecto(validadas);

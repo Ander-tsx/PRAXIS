@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type ClientProxy, ClientProxyFactory } from '@nestjs/microservices';
 import { opcionesDeCliente } from '@praxis/local-transport';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import type { FunctionDeclaration } from './tools';
 
 /**
@@ -339,6 +339,45 @@ export class ConsultasService {
   }
 
   /** Lo que se le enseña a la persona mientras PRAX consulta. */
+  /**
+   * Los espacios y tableros de cada proyecto de «Recursos», solo por nombre,
+   * para el modo sin proyecto (2026-09-30).
+   *
+   * 🔴 Sin esto, a «carga el backlog en el tablero Desarrollo» PRAX preguntaba
+   * en qué proyecto estaba —o proponía crear uno nuevo—, porque solo veía los
+   * nombres de los proyectos y consultar era decisión del modelo, que no
+   * siempre la tomaba. Con el índice, «Desarrollo» se encuentra sin consultar.
+   *
+   * Son nombres, no contenido: lo que la persona ve en la barra lateral. Hasta
+   * diez proyectos y 3 s; si algo falla, ese proyecto va sin índice.
+   */
+  async indiceDeProyectos(
+    proyectos: { id: string; nombre: string }[],
+  ): Promise<
+    { id: string; nombre: string; espacios?: { nombre: string; tableros: string[] }[] }[]
+  > {
+    return Promise.all(
+      proyectos.slice(0, 10).map(async (proyecto) => {
+        try {
+          const detalle = await firstValueFrom(
+            this.projects
+              .send<{
+                workspaces?: { name: string; boards?: { name: string }[] }[];
+              }>({ cmd: 'project_find_one' }, { id: proyecto.id })
+              .pipe(timeout(3000)),
+          );
+          const espacios = (detalle?.workspaces ?? []).map((w) => ({
+            nombre: w.name,
+            tableros: (w.boards ?? []).map((b) => b.name),
+          }));
+          return espacios.length > 0 ? { ...proyecto, espacios } : proyecto;
+        } catch {
+          return proyecto;
+        }
+      }),
+    ).then((conIndice) => [...conIndice, ...proyectos.slice(10)]);
+  }
+
   descripcion(nombre: string, args: Record<string, unknown>, ambito: AmbitoDeConsulta): string {
     const proyecto = this.nombreDeProyecto(args.proyectoId, ambito);
     if (nombre === 'consultar_tarea') return 'Leyendo una tarea';
