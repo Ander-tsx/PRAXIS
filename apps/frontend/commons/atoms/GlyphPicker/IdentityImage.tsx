@@ -43,7 +43,7 @@ export function IdentityImage({
     <span
       role="img"
       aria-label={label ?? 'Imagen'}
-      className={`shrink-0 bg-cover bg-center transition-[filter] ${MEDIDAS[size]} ${RADIO[size][shape]} ${className}`}
+      className={`block shrink-0 bg-cover bg-center transition-[filter] ${MEDIDAS[size]} ${RADIO[size][shape]} ${className}`}
       style={{
         backgroundColor: colors.surfaceElevated,
         backgroundImage: `url(${GATEWAY_PATH}${imageUrl})`,
