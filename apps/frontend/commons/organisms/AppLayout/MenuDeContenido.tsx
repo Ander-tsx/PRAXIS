@@ -44,8 +44,8 @@ export function MenuDeContenido({
   alEliminar,
 }: {
   objetivo: {
-    /** «espacio» o «documento»: sale en los textos. */
-    tipo: 'espacio' | 'documento';
+    /** Qué es: sale en los textos. */
+    tipo: 'espacio' | 'documento' | 'tablero';
     name: string;
     /** Ruta del gateway de ese recurso, sin la barra final. */
     path: string;
@@ -271,9 +271,11 @@ export function MenuDeContenido({
         onClose={() => setModo(null)}
         title={`Eliminar «${proyecto.name}»`}
         description={
-          objetivo.tipo === 'espacio'
-            ? 'Esto no se puede deshacer, y se lleva por delante sus tableros y tareas.'
-            : 'Esto no se puede deshacer.'
+          objetivo.tipo === 'documento'
+            ? 'Esto no se puede deshacer.'
+            : objetivo.tipo === 'tablero'
+              ? 'Esto no se puede deshacer, y se lleva por delante sus columnas y tareas.'
+              : 'Esto no se puede deshacer, y se lleva por delante sus tableros y tareas.'
         }
         size="sm"
       >

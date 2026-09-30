@@ -39,7 +39,13 @@ export function CrearEnProyecto({
   espacios,
   gatewayPath,
   onCreado,
+  queInicial,
+  espacioInicialId,
 }: {
+  /** Con qué opción arranca el formulario, si se abrió desde el «+» de un espacio. */
+  queInicial?: QueCrear;
+  /** Y en qué espacio, ya elegido. */
+  espacioInicialId?: string;
   abierto: boolean;
   onCerrar: () => void;
   proyecto: { id: string; slug: string; name: string };
@@ -48,13 +54,13 @@ export function CrearEnProyecto({
   onCreado: () => void;
 }) {
   const router = useRouter();
-  const [que, setQue] = useState<QueCrear>('documento');
+  const [que, setQue] = useState<QueCrear>(queInicial ?? 'documento');
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
   const tipoDelEspacio: TipoDeEspacio = que === 'tablero' ? 'BOARDS' : 'DOCUMENTS';
   const candidatos = espacios.filter((e) => e.kind === tipoDelEspacio);
-  const [espacioId, setEspacioId] = useState<string>('');
+  const [espacioId, setEspacioId] = useState<string>(espacioInicialId ?? '');
   const elegido = candidatos.find((e) => e.id === espacioId) ?? candidatos[0] ?? null;
   const [espacioNuevo, setEspacioNuevo] = useState(false);
   const creaEspacio = que !== 'espacio' && (espacioNuevo || !elegido);
