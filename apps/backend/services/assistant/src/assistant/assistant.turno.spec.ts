@@ -364,6 +364,101 @@ describe('El turno de PRAX: bucle de consultas', () => {
     ]);
   });
 
+  it('piden el backlog y propone UNA: se le pide el lote, y la suelta no se repite', async () => {
+    const m = montar([
+      respuesta({
+        text: '',
+        calls: [
+          {
+            name: 'proponer_tarea',
+            args: {
+              title: 'TEC-01: Flutter',
+              columnId: 'col-hacer',
+              priority: 'HIGH',
+              porQue: 'x',
+            },
+          },
+        ],
+      }),
+      respuesta({
+        text: '',
+        calls: [
+          {
+            name: 'proponer_tareas',
+            args: {
+              columnId: 'col-hacer',
+              porQue: 'Backlog',
+              tareas: [{ title: 'TEC-01: Configurar Flutter' }, { title: 'TEC-02: Spike' }],
+            },
+          },
+        ],
+      }),
+    ]);
+    m.conversaciones.historial.mockResolvedValueOnce([
+      { role: 'user', text: 'Carga todas las tareas de este backlog' },
+      { role: 'model', text: 'Abro MOBILE.' },
+    ] as never);
+    (m.servicio as any).reportsClient = {
+      send: () =>
+        of({
+          proyecto: { nombre: 'Web' },
+          columnas: [{ id: 'col-hacer', nombre: 'To Do', orden: 0 }],
+          etiquetas: [],
+          tareas: [],
+        }),
+    };
+
+    await m.servicio.chat({
+      ...payload,
+      message: 'Listo, ya abrí «MOBILE». Sigue con lo que te pedí.',
+      projectId: PROYECTO.id,
+      proyectos: [],
+      permisos: { canCreateTask: true },
+    } as any);
+
+    expect(m.gemini.chat).toHaveBeenCalledTimes(2);
+    const [turno] = m.conversaciones.guardarTurno.mock.calls[0] as unknown as [
+      { proposals: { tool: string; args: Record<string, any> }[] },
+    ];
+    expect(turno.proposals).toHaveLength(1);
+    expect(turno.proposals[0].tool).toBe('proponer_tareas');
+    expect(turno.proposals[0].args.tareas).toHaveLength(2);
+  });
+
+  it('propone sin escribir nada: ya no hay turno de corrección, la tarjeta se explica sola', async () => {
+    const m = montar([
+      respuesta({
+        text: '',
+        calls: [
+          {
+            name: 'proponer_tarea',
+            args: { title: 'Revisar login', columnId: 'col-hacer', priority: 'LOW', porQue: 'x' },
+          },
+        ],
+      }),
+    ]);
+    (m.servicio as any).reportsClient = {
+      send: () =>
+        of({
+          proyecto: { nombre: 'Web' },
+          columnas: [{ id: 'col-hacer', nombre: 'To Do', orden: 0 }],
+          etiquetas: [],
+          tareas: [],
+        }),
+    };
+
+    const r = await m.servicio.chat({
+      ...payload,
+      message: 'Añade revisar el login',
+      projectId: PROYECTO.id,
+      proyectos: [],
+      permisos: { canCreateTask: true },
+    } as any);
+
+    expect(m.gemini.chat).toHaveBeenCalledTimes(1);
+    expect(r.reply).toMatch(/Te propongo una tarea/);
+  });
+
   it('si pregunta, solo pregunta: una pregunta y nada más en ese turno', async () => {
     const pregunta = (texto: string) => ({
       name: 'proponer_pregunta',

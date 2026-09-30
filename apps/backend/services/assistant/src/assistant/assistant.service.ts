@@ -814,7 +814,34 @@ export class AssistantService {
      */
     const propuestaFantasma =
       respuesta.calls.length === 0 && herramientas.length > 1 && PROPUESTA_PROMETIDA.test(reply);
-    if (invalidasCount > 0 || (respuesta.calls.length > 0 && !reply) || propuestaFantasma) {
+    /* 🔴 Ya no se corrige «propuso sin escribir nada»: la tarjeta se explica
+       sola (`textoPorDefecto` la nombra) y el turno de corrección, sin ver las
+       consultas del turno, volvía a proponer — un lote de 35 al lado de la
+       tarea suelta, en otra columna (2026-09-30, gpt-oss). Solo se corrige lo
+       que está mal: propuestas descartadas o prometidas y no hechas. */
+    /**
+     * Un lote que salió de una en una: piden un backlog, una lista, «todas»…
+     * y llega UNA `proponer_tarea`. gpt-oss lo hacía con el backlog adjunto:
+     * TEC-01 y nada más. Se le pide rehacerlo como `proponer_tareas`; al
+     * juntarlas (`fundirLotes`) la suelta entra en el lote o se descarta.
+     */
+    /* También lo pedido antes: tras «abrir proyecto», el turno que propone es
+       «Sigue con lo que te pedí», y el backlog venía dos mensajes atrás. */
+    const pedidoReciente = [
+      payload.message,
+      ...history
+        .filter((turno) => turno.role !== 'model')
+        .slice(-3)
+        .map((turno) => turno.text),
+    ].join('\n');
+    const pidenVarias =
+      adjuntos.length > 0 || /\b(backlog|todas|tareas|historias|lista)\b/i.test(pedidoReciente);
+    const loteDeUna =
+      pidenVarias &&
+      validadas.length === 1 &&
+      validadas[0].tool === 'proponer_tarea' &&
+      herramientas.some((h) => h.name === 'proponer_tareas');
+    if (invalidasCount > 0 || propuestaFantasma || loteDeUna) {
       /* ⚠️ **Este turno cuesta una llamada entera más**, y hasta ahora no se
          veía en ninguna parte: una conversación donde el modelo falla al
          validar en cada mensaje paga el doble sin que nadie pueda notarlo hasta
@@ -837,6 +864,11 @@ export class AssistantService {
         if (invalidasCount > 0) {
           feedback.push(
             'Has intentado usar herramientas, pero fallaron la validación (quizá referenciaste un id que no existe o usaste mal los parámetros) y fueron descartadas.',
+          );
+        }
+        if (loteDeUna) {
+          feedback.push(
+            'Has propuesto UNA sola tarea, pero te piden todas las del origen. Llama AHORA a proponer_tareas con TODAS ellas (incluida la que ya propusiste) en una sola llamada, en la misma columna, conservando su nomenclatura en el titulo y sus puntos en estimatePoints.',
           );
         }
         if (propuestaFantasma) {
@@ -2340,6 +2372,19 @@ export class AssistantService {
         if (puestos.has(columna)) continue;
         puestos.add(columna);
         salida.push(lotes.get(columna) as AssistantProposal);
+        continue;
+      }
+      /* Una suelta que ya está en algún lote del turno sobra, vaya a la columna
+         que vaya: es la misma tarea dos veces. */
+      if (
+        p.tool === 'proponer_tarea' &&
+        [...lotes.values()].some((l) =>
+          (l.args.tareas as { title: string }[]).some(
+            (t) => clave(t.title) === clave(p.args.title),
+          ),
+        )
+      ) {
+        this.log.warn('prax_tarea_suelta_repetida_en_lote');
         continue;
       }
       const lote = p.tool === 'proponer_tarea' ? lotes.get(String(p.args.columnId)) : undefined;
