@@ -16,6 +16,7 @@ import {
   type QuotaExceededDetails,
   QuotaKind,
   tokensPrax,
+  type AssistantModelo,
   type PasoDePensamiento,
 } from '@praxis/contracts';
 import { opcionesDeCliente } from '@praxis/local-transport';
@@ -38,6 +39,7 @@ import { type AmbitoDeOrganizacion, ConversationsService } from './conversations
 import { GeminiClient, type GeminiContent, GeminiError, type UsoDeGemini } from './gemini.client';
 import { instruccionSinProyecto, systemInstruction } from './prompt';
 import { QuotaService } from './quota.service';
+import { OpenRouterClient } from './openrouter.client';
 import { RouterDeContexto } from './router';
 import {
   intencionPorPalabras,
@@ -92,6 +94,8 @@ interface ChatPayload {
    * posible. Ver `QuotaService.iaDe` en el gateway.
    */
   organizationId?: string | null;
+  /** Con qué modelo responde. Sin él, Gemini. Ver `ASSISTANT_MODELOS`. */
+  modelo?: AssistantModelo;
   /**
    * Qué plan puso ese tope. Solo se usa para **explicarlo** al agotarse.
    *
@@ -314,6 +318,7 @@ export class AssistantService {
     private readonly adjuntos: AttachmentsService,
     private readonly consultas: ConsultasService,
     private readonly router: RouterDeContexto,
+    private readonly openrouter: OpenRouterClient,
   ) {
     this.reportsClient = ClientProxyFactory.create(opcionesDeCliente('REPORTS', this.config));
   }
@@ -471,6 +476,26 @@ export class AssistantService {
       contar(paso('lectura', `Leyendo «${adjunto.name}»`));
     }
 
+    /**
+     * Con qué modelo se responde.
+     *
+     * gpt-oss solo lee texto: con una imagen o un PDF delante, el turno lo
+     * responde Gemini. Y sin clave de OpenRouter en el servidor, también. Las
+     * dos cosas se dicen en el pensamiento: elegir un modelo y que conteste otro
+     * sin avisar es la clase de cosa que hace desconfiar del selector.
+     */
+    let modelo: AssistantModelo = 'gemini';
+    if (payload.modelo === 'gpt-oss') {
+      if (!this.openrouter.disponible) {
+        contar(paso('ruta', 'GPT-OSS no está configurado aquí', 'respondo con Gemini'));
+      } else if (archivos.length > 0) {
+        contar(paso('ruta', 'GPT-OSS no lee imágenes ni PDF', 'este turno lo responde Gemini'));
+      } else {
+        modelo = 'gpt-oss';
+      }
+    }
+    const llm: Pick<GeminiClient, 'chat'> = modelo === 'gpt-oss' ? this.openrouter : this.gemini;
+
     const mensajeConArchivos =
       textos.length > 0 ? `${payload.message}\n\n${textos}` : payload.message;
 
@@ -619,7 +644,7 @@ export class AssistantService {
         const agotado = vuelta >= MAX_VUELTAS_DE_CONSULTA || uso.entrada >= PRESUPUESTO_DE_ENTRADA;
         let respuesta: Awaited<ReturnType<GeminiClient['chat']>>;
         try {
-          respuesta = await this.gemini.chat(
+          respuesta = await llm.chat(
             {
               system: instruccion,
               history,
@@ -702,7 +727,7 @@ export class AssistantService {
 
       /* Se cobra lo que se gastó de verdad, en tokens PRAX (D8). Antes del turno
          de recuperación, que no se cobra: es culpa nuestra, no de quien pregunta. */
-      uso.tokensPrax = tokensPrax(uso);
+      uso.tokensPrax = tokensPrax(uso, modelo);
       cuota = await this.quota.consumir(
         payload.userId,
         payload.limiteMensual,
@@ -812,7 +837,7 @@ export class AssistantService {
           },
         ];
 
-        const segundaRespuesta = await this.gemini.chat(
+        const segundaRespuesta = await llm.chat(
           {
             system: briefing
               ? systemInstruction(
@@ -861,7 +886,7 @@ export class AssistantService {
 
     reply = reply || this.textoPorDefecto(validadas);
     for (const propuesta of validadas) contar(pasoDePropuesta(propuesta.tool, propuesta.args));
-    const pensamiento = { pasos, ms: Date.now() - inicio };
+    const pensamiento = { pasos, ms: Date.now() - inicio, modelo };
 
     /* Las propuestas vuelven **con su id**: es lo que necesita el cliente para
        marcarlas como aceptadas o descartadas después. */

@@ -971,3 +971,15 @@ Lo que el dueño del producto encontró al probar lo desplegado, y cómo se cerr
   desde `md`, y gestos de una vez por ánimo (saltito con chispas, temblor,
   respingo). Pensando: halo rápido, reflejo que cruza el cuerpo y tres chispas
   en órbita. Todo se apaga con `prefers-reduced-motion`.
+- **Segundo modelo: GPT-OSS 120B por OpenRouter.** Probado de punta a punta
+  en local el 2026-09-30: consulta los sprints, responde con los datos buenos
+  y propone estimaciones que validan. `openrouter.client.ts` traduce el
+  formato de Gemini al de OpenAI (y vuelve), así que el bucle no sabe con qué
+  modelo habla. Se elige en el compositor (`SelectorDeModelo`, recordado en
+  `localStorage`) y viaja como `modelo` en el cuerpo del turno. Solo texto:
+  con imagen o PDF responde Gemini, y lo dice. La cuota pesa lo que cuesta
+  (`PESOS_POR_MODELO`: ~0,12 la entrada y ~0,57 la salida, frente a 1 y 8).
+  Variables: **`PRAX_OPENROUTER_API_KEY`** (si falta, usa
+  `OPENROUTER_API_KEY`; sin ninguna, responde Gemini) y opcionales
+  `PRAX_OPENROUTER_MODEL` (`openai/gpt-oss-120b`) y
+  `PRAX_OPENROUTER_REASONING` (`low`).

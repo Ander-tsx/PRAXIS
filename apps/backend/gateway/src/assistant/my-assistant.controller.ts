@@ -199,6 +199,7 @@ export class MyAssistantController {
       message: body.message,
       conversationId: body.conversationId,
       attachmentIds: body.attachmentIds,
+      modelo: body.modelo,
       /* Vacío y no «los de algún proyecto»: no hay proyecto del que sacar
              miembros, y el mapa de permisos de un proyecto que no existe no
              significa nada. */

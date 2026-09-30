@@ -1,4 +1,9 @@
-import type { AssistantChatResult, ClaseDePaso, PasoDePensamiento } from '../api/assistant';
+import type {
+  AssistantChatResult,
+  AssistantModelo,
+  ClaseDePaso,
+  PasoDePensamiento,
+} from '../api/assistant';
 import { ApiError, type ApiErrorCode } from '../api/envelope';
 import { detallesDeCuota } from '../billing/planes';
 import type { RespuestaChat } from './actions';
@@ -48,6 +53,8 @@ export async function preguntarEnVivo(
     conversationId?: string;
     attachmentIds?: string[];
     organizationId?: string | null;
+    /** Sin él, o con `gemini`, no viaja: el servidor ya usa Gemini por defecto. */
+    modelo?: AssistantModelo;
   },
   oyentes: OyentesDelTurno = {},
 ): Promise<RespuestaChat> {
@@ -66,6 +73,7 @@ export async function preguntarEnVivo(
         /* Solo si los hay: un campo de más es un 400 (CLAUDE.md). */
         ...(opciones.attachmentIds?.length ? { attachmentIds: opciones.attachmentIds } : {}),
         ...(opciones.organizationId ? { organizationId: opciones.organizationId } : {}),
+        ...(opciones.modelo && opciones.modelo !== 'gemini' ? { modelo: opciones.modelo } : {}),
       }),
     });
   } catch {

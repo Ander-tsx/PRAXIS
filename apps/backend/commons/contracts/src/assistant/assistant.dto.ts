@@ -48,6 +48,20 @@ import {
  */
 export const ASSISTANT_LIMITE_POR_DEFECTO = 250_000;
 
+/**
+ * Los modelos que se pueden elegir en PRAX.
+ *
+ * - `gemini`: Gemini Flash, el de siempre. Lee imágenes y PDF.
+ * - `gpt-oss`: `openai/gpt-oss-120b` por OpenRouter. Mucho más barato y con
+ *   otra cuota de proveedor, así que sigue respondiendo cuando Gemini va
+ *   saturado. Solo texto: un turno con imagen o PDF lo responde Gemini.
+ *
+ * Sin elegir, `gemini`. Si el servidor no tiene la clave de OpenRouter, un turno
+ * que pide `gpt-oss` lo responde Gemini y lo dice en el pensamiento.
+ */
+export const ASSISTANT_MODELOS = ['gemini', 'gpt-oss'] as const;
+export type AssistantModelo = (typeof ASSISTANT_MODELOS)[number];
+
 /** Lo que Gemini dice que costó una llamada o un turno, en tokens de verdad. */
 export interface UsoDeTokens {
   entrada: number;
@@ -68,10 +82,32 @@ export interface UsoDeTokens {
  * Una sola función para el servicio que cobra y la pantalla que lo enseña: si
  * pesaran distinto, el contador diría una cosa y el 402 otra.
  */
-export function tokensPrax(uso: UsoDeTokens): number {
+export function tokensPrax(uso: UsoDeTokens, modelo: AssistantModelo = 'gemini'): number {
+  const peso = PESOS_POR_MODELO[modelo];
   const cache = Math.min(uso.cache, uso.entrada);
-  return Math.round((uso.entrada - cache) * 1 + cache * 0.25 + (uso.salida + uso.razonamiento) * 8);
+  return Math.round(
+    (uso.entrada - cache) * peso.entrada +
+      cache * peso.cache +
+      (uso.salida + uso.razonamiento) * peso.salida,
+  );
 }
+
+/**
+ * Cuánto pesa cada token según el modelo, con un token de entrada de Gemini
+ * Flash como unidad.
+ *
+ * gpt-oss sale de medir la factura de OpenRouter el 2026-09-30 (≈ $0,037 por
+ * millón de entrada y $0,17 de salida, frente a $0,30 y $2,50 de Flash). La
+ * cuota mide coste, no longitud: la misma respuesta con gpt-oss gasta mucho
+ * menos de la cuota, porque cuesta mucho menos.
+ */
+const PESOS_POR_MODELO: Record<
+  AssistantModelo,
+  { entrada: number; cache: number; salida: number }
+> = {
+  gemini: { entrada: 1, cache: 0.25, salida: 8 },
+  'gpt-oss': { entrada: 0.12, cache: 0.06, salida: 0.57 },
+};
 
 /** Los cuatro papeles de un mensaje del hilo. */
 export const ASSISTANT_ROLES = ['user', 'model'] as const;
@@ -360,6 +396,15 @@ export class AssistantChatBodyDto {
   @IsOptional()
   @IsUUID('4')
   organizationId?: string;
+
+  /** Con qué modelo responde este turno. Ver `ASSISTANT_MODELOS`. */
+  @ApiPropertyOptional({
+    enum: ASSISTANT_MODELOS,
+    description: 'Modelo del turno. Por defecto, gemini',
+  })
+  @IsOptional()
+  @IsIn(ASSISTANT_MODELOS)
+  modelo?: AssistantModelo;
 }
 
 /** Cuántos proyectos caben en «Recursos». El mismo tope que la lista que se ofrece. */
@@ -470,6 +515,8 @@ export interface PensamientoDePrax {
   pasos: PasoDePensamiento[];
   /** Cuánto duró el turno entero, en ms. */
   ms: number;
+  /** Qué modelo respondió. Ausente en los de antes: Gemini. */
+  modelo?: AssistantModelo;
 }
 
 /** Lo que ve el chat después de cada turno. */

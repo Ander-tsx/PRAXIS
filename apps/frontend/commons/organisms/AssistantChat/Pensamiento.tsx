@@ -1,7 +1,13 @@
 'use client';
 
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
-import { type ClaseDePaso, type PasoDePensamiento, formatearTokens } from '../../api/assistant';
+import {
+  type AssistantModelo,
+  type ClaseDePaso,
+  MODELOS_DE_PRAX,
+  type PasoDePensamiento,
+  formatearTokens,
+} from '../../api/assistant';
 
 /**
  * Lo que PRAX hace mientras piensa, y lo que hizo cuando ya ha respondido.
@@ -32,6 +38,7 @@ export function Pensamiento({
   enCurso,
   ms,
   tokens,
+  modelo,
   alAvanzar,
 }: {
   pasos: PasoDePensamiento[];
@@ -41,6 +48,8 @@ export function Pensamiento({
   ms?: number | undefined;
   /** Lo que costó la respuesta, para la línea compacta. */
   tokens?: number | undefined;
+  /** Qué modelo respondió. Solo se nombra si no es el de siempre. */
+  modelo?: AssistantModelo | undefined;
   /** Cada paso nuevo, para que el hilo lo siga hacia abajo. */
   alAvanzar?: (() => void) | undefined;
 }) {
@@ -67,6 +76,7 @@ export function Pensamiento({
   const resumen = [
     `${visibles.length} ${visibles.length === 1 ? 'paso' : 'pasos'}`,
     tokens ? `${formatearTokens(tokens)} tokens` : null,
+    modelo && modelo !== 'gemini' ? MODELOS_DE_PRAX.find((m) => m.id === modelo)?.nombre : null,
   ]
     .filter(Boolean)
     .join(' · ');

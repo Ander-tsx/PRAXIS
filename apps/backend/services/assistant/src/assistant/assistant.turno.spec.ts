@@ -33,7 +33,7 @@ function respuesta(parcial: Partial<GeminiReply>): GeminiReply {
 
 const PROYECTO = { id: '11111111-1111-4111-8111-111111111111', nombre: 'Web' };
 
-function montar(respuestas: GeminiReply[]) {
+function montar(respuestas: GeminiReply[], opciones: { openrouter?: boolean } = {}) {
   const llamadas: { params: any }[] = [];
   const gemini = {
     chat: jest.fn(async (params: any, alTexto?: (d: string) => void) => {
@@ -57,7 +57,14 @@ function montar(respuestas: GeminiReply[]) {
     contar: jest.fn(async () => 0),
     guardarTurno: jest.fn(async () => []),
   };
-  const adjuntos = { paraElTurno: jest.fn(async () => []) };
+  const adjuntos = { paraElTurno: jest.fn(async (): Promise<unknown[]> => []) };
+  /* El otro modelo responde lo mismo que Gemini: aquí solo importa a cuál se llama. */
+  const openrouter = {
+    disponible: opciones.openrouter ?? true,
+    chat: jest.fn(async (params: any, alTexto?: (d: string) => void) =>
+      gemini.chat(params, alTexto),
+    ),
+  };
   const config = { get: () => undefined, getOrThrow: () => '' } as unknown as ConfigService;
 
   const servicio = new AssistantService(
@@ -75,8 +82,9 @@ function montar(respuestas: GeminiReply[]) {
         motivo: 'prueba',
       }),
     } as any,
+    openrouter as any,
   );
-  return { servicio, gemini, consultas, llamadas, conversaciones, quota };
+  return { servicio, gemini, openrouter, consultas, llamadas, conversaciones, quota, adjuntos };
 }
 
 const payload = {
@@ -188,6 +196,49 @@ describe('El turno de PRAX: bucle de consultas', () => {
     expect(fin.tipo).toBe('fin');
     expect(fin.resultado.reply).toContain('¿Te refieres al tablero Web?');
     expect(fin.resultado.reply).toContain('No he podido terminar de consultar');
+  });
+
+  it('con modelo gpt-oss, el turno entero va por OpenRouter y la cuota pesa lo que cuesta', async () => {
+    const m = montar([respuesta({ text: 'Quedan 3.' })]);
+
+    const eventos = await lastValueFrom(
+      m.servicio.chatEnVivo({ ...payload, modelo: 'gpt-oss' } as any).pipe(toArray()),
+    );
+    const fin = eventos[eventos.length - 1] as Extract<EventoDeTurno, { tipo: 'fin' }>;
+
+    expect(m.openrouter.chat).toHaveBeenCalledTimes(1);
+    expect(fin.resultado.pensamiento?.modelo).toBe('gpt-oss');
+    /* 1000 de entrada ×0,12 + 60 de salida ×0,57, frente a 1480 con Gemini. */
+    expect(fin.resultado.uso?.tokensPrax).toBe(154);
+  });
+
+  it('gpt-oss sin clave en el servidor: responde Gemini y lo dice', async () => {
+    const m = montar([respuesta({ text: 'Quedan 3.' })], { openrouter: false });
+
+    const eventos = await lastValueFrom(
+      m.servicio.chatEnVivo({ ...payload, modelo: 'gpt-oss' } as any).pipe(toArray()),
+    );
+    const fin = eventos[eventos.length - 1] as Extract<EventoDeTurno, { tipo: 'fin' }>;
+
+    expect(m.openrouter.chat).not.toHaveBeenCalled();
+    expect(fin.resultado.pensamiento?.modelo).toBe('gemini');
+    expect(fin.resultado.pensamiento?.pasos[0].texto).toMatch(/no está configurado/);
+  });
+
+  it('gpt-oss no lee imágenes: un turno con una lo responde Gemini', async () => {
+    const m = montar([respuesta({ text: 'Veo un gráfico.' })]);
+    m.adjuntos.paraElTurno.mockResolvedValueOnce([
+      { id: 'a1', name: 'foto.png', mime: 'image/png', data: 'AAAA', pages: null, extract: null },
+    ]);
+
+    await lastValueFrom(
+      m.servicio
+        .chatEnVivo({ ...payload, modelo: 'gpt-oss', attachmentIds: ['a1'] } as any)
+        .pipe(toArray()),
+    );
+
+    expect(m.openrouter.chat).not.toHaveBeenCalled();
+    expect(m.gemini.chat).toHaveBeenCalled();
   });
 
   it('🔴 un modelo que no deja de consultar se corta, y la última vuelta va sin consultas', async () => {

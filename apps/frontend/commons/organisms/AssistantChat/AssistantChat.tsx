@@ -49,7 +49,7 @@ import { alpha, colors } from '../../tokens';
 import { useDock } from '../AppLayout/DockPanel';
 import { usePrax } from '../AppLayout/PraxContext';
 import { AmpliarPlan } from './AmpliarPlan';
-import { RecursosMenu } from './ComposerControls';
+import { RecursosMenu, SelectorDeModelo, useModeloDePrax } from './ComposerControls';
 import { ConversationHistory } from './ConversationHistory';
 import { MedidorDeTokens } from './MedidorDeTokens';
 import { Pensamiento } from './Pensamiento';
@@ -558,6 +558,7 @@ export function AssistantChat({
     avisoId: string;
   } | null>(null);
   const [cuota, setCuota] = useState<AssistantQuota | null>(cuotaInicial);
+  const [modelo, setModelo] = useModeloDePrax();
 
   const hiloRef = useRef<HTMLDivElement>(null);
   const seccionRef = useRef<HTMLElement>(null);
@@ -821,6 +822,7 @@ export function AssistantChat({
           conversationId: conversationId ?? undefined,
           attachmentIds: enviados.map((adjunto) => adjunto.id),
           organizationId: organizacionActivaId,
+          modelo,
         },
         {
           alEmpezar: (id) => {
@@ -1893,6 +1895,8 @@ export function AssistantChat({
 
                   <div className="flex-1" />
 
+                  <SelectorDeModelo modelo={modelo} onElegir={setModelo} disabled={pendiente} />
+
                   <button
                     type="submit"
                     /* El texto es obligatorio aunque haya archivos: ver
@@ -2047,6 +2051,7 @@ function Burbuja({
           enCurso={false}
           ms={mensaje.pensamiento.ms}
           tokens={mensaje.uso?.tokensPrax}
+          modelo={mensaje.pensamiento.modelo}
         />
       )}
       <div

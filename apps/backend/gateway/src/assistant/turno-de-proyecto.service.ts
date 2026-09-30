@@ -67,6 +67,7 @@ export class TurnoDeProyectoService {
              archivo es justo lo que quita de encima el tope de 1 MB de la
              Server Action. Ver `AssistantChatBodyDto.attachmentIds`. */
       attachmentIds: body.attachmentIds,
+      modelo: body.modelo,
       permisos,
       miembros,
       chat,

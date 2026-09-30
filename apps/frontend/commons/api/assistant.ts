@@ -780,7 +780,28 @@ export interface PasoDePensamiento {
 export interface PensamientoDePrax {
   pasos: PasoDePensamiento[];
   ms: number;
+  /** Qué modelo respondió. Ausente en los de antes: Gemini. */
+  modelo?: AssistantModelo;
 }
+
+/**
+ * Los modelos que se pueden elegir en el compositor. Espejo de
+ * `ASSISTANT_MODELOS` en los contratos.
+ */
+export type AssistantModelo = 'gemini' | 'gpt-oss';
+
+export const MODELOS_DE_PRAX: {
+  id: AssistantModelo;
+  nombre: string;
+  detalle: string;
+}[] = [
+  { id: 'gemini', nombre: 'Gemini Flash', detalle: 'El de siempre. Lee imágenes y PDF.' },
+  {
+    id: 'gpt-oss',
+    nombre: 'GPT-OSS 120B',
+    detalle: 'Rápido y mucho más barato. Solo texto: con imágenes o PDF responde Gemini.',
+  },
+];
 
 /**
  * Cuánta entrada tiene que reenviar el siguiente turno para que avisemos de que

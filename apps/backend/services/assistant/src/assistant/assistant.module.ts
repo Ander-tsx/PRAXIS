@@ -8,6 +8,7 @@ import { AssistantService } from './assistant.service';
 import { AttachmentsService } from './attachments.service';
 import { ConsultasService } from './consultas';
 import { ConversationsService } from './conversations.service';
+import { OpenRouterClient } from './openrouter.client';
 import { GeminiClient } from './gemini.client';
 import { QuotaService } from './quota.service';
 import { RouterDeContexto } from './router';
@@ -24,6 +25,7 @@ import { RouterDeContexto } from './router';
     AttachmentsService,
     QuotaService,
     GeminiClient,
+    OpenRouterClient,
   ],
 })
 export class AssistantModule {}

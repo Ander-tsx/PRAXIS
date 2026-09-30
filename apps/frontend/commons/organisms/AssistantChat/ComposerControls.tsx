@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { type AssistantModelo, MODELOS_DE_PRAX } from '../../api/assistant';
 import { type AlcanceDePrax, alcanceAction, guardarAlcanceAction } from '../../assistant/actions';
 
 /**
@@ -270,5 +271,129 @@ function IconoRecurso() {
         d="M4 7a2 2 0 012-2h3l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z"
       />
     </svg>
+  );
+}
+
+const CLAVE_DEL_MODELO = 'praxis_prax_modelo';
+
+/**
+ * El modelo con el que responde PRAX, recordado en este navegador.
+ *
+ * `localStorage` y no el servidor: es una preferencia de quien mira, sin nada
+ * que compartir ni que proteger, y si se pierde vuelve a Gemini, que es lo
+ * seguro. Leer y escribir van en `try` porque en una ventana privada o con los
+ * datos del sitio bloqueados el acceso mismo lanza.
+ */
+export function useModeloDePrax(): [AssistantModelo, (modelo: AssistantModelo) => void] {
+  const [modelo, setModelo] = useState<AssistantModelo>('gemini');
+  useEffect(() => {
+    try {
+      const guardado = window.localStorage.getItem(CLAVE_DEL_MODELO);
+      if (MODELOS_DE_PRAX.some((m) => m.id === guardado)) setModelo(guardado as AssistantModelo);
+    } catch {
+      /* Sin almacenamiento: se queda en Gemini. */
+    }
+  }, []);
+  const elegir = (nuevo: AssistantModelo) => {
+    setModelo(nuevo);
+    try {
+      window.localStorage.setItem(CLAVE_DEL_MODELO, nuevo);
+    } catch {
+      /* Sin almacenamiento: vale para esta visita. */
+    }
+  };
+  return [modelo, elegir];
+}
+
+/**
+ * El selector de modelo del compositor.
+ *
+ * Volvió en 2026-09-30 con **dos opciones que hacen algo**: F2 lo había quitado
+ * porque entonces solo había un modelo y el selector era de adorno. Cada una
+ * dice en qué se diferencia, y la limitación de gpt-oss —solo texto— se dice
+ * aquí, antes de elegirlo, no después de adjuntar una imagen.
+ */
+export function SelectorDeModelo({
+  modelo,
+  onElegir,
+  disabled = false,
+}: {
+  modelo: AssistantModelo;
+  onElegir: (modelo: AssistantModelo) => void;
+  disabled?: boolean;
+}) {
+  const { abierto, setAbierto, ref } = useMenuAbierto();
+  const actual = MODELOS_DE_PRAX.find((m) => m.id === modelo) ?? MODELOS_DE_PRAX[0];
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setAbierto((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={abierto}
+        aria-label={`Modelo: ${actual.nombre}`}
+        title="Modelo de PRAX"
+        className="flex h-8 items-center gap-1 rounded-lg px-2 font-sans text-xs font-medium text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary disabled:opacity-50"
+      >
+        {actual.nombre}
+        <svg
+          className={['h-3 w-3 transition-transform', abierto ? 'rotate-180' : ''].join(' ')}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.5}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="m6 15 6-6 6 6" />
+        </svg>
+      </button>
+
+      {abierto && (
+        <div
+          role="listbox"
+          aria-label="Modelo de PRAX"
+          data-tone="dark"
+          className="animate-desplegar-panel absolute right-0 bottom-full z-40 mb-2 flex w-72 flex-col rounded-xl border border-border bg-surface-elevated p-1 shadow-2xl"
+        >
+          {MODELOS_DE_PRAX.map((opcion) => {
+            const elegido = opcion.id === modelo;
+            return (
+              <button
+                key={opcion.id}
+                type="button"
+                role="option"
+                aria-selected={elegido}
+                onClick={() => {
+                  onElegir(opcion.id);
+                  setAbierto(false);
+                }}
+                className={[
+                  'flex items-start gap-2.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-surface',
+                  elegido ? 'bg-surface' : '',
+                ].join(' ')}
+              >
+                <span
+                  className={[
+                    'mt-1 h-1.5 w-1.5 shrink-0 rounded-full',
+                    elegido ? 'bg-primary' : 'bg-transparent',
+                  ].join(' ')}
+                  aria-hidden="true"
+                />
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="font-sans text-[13px] font-medium text-text-primary">
+                    {opcion.nombre}
+                  </span>
+                  <span className="font-sans text-[11px] leading-snug text-text-secondary">
+                    {opcion.detalle}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
