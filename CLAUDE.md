@@ -27,7 +27,7 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | [docs/PLAN-DOCUMENTOS.md](docs/PLAN-DOCUMENTOS.md) | Documentos dentro de los Espacios. **Etapa 2 entregada** (2026-09-25): editor en bloques (TipTap) **en tiempo real** (`collab-service`, Hocuspocus, puerto 3010), guardado como Yjs + copia en Markdown, compartir como Google Docs (`/d/<id>`), imágenes, versiones y documentos vinculados a tareas. Decisiones E1–E11 y sus trampas |
 | [docs/PLAN-FUSION-ZONAS.md](docs/PLAN-FUSION-ZONAS.md) | **Etapa cerrada** (2026-09-04, rama `feature/fusion-zonas`) — Multi-Zones fusionado en una sola aplicación. Por qué nacieron las zonas (un requisito de una materia, no una decisión de arquitectura), por qué no se sostenían —las 8 apps corrían en **un solo contenedor**, todo el coste y ningún beneficio— y cómo se hizo: ocho decisiones, seis invariantes y doce pasos (F0–F11), **ninguna URL cambiada**. Se conserva por el registro: cada paso anota qué trampa apareció, y varias no dan error —`revalidatePath` sin prefijo, `projectPath()`, un `redirect()` bajo un layout que ya hace streaming— |
 | [docs/PLAN-MONOLITO.md](docs/PLAN-MONOLITO.md) | **Etapa en curso** (2026-09-29): el backend pasa de once procesos a **uno**. La RAM de `praxis-api` era ~90% de la factura de Railway y no era un leak, sino el coste fijo de once V8 en reposo: 1.335 MB frente a 189. Transporte en proceso con la semántica exacta de TCP, fuera Alexa y las rutas muertas de Análisis, y un reposo que deja dormir al contenedor. Diez decisiones, el orden y cómo se despliega. **Va antes que el de PRAX** |
-| [docs/PLAN-PRAX-SEMIAGENTICO.md](docs/PLAN-PRAX-SEMIAGENTICO.md) | **F0–F10 hechas** (2026-09-29, rama `feature/prax-semiagentico`, pendiente de revisión) — refactor de PRAX, frontend y **backend** por encargo: bucle de consultas de solo lectura (**sigue proponiendo, nunca ejecuta**), turno por SSE, «Recursos» guardado en servidor y atado a la organización activa, cobro en tokens ponderados, Jev como router opcional detrás de un interruptor, `ChatMessage.origin`, @PRAX en el chat grupal y el rediseño de ambos chats. Diecisiete decisiones (D1–D17), seis invariantes y once fases. ⚠️ Destapa que **el corte de 15 s del cliente** es la causa más probable de «PRAX no responde». **Se sigue estrictamente** |
+| [docs/PLAN-PRAX-SEMIAGENTICO.md](docs/PLAN-PRAX-SEMIAGENTICO.md) | **En `main` y desplegado.** Al final, el **registro del pulido del 2026-09-30** —foco de proyecto, pensamiento visible, anillo de tokens, **segundo modelo gpt-oss por OpenRouter**, lotes `proponer_tareas`/`proponer_borrados`, sesión caducada en el proxy— con **cómo retomarlo** y lo pendiente. **Léelo antes de tocar PRAX.** Origen: F0–F10 (2026-09-29) — refactor de PRAX, frontend y **backend** por encargo: bucle de consultas de solo lectura (**sigue proponiendo, nunca ejecuta**), turno por SSE, «Recursos» guardado en servidor y atado a la organización activa, cobro en tokens ponderados, Jev como router opcional detrás de un interruptor, `ChatMessage.origin`, @PRAX en el chat grupal y el rediseño de ambos chats. Diecisiete decisiones (D1–D17), seis invariantes y once fases. ⚠️ Destapa que **el corte de 15 s del cliente** es la causa más probable de «PRAX no responde». **Se sigue estrictamente** |
 | [docs/PRAX-MCP-SEGUNDA-ITERACION.md](docs/PRAX-MCP-SEGUNDA-ITERACION.md) | Nota interna, sin decidir: Praxis como servidor MCP (Claude usando Praxis) frente a PRAX como cliente MCP. Qué falta —OAuth, sobre todo— y qué choca con «propone; nunca ejecuta» |
 | [docs/frontend/PLAN-PRAX-AGENTICO.md](docs/frontend/PLAN-PRAX-AGENTICO.md) | 🚫 **Sustituido** por el de arriba. Se conserva por el diagnóstico en frío y la ficha de Jev. Era: **etapa por empezar** (2026-09-25). Dos cosas sin tocar todavía: por qué PRAX no responde desde la migración a organizaciones (diagnóstico en frío, sin reproducir — tres hipótesis con `file:line`, nada confirmado) y la idea de un modelo barato de decisión («jev», sin verificar qué modelo es) delante del modelo real para recortar contexto. Incluye por qué «volver agéntico» a PRAX no puede chocar con «el asistente propone; nunca ejecuta» sin decidirlo antes |
 | [kyloo-design/SKILL.md](kyloo-design/SKILL.md) | **Antes de tocar cualquier pantalla.** Cómo se componen: filas en vez de tarjetas, tipografía como jerarquía, activo por tono. ⚠️ **Su paleta, sus radios y sus fuentes están revertidos** (`3fa9b87`) y no se reaplican sin pedirlo — lee el aviso de su cabecera. §13 es la de dentro de la aplicación |
@@ -127,6 +127,11 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
 - cada zona monta `src/app/api/gateway/[...path]/route.ts` con `createGatewayProxy()`
 
 `@praxis/commons/auth` es código de servidor: **nunca** lo importes desde el índice raíz ni desde un componente cliente. Detalle en ESTADO-ACTUAL §14.
+
+⚠️ **La cookie `praxis_session` caduca con el JWT (15 min) y el navegador la
+borra.** `createGatewayProxy` renueva con el refresh token **aunque falte** —antes
+respondía «No hay sesión activa» con la sesión viva— y guarda la cookie nueva
+también en los flujos SSE. Lo fija `web/src/lib/proxy-sesion.spec.ts`.
 
 ## Trampas del backend que ya nos han mordido
 
@@ -429,6 +434,16 @@ Desde la etapa semiagéntica ([PLAN-PRAX-SEMIAGENTICO](docs/PLAN-PRAX-SEMIAGENTI
 - **El contenido de un documento lo aplica el editor**, no una propuesta por
   REST (E4 de PLAN-DOCUMENTOS): la revisión se deja en `sessionStorage` y la
   aplica `RevisionDePrax` como una versión restaurada.
+- **Hay dos modelos y se eligen en el compositor**: Gemini (por defecto) y
+  gpt-oss-120b por OpenRouter (`openrouter.client.ts`, `PRAX_OPENROUTER_API_KEY`).
+  El adaptador traduce al formato de Gemini, así que el bucle no sabe con cuál
+  habla. ⚠️ **gpt-oss escribe las llamadas como texto** (JSON, `<proponer_x{…}>`):
+  el adaptador las retiene y las convierte. Una forma nueva de fuga se tapa ahí,
+  con su test, no solo en el prompt. Con imagen o PDF responde Gemini.
+- **Varias tareas son UNA propuesta**: `proponer_tareas` y `proponer_borrados`.
+  `fundirLotes` junta las sueltas en el lote de su columna, y un turno con una
+  pregunta se queda solo con esa pregunta. Registro y trampas, al final de
+  PLAN-PRAX-SEMIAGENTICO.
 - **En local, sin clave de Gemini válida, se usa el falso**
   (`e2e/fixtures/gemini-falso.mjs`, `GEMINI_BASE_URL=http://127.0.0.1:3999`).
   Sus respuestas son un guion fijo —«Déjame mirar las tareas…»—, así que una

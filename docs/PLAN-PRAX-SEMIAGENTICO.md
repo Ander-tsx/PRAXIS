@@ -925,7 +925,7 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
 
 ---
 
-## Pulido tras el primer uso en producción (2026-09-30, rama `feature/prax-pulido`)
+## Pulido tras el primer uso en producción (2026-09-30, ya en `main` y desplegado)
 
 Lo que el dueño del producto encontró al probar lo desplegado, y cómo se cerró.
 
@@ -983,3 +983,148 @@ Lo que el dueño del producto encontró al probar lo desplegado, y cómo se cerr
   `OPENROUTER_API_KEY`; sin ninguna, responde Gemini) y opcionales
   `PRAX_OPENROUTER_MODEL` (`openai/gpt-oss-120b`) y
   `PRAX_OPENROUTER_REASONING` (`low`).
+
+
+### Segunda tanda: probado por el dueño en producción (2026-09-30, `a60db0e2`…`f9136924`)
+
+Todo en `main` y desplegado. Cada fallo lo encontró el dueño del producto
+usando PRAX de verdad con un backlog `.md` de 35 tareas; entre paréntesis, el
+commit. Casi todo está en `assistant.service.ts`, `openrouter.client.ts`,
+`prompt.ts` y `ProposalCard.tsx`, y cada arreglo lleva su prueba en
+`assistant.turno.spec.ts` u `openrouter.client.spec.ts`.
+
+**Sesión**
+
+- 🔴 **«No hay sesión activa» con la sesión viva** (`a60db0e2`). La cookie
+  `praxis_session` caduca con el JWT (15 min) y el navegador la borra;
+  `createGatewayProxy` respondía 401 sin mirar el refresh token. Solo se
+  arreglaba navegando, porque el guard de página sí renueva. Ahora renueva si
+  falta la cookie, y guarda la nueva **también en la rama SSE**, que antes la
+  tiraba. Prueba: `web/src/lib/proxy-sesion.spec.ts`.
+
+**Sin proyecto elegido**
+
+- 🔴 **El prompt le prohibía mirar** (`a60db0e2`). `instruccionSinProyecto`
+  decía «No sabes NADA de lo que hay dentro» de los proyectos, de antes de que
+  existieran las consultas: PRAX no encontraba «el tablero Desarrollo» y
+  proponía crear un proyecto nuevo. Ahora sabe que puede consultar, que debe
+  proponer abrir el proyecto que encaja y que no debe crear uno nuevo si cabe
+  en uno existente.
+- **Índice de espacios y tableros** (`be3152e6`). Sin foco, los proyectos de
+  «Recursos» llegan con los nombres de sus espacios y tableros
+  (`ConsultasService.indiceDeProyectos`, hasta 10 proyectos, 3 s). Así
+  «Desarrollo» se encuentra sin depender de que el modelo decida consultar. En
+  el pensamiento sale como «Mirando tus proyectos».
+- **Primero el proyecto** (`f9136924`). Sin proyecto abierto no se pregunta
+  por espacios ni tableros: se propone abrir el proyecto, y las dudas de
+  tablero se resuelven ya dentro.
+- **Aceptar «Abrir un proyecto» continúa solo** (`a60db0e2`, `e6f94273`).
+  `abrirYContinuar` deja en `sessionStorage` (`prax-continuar:<conversación>`)
+  el mensaje «Listo, ya abrí «X». Sigue con lo que te pedí.»; un efecto lo
+  manda cuando el foco ya es ese proyecto y el hilo terminó de cargar
+  (`cargando` evita que la recarga desde la URL pise la burbuja). En el panel
+  flotante la tarjeta no tenía ni botón «Aceptar».
+
+**Propuestas en lote**
+
+- **`proponer_tareas`** (`22b3bfa2`): una propuesta con todas las tareas
+  (título, descripción, prioridad y `estimatePoints`) en una columna, con
+  `alBacklog` para dejarlas sin sprint. `TaskBatchProposalCard` las lista y
+  `aceptarLoteDeTareasAction` las crea una a una por
+  `POST /boards/:id/tasks`. Tope `MAX_TAREAS_POR_LOTE = 60`. Antes, los dos
+  modelos proponían de una en una y prometían «la siguiente».
+- **`proponer_borrados`** (`f9136924`): igual para borrar, con la doble
+  confirmación del borrado suelto; `DELETE /tasks/:id` una a una. Solo valen
+  los ids que PRAX ha visto (inventario o consultas del turno). Tope
+  `MAX_BORRADOS_POR_LOTE = 200`.
+- Los **puntos** también en `proponer_tarea` suelta (`estimatePoints`); antes
+  acababan en la descripción («Estimación: 3 SP»).
+- **`fundirLotes`** (`b80c5ee5`, `8ebf282d`): por columna, varios lotes son
+  uno y las sueltas entran en él sin repetir (por título o por su código,
+  «TEC-01»). Una suelta que ya está en cualquier lote del turno se descarta.
+- **Si pregunta, solo pregunta** (`be3152e6`): con un `proponer_pregunta` en
+  el turno queda solo la primera pregunta y nada más; la respuesta dispara el
+  turno que propone. Salían «¿en qué tablero?» y las 35 tareas en la misma
+  tarjeta.
+- **Tableros con el mismo nombre** (`f9136924`). reports-service nombra
+  «Espacio › Tablero» cuando el nombre se repite, en el inventario y en
+  `columnas[].tablero`, que es de donde salen `boardName` y `tablero` de las
+  tarjetas. Con «Macrofit» en Desarrollo y en Test, las tareas se cargaron en
+  el que no era y la tarjeta no permitía verlo.
+
+**El turno de corrección**
+
+- 🔴 **Ya no se lanza por «propuso sin escribir texto»** (`8ebf282d`). La
+  tarjeta se explica sola (`textoPorDefecto`), y ese turno —que no ve las
+  consultas del turno— volvía a proponer en otra columna: de ahí salían el lote
+  de 35 junto a la tarea suelta. Queda para propuestas descartadas, propuestas
+  prometidas y no hechas, y el **lote de una**: si piden varias (adjunto, o
+  «backlog», «todas», «tareas», también en los 3 mensajes anteriores) y llega
+  una sola `proponer_tarea`, se le pide el `proponer_tareas` completo.
+- No escribe en vivo, y su texto solo se añade si no había ninguno o si hay que
+  explicar un descarte; antes repetía el párrafo (`22b3bfa2`).
+- La deduplicación de propuestas ignora `porQue` (`e6f94273`): salían dos
+  «Abrir Aura» con distinta explicación.
+
+**Salida cortada**
+
+- `maxOutputTokens` es siempre `MAX_TOKENS_PLANTILLA` (8192) (`a60db0e2`). Con
+  2048 en modo proyecto, el razonamiento de Gemini se comía el presupuesto y la
+  respuesta acababa a media frase. Si aun así se corta (`MAX_TOKENS` en Gemini,
+  `length` en OpenRouter), se añade «Dime «sigue» y continúo».
+
+**gpt-oss (OpenRouter)**
+
+Escribe las llamadas a herramientas **como texto**, cada vez de una forma
+distinta: JSON suelto, ```json, `<proponer_pregunta{…}>`, «(proponer_pregunta)»
+y listas de opciones. Además usaba voseo. Lo que lo contiene, todo en
+`openrouter.client.ts`:
+
+- `inicioDeJson` retiene sin pintar desde que asoma una de esas formas a
+  principio de línea;
+- `llamadasDelTexto` la convierte en la llamada que debió ser si encaja con
+  una herramienta declarada, o la descarta;
+- `REGLAS_DE_FORMATO` va al final del sistema: tutear, no escribir JSON ni
+  nombres de herramientas, lotes en una llamada;
+- razonamiento `medium`, porque con `low` se saltaba las herramientas;
+- `provider.sort = 'throughput'`, porque un turno tardó 106 s.
+
+**Una forma nueva de fuga se añade ahí, con su test, no solo en el prompt.**
+
+### Cómo retomarlo
+
+- Producción: `main` = `f9136924`. Railway (`KYLOO SPACE / production`) tiene
+  `GEMINI_MODEL=gemini-flash-latest`,
+  `GEMINI_MODEL_FALLBACK=gemini-flash-lite-latest` y `PRAX_OPENROUTER_API_KEY`
+  (la pone el dueño; nunca va en archivos versionados).
+- Local: la clave de OpenRouter de pruebas va en
+  `apps/backend/services/assistant/.env` como `PRAX_OPENROUTER_API_KEY`. El
+  dueño la **pausa** entre pruebas, y pausada da 401 «User not found»: pídele
+  que la active. Gemini en local es el falso
+  (`GEMINI_BASE_URL=http://127.0.0.1:3999`): sirve para probar la mecánica, no
+  el comportamiento del modelo. Sus directivas (`#propon`, `#consulta`) van
+  **al principio de una línea**.
+- **Copia de la base antes de desplegar una migración**: `praxis-db` no tiene
+  proxy público; se entra por SSH con `~/.ssh/praxis_railway` (clave
+  `praxis-backups`, ya registrada en Railway). El usuario sale de
+  `railway ssh config -s praxis-db -i ~/.ssh/praxis_railway --dry-run`:
+  `ssh -i ~/.ssh/praxis_railway <usuario>@ssh.railway.com 'pg_dump -U "$PGUSER" -d "$PGDATABASE" --no-owner | gzip -c' > ~/praxis-backups/<fecha>.sql.gz`.
+  La última copia, de antes de la migración `pensamiento_de_prax`, está en
+  `~/praxis-backups/`.
+- El dueño prefiere **revisión a ojo y push a `main`** para probar él en
+  producción. Las e2e completas tardan ~40 min: correrlas al cerrar un bloque,
+  no por cambio.
+
+### Pendiente
+
+- 🔴 **Sin probar en producción** tras `f9136924`: el borrado en lote, «Test ›
+  Macrofit» en las tarjetas y el orden «primero el proyecto».
+- La lista de tareas que recibe PRAX puede venir recortada
+  (`INVENTARIO_MAX_CHARS`). Con muchas tareas, un «borra todas» puede quedarse
+  corto si el modelo no consulta antes; si pasa, conviene un borrado por
+  alcance (tablero o columna) que resuelva la lista en el servidor.
+- e2e en rojo que **ya estaban en `main`**: `07-reglas` (8), `09-scrum:55` y
+  `04-invitaciones:22`. Es la Server Action que no confirma su resultado ~50 %
+  de las veces; no es de PRAX.
+- La imagen Docker del frontend no se pudo probar en local (se llenó el disco
+  de Docker); Railway la construye bien.
