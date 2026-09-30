@@ -940,6 +940,8 @@ export class AssistantService {
       validadas = [preguntas[0]];
     }
 
+    validadas = this.fundirLotes(validadas);
+
     reply = reply || this.textoPorDefecto(validadas);
     for (const propuesta of validadas) contar(pasoDePropuesta(propuesta.tool, propuesta.args));
     const pensamiento = { pasos, ms: Date.now() - inicio, modelo };
@@ -2295,6 +2297,76 @@ export class AssistantService {
   private soloConocidos(valor: unknown, conocidos: Set<string>): string[] {
     if (!Array.isArray(valor)) return [];
     return valor.map(String).filter((id) => conocidos.has(id));
+  }
+
+  /**
+   * Un lote y tareas sueltas para la misma columna son **una** propuesta.
+   *
+   * 🔴 gpt-oss devolvía en el mismo turno «TEC-01» suelta y el lote de 35 (con
+   * TEC-01 dentro): dos tarjetas con flechas, y aceptar las dos creaba TEC-01
+   * dos veces (2026-09-30). Aquí, por columna: los lotes se juntan en uno y las
+   * sueltas entran en él, sin repetir las que ya están por título (o por su
+   * nomenclatura, «TEC-01», si la tienen). Lo que va a otra columna no se toca.
+   */
+  private fundirLotes(propuestas: AssistantProposal[]): AssistantProposal[] {
+    const lotes = new Map<string, AssistantProposal>();
+    for (const p of propuestas) {
+      if (p.tool !== 'proponer_tareas') continue;
+      const columna = String(p.args.columnId);
+      const previo = lotes.get(columna);
+      if (!previo) {
+        lotes.set(columna, {
+          ...p,
+          args: { ...p.args, tareas: [...(p.args.tareas as unknown[])] },
+        });
+      } else {
+        (previo.args.tareas as unknown[]).push(...(p.args.tareas as unknown[]));
+      }
+    }
+    if (lotes.size === 0) return propuestas;
+
+    const clave = (titulo: unknown) => {
+      const t = String(titulo ?? '')
+        .trim()
+        .toLowerCase();
+      const codigo = /^([a-z]{1,6}-\d{1,4})\b/.exec(t)?.[1];
+      return codigo ?? t;
+    };
+    const salida: AssistantProposal[] = [];
+    const puestos = new Set<string>();
+    for (const p of propuestas) {
+      if (p.tool === 'proponer_tareas') {
+        const columna = String(p.args.columnId);
+        if (puestos.has(columna)) continue;
+        puestos.add(columna);
+        salida.push(lotes.get(columna) as AssistantProposal);
+        continue;
+      }
+      const lote = p.tool === 'proponer_tarea' ? lotes.get(String(p.args.columnId)) : undefined;
+      if (!lote) {
+        salida.push(p);
+        continue;
+      }
+      const { columnId: _c, columnName: _n, boardName: _b, porQue: _p, ...tarea } = p.args;
+      const tareas = lote.args.tareas as { title: string }[];
+      if (!tareas.some((t) => clave(t.title) === clave(tarea.title))) {
+        tareas.push(tarea as { title: string });
+      }
+      this.log.warn('prax_tarea_suelta_fundida_en_lote');
+    }
+    /* Sin repetidas dentro del lote, y con el tope de siempre. */
+    for (const lote of lotes.values()) {
+      const vistas = new Set<string>();
+      lote.args.tareas = (lote.args.tareas as { title: string }[])
+        .filter((t) => {
+          const k = clave(t.title);
+          if (vistas.has(k)) return false;
+          vistas.add(k);
+          return true;
+        })
+        .slice(0, MAX_TAREAS_POR_LOTE);
+    }
+    return salida;
   }
 
   /** Puntos de estimación: entero de 0 a 999, o `null` si no hay o no vale. */

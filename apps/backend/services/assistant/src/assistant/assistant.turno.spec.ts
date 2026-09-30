@@ -303,6 +303,67 @@ describe('El turno de PRAX: bucle de consultas', () => {
     ]);
   });
 
+  it('una tarea suelta y un lote para la misma columna salen como UN lote, sin repetir', async () => {
+    const m = montar([
+      respuesta({
+        text: 'Aquí van.',
+        calls: [
+          {
+            name: 'proponer_tarea',
+            args: {
+              title: 'TEC-01: Configurar Flutter',
+              columnId: 'col-hacer',
+              priority: 'HIGH',
+              porQue: 'x',
+            },
+          },
+          {
+            name: 'proponer_tareas',
+            args: {
+              columnId: 'col-hacer',
+              porQue: 'Backlog',
+              tareas: [
+                { title: 'TEC-01: Configurar proyecto Flutter y repo' },
+                { title: 'TEC-02: Spike' },
+              ],
+            },
+          },
+          {
+            name: 'proponer_tarea',
+            args: { title: 'Extra', columnId: 'col-hacer', priority: 'LOW', porQue: 'y' },
+          },
+        ],
+      }),
+    ]);
+    (m.servicio as any).reportsClient = {
+      send: () =>
+        of({
+          proyecto: { nombre: 'Web' },
+          columnas: [{ id: 'col-hacer', nombre: 'To Do', orden: 0 }],
+          etiquetas: [],
+          tareas: [],
+        }),
+    };
+
+    await m.servicio.chat({
+      ...payload,
+      projectId: PROYECTO.id,
+      proyectos: [],
+      permisos: { canCreateTask: true },
+    } as any);
+
+    const [turno] = m.conversaciones.guardarTurno.mock.calls[0] as unknown as [
+      { proposals: { tool: string; args: Record<string, any> }[] },
+    ];
+    expect(turno.proposals).toHaveLength(1);
+    expect(turno.proposals[0].tool).toBe('proponer_tareas');
+    expect(turno.proposals[0].args.tareas.map((t: { title: string }) => t.title)).toEqual([
+      'TEC-01: Configurar proyecto Flutter y repo',
+      'TEC-02: Spike',
+      'Extra',
+    ]);
+  });
+
   it('si pregunta, solo pregunta: una pregunta y nada más en ese turno', async () => {
     const pregunta = (texto: string) => ({
       name: 'proponer_pregunta',
