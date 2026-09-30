@@ -152,6 +152,19 @@ export default defineConfig({
       testDir: './tests/ui',
       use: {
         ...devices['Desktop Chrome'],
+        /**
+         * 🔴 **Chromium completo, no `chromium-headless-shell`.** Es el que usa
+         * Playwright por defecto en modo sin ventana, y no produce fotogramas:
+         * `requestAnimationFrame` no avanza y una View Transition no termina
+         * nunca. React 19.2 revela lo que llega por streaming dentro de una, así
+         * que en esas pruebas la página quedaba a medias —el contenido servido,
+         * oculto en un `<div hidden id="S:…">` al final del `<body>`, y una copia
+         * pintada por el cliente— y **toda transición posterior esperaba a ese
+         * límite pendiente**: el resultado de una Server Action no llegaba nunca,
+         * el panel de «Crear regla» no se cerraba y `getByText` encontraba el
+         * texto dos veces. Ninguna persona con la pestaña a la vista lo sufre.
+         */
+        channel: 'chromium',
         baseURL: SHELL_URL,
         /**
          * El shell y las zonas se sirven en HTTP en local. Sin esto, la cookie
