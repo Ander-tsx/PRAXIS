@@ -76,6 +76,7 @@ const PROPUESTAS: Record<string, string> = {
   proponer_mensaje_privado: 'Mensaje privado',
   proponer_marcar_pasos: 'Marcar pasos',
   proponer_borrado: 'Borrar',
+  proponer_borrados: 'Borrar tareas',
   proponer_sprint: 'Crear sprint',
   proponer_iniciar_sprint: 'Iniciar sprint',
   proponer_planificacion: 'Planificar sprint',

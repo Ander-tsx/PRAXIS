@@ -21,6 +21,7 @@ import type {
   SprintProposal,
   StartSprintProposal,
   TaskBatchProposal,
+  DeleteBatchProposal,
   TaskProposal,
 } from '../api/assistant';
 import type {
@@ -963,6 +964,43 @@ export async function aceptarBorradoAction(
   } catch (error) {
     return { error: describe(error, 'No se pudo borrar la tarea.'), borrada: null };
   }
+}
+
+/**
+ * Borrar un lote de tareas (`proponer_borrados`), una a una por
+ * `DELETE /tasks/:id` —el mismo endpoint y el mismo permiso que el menú de la
+ * tarea—. Cada una se comprueba antes contra el proyecto: la lista ha pasado
+ * por el navegador. No se para al primer fallo; se dice cuáles no se borraron.
+ */
+export async function aceptarBorradosAction(
+  projectId: string,
+  propuesta: DeleteBatchProposal,
+): Promise<{ error: string | null; borradas: number; fallidas: string[] }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', borradas: 0, fallidas: [] };
+
+  let borradas = 0;
+  const fallidas: string[] = [];
+  for (const { taskId, taskTitle } of propuesta.tareas) {
+    const encontrada = await tareaDelProyecto(api, projectId, String(taskId ?? '').trim());
+    if ('error' in encontrada) {
+      /* Ya no existe: para quien quería borrarla, es lo mismo. */
+      if (encontrada.error === 'Esa tarea ya no existe.') borradas += 1;
+      else fallidas.push(taskTitle);
+      continue;
+    }
+    try {
+      await api.delete(`/tasks/${encontrada.tarea.id}`);
+      borradas += 1;
+    } catch {
+      fallidas.push(taskTitle);
+    }
+  }
+  return {
+    error: borradas === 0 ? 'No se pudo borrar ninguna tarea.' : null,
+    borradas,
+    fallidas,
+  };
 }
 
 /**

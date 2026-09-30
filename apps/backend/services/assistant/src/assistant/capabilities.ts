@@ -2,6 +2,7 @@ import {
   PROPONER_ASIGNACION,
   PROPONER_AUTOMATIZACION,
   PROPONER_BORRADO,
+  PROPONER_BORRADOS,
   PROPONER_CHECKLIST,
   PROPONER_COMENTARIO,
   PROPONER_DOCUMENTO,
@@ -130,7 +131,7 @@ export const CAPACIDADES: Capacidad[] = [
   {
     que: 'Borrar tareas (no se deshace)',
     permisos: ['canDeleteTask'],
-    herramientas: [PROPONER_BORRADO],
+    herramientas: [PROPONER_BORRADO, PROPONER_BORRADOS],
     donde: 'el menú «⋯» del panel de la tarea',
   },
   {

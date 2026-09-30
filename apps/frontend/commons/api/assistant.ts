@@ -186,6 +186,18 @@ export interface DeleteProposal extends SobreTarea {
   cerrada?: boolean;
 }
 
+/** `proponer_borrados`: varias tareas en una propuesta (2026-09-30). */
+export interface DeleteBatchProposal {
+  tareas: {
+    taskId: string;
+    taskTitle: string;
+    columna?: string;
+    tablero?: string;
+    cerrada?: boolean;
+  }[];
+  porQue?: string;
+}
+
 /**
  * `proponer_mensaje`. Se envía al chat del equipo, a nombre de quien acepta.
  *
@@ -599,6 +611,12 @@ export function isTaskProposal(
   propuesta: AssistantProposal,
 ): propuesta is AssistantProposal & { args: TaskProposal } {
   return propuesta.tool === 'proponer_tarea' && typeof propuesta.args.title === 'string';
+}
+
+export function isDeleteBatchProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: DeleteBatchProposal } {
+  return propuesta.tool === 'proponer_borrados' && Array.isArray(propuesta.args.tareas);
 }
 
 export function isTaskBatchProposal(

@@ -459,6 +459,62 @@ describe('El turno de PRAX: bucle de consultas', () => {
     expect(r.reply).toMatch(/Te propongo una tarea/);
   });
 
+  it('borrar varias: una propuesta con las conocidas; las que no están en el inventario, fuera', async () => {
+    const m = montar([
+      respuesta({
+        text: 'Las borro todas.',
+        calls: [
+          {
+            name: 'proponer_borrados',
+            args: { taskIds: ['t1', 't2', 'inventada'], porQue: 'Duplicadas' },
+          },
+        ],
+      }),
+    ]);
+    (m.servicio as any).reportsClient = {
+      send: () =>
+        of({
+          proyecto: { nombre: 'Web' },
+          columnas: [{ id: 'col-hacer', nombre: 'To Do', orden: 0 }],
+          etiquetas: [],
+          tareas: [
+            {
+              id: 't1',
+              titulo: 'TEC-01',
+              columna: 'To Do',
+              tablero: 'Test › Macrofit',
+              cerrada: false,
+            },
+            {
+              id: 't2',
+              titulo: 'TEC-02',
+              columna: 'To Do',
+              tablero: 'Test › Macrofit',
+              cerrada: false,
+            },
+          ],
+        }),
+    };
+
+    await m.servicio.chat({
+      ...payload,
+      projectId: PROYECTO.id,
+      proyectos: [],
+      permisos: { canDeleteTask: true },
+    } as any);
+
+    const [turno] = m.conversaciones.guardarTurno.mock.calls[0] as unknown as [
+      { proposals: { tool: string; args: Record<string, any> }[] },
+    ];
+    expect(turno.proposals).toHaveLength(1);
+    expect(turno.proposals[0].tool).toBe('proponer_borrados');
+    expect(turno.proposals[0].args.tareas.map((t: { taskId: string }) => t.taskId)).toEqual([
+      't1',
+      't2',
+    ]);
+    expect(turno.proposals[0].args.tareas[0].tablero).toBe('Test › Macrofit');
+  });
+
   it('si pregunta, solo pregunta: una pregunta y nada más en ese turno', async () => {
     const pregunta = (texto: string) => ({
       name: 'proponer_pregunta',

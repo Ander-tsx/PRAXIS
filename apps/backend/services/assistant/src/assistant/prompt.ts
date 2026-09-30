@@ -775,6 +775,10 @@ export function instruccionSinProyecto(
                   'que no existe.',
               ]
             : []),
+          'PRIMERO EL PROYECTO: sin proyecto abierto, NO preguntes por espacios ni ' +
+            'tableros. Si lo que nombran esta en un solo proyecto, propon abrir ese ' +
+            'proyecto directamente; las dudas de espacio o tablero se preguntan despues, ' +
+            'ya dentro, con sus tableros delante.',
           'SI LA PETICION NECESITA UN PROYECTO (crear o mover tareas, cargar un backlog, ' +
             'planificar): averigua en cual encaja' +
             (puedeConsultar ? ' consultando' : '') +

@@ -26,6 +26,7 @@ import type {
   TaskProposal,
   TemplateProposal,
   TaskBatchProposal,
+  DeleteBatchProposal,
 } from '../../api/assistant';
 import { claveDeRevisionDePrax } from '../../api/assistant';
 import {
@@ -39,6 +40,7 @@ import {
   aceptarAsignacionAction,
   aceptarAutomatizacionAction,
   aceptarBorradoAction,
+  aceptarBorradosAction,
   aceptarChecklistAction,
   aceptarComentarioAction,
   aceptarDocumentoAction,
@@ -150,6 +152,7 @@ const FAMILIA_DE_HERRAMIENTA: Record<string, Familia> = {
   proponer_pregunta: 'analizar',
   proponer_abrir_proyecto: 'analizar',
   proponer_borrado: 'destruir',
+  proponer_borrados: 'destruir',
 };
 
 export function familiaDe(tool: string): Familia {
@@ -902,6 +905,108 @@ export function DeleteProposalCard({
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="danger" onClick={() => setConfirmando(true)}>
             Sí, quiero borrarla
+          </Button>
+          <span className="font-sans text-xs text-text-secondary">
+            Te lo preguntamos otra vez antes de hacerlo.
+          </span>
+        </div>
+      )}
+    </Marco>
+  );
+}
+
+/**
+ * Borrar varias tareas (`proponer_borrados`): la lista entera, en rojo, y la
+ * misma doble confirmación que el borrado suelto. Hasta confirmar no hay
+ * «Aceptar», así que tampoco entra en «Aceptar todas».
+ */
+export function DeleteBatchProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: DeleteBatchProposal }) {
+  const [estado, setEstado] = useState<Estado>('pendiente');
+  const [error, setError] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
+  const [todas, setTodas] = useState(false);
+  const total = propuesta.tareas.length;
+  const visibles = todas ? propuesta.tareas : propuesta.tareas.slice(0, 10);
+
+  async function borrar() {
+    setEstado('enviando');
+    setError(null);
+    const respuesta = await aceptarBorradosAction(projectId, propuesta);
+    if (respuesta.error) {
+      setError(respuesta.error);
+      setEstado('pendiente');
+      setConfirmando(false);
+      return;
+    }
+    setResultado({
+      texto:
+        respuesta.fallidas.length === 0
+          ? `Se borraron ${respuesta.borradas} tareas.`
+          : `Se borraron ${respuesta.borradas}; no se pudieron borrar: ${respuesta.fallidas.join(', ')}.`,
+      href: null,
+    });
+    setEstado('hecho');
+  }
+
+  return (
+    <Marco
+      titulo={`Borrar ${total} ${total === 1 ? 'tarea' : 'tareas'}`}
+      sinAplicar="Todavía no se ha borrado nada."
+      porQue={propuesta.porQue}
+      estado={estado}
+      error={error}
+      resultado={resultado}
+      onAceptar={confirmando ? borrar : undefined}
+      onDescartar={() => setEstado('descartada')}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+      tono="destructivo"
+    >
+      <ol className="flex flex-col gap-1">
+        {visibles.map((tarea) => (
+          <li
+            key={tarea.taskId}
+            className="flex items-baseline gap-2 rounded-lg px-3 py-1.5"
+            style={{ background: alpha(colors.error, 6) }}
+          >
+            <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary">
+              {tarea.taskTitle}
+            </span>
+            <span className="shrink-0 font-sans text-[11px] text-text-secondary">
+              {[tarea.tablero, tarea.columna].filter(Boolean).join(' · ')}
+            </span>
+          </li>
+        ))}
+      </ol>
+      {total > 10 && (
+        <button
+          type="button"
+          onClick={() => setTodas((v) => !v)}
+          className="self-start font-sans text-xs font-medium text-text-secondary transition-colors hover:text-text-primary"
+        >
+          {todas ? 'Ver menos' : `Ver las ${total - 10} restantes`}
+        </button>
+      )}
+
+      <p
+        className="rounded-lg px-3 py-2 font-sans text-sm"
+        style={{ background: alpha(colors.error, 10), color: colors.error }}
+      >
+        <strong>Esto no se puede deshacer.</strong> Se borran las {total} tareas y con ellas sus
+        subtareas, checklists, comentarios y adjuntos.
+      </p>
+
+      {!confirmando && estado === 'pendiente' && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="danger" onClick={() => setConfirmando(true)}>
+            Sí, quiero borrar las {total}
           </Button>
           <span className="font-sans text-xs text-text-secondary">
             Te lo preguntamos otra vez antes de hacerlo.

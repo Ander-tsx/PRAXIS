@@ -50,7 +50,7 @@ import {
 } from './pensamiento';
 import { PROPONER_PLANTILLA, instruccionDePlantilla, validarPlantilla } from './template';
 import { catalogoDeCapacidades, herramientasPara } from './capabilities';
-import { MAX_TAREAS_POR_LOTE, herramientasSinProyecto } from './tools';
+import { MAX_BORRADOS_POR_LOTE, MAX_TAREAS_POR_LOTE, herramientasSinProyecto } from './tools';
 
 /** Lo que el gateway manda en cada turno. Todo lo de permisos llega resuelto. */
 interface ChatPayload {
@@ -172,6 +172,7 @@ const MAX_OPCIONES = 8;
 const NOMBRE_DE_PROPUESTA: Record<string, string> = {
   proponer_tarea: 'una tarea',
   proponer_tareas: 'un lote de tareas',
+  proponer_borrados: 'un borrado de varias tareas',
   proponer_asignacion: 'un cambio de encargados',
   proponer_edicion: 'unos cambios en la tarea',
   proponer_movimiento: 'mover la tarea',
@@ -1703,6 +1704,37 @@ export class AssistantService {
     if (call.name === 'proponer_sprint') return this.validarSprint(call, briefing);
     if (call.name === 'proponer_iniciar_sprint') return this.validarInicioDeSprint(call, briefing);
     if (call.name === 'proponer_planificacion') return this.validarPlanificacion(call, briefing);
+
+    /* El borrado en lote: cada id tiene que estar en lo que PRAX ha visto
+       (inventario o consultas del turno), igual que el borrado suelto. Los que
+       no, se quitan de la lista; sin ninguno, no hay propuesta. */
+    if (call.name === 'proponer_borrados') {
+      const ids = [
+        ...new Set((Array.isArray(call.args.taskIds) ? call.args.taskIds : []).map(String)),
+      ];
+      const tareas = ids
+        .map((id) => briefing.tareas?.find((t) => t.id === id))
+        .filter((t): t is TareaDelBriefing => Boolean(t))
+        .slice(0, MAX_BORRADOS_POR_LOTE)
+        .map((t) => ({
+          taskId: t.id,
+          taskTitle: t.titulo,
+          columna: t.columna,
+          ...(t.tablero ? { tablero: t.tablero } : {}),
+          cerrada: t.cerrada,
+        }));
+      if (tareas.length < ids.length) {
+        this.log.warn(`prax_borrados_desconocidos pedidos=${ids.length} validos=${tareas.length}`);
+      }
+      if (tareas.length === 0) return null;
+      return {
+        tool: call.name,
+        args: {
+          tareas,
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+        },
+      };
+    }
 
     /* Las cuatro de la capa 2 comparten la misma puerta: todas apuntan a una
        tarea que ya existe, y ninguna vale sin ella. */

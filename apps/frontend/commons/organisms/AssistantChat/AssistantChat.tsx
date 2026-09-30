@@ -35,6 +35,7 @@ import {
   isMoveProposal,
   isOpenProjectProposal,
   isQuestionProposal,
+  isDeleteBatchProposal,
   isTaskBatchProposal,
   isTaskProposal,
   isTemplateProposal,
@@ -76,6 +77,7 @@ import {
   StartSprintProposalCard,
   MoveProposalCard,
   OpenProjectProposalCard,
+  DeleteBatchProposalCard,
   TaskBatchProposalCard,
   QuestionProposalCard,
   TaskProposalCard,
@@ -1376,6 +1378,19 @@ export function AssistantChat({
                           value={{ familia: familiaDe(propuesta.tool), indice }}
                         >
                           {((): React.ReactNode => {
+                            if (isDeleteBatchProposal(propuesta)) {
+                              return (
+                                <DeleteBatchProposalCard
+                                  key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                  projectId={projectId ?? ''}
+                                  proposalId={propuesta.id}
+                                  estadoGuardado={propuesta.status}
+                                  propuesta={propuesta.args}
+                                  nombres={nombres}
+                                  etiquetas={etiquetas}
+                                />
+                              );
+                            }
                             if (isTaskBatchProposal(propuesta)) {
                               return (
                                 <TaskBatchProposalCard

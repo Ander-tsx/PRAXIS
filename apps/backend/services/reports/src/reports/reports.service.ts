@@ -1044,7 +1044,16 @@ export class ReportsService {
       if (bloque) tablero.scrum = bloque;
     }
     /* `boardId` → nombre, para etiquetar el inventario sin recorrerlo dos veces. */
-    const nombreDeTablero = new Map(tableros.map((t) => [t.id, t.nombre]));
+    /* 🔴 Con dos tableros del mismo nombre en espacios distintos («Macrofit» en
+       Desarrollo y en Test), el inventario decía «Macrofit» en los dos y no se
+       sabía cuál era cuál: las tareas se cargaron en el que no era
+       (2026-09-30). Si un nombre se repite, va con su espacio delante. */
+    const repetidos = new Set(
+      tableros.map((t) => t.nombre).filter((n, i, todos) => todos.indexOf(n) !== i),
+    );
+    const nombreVisible = (t: { nombre: string; espacio: string }) =>
+      repetidos.has(t.nombre) && t.espacio ? `${t.espacio} › ${t.nombre}` : t.nombre;
+    const nombreDeTablero = new Map(tableros.map((t) => [t.id, nombreVisible(t)]));
 
     return {
       proyecto: {
@@ -1067,7 +1076,8 @@ export class ReportsService {
         color: c.color,
         orden: c.order,
         tableroId: c.boardId,
-        tablero: c.boardName,
+        tablero: nombreDeTablero.get(c.boardId) ?? c.boardName,
+        espacio: c.workspaceName,
       })),
       etiquetas: (etiquetas ?? []).map((l) => ({ id: l.id, nombre: l.name })),
       /**

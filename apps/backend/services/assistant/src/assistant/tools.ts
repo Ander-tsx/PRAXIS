@@ -116,6 +116,42 @@ export const PROPONER_TAREA: FunctionDeclaration = {
   },
 };
 
+/** Cuántas tareas se pueden borrar en una propuesta. */
+export const MAX_BORRADOS_POR_LOTE = 200;
+
+/**
+ * Borrar muchas tareas en **una** propuesta (2026-09-30).
+ *
+ * «Borra todo el backlog» salía como un borrado de UNA tarea. Igual que el alta
+ * en lote: una tarjeta, roja, con la lista entera y la doble confirmación; al
+ * aceptar, el frontend borra cada una por `DELETE /tasks/:id` con los permisos
+ * de quien acepta.
+ */
+export const PROPONER_BORRADOS: FunctionDeclaration = {
+  name: 'proponer_borrados',
+  description:
+    'Prepara en UNA propuesta el BORRADO de VARIAS tareas que YA existen (todas las ' +
+    'de un tablero, una columna, las duplicadas...). NO borra nada: la persona lo ' +
+    'confirma dos veces. Usala siempre que haya dos o mas: TODAS en la misma llamada, ' +
+    'nunca de una en una. Los ids salen del inventario o de consultar_tareas; si el ' +
+    'inventario esta recortado, consulta antes para tenerlas todas.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      taskIds: {
+        type: 'ARRAY',
+        items: { type: 'STRING' },
+        description: `ids de las tareas a borrar. Hasta ${MAX_BORRADOS_POR_LOTE}.`,
+      },
+      porQue: {
+        type: 'STRING',
+        description: 'Obligatorio. Una frase: que se borra y por que.',
+      },
+    },
+    required: ['taskIds', 'porQue'],
+  },
+};
+
 /** Cuántas tareas caben en un lote. Más, y el modelo se corta o la tarjeta no se lee. */
 export const MAX_TAREAS_POR_LOTE = 60;
 
