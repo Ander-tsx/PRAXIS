@@ -515,7 +515,11 @@ export function inicioDeJson(texto: string): number {
   const bloque = texto.search(/```(json)?\s*[[{]/);
   const m = /(^|\n)[ \t]*(?=\{\s*"|\[\s*\{)/.exec(texto);
   const linea = m ? m.index + m[0].length : -1;
-  const candidatos = [bloque, linea].filter((n) => n !== -1);
+  /* La llamada escrita como etiqueta o como función: `<proponer_pregunta{…}>`,
+     `proponer_tareas({…})` (2026-09-30). Solo al principio de una línea. */
+  const e = /(^|\n)[ \t]*(?=<?\s*(proponer|consultar)_[a-z_]+\s*[({<])/.exec(texto);
+  const etiqueta = e ? e.index + e[0].length : -1;
+  const candidatos = [bloque, linea, etiqueta].filter((n) => n !== -1);
   return candidatos.length > 0 ? Math.min(...candidatos) : -1;
 }
 
@@ -538,6 +542,33 @@ export function llamadasDelTexto(
 ): { calls: Llamada[]; despues: string } | null {
   let cuerpo = retenido.trim();
   let despues = '';
+  /* `<proponer_x{…}>` o `proponer_x({…})`: el nombre va delante y los
+     argumentos entre la primera y la última llave. */
+  const conNombre = /^<?\s*((?:proponer|consultar)_[a-z_]+)\s*[({<]?/.exec(cuerpo);
+  if (conNombre) {
+    const nombre = conNombre[1];
+    const inicio = cuerpo.indexOf('{');
+    const fin = cuerpo.lastIndexOf('}');
+    const tras = cuerpo
+      .slice(fin + 1)
+      .replace(/^[\s)>]*/, '')
+      .trim();
+    if (inicio === -1 || fin < inicio) return { calls: [], despues: tras };
+    let args: unknown;
+    try {
+      args = JSON.parse(cuerpo.slice(inicio, fin + 1));
+    } catch {
+      return { calls: [], despues: tras };
+    }
+    const existe = herramientas.some((h) => h.name === nombre);
+    return {
+      calls:
+        existe && args && typeof args === 'object'
+          ? [{ name: nombre, args: args as Record<string, unknown> }]
+          : [],
+      despues: tras,
+    };
+  }
   if (cuerpo.startsWith('```')) {
     cuerpo = cuerpo.replace(/^```(json)?/, '');
     const cierre = cuerpo.indexOf('```');

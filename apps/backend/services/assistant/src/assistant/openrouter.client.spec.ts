@@ -216,6 +216,23 @@ describe('gpt-oss: JSON escrito como texto', () => {
     });
   });
 
+  it('rescata la llamada escrita como etiqueta: <proponer_pregunta{…}>', () => {
+    const texto =
+      '¿En cuál?\n\n<proponer_pregunta{\n  "pregunta": "¿Dónde?",\n  "opciones": ["Desarrollo", "Test"]\n}>';
+    const corte = inicioDeJson(texto);
+    expect(texto.slice(0, corte).trim()).toBe('¿En cuál?');
+    expect(llamadasDelTexto(texto.slice(corte), [pregunta])).toEqual({
+      calls: [
+        {
+          name: 'proponer_pregunta',
+          args: { pregunta: '¿Dónde?', opciones: ['Desarrollo', 'Test'] },
+        },
+      ],
+      despues: '',
+    });
+    expect(inicioDeJson('Uso proponer_pregunta a veces')).toBe(-1);
+  });
+
   it('un JSON que no encaja con nada se descarta; lo que no es JSON se devuelve', () => {
     expect(llamadasDelTexto('{"zzz":1}', [pregunta])).toEqual({ calls: [], despues: '' });
     expect(llamadasDelTexto('{ esto no es json', [pregunta])).toBeNull();
