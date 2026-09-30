@@ -10,16 +10,28 @@ import {
   HttpStatus,
   Inject,
   Logger,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Request,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientProxy } from '@nestjs/microservices';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   AcceptInvitationBodyDto,
   ChangeOrganizationMemberRoleBodyDto,
@@ -35,8 +47,10 @@ import {
   RenameOrganizationBodyDto,
   TransferOrganizationBodyDto,
 } from '@praxis/contracts';
+import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { IMAGEN_MAX_BYTES, validarImagenSubida } from '../common/imagen';
 import { oFalla } from './fallos';
 import { QuotaService } from './quota.service';
 import { StripeService } from './stripe.service';
@@ -239,6 +253,86 @@ export class OrganizationsController {
         ),
       ),
     );
+  }
+
+  /**
+   * Sube la imagen de la organización. Misma puerta que renombrar
+   * (`canManageOrganization`, que comprueba billing-service). Devuelve la
+   * organización con la `imageUrl` nueva.
+   */
+  @Post('image')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: IMAGEN_MAX_BYTES, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } },
+  })
+  @ApiOperation({ summary: 'Sube la imagen de la organización' })
+  async ponerImagen(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    validarImagenSubida(file);
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send<OrganizationView>(
+          { cmd: 'billing_org_set_image' },
+          {
+            organizationId,
+            userId: req.user!.userId,
+            mimeType: file.mimetype,
+            base64: file.buffer.toString('base64'),
+          },
+        ),
+      ),
+    );
+  }
+
+  @Delete('image')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Quita la imagen de la organización' })
+  async quitarImagen(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+  ) {
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send<OrganizationView>(
+          { cmd: 'billing_org_delete_image' },
+          { organizationId, userId: req.user!.userId },
+        ),
+      ),
+    );
+  }
+
+  /**
+   * Sirve los bytes de la imagen a quien pertenece a la organización. Un año de
+   * caché inmutable: la URL lleva `?v=<epoch>` y cambia con cada imagen nueva.
+   */
+  @Get('image')
+  @ApiOperation({ summary: 'Bytes de la imagen de la organización' })
+  async leerImagen(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Res() res: Response,
+  ) {
+    const imagen = oFalla(
+      await firstValueFrom(
+        this.billingClient.send<{ mimeType: string; size: number; base64: string } | null>(
+          { cmd: 'billing_org_get_image' },
+          { organizationId, userId: req.user!.userId },
+        ),
+      ),
+    );
+    if (!imagen) throw new NotFoundException('Esa organización no tiene imagen');
+
+    const bytes = Buffer.from(imagen.base64, 'base64');
+    res.setHeader('Content-Type', imagen.mimeType);
+    res.setHeader('Content-Length', bytes.length);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    res.send(bytes);
   }
 
   /**

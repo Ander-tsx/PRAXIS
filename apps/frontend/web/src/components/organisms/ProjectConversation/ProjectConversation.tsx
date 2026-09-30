@@ -31,6 +31,7 @@ export interface ProjectConversationProps {
   projectSlug: string;
   /** Identidad visual del proyecto, para el monograma de la cabecera. */
   projectIconKey?: string | null;
+  projectImageUrl?: string | null;
   projectColor?: string | null;
   page: ChatMessagePage;
   /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directory.ts`. */
@@ -72,6 +73,7 @@ export function ProjectConversation({
   projectName,
   projectSlug,
   projectIconKey = null,
+  projectImageUrl = null,
   projectColor = null,
   page,
   directorio,
@@ -157,6 +159,7 @@ export function ProjectConversation({
                 id={projectId}
                 name={projectName}
                 iconKey={projectIconKey}
+                imageUrl={projectImageUrl}
                 color={projectColor}
                 size="sm"
               />

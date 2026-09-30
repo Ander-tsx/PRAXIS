@@ -150,6 +150,7 @@ export default async function ChatVacioPage({ searchParams }: PageProps) {
                     id={chat.project.id}
                     name={chat.project.name}
                     iconKey={chat.project.iconKey}
+                    imageUrl={chat.project.imageUrl}
                     color={chat.project.color}
                   />
                   <span className="flex min-w-0 flex-1 flex-col">

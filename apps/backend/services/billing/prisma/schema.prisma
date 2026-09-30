@@ -107,6 +107,13 @@ model Organization {
   iconKey String?
   color   String?
 
+  /// Ruta **relativa al gateway** de la imagen subida, con marca de versión:
+  /// `/organizations/<id>/image?v=<epoch>`. Si existe, **gana** al icono.
+  /// Los bytes viven en `OrganizationImage`; aquí solo la ruta, por lo mismo que
+  /// `User.avatarUrl`: la versión dentro de la URL es lo que rompe la caché.
+  imageUrl String?
+  image    OrganizationImage?
+
   members       OrganizationMember[]
   roles         OrganizationRole[]
   roleTemplates ProjectRoleTemplate[]
@@ -119,6 +126,20 @@ model Organization {
   @@index([ownerUserId])
   @@schema("billing")
   @@map("organizations")
+}
+
+/// La imagen de la organización, **en su propia tabla** (como `UserAvatar`):
+/// son cientos de kilobytes que no hacen falta al listar organizaciones.
+model OrganizationImage {
+  organizationId String       @id
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mimeType       String
+  size           Int
+  bytes          Bytes
+  updatedAt      DateTime     @updatedAt
+
+  @@schema("billing")
+  @@map("organization_images")
 }
 
 /// Quién está dentro, y con qué papel.

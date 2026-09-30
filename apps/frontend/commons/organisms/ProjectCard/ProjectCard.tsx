@@ -119,6 +119,7 @@ export function ProjectCard({
           id={project.id}
           name={project.name}
           iconKey={project.iconKey ?? null}
+          imageUrl={project.imageUrl ?? null}
           color={project.color ?? null}
           size="md"
           apagado={suspendido}

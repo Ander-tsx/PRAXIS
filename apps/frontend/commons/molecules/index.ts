@@ -13,3 +13,4 @@ export * from './SlideOver';
 export * from './DataTable';
 export * from './SelectorDeFecha';
 export * from './QuotaNotice';
+export * from './ImagePicker';

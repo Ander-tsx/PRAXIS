@@ -258,6 +258,57 @@ export async function guardarIdentidadOrgAction(
   }
 }
 
+/**
+ * Sube la imagen de la organización (`POST /organizations/:id/image`, multipart).
+ * Devuelve la `imageUrl` que confirmó el servidor. Exige `canManageOrganization`.
+ */
+export async function subirImagenOrgAction(
+  formData: FormData,
+): Promise<{ error: string | null; imageUrl: string | null }> {
+  if (!(await sesionViva())) return { error: SESION_CADUCADA, imageUrl: null };
+
+  const organizationId = String(formData.get('organizationId') ?? '');
+  const file = formData.get('file');
+  if (!organizationId || !(file instanceof File) || file.size === 0) {
+    return { error: 'No llegó ninguna imagen.', imageUrl: null };
+  }
+
+  const envio = new FormData();
+  envio.append('file', file);
+
+  try {
+    const org = await createServerApiClient().postForm<OrganizationView>(
+      `/organizations/${organizationId}/image`,
+      envio,
+    );
+    if (!org?.imageUrl) return { error: 'El servidor no guardó la imagen.', imageUrl: null };
+    revalidatePath('/main/team');
+    return { error: null, imageUrl: org.imageUrl };
+  } catch (error) {
+    return {
+      error: error instanceof ApiError ? error.message : 'No se pudo subir la imagen.',
+      imageUrl: null,
+    };
+  }
+}
+
+/** Quita la imagen de la organización: vuelve a su icono o monograma. */
+export async function quitarImagenOrgAction(
+  organizationId: string,
+): Promise<{ error: string | null }> {
+  if (!(await sesionViva())) return { error: SESION_CADUCADA };
+
+  try {
+    await createServerApiClient().delete(`/organizations/${organizationId}/image`);
+    revalidatePath('/main/team');
+    return { error: null };
+  } catch (error) {
+    return {
+      error: error instanceof ApiError ? error.message : 'No se pudo quitar la imagen.',
+    };
+  }
+}
+
 export async function aceptarInvitacionAction(
   _prev: OrganizacionState,
   formData: FormData,

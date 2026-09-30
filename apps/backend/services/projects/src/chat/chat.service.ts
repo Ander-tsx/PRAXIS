@@ -993,6 +993,7 @@ export class ChatService {
             name: true,
             slug: true,
             iconKey: true,
+            imageUrl: true,
             color: true,
             /* Para que el directorio filtre los chats de proyecto por la
                organización activa, como el resto de la interfaz. */

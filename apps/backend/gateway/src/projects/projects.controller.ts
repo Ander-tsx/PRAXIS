@@ -16,10 +16,21 @@ import {
   Post,
   Query,
   Request,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import {
   CreateProjectBodyDto,
   FindProjectsQueryDto,
@@ -27,9 +38,11 @@ import {
   TransferProjectBodyDto,
   UpdateProjectBodyDto,
 } from '@praxis/contracts';
+import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { QuotaService } from '../billing/quota.service';
+import { IMAGEN_MAX_BYTES, validarImagenSubida } from '../common/imagen';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { AutomationPurgeService } from './automation-purge.service';
@@ -328,6 +341,66 @@ export class ProjectsController {
     const id = req.projectId!;
     // El id va después del spread: uno colado en el cuerpo no debe pisar la ruta.
     return firstValueFrom(this.projectsClient.send({ cmd: 'project_update' }, { ...body, id }));
+  }
+
+  /**
+   * Sube la imagen del proyecto. Misma puerta que renombrarlo (`canEditProject`):
+   * es identidad igual que el nombre y el icono. Devuelve el proyecto con la
+   * `imageUrl` nueva.
+   */
+  @Post(':id/image')
+  @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_PROJECT)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: IMAGEN_MAX_BYTES, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } },
+  })
+  @ApiOperation({ summary: 'Sube la imagen del proyecto' })
+  setImage(@Request() req: Express.Request, @UploadedFile() file: Express.Multer.File) {
+    validarImagenSubida(file);
+    return firstValueFrom(
+      this.projectsClient.send(
+        { cmd: 'project_set_image' },
+        { id: req.projectId!, mimeType: file.mimetype, base64: file.buffer.toString('base64') },
+      ),
+    );
+  }
+
+  @Delete(':id/image')
+  @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_PROJECT)
+  @ApiOperation({ summary: 'Quita la imagen del proyecto' })
+  deleteImage(@Request() req: Express.Request) {
+    return firstValueFrom(
+      this.projectsClient.send({ cmd: 'project_delete_image' }, { id: req.projectId! }),
+    );
+  }
+
+  /**
+   * Sirve los bytes de la imagen a quien pueda ver el proyecto.
+   *
+   * Un año de caché **inmutable**: la URL lleva `?v=<epoch>` y cambia con cada
+   * imagen nueva, así que la respuesta vieja nunca se vuelve a pedir.
+   */
+  @Get(':id/image')
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
+  @ApiOperation({ summary: 'Bytes de la imagen del proyecto' })
+  async getImage(@Request() req: Express.Request, @Res() res: Response) {
+    const imagen = await firstValueFrom(
+      this.projectsClient.send<{ mimeType: string; size: number; base64: string } | null>(
+        { cmd: 'project_get_image' },
+        { id: req.projectId! },
+      ),
+    );
+    if (!imagen) throw new NotFoundException('Ese proyecto no tiene imagen');
+
+    const bytes = Buffer.from(imagen.base64, 'base64');
+    res.setHeader('Content-Type', imagen.mimeType);
+    res.setHeader('Content-Length', bytes.length);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    res.send(bytes);
   }
 
   /** Elimina un proyecto (requiere poder eliminar boards) */

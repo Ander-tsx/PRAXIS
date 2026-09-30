@@ -180,6 +180,8 @@ export interface OrgDelSelector {
    */
   iconKey?: string | null;
   color?: string | null;
+  /** Imagen subida (ruta relativa al gateway). Gana al icono. */
+  imageUrl?: string | null;
 }
 
 /**
@@ -1000,6 +1002,7 @@ interface SidebarProject {
   name: string;
   slug: string;
   iconKey: string | null;
+  imageUrl: string | null;
   color: string | null;
   workspaces: EspacioDeLaBarra[];
 }
@@ -1061,6 +1064,7 @@ async function fetchProjectsTree(
     name: project.name,
     slug: project.slug,
     iconKey: project.iconKey ?? null,
+    imageUrl: project.imageUrl ?? null,
     color: project.color ?? null,
     /* Vacío hasta que alguien despliegue la fila. */
     workspaces: [],
@@ -1073,6 +1077,7 @@ interface SidebarProjectResumen {
   name: string;
   slug: string;
   iconKey?: string | null;
+  imageUrl?: string | null;
   color?: string | null;
 }
 
@@ -1617,6 +1622,7 @@ function SidebarProjectsTree({
                   id={project.id}
                   name={project.name}
                   iconKey={project.iconKey}
+                  imageUrl={project.imageUrl}
                   color={project.color}
                 />
               </Link>
@@ -1643,6 +1649,7 @@ function SidebarProjectsTree({
                     id={project.id}
                     name={project.name}
                     iconKey={project.iconKey}
+                    imageUrl={project.imageUrl}
                     color={project.color}
                   />
                 </span>
@@ -1847,6 +1854,7 @@ function FilaDeProyecto({
           id={chat.project.id}
           name={chat.project.name}
           iconKey={chat.project.iconKey}
+          imageUrl={chat.project.imageUrl}
           color={chat.project.color}
         />
       </span>

@@ -74,6 +74,7 @@ export function ProjectHeader({
       projectName={project.name}
       projectDescription={project.description ?? ''}
       projectIconKey={project.iconKey ?? null}
+      projectImageUrl={project.imageUrl ?? null}
       projectColor={project.color ?? null}
       canEdit={canEdit}
       canDelete={canDelete}
@@ -113,6 +114,7 @@ export function ProjectHeader({
             id={project.id}
             name={project.name}
             iconKey={project.iconKey ?? null}
+            imageUrl={project.imageUrl ?? null}
             color={project.color ?? null}
           />
           <h2 className="truncate font-sans text-xl font-semibold text-white">{project.name}</h2>
@@ -157,6 +159,7 @@ export function ProjectHeader({
             id={project.id}
             name={project.name}
             iconKey={project.iconKey ?? null}
+            imageUrl={project.imageUrl ?? null}
             color={project.color ?? null}
             size="md"
           />

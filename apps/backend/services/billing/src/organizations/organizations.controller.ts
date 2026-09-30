@@ -90,6 +90,34 @@ export class OrganizationsController {
     );
   }
 
+  @MessagePattern({ cmd: 'billing_org_set_image' })
+  ponerImagen(
+    @Payload() dto: { organizationId: string; userId: string; mimeType: string; base64: string },
+  ) {
+    return this.organizaciones.ponerImagen(
+      dto.organizationId,
+      dto.userId,
+      dto.mimeType,
+      new Uint8Array(Buffer.from(dto.base64, 'base64')),
+    );
+  }
+
+  @MessagePattern({ cmd: 'billing_org_delete_image' })
+  quitarImagen(@Payload() dto: { organizationId: string; userId: string }) {
+    return this.organizaciones.quitarImagen(dto.organizationId, dto.userId);
+  }
+
+  @MessagePattern({ cmd: 'billing_org_get_image' })
+  async leerImagen(@Payload() dto: { organizationId: string; userId: string }) {
+    const imagen = await this.organizaciones.leerImagen(dto.organizationId, dto.userId);
+    if (!imagen || 'error' in imagen) return imagen;
+    return {
+      mimeType: imagen.mimeType,
+      size: imagen.size,
+      base64: Buffer.from(imagen.bytes).toString('base64'),
+    };
+  }
+
   @MessagePattern({ cmd: 'billing_org_members' })
   miembros(@Payload() dto: { organizationId: string; userId: string }) {
     return this.organizaciones.miembros(dto.organizationId, dto.userId);

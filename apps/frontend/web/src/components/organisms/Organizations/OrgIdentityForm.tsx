@@ -1,6 +1,10 @@
 'use client';
 
-import { guardarIdentidadOrgAction } from '@/app/(privado)/main/team/actions';
+import {
+  guardarIdentidadOrgAction,
+  quitarImagenOrgAction,
+  subirImagenOrgAction,
+} from '@/app/(privado)/main/team/actions';
 import { ORGANIZACION_INITIAL_STATE } from '@/lib/main/action-state';
 import {
   Button,
@@ -9,6 +13,7 @@ import {
   Glyph,
   GlyphPicker,
   type GlyphSelection,
+  ImagePicker,
   glyphByKey,
   useAccion,
 } from '@praxis/commons';
@@ -42,12 +47,14 @@ export function OrgIdentityForm({
   initialName,
   initialIconKey,
   initialColor,
+  initialImageUrl = null,
   puedeEditar,
 }: {
   organizationId: string;
   initialName: string;
   initialIconKey: string | null;
   initialColor: string | null;
+  initialImageUrl?: string | null;
   puedeEditar: boolean;
 }) {
   const router = useRouter();
@@ -57,6 +64,26 @@ export function OrgIdentityForm({
   );
 
   const [name, setName] = useState(initialName);
+  const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl);
+
+  async function subirImagen(file: File): Promise<string | null> {
+    const datos = new FormData();
+    datos.set('organizationId', organizationId);
+    datos.set('file', file);
+    const resultado = await subirImagenOrgAction(datos);
+    if (resultado.error) return resultado.error;
+    setImageUrl(resultado.imageUrl);
+    router.refresh();
+    return null;
+  }
+
+  async function quitarImagen(): Promise<string | null> {
+    const resultado = await quitarImagenOrgAction(organizationId);
+    if (resultado.error) return resultado.error;
+    setImageUrl(null);
+    router.refresh();
+    return null;
+  }
   const [seleccion, setSeleccion] = useState<GlyphSelection>({
     iconKey: initialIconKey,
     color: initialColor || GLYPH_COLOR_DEFAULT,
@@ -71,8 +98,14 @@ export function OrgIdentityForm({
 
   const inicial = (name.trim() || initialName.trim() || 'O').charAt(0).toUpperCase();
 
-  const preview = glyphByKey(seleccion.iconKey) ? (
-    <Glyph iconKey={seleccion.iconKey} color={seleccion.color} size="md" shape="square" />
+  const preview = imageUrl || glyphByKey(seleccion.iconKey) ? (
+    <Glyph
+      iconKey={seleccion.iconKey}
+      imageUrl={imageUrl}
+      color={seleccion.color}
+      size="md"
+      shape="square"
+    />
   ) : (
     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-elevated font-sans text-base font-semibold text-text-primary">
       {inicial}
@@ -121,6 +154,13 @@ export function OrgIdentityForm({
           />
         </div>
       </div>
+
+      <ImagePicker
+        tieneImagen={imageUrl !== null}
+        onUpload={subirImagen}
+        onRemove={quitarImagen}
+        disabled={pending}
+      />
 
       <GlyphPicker value={seleccion} onChange={setSeleccion} disabled={pending} />
 

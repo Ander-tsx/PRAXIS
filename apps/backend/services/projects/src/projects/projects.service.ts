@@ -386,6 +386,71 @@ export class ProjectsService {
   }
 
   /**
+   * Guarda la imagen del proyecto y devuelve el proyecto con la `imageUrl` nueva.
+   *
+   * ⚠️ La URL lleva `?v=<epoch>`: sin ella la imagen nueva no se vería, la caché
+   * del navegador seguiría sirviendo la vieja. Y hay que invalidar `project:<id>`,
+   * que es la copia que lee el guard y la pantalla del proyecto.
+   */
+  async setImage(dto: { id: string; mimeType: string; base64: string }) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: dto.id },
+      select: { id: true },
+    });
+    if (!project) {
+      throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
+    }
+
+    const bytes = new Uint8Array(Buffer.from(dto.base64, 'base64'));
+    const version = Date.now();
+    const [, actualizado] = await this.prisma.$transaction([
+      this.prisma.projectImage.upsert({
+        where: { projectId: dto.id },
+        create: { projectId: dto.id, mimeType: dto.mimeType, size: bytes.length, bytes },
+        update: { mimeType: dto.mimeType, size: bytes.length, bytes },
+      }),
+      this.prisma.project.update({
+        where: { id: dto.id },
+        data: { imageUrl: `/projects/${dto.id}/image?v=${version}` },
+      }),
+    ]);
+    await this.redis.del(`project:${dto.id}`);
+    return actualizado;
+  }
+
+  /** Quita la imagen: el proyecto vuelve a su icono o monograma. */
+  async deleteImage(dto: { id: string }) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: dto.id },
+      select: { id: true },
+    });
+    if (!project) {
+      throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
+    }
+    await this.prisma.projectImage.deleteMany({ where: { projectId: dto.id } });
+    const actualizado = await this.prisma.project.update({
+      where: { id: dto.id },
+      data: { imageUrl: null },
+    });
+    await this.redis.del(`project:${dto.id}`);
+    return actualizado;
+  }
+
+  /** Los bytes, para la ruta que los sirve. `null` si no hay: es lo normal. */
+  async getImage(dto: { id: string }) {
+    const imagen = await this.prisma.projectImage.findUnique({
+      where: { projectId: dto.id },
+      select: { mimeType: true, size: true, bytes: true },
+    });
+    if (!imagen) return null;
+    return {
+      mimeType: imagen.mimeType,
+      size: imagen.size,
+      base64: Buffer.from(imagen.bytes).toString('base64'),
+    };
+  }
+
+  /**
    * Cambia el estado administrativo del proyecto.
    *
    * ## Las cachés, que es donde esto se rompe en silencio

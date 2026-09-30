@@ -518,6 +518,57 @@ export async function saveProjectSettingsAction(input: {
   }
 }
 
+/**
+ * Sube la imagen del proyecto. Va por `FormData` a un endpoint `multipart`,
+ * igual que la foto de perfil: en base64 dentro de JSON crecería un tercio.
+ *
+ * Devuelve la `imageUrl` que **confirmó el servidor** (con su versión, que es
+ * lo que rompe la caché del navegador). Exige `canEditProject`.
+ */
+export async function uploadProjectImageAction(
+  formData: FormData,
+): Promise<{ error: string | null; imageUrl: string | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', imageUrl: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const file = formData.get('file');
+  if (!projectId || !(file instanceof File) || file.size === 0) {
+    return { error: 'No llegó ninguna imagen.', imageUrl: null };
+  }
+
+  const envio = new FormData();
+  envio.append('file', file);
+
+  try {
+    const saved = await api.postForm<ProjectDetail>(`/projects/${projectId}/image`, envio);
+    if (!saved?.imageUrl) return { error: 'El servidor no guardó la imagen.', imageUrl: null };
+
+    revalidateProject(projectId);
+    revalidatePath('/projects');
+    return { error: null, imageUrl: saved.imageUrl };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo subir la imagen.'), imageUrl: null };
+  }
+}
+
+/** Quita la imagen del proyecto: vuelve a su icono o a las iniciales. */
+export async function deleteProjectImageAction(
+  projectId: string,
+): Promise<{ error: string | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.' };
+
+  try {
+    await api.delete(`/projects/${projectId}/image`);
+    revalidateProject(projectId);
+    revalidatePath('/projects');
+    return { error: null };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo quitar la imagen.') };
+  }
+}
+
 /* ─── Roles ─────────────────────────────────────────────────────────── */
 
 export async function saveRoleAction(_prev: RoleState, formData: FormData): Promise<RoleState> {

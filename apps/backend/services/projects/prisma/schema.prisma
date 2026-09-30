@@ -41,6 +41,12 @@ model Project {
   iconKey     String?
   color       String?
 
+  /// Ruta **relativa al gateway** de la imagen subida, con marca de versión:
+  /// `/projects/<id>/image?v=<epoch>`. Si existe, **gana** al icono. Los bytes
+  /// viven en `ProjectImage`; la versión en la URL es lo que rompe la caché.
+  imageUrl    String?
+  image       ProjectImage?
+
   /// Quién es **responsable** del proyecto.
   ///
   /// ⚠️ **Ya no es «el dueño», aunque la columna siga llamándose así.** Desde
@@ -105,6 +111,20 @@ model Project {
   @@index([status])
   @@schema("projects")
   @@map("projects")
+}
+
+/// La imagen del proyecto, **en su propia tabla** (como `UserAvatar`): son
+/// cientos de kilobytes que no hacen falta al listar ni al cargar un proyecto.
+model ProjectImage {
+  projectId String   @id
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mimeType  String
+  size      Int
+  bytes     Bytes
+  updatedAt DateTime @updatedAt
+
+  @@schema("projects")
+  @@map("project_images")
 }
 
 /// Hechos durables pendientes de publicación. No tiene transporte en esta etapa.

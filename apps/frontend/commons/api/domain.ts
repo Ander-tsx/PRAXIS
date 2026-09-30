@@ -271,6 +271,8 @@ export interface Project {
    */
   iconKey?: string | null;
   color?: string | null;
+  /** Imagen subida (ruta relativa al gateway, con versión). Gana al icono. */
+  imageUrl?: string | null;
   /**
    * La organización a la que pertenece. `NOT NULL` en la base desde la etapa de
    * organizaciones.
@@ -1437,6 +1439,7 @@ export interface ProjectChatSummary {
     name: string;
     slug: string;
     iconKey: string | null;
+    imageUrl?: string | null;
     color: string | null;
     /** Con lo que el directorio lo acota a la organización activa. */
     organizationId: string;

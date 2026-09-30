@@ -1,6 +1,10 @@
 'use client';
 
-import { saveProjectSettingsAction } from '@/app/(privado)/projects/[id]/actions';
+import {
+  deleteProjectImageAction,
+  saveProjectSettingsAction,
+  uploadProjectImageAction,
+} from '@/app/(privado)/projects/[id]/actions';
 import {
   FloatingLabelInput,
   FloatingLabelTextarea,
@@ -8,6 +12,7 @@ import {
   Glyph,
   GlyphPicker,
   type GlyphSelection,
+  ImagePicker,
   ProjectMonogram,
   glyphByKey,
 } from '@praxis/commons';
@@ -21,6 +26,7 @@ export interface ProjectSettingsButtonProps {
   projectDescription: string;
   projectIconKey: string | null;
   projectColor: string | null;
+  projectImageUrl?: string | null;
   /** `canEditProject`. Sin él no se puede tocar nombre/descripción/identidad. */
   canEdit: boolean;
   /** `canDeleteProject`. Decide si la zona de peligro aparece. */
@@ -57,6 +63,7 @@ export function ProjectSettingsButton({
   projectDescription,
   projectIconKey,
   projectColor,
+  projectImageUrl = null,
   canEdit,
   canDelete,
   workspaceCount,
@@ -107,6 +114,7 @@ export function ProjectSettingsButton({
           initialDescription={projectDescription}
           initialIconKey={projectIconKey}
           initialColor={projectColor}
+          initialImageUrl={projectImageUrl}
           canEdit={canEdit}
           canDelete={canDelete}
           workspaceCount={workspaceCount}
@@ -128,6 +136,7 @@ function ProjectSettingsModal({
   initialDescription,
   initialIconKey,
   initialColor,
+  initialImageUrl,
   canEdit,
   canDelete,
   workspaceCount,
@@ -143,6 +152,7 @@ function ProjectSettingsModal({
   initialDescription: string;
   initialIconKey: string | null;
   initialColor: string | null;
+  initialImageUrl: string | null;
   canEdit: boolean;
   canDelete: boolean;
   workspaceCount: number;
@@ -160,7 +170,27 @@ function ProjectSettingsModal({
     iconKey: initialIconKey,
     color: initialColor || GLYPH_COLOR_DEFAULT,
   });
+  const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl);
   const [saving, setSaving] = useState(false);
+
+  async function subirImagen(file: File): Promise<string | null> {
+    const datos = new FormData();
+    datos.set('projectId', projectId);
+    datos.set('file', file);
+    const resultado = await uploadProjectImageAction(datos);
+    if (resultado.error) return resultado.error;
+    setImageUrl(resultado.imageUrl);
+    router.refresh();
+    return null;
+  }
+
+  async function quitarImagen(): Promise<string | null> {
+    const resultado = await deleteProjectImageAction(projectId);
+    if (resultado.error) return resultado.error;
+    setImageUrl(null);
+    router.refresh();
+    return null;
+  }
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -246,9 +276,10 @@ function ProjectSettingsModal({
           {canEdit ? (
             <>
               <div className="flex items-center gap-4">
-                {glyphByKey(seleccion.iconKey) ? (
+                {imageUrl || glyphByKey(seleccion.iconKey) ? (
                   <Glyph
                     iconKey={seleccion.iconKey}
+                    imageUrl={imageUrl}
                     color={seleccion.color}
                     size="md"
                     shape="square"
@@ -266,6 +297,13 @@ function ProjectSettingsModal({
                   />
                 </div>
               </div>
+
+              <ImagePicker
+                tieneImagen={imageUrl !== null}
+                onUpload={subirImagen}
+                onRemove={quitarImagen}
+                disabled={saving}
+              />
 
               <FloatingLabelTextarea
                 id="project-description"
