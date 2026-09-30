@@ -1600,7 +1600,7 @@ function SidebarProjectsTree({
         </div>
       )}
 
-      <nav aria-label="Proyectos" className="flex flex-col gap-0.5">
+      <nav aria-label="Proyectos" className="flex flex-col">
         {projects.map((project) => {
           const isOpen = expanded.has(project.id);
           // Las URLs de proyecto usan el SLUG, no el id
@@ -1617,7 +1617,7 @@ function SidebarProjectsTree({
                 href={projectHref}
                 title={project.name}
                 aria-current={isActiveProject ? 'page' : undefined}
-                className={`flex justify-center py-2 rounded-lg transition-colors hover:bg-white/[0.06] ${isActiveProject ? 'bg-white/10' : ''}`}
+                className={`flex justify-center py-1 rounded-lg transition-colors hover:bg-white/[0.06] ${isActiveProject ? 'bg-white/10' : ''}`}
               >
                 <ProjectMonogram
                   id={project.id}
@@ -1633,7 +1633,7 @@ function SidebarProjectsTree({
           return (
             <div key={project.id} className="flex flex-col">
               <div
-                className={`group flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.06] ${isActiveProject ? 'bg-white/10' : ''}`}
+                className={`group flex items-center gap-1.5 rounded-lg px-2 py-1 transition-colors hover:bg-white/[0.06] ${isActiveProject ? 'bg-white/10' : ''}`}
               >
                 <button
                   type="button"
@@ -1645,7 +1645,7 @@ function SidebarProjectsTree({
                   <ChevronIcon open={isOpen} />
                 </button>
 
-                <span className="shrink-0 scale-[0.72] origin-center -mx-0.5">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[0.72]">
                   <ProjectMonogram
                     id={project.id}
                     name={project.name}
@@ -1794,11 +1794,11 @@ function FilaDePersona({
     <Link
       href={`/chat/${conversacion.peerId}`}
       aria-current={activo ? 'page' : undefined}
-      className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10 ${
+      className={`group flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/10 ${
         plegada ? 'justify-center px-0' : ''
       } ${activo ? 'bg-white/10' : ''}`}
     >
-      <span className="shrink-0">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[0.72]">
         <Avatar
           label={nombre}
           size="sm"
@@ -1826,7 +1826,7 @@ function FilaDePersona({
               </span>
             )}
           </span>
-          <span className="mt-0.5 flex items-center justify-between gap-2">
+          <span className="flex items-center justify-between gap-2">
             <span className="truncate font-sans text-[11px] text-text-secondary">
               {conversacion.ultimo ? resumenDe(conversacion.ultimo) : 'Iniciar conversación'}
             </span>
@@ -1854,11 +1854,11 @@ function FilaDeProyecto({
     <Link
       href={`/chat/proyecto/${chat.project.id}`}
       aria-current={activo ? 'page' : undefined}
-      className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10 ${
+      className={`group flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/10 ${
         plegada ? 'justify-center px-0' : ''
       } ${activo ? 'bg-white/10' : ''}`}
     >
-      <span className="flex shrink-0 origin-center scale-90 items-center justify-center">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[0.72]">
         <ProjectMonogram
           id={chat.project.id}
           name={chat.project.name}
@@ -1883,7 +1883,7 @@ function FilaDeProyecto({
               </span>
             )}
           </span>
-          <span className="mt-0.5 flex items-center justify-between gap-2">
+          <span className="flex items-center justify-between gap-2">
             <span className="truncate font-sans text-[11px] text-text-secondary">
               {chat.ultimo
                 ? `${autor ? personLabel(autor) : 'Alguien'}: ${resumenDe(chat.ultimo)}`
@@ -2008,7 +2008,7 @@ function SidebarChatList({
   }
 
   return (
-    <div className="flex max-h-[calc(100dvh-13rem)] flex-col gap-4 overflow-y-auto scrollbar-none px-1 pb-4">
+    <div className="flex max-h-[calc(100dvh-13rem)] flex-col gap-2 overflow-y-auto scrollbar-none px-1 pb-4">
       {!plegada && (
         <div className="px-2">
           <input
