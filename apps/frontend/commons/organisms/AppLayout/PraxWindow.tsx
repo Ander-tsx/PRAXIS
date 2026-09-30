@@ -3,14 +3,15 @@
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { SlideOver } from '../../molecules';
 import { AssistantChat } from '../AssistantChat/AssistantChat';
-import { PraxContext, type PraxContextValue } from './PraxContext';
+import { type FocoDePrax, PraxContext, type PraxContextValue } from './PraxContext';
 
 /**
  * PRAX, disponible **desde cualquier pantalla**.
  *
- * Sin foco de proyecto — es el modo `POST /me/assistant/chat` de
- * `AssistantChat`, tres herramientas. El PRAX enfocado del lienzo de Análisis
- * es otra cosa y sigue montándose aparte, en su página.
+ * Fuera de un proyecto va sin foco —el modo `POST /me/assistant/chat`—. Dentro
+ * de uno, la pantalla del proyecto fija el foco (`fijarFoco`) y PRAX habla de
+ * ese proyecto sin que haya que decirle cuál: es lo que se espera al pulsarlo
+ * con el tablero delante.
  *
  * ## Un solo panel, no tres modos
  *
@@ -29,6 +30,8 @@ import { PraxContext, type PraxContextValue } from './PraxContext';
  * Pantalla completa **no** es un modo de este panel: `aPantallaCompleta`
  * cierra y navega a `/assistant`.
  */
+const SIN_NOMBRES: Record<string, string> = {};
+
 export function PraxProvider({
   zonePath,
   organizacionActivaId,
@@ -42,6 +45,9 @@ export function PraxProvider({
   const [montado, setMontado] = useState(false);
   /** Texto que otro sitio deja puesto en el compositor. El `sello` re-dispara. */
   const [sugerencia, setSugerencia] = useState<{ texto: string; sello: number } | null>(null);
+  /** El proyecto que hay en pantalla. Ver `FocoDePrax`. */
+  const [foco, fijarFoco] = useState<FocoDePrax | null>(null);
+  const proyectosDelFoco = useMemo(() => (foco ? [{ id: foco.id, name: foco.name }] : []), [foco]);
 
   const abrir = useCallback(() => {
     setMontado(true);
@@ -63,8 +69,18 @@ export function PraxProvider({
   }, []);
 
   const valor = useMemo<PraxContextValue>(
-    () => ({ zonePath, abierto, abrir, cerrar, alternar, aPantallaCompleta, sugerir }),
-    [zonePath, abierto, abrir, cerrar, alternar, aPantallaCompleta, sugerir],
+    () => ({
+      zonePath,
+      abierto,
+      abrir,
+      cerrar,
+      alternar,
+      aPantallaCompleta,
+      sugerir,
+      foco,
+      fijarFoco,
+    }),
+    [zonePath, abierto, abrir, cerrar, alternar, aPantallaCompleta, sugerir, foco],
   );
 
   return (
@@ -73,11 +89,12 @@ export function PraxProvider({
       {montado && (
         <SlideOver open={abierto} onClose={cerrar} size="lg" tone="dark" ariaLabel="PRAX">
           <AssistantChat
-            projectId={null}
+            projectId={foco?.id ?? null}
+            proyectos={proyectosDelFoco}
             gatewayPath={`${zonePath}/api/gateway`}
             cuotaInicial={null}
-            nombres={{}}
-            etiquetas={{}}
+            nombres={foco?.nombres ?? SIN_NOMBRES}
+            etiquetas={foco?.etiquetas ?? SIN_NOMBRES}
             variante="flotante"
             sugerenciaExterna={sugerencia}
             organizacionActivaId={organizacionActivaId}

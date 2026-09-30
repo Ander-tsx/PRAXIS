@@ -99,6 +99,8 @@ export function useArrastreDeTablero({
 
   const pista = useRef<HTMLElement | null>(null);
   const columnas = useRef(new Map<string, HTMLElement>());
+  /** Columnas en paneles superpuestos: ganan el hit-test. Ver `registrarCapa`. */
+  const capas = useRef(new Map<string, HTMLElement>());
   const listas = useRef(new Map<string, { el: HTMLElement; disposicion: Disposicion }>());
   const tarjetas = useRef(new Map<string, Map<string, HTMLElement>>());
 
@@ -131,6 +133,35 @@ export function useArrastreDeTablero({
   const registrarColumna = useCallback((columnId: string, el: HTMLElement | null) => {
     if (el) columnas.current.set(columnId, el);
     else columnas.current.delete(columnId);
+  }, []);
+
+  /**
+   * Una columna que vive en un panel **encima** del tablero (el backlog).
+   *
+   * 🔴 **Sin esto, soltar en el panel caía en la columna de detrás.** El panel
+   * es `fixed` y tapa el lado derecho de la pista, pero las columnas tapadas
+   * siguen ahí y sus cajas contienen el puntero igual. `columnaBajoElPuntero`
+   * recorría las columnas en orden de registro y la primera que contenía el
+   * punto ganaba — casi siempre una del tablero, porque se registran antes que
+   * el panel. Y la del panel era solo su lista, sin la cabecera ni el alta, así
+   * que el blanco útil era una franja estrecha.
+   *
+   * Una capa gana **en todo su rectángulo**, antes que cualquier columna: lo que
+   * se ve encima es donde se suelta.
+   */
+  const registrarCapa = useCallback((columnId: string, el: HTMLElement | null) => {
+    if (el) capas.current.set(columnId, el);
+    else capas.current.delete(columnId);
+  }, []);
+
+  /** La capa que hay bajo el puntero, si hay alguna. */
+  const capaBajoElPuntero = useCallback((x: number, y: number): string | null => {
+    for (const [id, el] of capas.current) {
+      if (!el.isConnected) continue;
+      const caja = el.getBoundingClientRect();
+      if (x >= caja.left && x <= caja.right && y >= caja.top && y <= caja.bottom) return id;
+    }
+    return null;
   }, []);
 
   const registrarLista = useCallback(
@@ -180,24 +211,32 @@ export function useArrastreDeTablero({
   }, []);
 
   /** ¿Sobre qué columna está el puntero? Se mira la columna entera, no solo su lista. */
-  const columnaBajoElPuntero = useCallback((x: number, y: number): string | null => {
-    let mejor: { id: string; distancia: number } | null = null;
+  const columnaBajoElPuntero = useCallback(
+    (x: number, y: number): string | null => {
+      const capa = capaBajoElPuntero(x, y);
+      if (capa) return capa;
 
-    for (const [id, el] of columnas.current) {
-      const caja = el.getBoundingClientRect();
-      if (y < caja.top - 40 || y > caja.bottom + 40) continue;
+      let mejor: { id: string; distancia: number } | null = null;
 
-      if (x >= caja.left && x <= caja.right) return id;
+      for (const [id, el] of columnas.current) {
+        /* La de un panel ya se miró arriba, en su rectángulo entero. */
+        if (capas.current.has(id)) continue;
+        const caja = el.getBoundingClientRect();
+        if (y < caja.top - 40 || y > caja.bottom + 40) continue;
 
-      /* Fuera por los lados: se guarda la más cercana como red de seguridad,
+        if (x >= caja.left && x <= caja.right) return id;
+
+        /* Fuera por los lados: se guarda la más cercana como red de seguridad,
          para que arrastrar por el hueco entre dos columnas no deje el gesto sin
          destino y la tarjeta rebote al origen. */
-      const distancia = x < caja.left ? caja.left - x : x - caja.right;
-      if (!mejor || distancia < mejor.distancia) mejor = { id, distancia };
-    }
+        const distancia = x < caja.left ? caja.left - x : x - caja.right;
+        if (!mejor || distancia < mejor.distancia) mejor = { id, distancia };
+      }
 
-    return mejor && mejor.distancia < 120 ? mejor.id : null;
-  }, []);
+      return mejor && mejor.distancia < 120 ? mejor.id : null;
+    },
+    [capaBajoElPuntero],
+  );
 
   /** Posición de la pista en la que caería la columna que viaja. */
   const huecoDeColumna = useCallback((x: number, arrastrada: string): number | null => {
@@ -271,7 +310,7 @@ export function useArrastreDeTablero({
   const estaEnLaFranja = useCallback(
     (x: number, y: number): boolean => {
       const tira = pista.current;
-      if (tira) {
+      if (tira && !capaBajoElPuntero(x, y)) {
         const caja = tira.getBoundingClientRect();
         const dentro = x >= caja.left && x <= caja.right;
         if (dentro && x < caja.left + MARGEN_DE_AUTODESPLAZAMIENTO) return true;
@@ -286,7 +325,7 @@ export function useArrastreDeTablero({
       }
       return false;
     },
-    [columnaBajoElPuntero],
+    [columnaBajoElPuntero, capaBajoElPuntero],
   );
 
   /**
@@ -346,6 +385,8 @@ export function useArrastreDeTablero({
     if (
       tira &&
       cajaDeTira &&
+      /* Sobre el panel del backlog, la pista está debajo: no se desplaza. */
+      !capaBajoElPuntero(x, y) &&
       x >= cajaDeTira.left &&
       x <= cajaDeTira.right &&
       armarHorizontal(x, cajaDeTira)
@@ -391,7 +432,7 @@ export function useArrastreDeTablero({
     if (huboDesplazamiento || estaEnLaFranja(x, y)) {
       fotograma.current = requestAnimationFrame(pintar);
     }
-  }, [recalcular, columnaBajoElPuntero, estaEnLaFranja, armarHorizontal]);
+  }, [recalcular, columnaBajoElPuntero, capaBajoElPuntero, estaEnLaFranja, armarHorizontal]);
 
   const pedirFotograma = useCallback(() => {
     if (fotograma.current === null) fotograma.current = requestAnimationFrame(pintar);
@@ -630,6 +671,7 @@ export function useArrastreDeTablero({
     cancelar: limpiar,
     registrarPista,
     registrarColumna,
+    registrarCapa,
     registrarLista,
     registrarTarjeta,
   };

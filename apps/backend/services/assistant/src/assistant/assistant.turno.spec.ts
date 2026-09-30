@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { lastValueFrom, of, toArray } from 'rxjs';
 
 import { AssistantService, type EventoDeTurno } from './assistant.service';
-import type { GeminiReply } from './gemini.client';
+import { GeminiError, type GeminiReply } from './gemini.client';
 
 /**
  * El bucle de consultas de un turno (F3 de docs/PLAN-PRAX-SEMIAGENTICO.md).
@@ -140,6 +140,54 @@ describe('El turno de PRAX: bucle de consultas', () => {
     });
     /* Y eso es lo que se cobra: tokens PRAX, no «un mensaje». */
     expect(m.quota.consumir).toHaveBeenCalledWith('u1', undefined, 'org-1', 2960);
+  });
+
+  it('cuenta su pensamiento: la ruta, la consulta con su resultado y la redacción, y lo guarda', async () => {
+    const m = montar([
+      respuesta({
+        text: 'Lo miro.',
+        calls: [{ name: 'consultar_tareas', args: { proyectoId: PROYECTO.id } }],
+      }),
+      respuesta({ text: 'Quedan 3.' }),
+    ]);
+
+    const eventos = await lastValueFrom(m.servicio.chatEnVivo(payload as any).pipe(toArray()));
+    const pasos = eventos.filter(
+      (e): e is Extract<EventoDeTurno, { tipo: 'paso' }> => e.tipo === 'paso',
+    );
+
+    expect(pasos.map((p) => p.clase)).toEqual(['ruta', 'redaccion', 'consulta', 'redaccion']);
+    expect(pasos[2]).toMatchObject({ texto: 'Buscando tareas en «Web»', detalle: '0 tareas' });
+    const fin = eventos[eventos.length - 1] as Extract<EventoDeTurno, { tipo: 'fin' }>;
+    expect(fin.resultado.pensamiento?.pasos).toHaveLength(4);
+    expect(m.conversaciones.guardarTurno).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pensamiento: expect.objectContaining({ pasos: expect.any(Array) }),
+      }),
+    );
+  });
+
+  it('🔴 una vuelta que falla a mitad no tira lo ya escrito: el turno se cierra con ello', async () => {
+    const m = montar([
+      respuesta({
+        text: '¿Te refieres al tablero Web?',
+        calls: [{ name: 'consultar_tareas', args: { proyectoId: PROYECTO.id } }],
+      }),
+    ]);
+    let vez = 0;
+    const original = m.gemini.chat.getMockImplementation()!;
+    m.gemini.chat.mockImplementation(async (params: any, alTexto?: (d: string) => void) => {
+      vez += 1;
+      if (vez === 2) throw new GeminiError('El proveedor de IA está saturado ahora mismo.', 429);
+      return original(params, alTexto);
+    });
+
+    const eventos = await lastValueFrom(m.servicio.chatEnVivo(payload as any).pipe(toArray()));
+    const fin = eventos[eventos.length - 1] as Extract<EventoDeTurno, { tipo: 'fin' }>;
+
+    expect(fin.tipo).toBe('fin');
+    expect(fin.resultado.reply).toContain('¿Te refieres al tablero Web?');
+    expect(fin.resultado.reply).toContain('No he podido terminar de consultar');
   });
 
   it('🔴 un modelo que no deja de consultar se corta, y la última vuelta va sin consultas', async () => {

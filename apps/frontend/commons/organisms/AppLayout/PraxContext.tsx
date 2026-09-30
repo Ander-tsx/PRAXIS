@@ -8,6 +8,23 @@ import { createContext, useContext } from 'react';
  * es quien monta el `AssistantChat`.
  */
 
+/**
+ * El proyecto que tiene delante quien abre PRAX.
+ *
+ * Lo pone la pantalla del proyecto (`PraxProjectButton`) al montarse y lo quita
+ * al desmontarse. Solo llega si la persona tiene `canViewReports` ahí: es lo que
+ * pide `POST /projects/:id/assistant/chat`, y ofrecer un foco que responde 403 a
+ * la primera pregunta sería peor que hablar sin él.
+ */
+export interface FocoDePrax {
+  id: string;
+  name: string;
+  /** `userId` → nombre, para que las propuestas no hablen en UUID. */
+  nombres: Record<string, string>;
+  /** `labelId` → nombre. */
+  etiquetas: Record<string, string>;
+}
+
 export interface PraxContextValue {
   /** La ruta pública de la zona (`/projects`, `/assistant`…). */
   zonePath: string;
@@ -25,6 +42,9 @@ export interface PraxContextValue {
    * texto viaja como prop (`sugerenciaExterna`).
    */
   sugerir: (texto: string) => void;
+  /** El proyecto de la pantalla, o `null` fuera de uno. Ver `FocoDePrax`. */
+  foco: FocoDePrax | null;
+  fijarFoco: (foco: FocoDePrax | null) => void;
 }
 
 export const PraxContext = createContext<PraxContextValue | null>(null);

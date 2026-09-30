@@ -184,6 +184,10 @@ model Message {
   /// `contexto` es la entrada de la **primera** vuelta, lo que reenviará el
   /// siguiente turno: es lo que dispara el aviso de conversación larga.
   uso            Json?
+  /// Lo que hizo PRAX para llegar a esta respuesta, solo en los del modelo:
+  /// `{ pasos: { clase, texto, detalle? }[], ms }`. Se enseña plegado bajo la
+  /// respuesta y se despliega al pulsarlo.
+  pensamiento    Json?
   proposals      Proposal[]
   attachments    Attachment[]
   createdAt      DateTime     @default(now())

@@ -28,6 +28,7 @@ import {
   TabNav,
   type Task,
   personLabel,
+  personName,
   projectHref,
   resolveProfiles,
   tabLinkClasses,
@@ -317,6 +318,22 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     items: [...directorio.perfiles.values()],
     total: directorio.perfiles.size,
   };
+
+  /**
+   * El foco de PRAX en este proyecto: su id, su nombre y cómo llamar a cada
+   * persona y etiqueta. Solo con `canViewReports`, que es lo que pide el turno
+   * con proyecto. Ver `PraxProjectButton`.
+   */
+  const focoDePrax = can.canViewReports
+    ? {
+        id: project.id,
+        name: project.name,
+        nombres: Object.fromEntries(
+          members.map((m) => [m.userId, personName(directorio, m.userId)]),
+        ),
+        etiquetas: Object.fromEntries(labels.map((label) => [label.id, label.name])),
+      }
+    : null;
 
   const boardCount = project.workspaces.reduce(
     (total, workspace) => total + workspace.boards.length,
@@ -616,7 +633,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             )}
           />
           <div className="hidden sm:flex items-center gap-2">
-            <PraxProjectButton />
+            <PraxProjectButton foco={focoDePrax} />
             <a
               href={`/chat/proyecto/${project.id}`}
               className="flex items-center gap-2 rounded-lg border border-white/[0.12] bg-white/[0.04] px-3.5 py-1.5 font-sans text-sm font-medium text-white transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"

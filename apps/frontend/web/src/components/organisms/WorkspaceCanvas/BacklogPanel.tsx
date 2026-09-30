@@ -44,6 +44,8 @@ export interface BacklogPanelProps {
   destino: DestinoDeTarea | null;
   alEmpezarArrastre: (taskId: string, columnId: string, evento: React.PointerEvent) => void;
   registrarColumna: (columnId: string, el: HTMLElement | null) => void;
+  /** El panel entero como blanco de suelta, por encima del tablero. */
+  registrarCapa: (columnId: string, el: HTMLElement | null) => void;
   registrarLista: (columnId: string, el: HTMLElement | null, disposicion: Disposicion) => void;
   registrarTarjeta: (columnId: string, taskId: string, el: HTMLElement | null) => void;
   registrarReposicion: (id: string, el: HTMLElement | null) => void;
@@ -76,6 +78,7 @@ export function BacklogPanel({
   tareas,
   canCreate,
   canMove,
+  registrarCapa,
   ...resto
 }: BacklogPanelProps) {
   const [busqueda, setBusqueda] = useState('');
@@ -127,7 +130,15 @@ export function BacklogPanel({
           contenido**: sus tarjetas estarían en la página —para un lector de
           pantalla y para cualquier búsqueda— como si estuvieran en el tablero. */}
       {abierto && (
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div
+          /* El blanco de suelta es **el panel entero** —cabecera y alta
+             incluidas—, no solo la lista: es lo que tapa el tablero, y lo que
+             se ve encima es donde se suelta. Ver `registrarCapa`. */
+          ref={(el) =>
+            registrarCapa(BACKLOG, el?.closest<HTMLElement>('[role="complementary"]') ?? el)
+          }
+          className="flex min-h-0 flex-1 flex-col gap-3"
+        >
           {canCreate && primera && (
             <AltaRapida
               projectId={projectId}

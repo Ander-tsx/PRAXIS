@@ -533,6 +533,7 @@ export function BoardColumns({
     empezar,
     registrarPista,
     registrarColumna,
+    registrarCapa,
     registrarLista,
     registrarTarjeta,
   } = arrastreDeTablero;
@@ -1053,6 +1054,7 @@ export function BoardColumns({
           destino={destinoTarea}
           alEmpezarArrastre={empezarArrastreDeTarea}
           registrarColumna={registrarColumna}
+          registrarCapa={registrarCapa}
           registrarLista={registrarLista}
           registrarTarjeta={registrarTarjeta}
           registrarReposicion={reposicion.registrar}

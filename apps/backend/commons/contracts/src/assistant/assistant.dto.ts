@@ -70,9 +70,7 @@ export interface UsoDeTokens {
  */
 export function tokensPrax(uso: UsoDeTokens): number {
   const cache = Math.min(uso.cache, uso.entrada);
-  return Math.round(
-    (uso.entrada - cache) * 1 + cache * 0.25 + (uso.salida + uso.razonamiento) * 8,
-  );
+  return Math.round((uso.entrada - cache) * 1 + cache * 0.25 + (uso.salida + uso.razonamiento) * 8);
 }
 
 /** Los cuatro papeles de un mensaje del hilo. */
@@ -438,6 +436,42 @@ export interface AssistantProposal {
 
 export type AssistantProposalStatus = 'PENDING' | 'ACCEPTED' | 'DISCARDED';
 
+/**
+ * Un paso del pensamiento de PRAX: algo que **ocurrió de verdad** durante el
+ * turno, no una animación.
+ *
+ * - `contexto`: releer el hilo o el estado del proyecto.
+ * - `ruta`: qué tipo de petición es y qué se hace con ella.
+ * - `lectura`: un archivo adjunto.
+ * - `consulta`: una consulta `consultar_*` que el servidor ejecutó.
+ * - `redaccion`: empezar a escribir la respuesta.
+ * - `propuesta`: una propuesta que pasó la validación.
+ * - `correccion`: una que no pasó, y el segundo intento.
+ * - `espera`: el proveedor pidió esperar.
+ */
+export type ClaseDePaso =
+  | 'contexto'
+  | 'ruta'
+  | 'lectura'
+  | 'consulta'
+  | 'redaccion'
+  | 'propuesta'
+  | 'correccion'
+  | 'espera';
+
+export interface PasoDePensamiento {
+  clase: ClaseDePaso;
+  texto: string;
+  /** Lo que salió del paso, corto: «12 tareas», «3 páginas». */
+  detalle?: string;
+}
+
+export interface PensamientoDePrax {
+  pasos: PasoDePensamiento[];
+  /** Cuánto duró el turno entero, en ms. */
+  ms: number;
+}
+
 /** Lo que ve el chat después de cada turno. */
 export interface AssistantChatResult {
   /**
@@ -466,6 +500,8 @@ export interface AssistantChatResult {
     /** Lo que se cobró, en tokens PRAX (D8). Sin el turno de recuperación. */
     tokensPrax: number;
   };
+  /** Los pasos que dio PRAX en este turno. */
+  pensamiento?: PensamientoDePrax;
 }
 
 /** Una conversación en la lista, sin sus mensajes. */
@@ -493,6 +529,8 @@ export interface AssistantStoredMessage {
    * así que el hilo citaba documentos que ya no existen en ninguna parte.
    */
   attachments: AssistantAttachment[];
+  /** Solo en los del modelo, y solo desde que se guarda (2026-09-30). */
+  pensamiento?: PensamientoDePrax;
 }
 
 /**

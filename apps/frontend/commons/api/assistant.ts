@@ -537,6 +537,8 @@ export interface StoredMessage {
   attachments?: AssistantAttachment[];
   /** Lo que costó esta respuesta de PRAX (D9). Ausente en las de antes. */
   uso?: UsoDelTurno;
+  /** Los pasos que dio PRAX para responder. Ausente en las de antes. */
+  pensamiento?: PensamientoDePrax;
 }
 
 export interface FullConversation {
@@ -568,6 +570,7 @@ export interface AssistantChatResult {
    * consultas (F3). `vueltas` son las llamadas al modelo que hizo falta hacer.
    */
   uso?: UsoDelTurno;
+  pensamiento?: PensamientoDePrax;
 }
 
 /** Un turno del hilo. Lo reenvía el cliente en cada mensaje; nadie lo guarda. */
@@ -752,6 +755,31 @@ export interface UsoDelTurno {
   contexto: number;
   /** Lo que se cobró, en tokens PRAX (D8). Sin el turno de recuperación. */
   tokensPrax: number;
+}
+
+/**
+ * Un paso del pensamiento de PRAX. Espejo de `PasoDePensamiento` en los
+ * contratos: cada uno es algo que ocurrió de verdad durante el turno.
+ */
+export type ClaseDePaso =
+  | 'contexto'
+  | 'ruta'
+  | 'lectura'
+  | 'consulta'
+  | 'redaccion'
+  | 'propuesta'
+  | 'correccion'
+  | 'espera';
+
+export interface PasoDePensamiento {
+  clase: ClaseDePaso;
+  texto: string;
+  detalle?: string;
+}
+
+export interface PensamientoDePrax {
+  pasos: PasoDePensamiento[];
+  ms: number;
 }
 
 /**

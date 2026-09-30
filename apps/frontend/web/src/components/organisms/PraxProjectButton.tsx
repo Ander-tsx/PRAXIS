@@ -1,6 +1,7 @@
 'use client';
 
-import { PraxSidebarIcon, usePrax } from '@praxis/commons';
+import { type FocoDePrax, PraxSidebarIcon, usePrax } from '@praxis/commons';
+import { useEffect } from 'react';
 
 /**
  * El acceso a PRAX **dentro de un proyecto**: a la izquierda del botón de
@@ -9,9 +10,26 @@ import { PraxSidebarIcon, usePrax } from '@praxis/commons';
  * Sustituye al lanzador flotante global (`PraxLauncher`, retirado): tapaba el
  * tablero más de lo que ayudaba, y cada pantalla tiene ahora su propia forma
  * de llamar a PRAX, integrada en sus utilidades. Esta es la del proyecto.
+ *
+ * ## Y le dice a PRAX de qué proyecto se habla
+ *
+ * 🔴 Antes el panel se abría siempre sin foco: con el tablero delante, «¿cómo
+ * va?» recibía un «¿de qué proyecto me hablas?». Ahora el botón fija el foco
+ * al montarse y lo quita al salir del proyecto. `foco` llega `null` si la
+ * persona no tiene `canViewReports`: entonces PRAX habla sin proyecto, que es
+ * lo único que el gateway le dejaría hacer.
  */
-export function PraxProjectButton() {
+export function PraxProjectButton({ foco }: { foco: FocoDePrax | null }) {
   const prax = usePrax();
+  const fijarFoco = prax?.fijarFoco;
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: el foco se renueva por proyecto; los mapas cambian de identidad en cada render del servidor.
+  useEffect(() => {
+    if (!fijarFoco) return;
+    fijarFoco(foco);
+    return () => fijarFoco(null);
+  }, [fijarFoco, foco?.id]);
+
   if (!prax) return null;
 
   return (
@@ -27,7 +45,7 @@ export function PraxProjectButton() {
         prax.alternar();
       }}
       aria-pressed={prax.abierto}
-      title="PRAX"
+      title={foco ? `PRAX sobre ${foco.name}` : 'PRAX'}
       className="flex items-center gap-2 rounded-lg border border-white/[0.12] bg-white/[0.04] px-3.5 py-1.5 font-sans text-sm font-medium text-white transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
     >
       <PraxSidebarIcon className="h-4 w-4" />

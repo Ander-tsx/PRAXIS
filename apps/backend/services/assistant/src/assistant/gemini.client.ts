@@ -111,10 +111,63 @@ export class GeminiError extends Error {
      * seguridad: la respuesta a la misma pregunta va a ser la misma.
      */
     readonly reintentable = false,
+    /**
+     * Solo en los 429: qué cuota se agotó y cuánto pide Google esperar. Ver
+     * {@link leerLimite}.
+     */
+    readonly limite?: LimiteDeGemini,
   ) {
     super(message);
     this.name = 'GeminiError';
   }
+}
+
+/**
+ * Lo que dice un 429 de Gemini, leído de su cuerpo.
+ *
+ * 🔴 **Un 429 no es «vuelve en unos minutos».** En producción (2026-09-30) PRAX
+ * contestaba «ha llegado a su límite de uso» a cualquier petición de verdad y
+ * un «hola» funcionaba en el mismo instante: el «hola» es una llamada y una
+ * pregunta real son tres o cuatro seguidas —el bucle de consultas—, cada una
+ * con el contexto entero. Con una clave del nivel gratuito eso agota la cuota
+ * **por minuto** del modelo, que se pasa sola en segundos, y el turno se tiraba
+ * entero en vez de esperar lo que Google pide en `RetryInfo`.
+ *
+ * Las cuotas son **por modelo**: la de un día agotada en uno no toca al de
+ * respaldo, así que ahí se cambia de modelo en vez de rendirse.
+ */
+export interface LimiteDeGemini {
+  /** El `quotaId` del `QuotaFailure`, para el log. `null` si no vino. */
+  cuota: string | null;
+  /** El `retryDelay` de `RetryInfo`, en ms. `null` si no vino. */
+  esperaMs: number | null;
+  /** Una cuota diaria: esperar no sirve hoy, cambiar de modelo sí. */
+  porDia: boolean;
+}
+
+/** Lo máximo que se espera a que se pase una cuota por minuto, dentro de un turno. */
+const ESPERA_MAXIMA_POR_LIMITE_MS = 20_000;
+
+export function leerLimite(detalle: string): LimiteDeGemini {
+  let cuota: string | null = null;
+  let esperaMs: number | null = null;
+  try {
+    const cuerpo = JSON.parse(detalle) as {
+      error?: {
+        details?: { '@type'?: string; violations?: { quotaId?: string }[]; retryDelay?: string }[];
+      };
+    };
+    for (const d of cuerpo.error?.details ?? []) {
+      if (d['@type']?.endsWith('QuotaFailure')) cuota = d.violations?.[0]?.quotaId ?? cuota;
+      if (d['@type']?.endsWith('RetryInfo') && d.retryDelay) {
+        const segundos = Number.parseFloat(d.retryDelay);
+        if (Number.isFinite(segundos)) esperaMs = Math.ceil(segundos * 1000);
+      }
+    }
+  } catch {
+    /* Un cuerpo que no es JSON: sin datos, se trata como un 429 cualquiera. */
+  }
+  return { cuota, esperaMs, porDia: /PerDay/i.test(cuota ?? '') };
 }
 
 /** Más de esto y la espera deja de parecer una espera. */
@@ -217,6 +270,8 @@ export class GeminiClient {
       extra?: GeminiContent[];
     },
     alTexto?: (delta: string) => void,
+    /** Avisa de una espera por límite, para contarla en el pensamiento (D7). */
+    alEsperar?: (segundos: number) => void,
   ): Promise<GeminiReply> {
     /**
      * Un turno son varios intentos, y eso es nuevo.
@@ -262,10 +317,29 @@ export class GeminiClient {
             `gemini_intento_fallido modelo=${modelo} intento=${intento}/${MAX_INTENTOS} ` +
               `status=${fallo.status ?? 'red'} reintentable=${fallo.reintentable} ${fallo.message}`,
           );
+          if (emitido) throw fallo;
+          /* Un límite de Gemini (429 que no es el tope de gasto). Las cuotas son
+             por modelo: la diaria no se pasa esperando, pero el de respaldo
+             tiene la suya. La por minuto sí se pasa, y Google dice cuánto. */
+          if (fallo.limite) {
+            const espera = fallo.limite.esperaMs;
+            const hayOtro = modelo !== modelos[modelos.length - 1];
+            if (espera === null || fallo.limite.porDia || (hayOtro && espera > 3_000)) {
+              if (hayOtro) break;
+              throw fallo;
+            }
+            if (intento >= MAX_INTENTOS || espera > ESPERA_MAXIMA_POR_LIMITE_MS) {
+              if (hayOtro) break;
+              throw fallo;
+            }
+            alEsperar?.(Math.ceil(espera / 1000));
+            await this.esperar(espera + 250);
+            continue;
+          }
           /* Lo que no es transitorio no mejora esperando, ni cambiando de
-             modelo: la clave, la cuota y el bloqueo de seguridad son del
-             proyecto entero, no de un modelo concreto. */
-          if (!fallo.reintentable || emitido) throw fallo;
+             modelo: la clave, el tope de gasto y el bloqueo de seguridad son
+             del proyecto entero, no de un modelo concreto. */
+          if (!fallo.reintentable) throw fallo;
           if (intento < MAX_INTENTOS) await this.esperar(esperaDelIntento(intento));
         }
       }
@@ -358,11 +432,20 @@ export class GeminiClient {
 
     if (!response.ok) {
       const detalle = await response.text().catch(() => '');
-      this.log.warn(`Gemini ${response.status}: ${detalle.slice(0, 500)}`);
+      const topeDeGasto = /spend(ing)? cap/i.test(detalle);
+      const limite = response.status === 429 && !topeDeGasto ? leerLimite(detalle) : undefined;
+      /* En una línea: el cuerpo entero salía partido en diez y cortado a 500
+         caracteres, justo antes de decir **qué** cuota se había agotado. */
+      this.log.warn(
+        limite
+          ? `gemini_limite modelo=${modelo} cuota=${limite.cuota ?? '?'} espera=${limite.esperaMs ?? '?'}ms`
+          : `Gemini ${response.status}: ${detalle.replace(/\s+/g, ' ').slice(0, 500)}`,
+      );
       throw new GeminiError(
         this.mensajeDelFallo(response.status, detalle),
         response.status,
         this.esTransitorio(response.status, detalle),
+        limite,
       );
     }
 
@@ -537,6 +620,11 @@ export class GeminiClient {
     if (texto.includes('spending cap') || texto.includes('spend cap')) {
       return 'El asistente esta fuera de servicio: la plataforma ha agotado su presupuesto de este mes.';
     }
-    return 'El asistente ha llegado a su limite de uso. Prueba en unos minutos.';
+    if (leerLimite(detalle).porDia) {
+      return 'El proveedor de IA ha agotado su cupo de hoy. Avisa a quien administra Praxis.';
+    }
+    /* ⚠️ Decía «el asistente ha llegado a su límite de uso», y se leía como la
+       cuota de tokens de la persona — que no tenía nada que ver. */
+    return 'El proveedor de IA está saturado ahora mismo. Prueba en un minuto.';
   }
 }

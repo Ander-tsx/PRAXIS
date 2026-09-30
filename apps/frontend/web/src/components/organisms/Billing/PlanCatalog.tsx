@@ -111,7 +111,7 @@ export function PlanCatalog({
                 /* Tokens PRAX por persona (D8 de docs/PLAN-PRAX-SEMIAGENTICO.md): un
                    mensaje ya no cuesta lo mismo que otro desde que PRAX consulta
                    antes de responder. La explicación va debajo de la tabla. */
-                label: 'Tokens PRAX / mes por persona',
+                label: 'Tokens de IA / mes por persona',
                 valor: (p: PlanSpec) =>
                   p.quotas.iaTokensMensualesPorPersona === null
                     ? 'Ilimitado'
@@ -181,9 +181,9 @@ export function PlanCatalog({
       {/* Qué es un token PRAX, dicho donde se compra (D8). Sin esto la fila de la
           tabla es un número que nadie sabe traducir a «cuánto puedo usarlo». */}
       <p className="max-w-3xl font-sans text-xs text-white/40">
-        <strong className="text-white/60">Tokens PRAX:</strong> lo que gasta el asistente, medido
-        como lo cobra el modelo. Lo que PRAX lee cuenta una vez; lo que escribe, ocho, porque cuesta
-        ocho veces más. Una pregunta corta sobre un proyecto ronda los 15-20 mil; consultar varios
+        <strong className="text-white/60">Tokens:</strong> lo que gasta el asistente, medido como lo
+        cobra el modelo. Lo que PRAX lee cuenta una vez; lo que escribe, ocho, porque cuesta ocho
+        veces más. Una pregunta corta sobre un proyecto ronda los 15-20 mil; consultar varios
         proyectos o mantener una conversación muy larga gasta más, y PRAX te avisa cuando seguirla
         sale caro. Cada persona tiene su cuota entera dentro de la organización.
       </p>
@@ -250,7 +250,7 @@ const REBASADO: Record<QuotaExcedida['kind'], (excedida: QuotaExcedida) => strin
   almacenamiento: (e) =>
     `Los adjuntos ocupan ${e.actual} MB y el plan da ${e.tope}. Los archivos siguen ahí y se descargan; no se puede subir otro.`,
   ia_mensual: (e) =>
-    `Llevas ${formatearTokens(e.actual)} tokens PRAX este mes y el plan da ${formatearTokens(e.tope)}. El contador vuelve a cero el día 1.`,
+    `Llevas ${formatearTokens(e.actual)} tokens este mes y el plan da ${formatearTokens(e.tope)}. El contador vuelve a cero el día 1.`,
   /* Los dos que no pueden llegar aquí, y por qué. El `Record` los exige
      completos, y dejarlos con una cadena vacía sería una línea en blanco el
      día que alguno sí llegue. */
@@ -317,7 +317,7 @@ function TuConsumo({ resumen }: { resumen: BillingSummary }) {
         <span className="tabular-nums text-white">
           {topeIa === null ? 'ilimitados' : formatearTokens(topeIa)}
         </span>{' '}
-        tokens PRAX. Se reinician el {fechaCorta(resumen.iaReiniciaEn)}.
+        tokens. Se reinician el {fechaCorta(resumen.iaReiniciaEn)}.
       </p>
     </div>
   );

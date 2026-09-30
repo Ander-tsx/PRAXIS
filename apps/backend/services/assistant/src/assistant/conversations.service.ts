@@ -154,6 +154,7 @@ export class ConversationsService {
         /* Lo que costó cada respuesta de PRAX (D9). Solo en las del modelo, y
            solo desde que se guarda. */
         ...(mensaje.uso ? { uso: mensaje.uso } : {}),
+        ...(mensaje.pensamiento ? { pensamiento: mensaje.pensamiento } : {}),
       })),
     };
   }
@@ -375,6 +376,8 @@ export class ConversationsService {
     respuesta: string;
     /** Lo que costó la respuesta (D9). Se guarda en el mensaje del modelo. */
     uso?: Record<string, number>;
+    /** Los pasos del turno. Se guarda en el mensaje del modelo. */
+    pensamiento?: { pasos: { clase: string; texto: string; detalle?: string }[]; ms: number };
     proposals: { tool: string; args: Record<string, unknown> }[];
     /** Quién pregunta. Solo se usa para no reclamar borradores de otra persona. */
     userId: string;
@@ -414,6 +417,7 @@ export class ConversationsService {
           role: 'MODEL',
           text: respuesta,
           ...(params.uso ? { uso: params.uso } : {}),
+          ...(params.pensamiento ? { pensamiento: params.pensamiento } : {}),
           proposals: {
             create: proposals.map((propuesta) => ({
               tool: propuesta.tool,

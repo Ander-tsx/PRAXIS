@@ -114,8 +114,10 @@ import { conversationIdDelError, cuotaDelError, describe, requireApi } from './h
 
 export interface RespuestaChat {
   reply: string | null;
-  /** Lo que costó el turno en tokens PRAX (D9). Solo si salió bien. */
+  /** Lo que costó el turno en tokens (D9). Solo si salió bien. */
   uso?: AssistantChatResult['uso'];
+  /** Los pasos que dio PRAX. Solo si salió bien. */
+  pensamiento?: AssistantChatResult['pensamiento'];
   proposals: AssistantChatResult['proposals'];
   /** Siempre que se pueda saber: también cuando el turno falla por cuota. */
   cuota: AssistantQuota | null;

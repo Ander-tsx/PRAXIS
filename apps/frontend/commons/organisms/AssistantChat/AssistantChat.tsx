@@ -11,12 +11,11 @@ import {
   type AssistantProposal,
   type AssistantQuota,
   type ConversationSummary,
-  PRAX_CONTEXTO_LARGO,
+  type PasoDePensamiento,
+  type PensamientoDePrax,
   type UsoDelTurno,
   assistantAttachmentHref,
   esImagenDeAsistente,
-  formatearTokens,
-  formatoReinicio,
   isAssignmentProposal,
   isBoardProposal,
   isCheckStepsProposal,
@@ -52,7 +51,8 @@ import { usePrax } from '../AppLayout/PraxContext';
 import { AmpliarPlan } from './AmpliarPlan';
 import { RecursosMenu } from './ComposerControls';
 import { ConversationHistory } from './ConversationHistory';
-import { FlujoDePensamiento } from './FlujoDePensamiento';
+import { MedidorDeTokens } from './MedidorDeTokens';
+import { Pensamiento } from './Pensamiento';
 import { ModelText } from './ModelText';
 import {
   AssignProposalCard,
@@ -111,8 +111,10 @@ interface Mensaje {
    * verdad no pasó nada.
    */
   degradado?: boolean;
-  /** Solo en los del asistente: lo que costó en tokens PRAX (D9). */
+  /** Solo en los del asistente: lo que costó en tokens (D9). */
   uso?: UsoDelTurno;
+  /** Solo en los del asistente: los pasos que dio para responder. */
+  pensamiento?: PensamientoDePrax;
 }
 
 export interface AssistantChatProps {
@@ -285,7 +287,7 @@ const SUGERENCIAS = [
  * al chat, que es donde se puede hacer algo.
  */
 export function AssistantChat({
-  projectId,
+  projectId: focoDeFuera,
   gatewayPath,
   cuotaInicial,
   nombres,
@@ -302,6 +304,29 @@ export function AssistantChat({
   /* Las dos variantes comparten toda la mecánica de alto y scroll; lo que
      cambia es la carcasa y la cabecera. */
   const esFlotante = variante === 'flotante';
+  /**
+   * De qué proyecto va **la conversación abierta** en el panel flotante.
+   *
+   * `undefined`: todavía no ha dicho nada, así que manda el foco de la
+   * pantalla. `null`: una conversación sin proyecto, que puede adoptar el de la
+   * pantalla (el backend lo permite una vez). Un id: ese, y no cambia.
+   */
+  const [proyectoDelHilo, setProyectoDelHilo] = useState<string | null | undefined>(undefined);
+  /** Quien quitó el proyecto de la insignia antes de escribir: habla sin foco. */
+  const [focoSoltado, setFocoSoltado] = useState(false);
+  /**
+   * 🔴 **El proyecto del que se habla.** En el panel flotante lo pone la
+   * pantalla: dentro de un proyecto, PRAX ya sabe cuál es (antes montaba
+   * siempre `null` y respondía «¿de qué proyecto hablas?» con el tablero
+   * delante). En `/assistant` lo gobierna la URL, como siempre.
+   */
+  const projectId = !esFlotante
+    ? focoDeFuera
+    : proyectoDelHilo
+      ? proyectoDelHilo
+      : focoSoltado
+        ? null
+        : focoDeFuera;
   /* `projectId` → nombre, para que el historial diga de qué iba cada
      conversación sin abrirla. Se construye aquí y no en la page porque el
      historial es de esta pantalla, no del servidor. */
@@ -320,8 +345,24 @@ export function AssistantChat({
     setMensajes([]);
     setError(null);
     setVista('chat');
+    setProyectoDelHilo(undefined);
+    setFocoSoltado(false);
     onElegirProyecto?.('', null);
   }, [onElegirProyecto]);
+
+  /**
+   * Cambiar de proyecto con el panel abierto en otra conversación.
+   *
+   * Un hilo es de un proyecto y no cambia (409 si se intenta). Al entrar en otro
+   * proyecto, la conversación de antes se queda en el historial y el panel
+   * empieza una nueva sobre el de ahora — que es de lo que se va a preguntar.
+   */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: solo al cambiar el foco de la pantalla.
+  useEffect(() => {
+    if (!esFlotante) return;
+    setFocoSoltado(false);
+    if (proyectoDelHilo && focoDeFuera && proyectoDelHilo !== focoDeFuera) empezarDeCero();
+  }, [focoDeFuera]);
 
   const nombresDeProyecto = useMemo(
     () => Object.fromEntries(proyectos.map((proyecto) => [proyecto.id, proyecto.name])),
@@ -500,7 +541,7 @@ export function AssistantChat({
   const [texto, setTexto] = useState('');
   const [pendiente, setPendiente] = useState(false);
   /** Lo que va llegando del turno en curso: los pasos y el texto (F3). */
-  const [enVivo, setEnVivo] = useState<{ pasos: string[]; texto: string } | null>(null);
+  const [enVivo, setEnVivo] = useState<{ pasos: PasoDePensamiento[]; texto: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   /**
    * El turno que se puede volver a mandar tal cual, si el último falló.
@@ -560,12 +601,16 @@ export function AssistantChat({
   }, []);
 
   const agotada = cuota !== null && cuota.usados >= cuota.limite;
+  const usosDelHilo = useMemo(
+    () => mensajes.flatMap((m) => (m.role === 'model' && m.uso ? [m.uso] : [])),
+    [mensajes],
+  );
 
   /**
    * Al fondo: en un hilo, lo último es lo que importa.
    *
    * Suelto de su `useEffect` porque tiene **dos disparadores** y ninguno sabe
-   * del otro: cada turno, y cada paso que descubre `FlujoDePensamiento`. Los
+   * del otro: cada turno, y cada paso que descubre `Pensamiento`. Los
    * pasos crecen hacia abajo mientras el hilo está quieto, así que sin esto el
    * tercero acaba escrito por debajo del borde y parece que no pasa nada.
    */
@@ -616,6 +661,7 @@ export function AssistantChat({
     }
 
     setConversationId(conversacion.id);
+    setProyectoDelHilo(conversacion.projectId ?? null);
     setMensajes(
       conversacion.mensajes.map((mensaje) => ({
         id: mensaje.id,
@@ -626,6 +672,7 @@ export function AssistantChat({
            `undefined` a un campo opcional es un error de tipos. */
         ...(mensaje.attachments ? { attachments: mensaje.attachments } : {}),
         ...(mensaje.uso ? { uso: mensaje.uso } : {}),
+        ...(mensaje.pensamiento ? { pensamiento: mensaje.pensamiento } : {}),
       })),
     );
 
@@ -759,6 +806,9 @@ export function AssistantChat({
      */
     let respuesta: Awaited<ReturnType<typeof preguntarAction>>;
     setEnVivo({ pasos: [], texto: '' });
+    /* Copia local de lo que llega en vivo: si el turno falla a mitad, lo ya
+       escrito se queda en el hilo (el estado de React aquí sería el de antes). */
+    const parcial = { texto: '', pasos: [] as PasoDePensamiento[], inicio: Date.now() };
     try {
       /* En vivo (F3): los pasos y el texto se pintan según llegan, y el final
          tiene la misma forma que la Server Action de antes, así que lo de abajo
@@ -773,13 +823,21 @@ export function AssistantChat({
           organizationId: organizacionActivaId,
         },
         {
-          alEmpezar: (id) => setConversationId(id),
-          alPaso: (paso) =>
+          alEmpezar: (id) => {
+            setConversationId(id);
+            /* El hilo queda atado al proyecto con el que arrancó. */
+            setProyectoDelHilo(projectId);
+          },
+          alPaso: (paso) => {
+            parcial.pasos.push(paso);
             setEnVivo((actual) =>
               actual ? { ...actual, pasos: [...actual.pasos, paso] } : actual,
-            ),
-          alTexto: (delta) =>
-            setEnVivo((actual) => (actual ? { ...actual, texto: actual.texto + delta } : actual)),
+            );
+          },
+          alTexto: (delta) => {
+            parcial.texto += delta;
+            setEnVivo((actual) => (actual ? { ...actual, texto: actual.texto + delta } : actual));
+          },
         },
       );
     } catch {
@@ -820,8 +878,25 @@ export function AssistantChat({
        */
       setAdjuntos(enviados);
       const idDegradado = crypto.randomUUID();
+      /**
+       * 🔴 **Lo que PRAX llegó a escribir no desaparece.** Antes el texto en
+       * vivo se borraba al fallar y en su sitio quedaba solo el aviso: «me hizo
+       * una pregunta y luego se fue». Se queda como su respuesta, con su
+       * pensamiento, y el aviso debajo.
+       */
+      const escrito = parcial.texto.trim();
       setMensajes((previos) => [
         ...previos,
+        ...(escrito
+          ? [
+              {
+                id: crypto.randomUUID(),
+                role: 'model' as const,
+                text: escrito,
+                pensamiento: { pasos: parcial.pasos, ms: Date.now() - parcial.inicio },
+              },
+            ]
+          : []),
         {
           id: idDegradado,
           role: 'model',
@@ -853,6 +928,10 @@ export function AssistantChat({
         text: respuesta.reply as string,
         proposals: respuesta.proposals,
         ...(respuesta.uso ? { uso: respuesta.uso } : {}),
+        pensamiento: respuesta.pensamiento ?? {
+          pasos: parcial.pasos,
+          ms: Date.now() - parcial.inicio,
+        },
       },
     ]);
   }
@@ -972,7 +1051,7 @@ export function AssistantChat({
               (enBlanco ? (
                 <button
                   type="button"
-                  onClick={() => onElegirProyecto?.('', null)}
+                  onClick={() => (esFlotante ? setFocoSoltado(true) : onElegirProyecto?.('', null))}
                   title="Elegir otro proyecto"
                   className="group flex max-w-full items-center gap-1 self-start rounded-full px-2.5 py-1 font-sans text-xs font-medium transition-colors"
                   style={{
@@ -1184,12 +1263,14 @@ export function AssistantChat({
           onElegir={cargar}
           onNueva={() => {
             setConversationId(null);
+            setProyectoDelHilo(undefined);
             setMensajes([]);
             setError(null);
             setVista('chat');
           }}
           onBorrarActiva={() => {
             setConversationId(null);
+            setProyectoDelHilo(undefined);
             setMensajes([]);
           }}
           filtroProyectoId={null}
@@ -1218,16 +1299,6 @@ export function AssistantChat({
                     }
                     reintentando={pendiente}
                   />
-                  {mensaje.role === 'model' && mensaje.uso && (
-                    /* Lo que costó esta respuesta (D9). Discreto: está para quien lo
-                         busque, no para distraer de lo que dijo. */
-                    <p className="-mt-3 pl-9 font-sans text-[11px] text-text-disabled tabular-nums">
-                      {formatearTokens(mensaje.uso.tokensPrax)} tokens PRAX
-                      {mensaje.uso.vueltas > 1 &&
-                        ` · consultó ${mensaje.uso.vueltas - 1} ${mensaje.uso.vueltas === 2 ? 'vez' : 'veces'}`}
-                    </p>
-                  )}
-
                   {(mensaje.proposals ?? []).length > 0 && (
                     /* Cuántas quedan sin decidir lo lleva el propio grupo: cada
                        tarjeta le informa de su estado, así que también cuenta
@@ -1544,16 +1615,19 @@ export function AssistantChat({
                 </div>
               ))}
 
-              {pendiente &&
-                (enVivo?.texto ? (
-                  /* El texto según lo escribe PRAX. La respuesta definitiva la
-                     pone el `fin` del turno, en el mismo marco. */
-                  <MensajeDePrax>
-                    <TextoEnVivo texto={enVivo.texto} />
-                  </MensajeDePrax>
-                ) : (
-                  <FlujoDePensamiento pasos={enVivo?.pasos ?? []} alAvanzar={irAlFondo} />
-                ))}
+              {pendiente && (
+                /* El pensamiento abierto mientras piensa; en cuanto escribe, se
+                   compacta y debajo va el texto. La respuesta definitiva la pone
+                   el `fin` del turno, en el mismo marco: no salta nada. */
+                <MensajeDePrax pensando>
+                  <Pensamiento
+                    pasos={enVivo?.pasos ?? []}
+                    enCurso={!enVivo?.texto}
+                    alAvanzar={irAlFondo}
+                  />
+                  {enVivo?.texto && <TextoEnVivo texto={enVivo.texto} />}
+                </MensajeDePrax>
+              )}
             </div>
           )}
 
@@ -1679,15 +1753,6 @@ export function AssistantChat({
                 enviar(texto);
               }}
             >
-              <ConsumoDeLaConversacion
-                mensajes={mensajes}
-                cuota={cuota}
-                onNueva={() => {
-                  setConversationId(null);
-                  setMensajes([]);
-                  setError(null);
-                }}
-              />
               <label htmlFor={campoId} className="sr-only">
                 Pregunta al asistente
               </label>
@@ -1802,6 +1867,17 @@ export function AssistantChat({
 
                   <RecursosMenu organizacionActivaId={organizacionActivaId ?? null} />
 
+                  <MedidorDeTokens
+                    usos={usosDelHilo}
+                    cuota={cuota}
+                    onNueva={() => {
+                      setConversationId(null);
+                      setProyectoDelHilo(undefined);
+                      setMensajes([]);
+                      setError(null);
+                    }}
+                  />
+
                   {/* Escondido: lo abre el menú «+». Las extensiones además de
                         los tipos, porque algunos selectores no reconocen
                         `text/markdown` y dejan los `.md` en gris. `accept` se
@@ -1859,60 +1935,6 @@ export function AssistantChat({
         </div>
       )}
     </section>
-  );
-}
-
-/**
- * Lo que cuesta esta conversación, y el aviso de cuando sale cara seguirla (D9
- * de docs/PLAN-PRAX-SEMIAGENTICO.md).
- *
- * Cada turno reenvía el hilo entero al modelo: una conversación larga no cuesta
- * más una vez, cuesta más **en cada mensaje**. Por eso el aviso mira el
- * `contexto` del último turno —lo que reenviará el siguiente— y no el total
- * gastado, y ofrece lo único que lo arregla: empezar una nueva.
- */
-function ConsumoDeLaConversacion({
-  mensajes,
-  cuota,
-  onNueva,
-}: {
-  mensajes: Mensaje[];
-  cuota: AssistantQuota | null;
-  onNueva: () => void;
-}) {
-  const conUso = mensajes.filter((m) => m.role === 'model' && m.uso);
-  if (conUso.length === 0) return null;
-  const gastado = conUso.reduce((total, m) => total + (m.uso?.tokensPrax ?? 0), 0);
-  const contexto = conUso[conUso.length - 1].uso?.contexto ?? 0;
-  const quedan = cuota ? Math.max(0, cuota.limite - cuota.usados) : null;
-
-  if (contexto >= PRAX_CONTEXTO_LARGO) {
-    return (
-      <div
-        role="status"
-        className="flex items-center gap-3 rounded-xl border border-warning/40 bg-warning-muted px-3 py-2 font-sans text-xs text-text-primary"
-      >
-        <span className="min-w-0 flex-1">
-          Esta conversación ya es larga: cada mensaje reenvía unos{' '}
-          <strong className="tabular-nums">{formatearTokens(contexto)}</strong> tokens de contexto.
-          Seguirla gasta mucho más que empezar una nueva.
-        </span>
-        <button
-          type="button"
-          onClick={onNueva}
-          className="shrink-0 rounded-lg border border-border px-2.5 py-1 font-medium text-text-primary transition-colors hover:bg-surface-elevated"
-        >
-          Empezar una nueva
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <p className="px-1 font-sans text-[11px] text-text-secondary tabular-nums">
-      Esta conversación: {formatearTokens(gastado)} tokens PRAX
-      {quedan !== null && <> · te quedan {formatearTokens(quedan)} este mes</>}
-    </p>
   );
 }
 
@@ -2019,6 +2041,14 @@ function Burbuja({
 
   return (
     <MensajeDePrax>
+      {mensaje.pensamiento && (
+        <Pensamiento
+          pasos={mensaje.pensamiento.pasos}
+          enCurso={false}
+          ms={mensaje.pensamiento.ms}
+          tokens={mensaje.uso?.tokensPrax}
+        />
+      )}
       <div
         className={
           mensaje.degradado
@@ -2057,11 +2087,18 @@ function Burbuja({
  * a todo el ancho. Lo comparten la respuesta terminada y la que se está
  * escribiendo, para que al terminar el turno no salte nada de sitio.
  */
-function MensajeDePrax({ children }: { children: React.ReactNode }) {
+function MensajeDePrax({
+  children,
+  pensando = false,
+}: {
+  children: React.ReactNode;
+  /** Mientras responde, la cara piensa. */
+  pensando?: boolean;
+}) {
   return (
     <div className="flex min-w-0 gap-3">
       <div className="mt-0.5 shrink-0">
-        <PraxAvatar mood="idle" size="sm" animate={false} />
+        <PraxAvatar mood={pensando ? 'thinking' : 'idle'} size="sm" animate={pensando} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 font-sans text-[15px] leading-relaxed text-text-primary">
         <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-text-secondary">

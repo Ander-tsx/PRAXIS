@@ -1,4 +1,4 @@
-import type { AssistantChatResult } from '../api/assistant';
+import type { AssistantChatResult, ClaseDePaso, PasoDePensamiento } from '../api/assistant';
 import { ApiError, type ApiErrorCode } from '../api/envelope';
 import { detallesDeCuota } from '../billing/planes';
 import type { RespuestaChat } from './actions';
@@ -23,7 +23,7 @@ import { conversationIdDelError, cuotaDelError, describe } from './errores';
  */
 export interface OyentesDelTurno {
   alEmpezar?: (conversationId: string) => void;
-  alPaso?: (texto: string) => void;
+  alPaso?: (paso: PasoDePensamiento) => void;
   alTexto?: (delta: string) => void;
 }
 
@@ -105,7 +105,11 @@ export async function preguntarEnVivo(
       conversationId = String(evento.conversationId);
       oyentes.alEmpezar?.(conversationId);
     } else if (tipo === 'paso') {
-      oyentes.alPaso?.(String(evento.texto ?? ''));
+      oyentes.alPaso?.({
+        clase: (evento.clase as ClaseDePaso | undefined) ?? 'consulta',
+        texto: String(evento.texto ?? ''),
+        ...(typeof evento.detalle === 'string' ? { detalle: evento.detalle } : {}),
+      });
     } else if (tipo === 'texto') {
       oyentes.alTexto?.(String(evento.delta ?? ''));
     } else if (tipo === 'fin') {
@@ -179,5 +183,6 @@ export async function preguntarEnVivo(
     conversationId: resultado.conversationId ?? conversationId,
     error: null,
     ...(resultado.uso ? { uso: resultado.uso } : {}),
+    ...(resultado.pensamiento ? { pensamiento: resultado.pensamiento } : {}),
   };
 }

@@ -922,3 +922,52 @@ ajustando con 50 a 300 ejemplos propios antes de encenderlo.
       (solo para esa persona; al resto, «N propuestas para …»).
     - Sin «Ver los reportes y usar el asistente», PRAX contesta en el chat qué
       permiso falta. Con la cuota agotada, lo dice.
+
+---
+
+## Pulido tras el primer uso en producción (2026-09-30, rama `feature/prax-pulido`)
+
+Lo que el dueño del producto encontró al probar lo desplegado, y cómo se cerró.
+
+- **PRAX no sabía en qué proyecto estabas.** El panel global se montaba
+  siempre con `projectId={null}`. Ahora `PraxProjectButton` fija un
+  `FocoDePrax` en `PraxContext` al montarse (solo con `canViewReports`) y lo
+  quita al salir. En `AssistantChat` flotante, `proyectoDelHilo` ata cada
+  conversación a su proyecto: entrar en otro proyecto con un hilo ajeno
+  empieza uno nuevo (el viejo queda en el historial); uno sin proyecto adopta
+  el de la pantalla.
+- 🔴 **«Ha llegado a su límite de uso» no era la cuota de la persona.** Era un
+  429 de Gemini (clave del nivel gratuito): un «hola» es una llamada y una
+  pregunta real son tres o cuatro seguidas, cada una con el contexto entero.
+  Confirmado en los logs de `praxis-api`. `gemini.client.ts` lee ahora el
+  `QuotaFailure` y el `RetryInfo` del 429 (`leerLimite`): la cuota por minuto
+  se **espera** (hasta 20 s, contándolo como paso), la diaria **salta al
+  modelo de respaldo** (las cuotas son por modelo) y el mensaje ya no culpa a
+  nadie: «el proveedor de IA está saturado». ⚠️ Sin `GEMINI_MODEL_FALLBACK`
+  en Railway no hay respaldo; y el arreglo de fondo es activar facturación en
+  la clave de Google AI Studio.
+- 🔴 **«Me hizo una pregunta y se fue».** Una vuelta del bucle que fallaba
+  después de escribir tiraba el turno entero, y el texto en vivo desaparecía.
+  Ahora el turno se cierra con lo escrito y una nota; y el cliente, si aun así
+  falla, conserva lo que llegó a pintar.
+- **Pensamiento visible.** Los `paso` del SSE pasan a ser estructurados
+  (`PasoDePensamiento`: `contexto`, `ruta`, `lectura`, `consulta`,
+  `redaccion`, `propuesta`, `correccion`, `espera`) y se guardan en
+  `Message.pensamiento` (migración `20260930120000_pensamiento_de_prax`,
+  aditiva). `Pensamiento.tsx` sustituye a `FlujoDePensamiento`: abierto
+  mientras piensa, compacto («Pensó 4 s · 5 pasos · 3 mil tokens») en cuanto
+  escribe, desplegable. **No nombra a Jev**: enseña la decisión, no quién la
+  tomó.
+- **«Tokens», sin «PRAX».** El consumo deja de ser una línea fija: es un
+  anillo de contexto junto a «Recursos» (`MedidorDeTokens.tsx`) con el
+  desglose al pulsarlo — contexto contra `PRAX_CONTEXTO_LARGO`, la
+  conversación, la última respuesta y la cuota del mes.
+- **Backlog.** Soltar en el panel caía en las columnas de detrás: el panel se
+  registra como **capa** (`registrarCapa` en `useArrastreDeTablero`) y gana
+  el hit-test en todo su rectángulo, cabecera incluida.
+- **Avatar.** `PraxAvatar` reescrito sin cambiar de personaje: volumen (luz,
+  sombra propia, filo y brillo), respiración con estiramiento, faldón que
+  ondula (SMIL sobre `d`), sombra de suelo y halo, ojos que siguen al puntero
+  desde `md`, y gestos de una vez por ánimo (saltito con chispas, temblor,
+  respingo). Pensando: halo rápido, reflejo que cruza el cuerpo y tres chispas
+  en órbita. Todo se apaga con `prefers-reduced-motion`.

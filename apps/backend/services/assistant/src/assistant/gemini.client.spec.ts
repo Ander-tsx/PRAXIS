@@ -87,11 +87,59 @@ describe('GeminiClient — qué se reintenta y qué se cuenta', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('NO reintenta el limite por minuto', async () => {
+  it('un 429 sin RetryInfo ni respaldo no se reintenta, y no culpa a la cuota de nadie', async () => {
     fetchSpy.mockResolvedValue(respuesta(429, 'quota exceeded'));
 
-    await expect(cliente().chat(turno)).rejects.toThrow(/limite de uso/);
+    await expect(cliente().chat(turno)).rejects.toThrow(/saturado/);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('un 429 por minuto espera lo que pide Google y vuelve a intentarlo', async () => {
+    const limite = {
+      error: {
+        code: 429,
+        details: [
+          {
+            '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+            violations: [{ quotaId: 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier' }],
+          },
+          { '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '0.01s' },
+        ],
+      },
+    };
+    fetchSpy
+      .mockResolvedValueOnce(respuesta(429, limite))
+      .mockResolvedValueOnce(respuesta(200, OK));
+    const esperas: number[] = [];
+
+    await expect(cliente().chat(turno, undefined, (s) => esperas.push(s))).resolves.toMatchObject({
+      text: 'hola',
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(esperas).toEqual([1]);
+  });
+
+  it('un 429 diario salta al modelo de respaldo, que tiene su propia cuota', async () => {
+    const diario = {
+      error: {
+        code: 429,
+        details: [
+          {
+            '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+            violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }],
+          },
+        ],
+      },
+    };
+    fetchSpy
+      .mockResolvedValueOnce(respuesta(429, diario))
+      .mockResolvedValueOnce(respuesta(200, OK));
+
+    await expect(
+      cliente({ GEMINI_MODEL: 'principal', GEMINI_MODEL_FALLBACK: 'respaldo' }).chat(turno),
+    ).resolves.toMatchObject({ text: 'hola' });
+    const urls = fetchSpy.mock.calls.map(([url]) => String(url));
+    expect(urls[1]).toContain('respaldo');
   });
 
   it('una clave invalida o restringida se cuenta como lo que es: configuracion', async () => {

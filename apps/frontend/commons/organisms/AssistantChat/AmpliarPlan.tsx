@@ -136,7 +136,7 @@ export function AmpliarPlan({ cuota }: { cuota: AssistantQuota }) {
               catálogo, y repetirlos en un componente que vive en cinco zonas es
               garantizar que un día prometan lo que el servidor niega. */}
           <p className="font-sans text-sm text-text-secondary">
-            Amplía los tokens PRAX al mes para ti y para quien trabaje contigo.
+            Amplía los tokens al mes para ti y para quien trabaje contigo.
           </p>
         </div>
       </div>
@@ -156,8 +156,7 @@ export function AmpliarPlan({ cuota }: { cuota: AssistantQuota }) {
         {/* ⚠️ Se dice que se renueva, y se dice aquí. Cobrar un segundo mes a
             quien creía estar comprando uno suelto es la peor reseña posible. */}
         <span className="font-sans text-xs text-text-secondary">
-          Suscripción mensual · tus {formatearTokens(cuota.limite)} tokens PRAX vuelven el{' '}
-          {reinicio}
+          Suscripción mensual · tus {formatearTokens(cuota.limite)} tokens vuelven el {reinicio}
         </span>
       </div>
     </div>
@@ -183,7 +182,7 @@ function AvisoDeCuota({ limite, reinicio }: { limite: number; reinicio: string }
       className="mt-auto shrink-0 rounded-sm border px-4 py-3 font-sans text-sm text-warning"
       style={{ background: alpha(colors.warning, 8), borderColor: alpha(colors.warning, 30) }}
     >
-      Has gastado los <strong>{formatearTokens(limite)}</strong> tokens PRAX de este mes. Vuelven el{' '}
+      Has gastado los <strong>{formatearTokens(limite)}</strong> tokens de este mes. Vuelven el{' '}
       <strong>{reinicio}</strong>.
     </p>
   );

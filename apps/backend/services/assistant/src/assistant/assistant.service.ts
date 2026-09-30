@@ -16,6 +16,7 @@ import {
   type QuotaExceededDetails,
   QuotaKind,
   tokensPrax,
+  type PasoDePensamiento,
 } from '@praxis/contracts';
 import { opcionesDeCliente } from '@praxis/local-transport';
 import { Observable, firstValueFrom } from 'rxjs';
@@ -38,6 +39,13 @@ import { GeminiClient, type GeminiContent, GeminiError, type UsoDeGemini } from 
 import { instruccionSinProyecto, systemInstruction } from './prompt';
 import { QuotaService } from './quota.service';
 import { RouterDeContexto } from './router';
+import {
+  intencionPorPalabras,
+  paso,
+  pasoDePropuesta,
+  pasoDeRuta,
+  resumenDeConsulta,
+} from './pensamiento';
 import { PROPONER_PLANTILLA, instruccionDePlantilla, validarPlantilla } from './template';
 import { catalogoDeCapacidades, herramientasPara } from './capabilities';
 import { herramientasSinProyecto } from './tools';
@@ -280,7 +288,7 @@ export type UsoDelTurno = NonNullable<AssistantChatResult['uso']>;
 /** Lo que cuenta un turno mientras ocurre (D7). */
 export type EventoDeTurno =
   | { tipo: 'inicio'; conversationId: string }
-  | { tipo: 'paso'; texto: string }
+  | ({ tipo: 'paso' } & PasoDePensamiento)
   | { tipo: 'texto'; delta: string }
   | { tipo: 'fin'; resultado: AssistantChatResult };
 
@@ -375,6 +383,14 @@ export class AssistantService {
     payload: ChatPayload,
     emitir: (evento: EventoDeTurno) => void,
   ): Promise<AssistantChatResult> {
+    /* El pensamiento: cada paso se emite al ocurrir y se guarda con la
+       respuesta, para desplegarlo igual al releer (ver `pensamiento.ts`). */
+    const inicio = Date.now();
+    const pasos: PasoDePensamiento[] = [];
+    const contar = (nuevo: PasoDePensamiento) => {
+      pasos.push(nuevo);
+      emitir({ tipo: 'paso', ...nuevo });
+    };
     const cuotaPrevia = await this.quota.estado(
       payload.userId,
       payload.limiteMensual,
@@ -394,6 +410,9 @@ export class AssistantService {
     );
     emitir({ tipo: 'inicio', conversationId });
     const history = await this.conversaciones.historial(conversationId);
+    if (history.length > 0) {
+      contar(paso('contexto', 'Releyendo la conversación', `${history.length} mensajes`));
+    }
 
     /**
      * ⚠️ **Sin foco no se pide briefing, y no es una optimización.**
@@ -423,6 +442,18 @@ export class AssistantService {
      * datos de ninguno. Ver `herramientasSinProyecto`.
      */
     const herramientas = briefing ? herramientasPara(payload.permisos) : herramientasSinProyecto();
+    if (briefing) {
+      const nombreDelProyecto =
+        (briefing as { proyecto?: { nombre?: string } }).proyecto?.nombre ?? 'el proyecto';
+      const tareasVistas = (briefing as { tareas?: unknown[] }).tareas?.length ?? 0;
+      contar(
+        paso(
+          'contexto',
+          `Leyendo el estado de «${nombreDelProyecto}»`,
+          tareasVistas > 0 ? `${tareasVistas} tareas` : undefined,
+        ),
+      );
+    }
 
     /**
      * Los archivos, repartidos en dos montones.
@@ -436,6 +467,9 @@ export class AssistantService {
      */
     const adjuntos = await this.adjuntos.paraElTurno(payload.userId, payload.attachmentIds ?? []);
     const { archivos, textos } = this.repartirAdjuntos(adjuntos);
+    for (const adjunto of adjuntos) {
+      contar(paso('lectura', `Leyendo «${adjunto.name}»`));
+    }
 
     const mensajeConArchivos =
       textos.length > 0 ? `${payload.message}\n\n${textos}` : payload.message;
@@ -452,6 +486,12 @@ export class AssistantService {
       mensaje: payload.message,
       conProyecto: Boolean(briefing),
     });
+    contar(
+      pasoDeRuta(
+        decision.intencion ?? intencionPorPalabras(payload.message),
+        decision.incluirInventario,
+      ),
+    );
     const briefingParaPrompt =
       briefing && !decision.incluirInventario
         ? {
@@ -541,8 +581,13 @@ export class AssistantService {
     /* El texto de varias vueltas se lee como uno: entre vuelta y vuelta, un
        párrafo nuevo, y solo si las dos escribieron algo. */
     let escrito = '';
+    let redactando = false;
     const alTexto = (delta: string) => {
       if (!delta) return;
+      if (!redactando) {
+        redactando = true;
+        contar(paso('redaccion', 'Redactando la respuesta'));
+      }
       if (escrito && !escrito.endsWith('\n') && pendienteDeSeparar) {
         escrito += '\n\n';
         emitir({ tipo: 'texto', delta: '\n\n' });
@@ -572,18 +617,42 @@ export class AssistantService {
       const extra: GeminiContent[] = [];
       for (let vuelta = 0; ; vuelta += 1) {
         const agotado = vuelta >= MAX_VUELTAS_DE_CONSULTA || uso.entrada >= PRESUPUESTO_DE_ENTRADA;
-        const respuesta = await this.gemini.chat(
-          {
-            system: instruccion,
-            history,
-            archivos,
-            message: mensajeConArchivos,
-            tools: agotado ? herramientas : todasLasHerramientas,
-            extra,
-            ...(briefing && !escribeDocumentos ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
-          },
-          alTexto,
-        );
+        let respuesta: Awaited<ReturnType<GeminiClient['chat']>>;
+        try {
+          respuesta = await this.gemini.chat(
+            {
+              system: instruccion,
+              history,
+              archivos,
+              message: mensajeConArchivos,
+              tools: agotado ? herramientas : todasLasHerramientas,
+              extra,
+              ...(briefing && !escribeDocumentos ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
+            },
+            alTexto,
+            (segundos) =>
+              contar(paso('espera', 'El proveedor va saturado', `reintento en ${segundos} s`)),
+          );
+        } catch (error) {
+          /**
+           * 🔴 **Una vuelta que falla a mitad no tira lo que ya se escribió.**
+           *
+           * Antes el turno entero se perdía: PRAX había escrito «¿te refieres a
+           * X?», pedía una consulta, la siguiente vuelta daba 429 y en pantalla
+           * el texto desaparecía, sustituido por un error — «me hizo una
+           * pregunta y se fue». Si ya hay texto, se cierra el turno con él y se
+           * dice que no se pudo seguir mirando.
+           */
+          if (vuelta === 0 || !escrito.trim() || !(error instanceof GeminiError)) throw error;
+          this.log.warn(
+            `prax_vuelta_fallida vuelta=${vuelta} ${error.message}: se cierra con lo escrito`,
+          );
+          alTexto(
+            '\n\n_(No he podido terminar de consultar: el proveedor de IA está saturado. ' +
+              'Vuelve a preguntarme en un momento si necesitas el resto.)_',
+          );
+          break;
+        }
         sumarUso(respuesta.uso);
         pendienteDeSeparar = true;
 
@@ -594,16 +663,17 @@ export class AssistantService {
         extra.push({ role: 'model', parts: respuesta.partes });
         const devueltas: GeminiContent['parts'] = [];
         for (const consulta of consultas) {
-          emitir({
-            tipo: 'paso',
-            texto: this.consultas.descripcion(consulta.name, consulta.args, ambito),
-          });
-          devueltas.push({
-            functionResponse: {
-              name: consulta.name,
-              response: await this.consultas.ejecutar(consulta.name, consulta.args, ambito),
-            },
-          });
+          const resultado = await this.consultas.ejecutar(consulta.name, consulta.args, ambito);
+          contar(
+            paso(
+              'consulta',
+              this.consultas.descripcion(consulta.name, consulta.args, ambito),
+              resumenDeConsulta(consulta.name, resultado),
+            ),
+          );
+          devueltas.push({ functionResponse: { name: consulta.name, response: resultado } });
+          /* La siguiente vuelta vuelve a redactar: su primer trozo es un paso nuevo. */
+          redactando = false;
         }
         extra.push({ role: 'user', parts: devueltas });
 
@@ -699,6 +769,15 @@ export class AssistantService {
          veía en ninguna parte: una conversación donde el modelo falla al
          validar en cada mensaje paga el doble sin que nadie pueda notarlo hasta
          la factura. Se registra para poder medirlo. */
+      contar(
+        paso(
+          'correccion',
+          invalidasCount > 0
+            ? 'Una propuesta no pasó la validación'
+            : 'Revisando que la respuesta cuadre',
+          'lo corrijo',
+        ),
+      );
       this.log.log(
         `assistant_turno_recuperacion invalidas=${invalidasCount} ` +
           `llamadas=${respuesta.calls.length} sinTexto=${!reply}`,
@@ -781,6 +860,8 @@ export class AssistantService {
     }
 
     reply = reply || this.textoPorDefecto(validadas);
+    for (const propuesta of validadas) contar(pasoDePropuesta(propuesta.tool, propuesta.args));
+    const pensamiento = { pasos, ms: Date.now() - inicio };
 
     /* Las propuestas vuelven **con su id**: es lo que necesita el cliente para
        marcarlas como aceptadas o descartadas después. */
@@ -805,6 +886,7 @@ export class AssistantService {
       respuesta: reply,
       proposals: validadas,
       uso,
+      pensamiento,
       userId: payload.userId,
       /* Los que de verdad llegaron a leerse: uno cuyo blob se hubiera perdido no
          sale de `paraElTurno`, y atarlo al mensaje pondría en la burbuja un
@@ -818,6 +900,7 @@ export class AssistantService {
       proposals: proposals as unknown as AssistantProposal[],
       cuota,
       uso,
+      pensamiento,
     };
   }
 
@@ -2169,7 +2252,7 @@ function cuotaAgotada(cuota: AssistantQuota, planTier?: string | null): RpcExcep
     statusCode: 402,
     code: QUOTA_EXCEEDED_CODE,
     message:
-      `Has gastado los ${cuota.limite.toLocaleString('es')} tokens PRAX de este mes. ` +
+      `Has gastado los ${cuota.limite.toLocaleString('es')} tokens de este mes. ` +
       'Vuelven el día 1 del mes que viene.',
     details: { ...detalle, cuota },
   });

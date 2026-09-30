@@ -422,17 +422,69 @@ button:disabled,
   animation: puntos-suspensivos 1.2s steps(4) infinite;
 }
 
-/* La cara de PRAX: flotar y el vaivén de los ojos al pensar.
-   ⚠️ Vivían en un `<style>` dentro del propio `PraxAvatar`, y eso reventaba la
-   hidratación —un `<style>` no es hijo válido de un `<span>`—. El bloque global
-   de `prefers-reduced-motion` de aquí abajo ya las apaga. */
-@keyframes prax-float {
+/* La cara de PRAX (atoms/PraxAvatar). Viven aquí y no en un `<style>` dentro
+   del componente: un `<style>` no es hijo válido de un `<span>` y reventaba la
+   hidratación. El bloque global de `prefers-reduced-motion` de aquí abajo las
+   apaga todas; lo que va por SMIL lo apaga el propio componente.
+
+   - `prax-respirar`: flota y respira a la vez —sube estirándose un poco y baja
+     aplastándose—, que es lo que separa un cuerpo de un recorte que sube y baja.
+   - `prax-sombra`: la sombra del suelo, que se encoge y aclara cuando sube.
+   - `prax-halo`: el resplandor de detrás, que late más deprisa pensando.
+   - `prax-reflejo`: la banda de luz que cruza el cuerpo mientras piensa.
+   - `prax-chispa`: las que saltan al contestar. */
+@keyframes prax-respirar {
   0%,
   100% {
-    transform: translateY(0);
+    transform: translateY(0) scale(1, 1);
   }
   50% {
-    transform: translateY(-3px);
+    transform: translateY(-3.5px) scale(0.985, 1.018);
+  }
+}
+@keyframes prax-sombra {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(0.78);
+    opacity: 0.3;
+  }
+}
+@keyframes prax-halo {
+  0%,
+  100% {
+    transform: scale(0.94);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.8;
+  }
+}
+@keyframes prax-reflejo {
+  0% {
+    transform: translateX(-90px) skewX(-18deg);
+  }
+  60%,
+  100% {
+    transform: translateX(110px) skewX(-18deg);
+  }
+}
+@keyframes prax-chispa {
+  0% {
+    transform: scale(0) rotate(0deg);
+    opacity: 0;
+  }
+  35% {
+    transform: scale(1) rotate(45deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0) rotate(90deg);
+    opacity: 0;
   }
 }
 @keyframes prax-eye-wobble {
@@ -441,7 +493,7 @@ button:disabled,
     transform: translateY(0);
   }
   50% {
-    transform: translateY(2px);
+    transform: translateY(1.5px);
   }
 }
 
@@ -792,5 +844,68 @@ body.arrastrando-en-tablero {
   }
   .prax-aceptada {
     background-position: 0 0, 0 0;
+  }
+}
+
+/* ============================================================
+   PRAX — pensamiento (organisms/AssistantChat/Pensamiento.tsx)
+
+   `prax-brillo`: un reflejo que recorre el texto del paso en curso, como el
+   «Thinking…» de los chats de IA. Es un degradado recortado al texto: el color
+   base es el secundario y el reflejo, el primario, así que respeta el tema.
+
+   `prax-paso-entra`: cada paso nuevo entra con un fundido y un desplazamiento
+   corto, para que la lista crezca en vez de saltar.
+   ============================================================ */
+@keyframes prax-brillo {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.prax-brillo {
+  background: linear-gradient(
+      90deg,
+      var(--color-text-secondary) 0%,
+      var(--color-text-secondary) 35%,
+      var(--color-text-primary) 50%,
+      var(--color-text-secondary) 65%,
+      var(--color-text-secondary) 100%
+    )
+    0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: prax-brillo 1.8s linear infinite;
+}
+
+@keyframes prax-paso-entra {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.prax-paso-entra {
+  animation: prax-paso-entra 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prax-brillo {
+    animation: none;
+    color: var(--color-text-primary);
+    background: none;
+  }
+  .prax-paso-entra {
+    animation: none;
   }
 }
