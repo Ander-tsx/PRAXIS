@@ -22,6 +22,7 @@ import {
   type ChatPanelHandle,
   type Directory,
   type UserProfile,
+  avatarHref,
   colors,
 } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
@@ -221,7 +222,7 @@ function Encabezado({
   const avatarElement = (
     <Avatar
       label={nombre}
-      src={perfil?.avatarUrl ? `/api/gateway${perfil.avatarUrl}` : null}
+      src={avatarHref(perfil?.avatarUrl, '/api/gateway')}
       presence={perfil?.presence}
       size="xl"
     />
@@ -252,7 +253,7 @@ function Encabezado({
             <div className="relative z-10 flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-200">
               {perfil?.avatarUrl ? (
                 <img
-                  src={`/api/gateway${perfil.avatarUrl}`}
+                  src={avatarHref(perfil.avatarUrl, '/api/gateway') ?? undefined}
                   alt={nombre}
                   className="max-h-[70vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
                 />

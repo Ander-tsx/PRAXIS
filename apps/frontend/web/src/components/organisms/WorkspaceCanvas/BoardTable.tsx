@@ -12,6 +12,7 @@ import {
   type Task,
   type UserProfile,
   alpha,
+  avatarHref,
   colors,
   dueState,
   personLabel,
@@ -307,7 +308,7 @@ function FilaTarea({
                   key={a.id}
                   size="sm"
                   label={u ? personLabel(u) : '?'}
-                  src={u?.avatarUrl ?? null}
+                  src={avatarHref(u?.avatarUrl, '/api/gateway')}
                 />
               );
             })}

@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import React, { useEffect, useRef, useState } from 'react';
 import { Glyph, glyphByKey } from '../../atoms/GlyphPicker';
+import { createApiClient } from '../../api/client';
+import { ImagePicker } from '../../molecules/ImagePicker';
 import { OrgIdentityModal } from './OrgIdentityModal';
 import type { OrgDelSelector } from './AppShell';
 
@@ -115,25 +117,7 @@ export function OrgSwitcher({
     }
   }
 
-  /* Con icono elegido, esa es la cara; si no, la inicial sobre el cuadro
-     neutro de siempre. La identidad la trae `OrgDelSelector` desde
-     `GET /me/organizations`. */
-  const cuadro = activa?.imageUrl || glyphByKey(activa?.iconKey) ? (
-    <Glyph
-      iconKey={activa?.iconKey ?? null}
-      imageUrl={activa?.imageUrl ?? null}
-      color={activa?.color ?? null}
-      size="sm"
-      shape="square"
-    />
-  ) : (
-    <span
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 font-sans text-[13px] font-semibold text-white"
-      aria-hidden="true"
-    >
-      {inicial}
-    </span>
-  );
+  const cuadro = <CaraDeOrg org={activa} inicial={inicial} />;
 
   if (plegada) {
     return null;
@@ -266,12 +250,13 @@ export function OrgSwitcher({
               </span>
             </div>
 
-            <div className="flex flex-col max-h-[160px] overflow-y-auto scrollbar-none">
+            <div className="flex flex-col max-h-[220px] overflow-y-auto scrollbar-none">
               {lista.map((org) => (
                 <OpcionDeOrg
                   key={org.id}
                   activa={org.id === activaId}
-                  etiqueta={org.name ?? 'Sin nombre'}
+                  cara={<CaraDeOrg org={org} inicial={(org.name ?? primerNombre ?? 'P').charAt(0).toUpperCase()} />}
+                  etiqueta={org.name ?? `Organización de ${primerNombre || 'Praxis'}`}
                   detalle={org.kind === 'PERSONAL' ? 'Tu espacio' : 'Equipo'}
                   onClick={() => elegir(org.id)}
                 />
@@ -334,13 +319,40 @@ export function OrgSwitcher({
   );
 }
 
+/**
+ * La cara de una organización: su imagen o icono elegidos, o la inicial sobre el
+ * cuadro neutro de siempre. La identidad la trae `OrgDelSelector`. La usan el
+ * botón del selector **y cada fila de la lista**: antes la lista solo tenía el
+ * nombre, y no se veía de quién era cada espacio.
+ */
+function CaraDeOrg({ org, inicial }: { org: OrgDelSelector | null; inicial: string }) {
+  return org?.imageUrl || glyphByKey(org?.iconKey) ? (
+    <Glyph
+      iconKey={org?.iconKey ?? null}
+      imageUrl={org?.imageUrl ?? null}
+      color={org?.color ?? null}
+      size="sm"
+      shape="square"
+    />
+  ) : (
+    <span
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 font-sans text-[13px] font-semibold text-white"
+      aria-hidden="true"
+    >
+      {inicial}
+    </span>
+  );
+}
+
 function OpcionDeOrg({
   activa,
+  cara,
   etiqueta,
   detalle,
   onClick,
 }: {
   activa: boolean;
+  cara: React.ReactNode;
   etiqueta: string;
   detalle: string;
   onClick: () => void;
@@ -349,14 +361,17 @@ function OpcionDeOrg({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors ${
         activa
           ? 'bg-white/10 text-white font-medium'
           : 'text-white hover:bg-white/5 hover:text-white'
       }`}
     >
-      <span className="truncate font-sans text-[13px]">{etiqueta}</span>
-      <span className="shrink-0 font-sans text-[10px] text-white">{detalle}</span>
+      {cara}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate font-sans text-[13px]">{etiqueta}</span>
+        <span className="font-sans text-[10px] text-text-secondary">{detalle}</span>
+      </span>
     </button>
   );
 }
@@ -496,28 +511,57 @@ function NewSpaceModal({ onClose, zonePath }: { onClose: () => void; zonePath: s
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /* La imagen se **guarda** al elegirla y se sube justo después de crear el
+     espacio: hasta entonces la organización no existe y no hay endpoint al que
+     mandarla. */
+  const [imagen, setImagen] = useState<File | null>(null);
+  const [vista, setVista] = useState<string | null>(null);
+  /* Si el espacio se creó pero la imagen no subió, no se crea otro: se entra. */
+  const [creadaId, setCreadaId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!imagen) return setVista(null);
+    const url = URL.createObjectURL(imagen);
+    setVista(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imagen]);
+
+  function entrar(id: string) {
+    document.cookie = `praxis_org=${id}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+    window.location.reload();
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    if (creadaId) return entrar(creadaId);
     if (!name) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${zonePath}/api/gateway/me/organizations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(body?.error?.message || 'Error al crear');
+      const api = createApiClient({ gatewayPath: `${zonePath}/api/gateway` });
+      /* `createApiClient` desenvuelve el `{ success, data }`: con `fetch` a pelo,
+         `body.id` era `undefined` y la cookie de la organización nueva nunca se
+         escribía. */
+      const creada = await api.post<{ id: string }>('/me/organizations', { name });
+      if (!creada?.id) throw new Error('El servidor no creó el espacio.');
+
+      if (imagen) {
+        const datos = new FormData();
+        datos.append('file', imagen);
+        try {
+          await api.post(`/organizations/${creada.id}/image`, undefined, { body: datos });
+        } catch {
+          setCreadaId(creada.id);
+          setError(
+            'El espacio se creó, pero no se pudo subir la imagen. Puedes ponerla después en Configuración.',
+          );
+          setLoading(false);
+          return;
+        }
       }
-      if (body?.id) {
-        document.cookie = `praxis_org=${body.id}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
-      }
-      window.location.reload();
+      entrar(creada.id);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Error al crear');
       setLoading(false);
     }
   }
@@ -540,6 +584,38 @@ function NewSpaceModal({ onClose, zonePath }: { onClose: () => void; zonePath: s
             required
           />
         </div>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium text-white">Imagen (opcional)</span>
+          <div className="flex items-center gap-4">
+            {vista ? (
+              <span
+                role="img"
+                aria-label="Vista previa"
+                className="h-11 w-11 shrink-0 rounded-xl border border-white/10 bg-cover bg-center"
+                style={{ backgroundImage: `url(${vista})` }}
+              />
+            ) : (
+              <span
+                aria-hidden="true"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-base font-semibold text-white"
+              >
+                {(name.trim() || 'E').charAt(0).toUpperCase()}
+              </span>
+            )}
+            <ImagePicker
+              tieneImagen={imagen !== null}
+              onUpload={async (file) => {
+                setImagen(file);
+                return null;
+              }}
+              onRemove={async () => {
+                setImagen(null);
+                return null;
+              }}
+              disabled={loading || creadaId !== null}
+            />
+          </div>
+        </div>
         {error && (
           <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
             {error}
@@ -551,7 +627,7 @@ function NewSpaceModal({ onClose, zonePath }: { onClose: () => void; zonePath: s
             disabled={loading || !name}
             className="px-6 py-2.5 bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors disabled:opacity-50"
           >
-            {loading ? 'Creando...' : 'Crear espacio'}
+            {loading ? 'Creando...' : creadaId ? 'Entrar al espacio' : 'Crear espacio'}
           </button>
         </div>
       </form>

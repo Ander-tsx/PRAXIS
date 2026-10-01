@@ -3,7 +3,7 @@
 import { Columns3, File, Folder, Plus } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   type ReactNode,
   createContext,
@@ -335,6 +335,7 @@ function ArmazonInterno({
   children,
 }: AppShellProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const browserPath = zonePath + (pathname === '/' ? '' : pathname);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -463,6 +464,16 @@ function ArmazonInterno({
    */
   const enCuenta = activePath === CUENTA_HREF || activePath.startsWith(`${CUENTA_HREF}/`);
   const activePathDeSecciones = enCuenta ? '' : activePath;
+  /**
+   * 🔴 **Con la consulta, para el árbol de proyectos.** `usePathname()` no la
+   * trae, y el árbol marca espacio, tablero y documento activos mirando
+   * `ws=`, `board=` y `doc=` — así que nada se marcaba nunca. Solo el árbol la
+   * recibe: `NavList` compara rutas exactas y con `?…` pegado dejaría de casar.
+   */
+  const consulta = searchParams.toString();
+  const activePathConConsulta = activePathDeSecciones
+    ? activePathDeSecciones + (consulta ? `?${consulta}` : '')
+    : '';
 
   /**
    * Las dos insignias de las pestañas, **vivas**.
@@ -585,7 +596,7 @@ function ArmazonInterno({
               <SidebarProjectsTree
                 zonePath={zonePath}
                 plegada={plegada}
-                activePath={activePathDeSecciones}
+                activePath={activePathConConsulta}
                 organizacionActivaId={organizacionActivaId ?? null}
               />
               <NavList

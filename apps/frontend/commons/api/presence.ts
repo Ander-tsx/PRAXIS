@@ -112,5 +112,10 @@ export function avatarHref(
   gatewayPath: string,
 ): string | null {
   if (!avatarUrl) return null;
+  /* 🔴 La foto de Google llega **absoluta** (`https://lh3.googleusercontent.com/…`),
+     la subida a mano **relativa** al gateway. Anteponer el proxy a la primera
+     la rompe, y no anteponerlo a la segunda también: por eso todo avatar tiene
+     que pasar por aquí. */
+  if (avatarUrl.startsWith('https://') || avatarUrl.startsWith('http://')) return avatarUrl;
   return `${gatewayPath}${avatarUrl}`;
 }
