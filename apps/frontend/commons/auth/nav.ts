@@ -148,7 +148,7 @@ export interface PrivateChrome extends CurrentUser {
    * sin eso solo cambiaría al recargar. Ver su nota.
    */
   mensajesSinLeer: number;
-  /** Avisos de bandeja sin leer, para la pestaña «Bandeja de entrada». Ídem. */
+  /** Avisos de bandeja sin leer, para la campana junto al avatar. Ídem. */
   avisosSinLeer: number;
 }
 

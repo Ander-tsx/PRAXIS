@@ -356,9 +356,21 @@ function ArmazonInterno({
    * ⚠️ **La ruta manda sobre la preferencia**, y por eso va primero: estando en
    * `/chat` la barra tiene que enseñar Chat aunque la cookie diga Bandeja.
    */
-  const [activeTab, setActiveTab] = useState<SidebarTab>(() =>
-    zonePath === '/chat' || browserPath.startsWith('/chat') ? 'chat' : pestanaInicial,
-  );
+  const [activeTab, setActiveTab] = useState<SidebarTab>(() => {
+    if (zonePath === '/chat' || browserPath.startsWith('/chat')) return 'chat';
+    /* Lo mismo para Configuraciones: estando en Equipo o en Administración la
+       barra enseña dónde estás. Se compara contra la lista canónica, no contra
+       rutas escritas a mano. */
+    const enConfiguracion = navItems.some(
+      (i) =>
+        esDeConfiguracion(i.href) &&
+        !i.disabled &&
+        (browserPath === i.href || browserPath.startsWith(`${i.href}/`)),
+    );
+    return enConfiguracion ? 'settings' : pestanaInicial;
+  });
+  /** La bandeja: un popover junto al avatar, ya no una pestaña. */
+  const [bandejaAbierta, setBandejaAbierta] = useState(false);
 
   /* Se escribe desde el cliente, igual que la del pliegue: es una preferencia,
      no una credencial, y así el cambio vale ya para la siguiente navegación. */
@@ -411,7 +423,7 @@ function ArmazonInterno({
    */
   useEffect(() => {
     function abrir() {
-      setActiveTab('inbox');
+      setBandejaAbierta(true);
       if (window.matchMedia('(max-width: 767px)').matches) setMobileMenuOpen(true);
     }
     window.addEventListener(ABRIR_BANDEJA_EVENT, abrir);
@@ -543,7 +555,6 @@ function ArmazonInterno({
               activa={activeTab}
               onCambiar={setActiveTab}
               mensajesSinLeer={mensajesSinLeer}
-              avisosSinLeer={avisosSinLeer}
               plegada={plegada}
             />
             {/**
@@ -576,7 +587,7 @@ function ArmazonInterno({
                 organizacionActivaId={organizacionActivaId ?? null}
               />
               <NavList
-                navItems={navItems.filter((i) => i.href !== '/projects')}
+                navItems={navItems.filter((i) => i.href === '/assistant')}
                 activePath={activePathDeSecciones}
                 plegada={plegada}
               />
@@ -588,12 +599,16 @@ function ArmazonInterno({
                 organizacionActivaId={organizacionActivaId ?? null}
               />
             </div>
-            <div className={activeTab === 'inbox' ? undefined : 'hidden'}>
-              <SidebarInboxList zonePath={zonePath} plegada={plegada} />
+            <div className={activeTab === 'settings' ? undefined : 'hidden'}>
+              <NavList
+                navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
+                activePath={activePathDeSecciones}
+                plegada={plegada}
+              />
             </div>
           </div>
 
-          <div className={`border-t border-border ${plegada ? 'p-2' : 'p-4'}`}>
+          <div className={`relative border-t border-border ${plegada ? 'p-2' : 'p-4'}`}>
             {/* Plegada, la tarjeta de usuario se queda en el avatar: el nombre y
                 el correo no caben, y el avatar ya identifica de quién es la
                 sesión, que es lo que esa tarjeta viene a decir. */}
@@ -625,7 +640,29 @@ function ArmazonInterno({
                 </span>
               </div>
             ) : (
-              <UserCard user={user} activa={enCuenta} estadoSlot={estadoSlot} />
+              <div className="flex items-start gap-1">
+                <div className="min-w-0 flex-1">
+                  <UserCard user={user} activa={enCuenta} estadoSlot={estadoSlot} />
+                </div>
+                {/* Solo el icono, a un lado del avatar: es la sección de avisos. */}
+                <BandejaBoton
+                  abierta={bandejaAbierta}
+                  onCambiar={setBandejaAbierta}
+                  sinLeer={avisosSinLeer}
+                  zonePath={zonePath}
+                />
+              </div>
+            )}
+            {plegada && (
+              <div className="flex justify-center">
+                <BandejaBoton
+                  abierta={bandejaAbierta}
+                  onCambiar={setBandejaAbierta}
+                  sinLeer={avisosSinLeer}
+                  zonePath={zonePath}
+                  plegada
+                />
+              </div>
             )}
           </div>
         </aside>
@@ -761,7 +798,6 @@ function ArmazonInterno({
                     activa={activeTab}
                     onCambiar={setActiveTab}
                     mensajesSinLeer={mensajesSinLeer}
-                    avisosSinLeer={avisosSinLeer}
                   />
 
                   {/* Aquí sí se monta y se desmonta, al revés que en el escritorio:
@@ -771,7 +807,14 @@ function ArmazonInterno({
                     barra que mantener viva por detrás. */}
                   {activeTab === 'home' && (
                     <NavList
-                      navItems={navItems}
+                      navItems={navItems.filter((i) => i.href === '/assistant')}
+                      activePath={activePathDeSecciones}
+                      onNavigate={() => setMobileMenuOpen(false)}
+                    />
+                  )}
+                  {activeTab === 'settings' && (
+                    <NavList
+                      navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
                       activePath={activePathDeSecciones}
                       onNavigate={() => setMobileMenuOpen(false)}
                     />
@@ -783,13 +826,20 @@ function ArmazonInterno({
                       organizacionActivaId={organizacionActivaId ?? null}
                     />
                   )}
-                  {activeTab === 'inbox' && (
-                    <SidebarInboxList zonePath={zonePath} plegada={false} />
-                  )}
                 </div>
 
-                <div className="border-t border-border pt-4">
-                  <UserCard user={user} activa={enCuenta} estadoSlot={estadoSlot} />
+                <div className="relative border-t border-border pt-4">
+                  <div className="flex items-start gap-1">
+                    <div className="min-w-0 flex-1">
+                      <UserCard user={user} activa={enCuenta} estadoSlot={estadoSlot} />
+                    </div>
+                    <BandejaBoton
+                      abierta={bandejaAbierta}
+                      onCambiar={setBandejaAbierta}
+                      sinLeer={avisosSinLeer}
+                      zonePath={zonePath}
+                    />
+                  </div>
                 </div>
               </>
             )}
@@ -1130,7 +1180,109 @@ async function fetchWorkspaces(
 }
 
 /** Cuál de las tres secciones de la barra lateral se está mirando. */
-type SidebarTab = 'home' | 'chat' | 'inbox';
+type SidebarTab = 'home' | 'chat' | 'settings';
+
+/** Lo que enseña «Inicio»: el árbol de proyectos y el asistente, nada más. */
+const HREFS_DE_INICIO = ['/assistant', '/projects'];
+
+/** Todo lo demás de la lista canónica vive en «Configuraciones». */
+const esDeConfiguracion = (href: string) => !HREFS_DE_INICIO.includes(href);
+
+/**
+ * La campana de avisos, **solo el icono**, junto al avatar. Sustituye a la
+ * pestaña «Bandeja»: pulsarla abre un popover con `SidebarInboxList`.
+ *
+ * ⚠️ Hay dos instancias (barra de escritorio y cajón móvil) que comparten el
+ * estado `abierta`. La que está oculta por CSS ni pinta la lista ni reacciona al
+ * clic fuera: sin ese filtro, pulsar dentro del popover visible cerraría el
+ * estado compartido desde la instancia invisible, y la lista pediría datos dos
+ * veces.
+ */
+function BandejaBoton({
+  abierta,
+  onCambiar,
+  sinLeer,
+  zonePath,
+  plegada = false,
+}: {
+  abierta: boolean;
+  onCambiar: (abierta: boolean) => void;
+  sinLeer: number;
+  zonePath: string;
+  plegada?: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const enPantalla = (ref.current?.getClientRects().length ?? 0) > 0;
+    setVisible(abierta && enPantalla);
+    if (!abierta || !enPantalla) return;
+
+    function fuera(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onCambiar(false);
+    }
+    function tecla(e: KeyboardEvent) {
+      if (e.key === 'Escape') onCambiar(false);
+    }
+    document.addEventListener('mousedown', fuera);
+    document.addEventListener('keydown', tecla);
+    return () => {
+      document.removeEventListener('mousedown', fuera);
+      document.removeEventListener('keydown', tecla);
+    };
+  }, [abierta, onCambiar]);
+
+  return (
+    <div ref={ref} className="shrink-0">
+      <button
+        type="button"
+        onClick={() => onCambiar(!abierta)}
+        aria-expanded={abierta}
+        aria-haspopup="dialog"
+        aria-label={sinLeer > 0 ? `Avisos, ${sinLeer} sin leer` : 'Avisos'}
+        title="Avisos"
+        className={`relative flex items-center justify-center rounded-full p-2.5 text-white transition-colors hover:bg-white/5 ${
+          abierta ? 'bg-white/10' : ''
+        }`}
+      >
+        <svg
+          className="h-5 w-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.75}
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+          />
+        </svg>
+        {sinLeer > 0 && (
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-[#202020]" />
+        )}
+      </button>
+
+      {visible && (
+        <div
+          role="dialog"
+          aria-label="Avisos"
+          className={`absolute z-50 rounded-2xl border border-border bg-[#252525] py-3 shadow-xl ${
+            plegada ? 'bottom-0 left-full ml-2 w-80' : 'bottom-full left-2 right-2 mb-2'
+          }`}
+        >
+          <SidebarInboxList
+            zonePath={zonePath}
+            plegada={false}
+            className="max-h-[min(28rem,60dvh)]"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * La insignia de una pestaña.
@@ -1156,7 +1308,8 @@ function InsigniaDePestana({ cuantos }: { cuantos: number }) {
 }
 
 /**
- * Las tres secciones de la barra lateral: Inicio, Chat y Bandeja.
+ * Las tres secciones de la barra lateral: Inicio, Chat y Configuraciones. La
+ * bandeja ya no es pestaña: es el icono de campana junto a tu avatar.
  *
  * ## Por qué está extraído y no en línea
  *
@@ -1176,13 +1329,11 @@ function SidebarTabs({
   activa,
   onCambiar,
   mensajesSinLeer,
-  avisosSinLeer,
   plegada = false,
 }: {
   activa: SidebarTab;
   onCambiar: (tab: SidebarTab) => void;
   mensajesSinLeer: number;
-  avisosSinLeer: number;
   /** Plegada: solo los iconos, en columna, y la insignia se reduce a un punto. */
   plegada?: boolean;
 }) {
@@ -1217,15 +1368,18 @@ function SidebarTabs({
       ),
     },
     {
-      id: 'inbox',
-      etiqueta: 'Bandeja',
-      insignia: avisosSinLeer,
+      id: 'settings',
+      etiqueta: 'Configuraciones',
+      insignia: 0,
       icono: (
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-        />
+        <>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </>
       ),
     },
   ];
@@ -2278,7 +2432,16 @@ function destinoDeUnAviso(aviso: AppNotification): string | undefined {
  * restar aquí sería adivinar, y adivinar en un contador acaba en insignias que
  * no se apagan.
  */
-function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: boolean }) {
+function SidebarInboxList({
+  zonePath,
+  plegada,
+  className = 'max-h-[calc(100dvh-13rem)]',
+}: {
+  zonePath: string;
+  plegada: boolean;
+  /** El tope de alto: en el popover de la campana es otro que en una pestaña. */
+  className?: string;
+}) {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [directorio, setDirectorio] = useState<Map<string, UserProfile>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -2350,7 +2513,7 @@ function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: bo
   );
 
   return (
-    <div className="flex flex-col max-h-[calc(100dvh-13rem)]">
+    <div className={`flex flex-col ${className}`}>
       {!plegada && (
         <div className="mx-3 mb-3 flex shrink-0 rounded-lg bg-white/5 p-0.5">
           <button
