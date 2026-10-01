@@ -11,6 +11,7 @@ export interface PerfilEnBarraProps {
   email: string;
   avatarSrc: string | null;
   coverSrc: string | null;
+  googleAvatarSrc: string | null;
   biography: string | null;
   location: string | null;
   presencia: string;
@@ -43,6 +44,7 @@ export function PerfilEnBarra({
   email,
   avatarSrc,
   coverSrc,
+  googleAvatarSrc,
   biography,
   location,
   presencia,
@@ -169,6 +171,7 @@ export function PerfilEnBarra({
           location: location || '',
           avatarSrc,
           coverSrc,
+          googleAvatarSrc,
         }}
       />
     </div>

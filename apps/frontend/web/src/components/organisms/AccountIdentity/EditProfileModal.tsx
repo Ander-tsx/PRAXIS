@@ -7,6 +7,7 @@ import {
   deleteCoverAction,
   updateProfileAction,
   uploadAvatarAction,
+  useGoogleAvatarAction,
   uploadCoverAction,
 } from '@/app/(privado)/main/profile/actions';
 import { Avatar, alpha, colors, FloatingLabelInput, FloatingLabelTextarea } from '@praxis/commons';
@@ -25,6 +26,8 @@ export function EditProfileModal({
     location: string;
     avatarSrc: string | null;
     coverSrc: string | null;
+    /** La foto de la cuenta de Google, si entró con ella: habilita «Usar mi foto de Google». */
+    googleAvatarSrc?: string | null;
   };
 }) {
   const [formData, setFormData] = useState({
@@ -46,6 +49,7 @@ export function EditProfileModal({
   /* Quitar una foto se aplica al guardar, igual que subirla: hasta entonces se
      puede cancelar y no se ha borrado nada en el servidor. */
   const [avatarQuitada, setAvatarQuitada] = useState(false);
+  const [usarGoogle, setUsarGoogle] = useState(false);
   const [coverQuitada, setCoverQuitada] = useState(false);
 
   useEffect(() => {
@@ -61,6 +65,7 @@ export function EditProfileModal({
       setAvatarFile(null);
       setCoverFile(null);
       setAvatarQuitada(false);
+      setUsarGoogle(false);
       setCoverQuitada(false);
       setError(null);
     }
@@ -81,7 +86,14 @@ export function EditProfileModal({
     setSaving(true);
     setError(null);
     try {
-      if (avatarQuitada && !avatarFile) {
+      if (usarGoogle && !avatarFile) {
+        const res = await useGoogleAvatarAction();
+        if (res.error) {
+          setError(res.error);
+          setSaving(false);
+          return;
+        }
+      } else if (avatarQuitada && !avatarFile) {
         const res = await deleteAvatarAction();
         if (res.error) {
           setError(res.error);
@@ -256,6 +268,7 @@ export function EditProfileModal({
                         setAvatarPreview(null);
                         setAvatarFile(null);
                         setAvatarQuitada(true);
+                        setUsarGoogle(false);
                       }}
                       aria-label="Quitar foto"
                       title="Quitar foto"
@@ -275,6 +288,26 @@ export function EditProfileModal({
           <div className="px-4 pt-16 pb-8 flex flex-col gap-6">
             {error && (
               <div className="text-red-400 text-sm p-3 bg-red-400/10 rounded-lg">{error}</div>
+            )}
+
+            {initialData.googleAvatarSrc && avatarPreview !== initialData.googleAvatarSrc && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAvatarPreview(initialData.googleAvatarSrc ?? null);
+                  setAvatarFile(null);
+                  setAvatarQuitada(false);
+                  setUsarGoogle(true);
+                }}
+                className="flex w-fit items-center gap-2 rounded-full border border-white/20 px-3.5 py-1.5 font-sans text-[13px] font-medium text-white transition-colors hover:bg-white/10"
+              >
+                <img
+                  src={initialData.googleAvatarSrc}
+                  alt=""
+                  className="h-5 w-5 rounded-full object-cover"
+                />
+                Usar mi foto de Google
+              </button>
             )}
 
             <FloatingLabelInput
@@ -314,6 +347,7 @@ export function EditProfileModal({
           const file = e.target.files?.[0];
           if (file) {
             setAvatarFile(file);
+            setUsarGoogle(false);
             setAvatarPreview(URL.createObjectURL(file));
           }
         }}

@@ -18,6 +18,8 @@ export interface UserProfile {
    * La zona le antepone su propio proxy — ver `avatarHref`.
    */
   avatarUrl: string | null;
+  /** La foto de la cuenta de Google, si entró con Google. Ver `useGoogleAvatarAction`. */
+  googleAvatarUrl?: string | null;
   coverUrl: string | null;
   biography: string | null;
   location: string | null;

@@ -69,6 +69,11 @@ export class UsersController {
     );
   }
 
+  @MessagePattern({ cmd: 'user_use_google_avatar' })
+  useGoogleAvatar(@Payload() dto: { userId: string }) {
+    return this.usersService.useGoogleAvatar(dto.userId);
+  }
+
   @MessagePattern({ cmd: 'user_delete_avatar' })
   deleteAvatar(@Payload() dto: { userId: string }) {
     return this.usersService.deleteAvatar(dto.userId);

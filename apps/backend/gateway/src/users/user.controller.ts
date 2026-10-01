@@ -289,6 +289,20 @@ export class UserController {
     );
   }
 
+  /**
+   * Vuelve a la foto de la cuenta de Google. Mismo guard de dueño que las demás:
+   * es tu cuenta y tu foto.
+   */
+  @Post(':id/avatar/google')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AccountOwnerGuard)
+  @ApiOperation({ summary: 'Usa la foto de la cuenta de Google' })
+  async useGoogleAvatar(@Param('id', ParseUUIDPipe) id: string) {
+    return await firstValueFrom(
+      this.credentialsClient.send({ cmd: 'user_use_google_avatar' }, { userId: id }),
+    );
+  }
+
   @Delete(':id/avatar')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AccountOwnerGuard)

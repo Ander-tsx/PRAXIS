@@ -97,6 +97,7 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
           email={profile.credential.email}
           avatarSrc={avatarHref(profile.avatarUrl, '/api/gateway')}
           coverSrc={avatarHref(profile.coverUrl, '/api/gateway')}
+          googleAvatarSrc={avatarHref(profile.googleAvatarUrl, '/api/gateway')}
           biography={profile.biography ?? null}
           location={profile.location ?? null}
           presencia={profile.presence ?? 'AVAILABLE'}

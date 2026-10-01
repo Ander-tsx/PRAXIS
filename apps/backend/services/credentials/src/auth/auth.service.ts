@@ -561,6 +561,15 @@ export class AuthService {
     });
 
     if (porGoogle?.user) {
+      /* La foto de Google se renueva en cada entrada (la cambian desde Google), pero
+         **solo** en su campo: `avatarUrl` es lo que se ve, y puede ser una subida. */
+      if (perfil.picture && perfil.picture !== porGoogle.user.googleAvatarUrl) {
+        await this.prisma.user.update({
+          where: { id: porGoogle.user.id },
+          data: { googleAvatarUrl: perfil.picture },
+        });
+        await this.redis.del(`user:${porGoogle.user.id}`);
+      }
       return this.emitirSesion(porGoogle.user.id, porGoogle.user.status);
     }
 
@@ -631,6 +640,7 @@ export class AuthService {
             firstName: perfil.given_name ?? '',
             lastName: perfil.family_name ?? '',
             avatarUrl: perfil.picture ?? null,
+            googleAvatarUrl: perfil.picture ?? null,
           },
         },
       },

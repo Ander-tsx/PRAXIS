@@ -189,6 +189,35 @@ export class UsersService {
     return actualizado;
   }
 
+  /**
+   * Vuelve a la foto de la cuenta de Google.
+   *
+   * Borra la subida a mano —si no, `UserAvatar` se quedaría guardando bytes que
+   * ya nadie ve— y apunta `avatarUrl` a la de Google, que es una URL absoluta.
+   * 404 si la cuenta nunca entró con Google: no hay foto a la que volver.
+   */
+  async useGoogleAvatar(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new RpcException({ statusCode: 404, message: 'Usuario no encontrado' });
+    }
+    if (!user.googleAvatarUrl) {
+      throw new RpcException({
+        statusCode: 404,
+        message: 'Esta cuenta no tiene una foto de Google.',
+      });
+    }
+
+    await this.prisma.userAvatar.deleteMany({ where: { userId } });
+    const actualizado = await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl: user.googleAvatarUrl },
+      include: { credential: { select: { email: true } } },
+    });
+    await this.redis.del(`user:${userId}`);
+    return actualizado;
+  }
+
   /** Quita la foto. Devuelve el perfil, ya sin `avatarUrl`. */
   async deleteAvatar(userId: string) {
     await this.prisma.userAvatar.deleteMany({ where: { userId } });

@@ -99,6 +99,25 @@ export async function uploadAvatarAction(
   }
 }
 
+/**
+ * Vuelve a la foto de tu cuenta de Google.
+ *
+ * Solo hay a qué volver si entraste con Google alguna vez: si no, el servidor
+ * responde 404 y el mensaje llega tal cual. Reemplaza a la foto subida a mano.
+ */
+export async function useGoogleAvatarAction(): Promise<{ error: string | null }> {
+  const userId = await idDeLaSesion();
+  if (!userId) return { error: 'Tu sesión ha caducado.' };
+
+  try {
+    await createServerApiClient().post(`/users/${userId}/avatar/google`, {});
+    revalidatePath('/main', 'layout');
+    return { error: null };
+  } catch (error) {
+    return { error: describir(error, 'No se pudo usar la foto de Google.') };
+  }
+}
+
 /** Quita tu foto y vuelve a las iniciales. */
 export async function deleteAvatarAction(): Promise<{ error: string | null }> {
   const userId = await idDeLaSesion();
