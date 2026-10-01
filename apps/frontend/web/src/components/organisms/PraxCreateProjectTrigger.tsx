@@ -4,6 +4,12 @@ import { createProjectAction } from '@/app/(privado)/projects/root-actions';
 import {
   FloatingLabelInput,
   FloatingLabelTextarea,
+  GLYPH_COLOR_DEFAULT,
+  Glyph,
+  GlyphPicker,
+  type GlyphSelection,
+  ImagePicker,
+  glyphByKey,
   usePrax,
   useSidebarPlegada,
 } from '@praxis/commons';
@@ -35,6 +41,21 @@ export function PraxCreateProjectTrigger({
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /* Identidad opcional: icono y color, y una imagen que gana al icono. Todo se
+     manda con el formulario y se aplica justo después de crear el proyecto. */
+  const [seleccion, setSeleccion] = useState<GlyphSelection>({
+    iconKey: null,
+    color: GLYPH_COLOR_DEFAULT,
+  });
+  const [imagen, setImagen] = useState<File | null>(null);
+  const [vista, setVista] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!imagen) return setVista(null);
+    const url = URL.createObjectURL(imagen);
+    setVista(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imagen]);
 
   // Cierra con ESC
   useEffect(() => {
@@ -63,6 +84,11 @@ export function PraxCreateProjectTrigger({
     setLoading(true);
     setError(null);
     const formData = new FormData(e.currentTarget);
+    if (seleccion.iconKey) {
+      formData.set('iconKey', seleccion.iconKey);
+      formData.set('color', seleccion.color ?? GLYPH_COLOR_DEFAULT);
+    }
+    if (imagen) formData.set('image', imagen);
     const res = await createProjectAction(
       { error: null, createdName: null, cuota: null },
       formData,
@@ -72,10 +98,15 @@ export function PraxCreateProjectTrigger({
       setError(res.error);
     } else if (res.createdName) {
       setModalOpen(false);
+      setSeleccion({ iconKey: null, color: GLYPH_COLOR_DEFAULT });
+      setImagen(null);
     }
   }
 
-  const Modal = () => {
+  /* Una función que se **llama**, no un componente (`<Modal />`): como componente
+     definido aquí dentro se remontaba en cada render y vaciaba lo escrito al
+     elegir un icono o al salir un error. */
+  const renderModal = () => {
     if (!modalOpen) return null;
     /* Por portal: dentro del cajón móvil —que se mueve con `transform`— un `fixed`
        queda atrapado en el cajón en vez de cubrir la pantalla. */
@@ -86,7 +117,7 @@ export function PraxCreateProjectTrigger({
           if (e.target === e.currentTarget) setModalOpen(false);
         }}
       >
-        <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c0b] shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#0c0c0b] shadow-2xl animate-in fade-in zoom-in-95 duration-200">
           <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
             <h2 className="text-sm font-semibold text-white">Nuevo Proyecto</h2>
             <button
@@ -137,6 +168,47 @@ export function PraxCreateProjectTrigger({
               maxLength={200}
               autoComplete="off"
             />
+
+            <div className="flex flex-col gap-3">
+              <span className="text-xs font-medium text-white">Imagen e icono (opcional)</span>
+              <div className="flex items-center gap-4">
+                {vista ? (
+                  <span
+                    role="img"
+                    aria-label="Vista previa"
+                    className="h-11 w-11 shrink-0 rounded-xl border border-white/10 bg-cover bg-center"
+                    style={{ backgroundImage: `url(${vista})` }}
+                  />
+                ) : glyphByKey(seleccion.iconKey) ? (
+                  <Glyph
+                    iconKey={seleccion.iconKey}
+                    color={seleccion.color}
+                    size="md"
+                    shape="square"
+                  />
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-base font-semibold text-white"
+                  >
+                    P
+                  </span>
+                )}
+                <ImagePicker
+                  tieneImagen={imagen !== null}
+                  onUpload={async (file) => {
+                    setImagen(file);
+                    return null;
+                  }}
+                  onRemove={async () => {
+                    setImagen(null);
+                    return null;
+                  }}
+                  disabled={loading}
+                />
+              </div>
+              <GlyphPicker value={seleccion} onChange={setSeleccion} disabled={loading} />
+            </div>
 
             <div className="mt-2 flex items-center justify-between">
               <button
@@ -205,7 +277,7 @@ export function PraxCreateProjectTrigger({
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
         </button>
-        <Modal />
+        {renderModal()}
       </>
     );
   }
@@ -234,7 +306,7 @@ export function PraxCreateProjectTrigger({
           </svg>
           <span className={plegada ? 'sr-only' : undefined}>Nuevo proyecto</span>
         </button>
-        <Modal />
+        {renderModal()}
       </>
     );
   }
@@ -267,7 +339,7 @@ export function PraxCreateProjectTrigger({
             </span>
           </div>
         </button>
-        <Modal />
+        {renderModal()}
       </>
     );
   }
@@ -291,7 +363,7 @@ export function PraxCreateProjectTrigger({
         </svg>
         Nuevo proyecto
       </button>
-      <Modal />
+      {renderModal()}
     </>
   );
 }

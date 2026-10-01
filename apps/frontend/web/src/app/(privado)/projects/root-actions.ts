@@ -74,6 +74,22 @@ export async function createProjectAction(
     };
   }
 
+  /* Identidad opcional, **después** de crear: el DTO de `POST /projects` no la
+     acepta (un campo de más es un 400) y se aplica por las rutas de siempre. Si
+     falla no se tumba la creación —el proyecto ya existe—: se puede poner luego
+     en su configuración. */
+  const iconKey = String(formData.get('iconKey') ?? '').trim();
+  const color = String(formData.get('color') ?? '').trim();
+  if (iconKey) {
+    await api.patch(`/projects/${created.id}`, { iconKey, color: color || null }).catch(() => null);
+  }
+  const imagen = formData.get('image');
+  if (imagen instanceof File && imagen.size > 0) {
+    const envio = new FormData();
+    envio.append('file', imagen);
+    await api.postForm(`/projects/${created.id}/image`, envio).catch(() => null);
+  }
+
   revalidatePath('/projects');
   return { error: null, createdName: created.name, cuota: null };
 }
