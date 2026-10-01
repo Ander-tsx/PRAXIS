@@ -1,11 +1,17 @@
 'use client';
 
 import { createProjectAction } from '@/app/(privado)/projects/root-actions';
-import { FloatingLabelInput, FloatingLabelTextarea, usePrax } from '@praxis/commons';
+import {
+  FloatingLabelInput,
+  FloatingLabelTextarea,
+  usePrax,
+  useSidebarPlegada,
+} from '@praxis/commons';
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface PraxCreateProjectTriggerProps {
-  triggerVariant?: 'boton' | 'tarjeta';
+  triggerVariant?: 'boton' | 'tarjeta' | 'fila';
   /**
    * En qué organización se crea. Es la **activa**, resuelta en el servidor
    * (`loadPrivateChrome` → `resolverOrganizacionActiva`), no la cookie en crudo.
@@ -25,6 +31,7 @@ export function PraxCreateProjectTrigger({
   organizationId,
 }: PraxCreateProjectTriggerProps) {
   const prax = usePrax();
+  const plegada = useSidebarPlegada();
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,9 +77,11 @@ export function PraxCreateProjectTrigger({
 
   const Modal = () => {
     if (!modalOpen) return null;
-    return (
+    /* Por portal: dentro del cajón móvil —que se mueve con `transform`— un `fixed`
+       queda atrapado en el cajón en vez de cubrir la pantalla. */
+    return createPortal(
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
         onMouseDown={(e) => {
           if (e.target === e.currentTarget) setModalOpen(false);
         }}
@@ -169,9 +178,39 @@ export function PraxCreateProjectTrigger({
             </div>
           </form>
         </div>
-      </div>
+      </div>,
+      document.body,
     );
   };
+
+  /* La fila del menú lateral: mismo aspecto que las entradas de `NavList`. */
+  if (triggerVariant === 'fila') {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          title={plegada ? 'Nuevo proyecto' : undefined}
+          className={`flex w-full items-center rounded-full font-sans text-[13px] font-medium text-white transition-colors duration-150 hover:bg-white/5 ${
+            plegada ? 'justify-center px-0 py-2.5' : 'gap-3 px-4 py-2.5 text-left'
+          }`}
+        >
+          <svg
+            className="h-5 w-5 shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.75}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          <span className={plegada ? 'sr-only' : undefined}>Nuevo proyecto</span>
+        </button>
+        <Modal />
+      </>
+    );
+  }
 
   if (triggerVariant === 'tarjeta') {
     return (

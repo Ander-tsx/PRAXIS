@@ -7,7 +7,7 @@
  * lateral: enlaces, nombre, correo y hasta el botón de cerrar sesión, cosas que
  * no cambian al cambiar de pantalla.
  */
-export { AppShell, useAppShell } from './AppShell';
+export { AppShell, useAppShell, useSidebarPlegada } from './AppShell';
 export type { AppShellProps, AppShellUser } from './AppShell';
 export { AppHeader } from './AppHeader';
 export type { AppHeaderProps } from './AppHeader';

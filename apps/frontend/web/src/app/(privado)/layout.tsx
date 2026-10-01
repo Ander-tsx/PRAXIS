@@ -1,4 +1,5 @@
 import { setPresenceAction } from '@/app/(privado)/presence-actions';
+import { PraxCreateProjectTrigger } from '@/components/organisms/PraxCreateProjectTrigger';
 import { AvisoAsientoCongelado } from '@/components/organisms/Billing/AvisoAsientoCongelado';
 import { AppShell, PresenceFooter, avatarHref, displayName } from '@praxis/commons';
 import { loadPrivateChrome } from '@praxis/commons/auth';
@@ -85,6 +86,9 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
          escuchando el flujo. Ver `AppShellProps.mensajesSinLeer`. */
       mensajesSinLeer={mensajesSinLeer}
       avisosSinLeer={avisosSinLeer}
+      nuevoProyectoSlot={
+        <PraxCreateProjectTrigger triggerVariant="fila" organizationId={organizacionActivaId} />
+      }
       user={{
         name: displayName(profile),
         email: profile.credential.email,

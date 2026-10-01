@@ -163,6 +163,11 @@ export interface AppShellProps {
    */
   mensajesSinLeer?: number;
   avisosSinLeer?: number;
+  /**
+   * La fila «Nuevo proyecto» de «Inicio». La pone el `layout.tsx` porque el
+   * formulario vive en `web` (acción de servidor) y `commons` no puede importarlo.
+   */
+  nuevoProyectoSlot?: ReactNode;
   children: ReactNode;
 }
 
@@ -332,6 +337,7 @@ function ArmazonInterno({
   organizacionActivaId,
   mensajesSinLeer: mensajesIniciales = 0,
   avisosSinLeer: avisosIniciales = 0,
+  nuevoProyectoSlot,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -610,6 +616,7 @@ function ArmazonInterno({
                 activePath={activePathDeSecciones}
                 plegada={plegada}
               />
+              {nuevoProyectoSlot}
             </div>
             <div className={activeTab === 'chat' ? undefined : 'hidden'}>
               <SidebarChatList
@@ -843,6 +850,7 @@ function ArmazonInterno({
                       activePath={activePathDeSecciones}
                       onNavigate={() => setMobileMenuOpen(false)}
                     />
+                    {nuevoProyectoSlot}
                     </div>
                   )}
                   {activeTab === 'settings' && (
@@ -1286,8 +1294,10 @@ function BandejaBoton({
     };
   }, [abierta, onCambiar]);
 
+  /* `mt-1`: la tarjeta de usuario mide 48 px y la campana 40; empezar arriba la
+     dejaba por encima del nombre y del avatar. */
   return (
-    <div ref={ref} className="shrink-0">
+    <div ref={ref} className={plegada ? 'shrink-0' : 'mt-1 shrink-0'}>
       <button
         type="button"
         onClick={() => onCambiar(!abierta)}
