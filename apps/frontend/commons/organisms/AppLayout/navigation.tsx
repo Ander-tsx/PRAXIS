@@ -41,6 +41,8 @@ const SECTION_PRINCIPAL = 'Principal';
  * quien no administra, en vez de comparar tres `href` sueltos. */
 export const SECTION_ADMINISTRACION = 'Administración';
 const SECTION_CONFIGURACION = 'Configuración';
+/** Lo de la pestaña «Configuraciones» que no es administración ni ayuda. */
+const SECTION_GENERAL = 'General';
 
 /**
  * `aria-hidden` va escrito en cada `<svg>` y no aquí: son iconos decorativos
@@ -110,7 +112,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     label: 'Equipo',
     href: '/main/team',
-    section: SECTION_PRINCIPAL,
+    section: SECTION_GENERAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
@@ -124,7 +126,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     label: 'Facturación',
     href: '/main/billing',
-    section: SECTION_PRINCIPAL,
+    section: SECTION_GENERAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
@@ -138,7 +140,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     label: 'Integraciones',
     href: '/main/integraciones',
-    section: SECTION_PRINCIPAL,
+    section: SECTION_GENERAL,
     disabled: true,
     icon: (
       <svg {...iconProps} aria-hidden="true">

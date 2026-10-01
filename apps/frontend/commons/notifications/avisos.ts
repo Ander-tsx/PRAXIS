@@ -169,7 +169,7 @@ export function destinoDeAviso({ type, proyectoRef, taskId }: DestinoDeAviso): s
 }
 
 /**
- * Abrir la pestaña «Bandeja» de la barra lateral, desde cualquier sitio.
+ * Abrir el popover de avisos (la campana junto al avatar), desde cualquier sitio.
  *
  * ## Por qué un evento del navegador y no una ruta
  *

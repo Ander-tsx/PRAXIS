@@ -77,7 +77,7 @@ export async function getSidebarPlegada(): Promise<boolean> {
 export const SIDEBAR_TAB_COOKIE = 'praxis_sidebar_tab';
 
 /** Las tres pestañas. Espejo de `SidebarTab` en `AppShell`. */
-export type SidebarTabGuardada = 'home' | 'chat' | 'inbox';
+export type SidebarTabGuardada = 'home' | 'chat' | 'settings';
 
 /**
  * Qué pestaña abrir.
@@ -89,5 +89,6 @@ export type SidebarTabGuardada = 'home' | 'chat' | 'inbox';
 export async function getSidebarTab(): Promise<SidebarTabGuardada> {
   const store = await cookies();
   const valor = store.get(SIDEBAR_TAB_COOKIE)?.value;
-  return valor === 'chat' || valor === 'inbox' ? valor : 'home';
+  /* Una cookie vieja con `inbox` (la bandeja ya no es pestaña) cae a `home`. */
+  return valor === 'chat' || valor === 'settings' ? valor : 'home';
 }
