@@ -529,8 +529,9 @@ function ArmazonInterno({
             <BotonDePliegue plegada={plegada} onClick={alternarPliegue} />
           </div>
 
+          {/* ⚠️ Selector y pestañas **fuera** del scroll: solo se desplaza el contenido de la pestaña. */}
           <div
-            className={`scrollbar-none flex-1 overflow-y-auto pb-6 pt-2 ${plegada ? 'px-2' : 'px-4'}`}
+            className={`flex min-h-0 flex-1 flex-col pt-2 ${plegada ? 'px-2' : 'px-4'}`}
           >
             <div className="mb-4">
               <OrgSwitcher
@@ -557,6 +558,7 @@ function ArmazonInterno({
               mensajesSinLeer={mensajesSinLeer}
               plegada={plegada}
             />
+            <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto pb-6">
             {/**
              * 🔴 **Las tres pestañas se montan siempre; se esconden con CSS.**
              *
@@ -606,6 +608,7 @@ function ArmazonInterno({
                 activePath={activePathDeSecciones}
                 plegada={plegada}
               />
+            </div>
             </div>
           </div>
 
@@ -771,7 +774,7 @@ function ArmazonInterno({
                   </button>
                 </div>
 
-                <div className="flex flex-col gap-4 flex-1 overflow-y-auto scrollbar-none mb-6">
+                <div className="flex flex-col gap-4 flex-1 min-h-0 mb-6">
                   <OrgSwitcher
                     name={user.name}
                     plegada={false}
@@ -801,6 +804,7 @@ function ArmazonInterno({
                     mensajesSinLeer={mensajesSinLeer}
                   />
 
+                  <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto">
                   {/* Aquí sí se monta y se desmonta, al revés que en el escritorio:
                     el cajón entero solo existe mientras está abierto, así que
                     las suscripciones de estas listas ya viven en la barra de
@@ -828,6 +832,7 @@ function ArmazonInterno({
                       organizacionActivaId={organizacionActivaId ?? null}
                     />
                   )}
+                  </div>
                 </div>
 
                 <div className="relative border-t border-border pt-4">
@@ -2295,7 +2300,7 @@ function SidebarChatList({
   }
 
   return (
-    <div className="flex max-h-[calc(100dvh-13rem)] flex-col gap-2 overflow-y-auto scrollbar-none px-1 pb-4">
+    <div className="flex flex-col gap-2 px-1 pb-4">
       {!plegada && (
         <div className="px-2">
           <input
@@ -2437,7 +2442,7 @@ function destinoDeUnAviso(aviso: AppNotification): string | undefined {
 function SidebarInboxList({
   zonePath,
   plegada,
-  className = 'max-h-[calc(100dvh-13rem)]',
+  className = '',
 }: {
   zonePath: string;
   plegada: boolean;
