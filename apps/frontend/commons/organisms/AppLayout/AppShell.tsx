@@ -1444,7 +1444,7 @@ function SidebarTabs({
       className={
         plegada
           ? 'mb-4 flex shrink-0 flex-col items-center gap-1'
-          : 'mb-4 flex shrink-0 items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none'
+          : '-mt-2 mb-4 flex shrink-0 items-center gap-1 overflow-x-auto whitespace-nowrap pt-2 scrollbar-none'
       }
     >
       {pestanas.map((pestana) => {
@@ -1469,6 +1469,8 @@ function SidebarTabs({
                 : 'text-text-secondary hover:bg-white/5 hover:text-white'
             }`}
           >
+            {/* ⚠️ La fila lleva `pt-2` (y `-mt-2` para no moverla): `overflow-x-auto` recorta
+                también en vertical y cortaba por arriba la burbuja del contador. */}
             {/* La insignia va **sobre el icono**, no al lado: inline ensanchaba la pestaña
                 y «Configuraciones» se salía por el borde de la barra. */}
             <span className="relative inline-flex">
