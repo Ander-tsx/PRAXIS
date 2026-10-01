@@ -152,7 +152,7 @@ export function ProjectConversation({
       /* Las menciones sí: en el chat del equipo hay a quién nombrar. */
       permiteMenciones
       encabezado={
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+        <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-3 md:gap-3 md:pb-4">
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex items-center gap-2">
               <ProjectMonogram
@@ -163,7 +163,7 @@ export function ProjectConversation({
                 color={projectColor}
                 size="sm"
               />
-              <h2 className="truncate font-display text-2xl text-text-primary">{projectName}</h2>
+              <h2 className="truncate font-display text-lg text-text-primary md:text-2xl">{projectName}</h2>
             </div>
             <p className="font-sans text-xs text-white">
               Chat del equipo ·{' '}

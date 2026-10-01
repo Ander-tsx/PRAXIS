@@ -219,18 +219,31 @@ function Encabezado({
   const [ampliada, setAmpliada] = useState(false);
   const inicial = (nombre.charAt(0) || peerId.charAt(0)).toUpperCase();
 
+  /* Más chico en móvil: a 56 px el avatar y el nombre se comían media cabecera. */
   const avatarElement = (
-    <Avatar
-      label={nombre}
-      src={avatarHref(perfil?.avatarUrl, '/api/gateway')}
-      presence={perfil?.presence}
-      size="xl"
-    />
+    <>
+      <span className="md:hidden">
+        <Avatar
+          label={nombre}
+          src={avatarHref(perfil?.avatarUrl, '/api/gateway')}
+          presence={perfil?.presence}
+          size="md"
+        />
+      </span>
+      <span className="hidden md:block">
+        <Avatar
+          label={nombre}
+          src={avatarHref(perfil?.avatarUrl, '/api/gateway')}
+          presence={perfil?.presence}
+          size="xl"
+        />
+      </span>
+    </>
   );
 
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
-      <div className="flex min-w-0 items-center gap-4">
+    <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border pb-3 md:gap-3 md:pb-4">
+      <div className="flex min-w-0 items-center gap-3 md:gap-4">
         {/* Avatar clickeable para ampliar */}
         <button
           type="button"
@@ -279,7 +292,7 @@ function Encabezado({
         )}
 
         <div className="flex min-w-0 flex-col gap-1.5">
-          <h2 className="font-display text-2xl text-text-primary">{nombre}</h2>
+          <h2 className="truncate font-display text-lg text-text-primary md:text-2xl">{nombre}</h2>
 
           {proyectos.length === 0 ? (
             <p className="font-sans text-xs text-text-secondary">
