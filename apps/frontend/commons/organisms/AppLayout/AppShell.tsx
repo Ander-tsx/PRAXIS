@@ -553,7 +553,11 @@ function ArmazonInterno({
              */}
             <SidebarTabs
               activa={activeTab}
-              onCambiar={setActiveTab}
+              onCambiar={(t) => {
+                setActiveTab(t);
+                setBandejaAbierta(false);
+              }}
+              bandejaAbierta={bandejaAbierta}
               mensajesSinLeer={mensajesSinLeer}
               plegada={plegada}
             />
@@ -579,7 +583,9 @@ function ArmazonInterno({
              * se quiere: son tres suscripciones al mismo `EventSource` que ya
              * está abierto, no tres conexiones.
              */}
-            <div className={activeTab === 'home' ? 'flex flex-col gap-4' : 'hidden'}>
+            <div
+              className={activeTab === 'home' && !bandejaAbierta ? 'flex flex-col gap-4' : 'hidden'}
+            >
               <SidebarProjectsTree
                 zonePath={zonePath}
                 plegada={plegada}
@@ -593,20 +599,21 @@ function ArmazonInterno({
                 plegada={plegada}
               />
             </div>
-            <div className={activeTab === 'chat' ? undefined : 'hidden'}>
+            <div className={activeTab === 'chat' && !bandejaAbierta ? undefined : 'hidden'}>
               <SidebarChatList
                 zonePath={zonePath}
                 plegada={plegada}
                 organizacionActivaId={organizacionActivaId ?? null}
               />
             </div>
-            <div className={activeTab === 'settings' ? undefined : 'hidden'}>
+            <div className={activeTab === 'settings' && !bandejaAbierta ? undefined : 'hidden'}>
               <NavList
                 navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
                 activePath={activePathDeSecciones}
                 plegada={plegada}
               />
             </div>
+            {bandejaAbierta && <SidebarInboxList zonePath={zonePath} plegada={plegada} />}
           </div>
 
           <div className={`relative border-t border-border ${plegada ? 'p-2' : 'p-4'}`}>
@@ -650,7 +657,6 @@ function ArmazonInterno({
                   abierta={bandejaAbierta}
                   onCambiar={setBandejaAbierta}
                   sinLeer={avisosSinLeer}
-                  zonePath={zonePath}
                 />
               </div>
             )}
@@ -660,8 +666,6 @@ function ArmazonInterno({
                   abierta={bandejaAbierta}
                   onCambiar={setBandejaAbierta}
                   sinLeer={avisosSinLeer}
-                  zonePath={zonePath}
-                  plegada
                 />
               </div>
             )}
@@ -797,7 +801,11 @@ function ArmazonInterno({
                    */}
                   <SidebarTabs
                     activa={activeTab}
-                    onCambiar={setActiveTab}
+                    onCambiar={(t) => {
+                      setActiveTab(t);
+                      setBandejaAbierta(false);
+                    }}
+                    bandejaAbierta={bandejaAbierta}
                     mensajesSinLeer={mensajesSinLeer}
                   />
 
@@ -806,7 +814,7 @@ function ArmazonInterno({
                     las suscripciones de estas listas ya viven en la barra de
                     escritorio cuando la hay, y en un teléfono no hay ninguna
                     barra que mantener viva por detrás. */}
-                  {activeTab === 'home' && (
+                  {!bandejaAbierta && activeTab === 'home' && (
                     <NavList
                       navItems={navItems.filter((i) => i.href === '/assistant')}
                       sinEtiquetas
@@ -814,20 +822,21 @@ function ArmazonInterno({
                       onNavigate={() => setMobileMenuOpen(false)}
                     />
                   )}
-                  {activeTab === 'settings' && (
+                  {!bandejaAbierta && activeTab === 'settings' && (
                     <NavList
                       navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
                       activePath={activePathDeSecciones}
                       onNavigate={() => setMobileMenuOpen(false)}
                     />
                   )}
-                  {activeTab === 'chat' && (
+                  {!bandejaAbierta && activeTab === 'chat' && (
                     <SidebarChatList
                       zonePath={zonePath}
                       plegada={false}
                       organizacionActivaId={organizacionActivaId ?? null}
                     />
                   )}
+                  {bandejaAbierta && <SidebarInboxList zonePath={zonePath} plegada={false} />}
                 </div>
 
                 <div className="relative border-t border-border pt-4">
@@ -839,7 +848,6 @@ function ArmazonInterno({
                       abierta={bandejaAbierta}
                       onCambiar={setBandejaAbierta}
                       sinLeer={avisosSinLeer}
-                      zonePath={zonePath}
                     />
                   </div>
                 </div>
@@ -1192,97 +1200,48 @@ const esDeConfiguracion = (href: string) => !HREFS_DE_INICIO.includes(href);
 
 /**
  * La campana de avisos, **solo el icono**, junto al avatar. Sustituye a la
- * pestaña «Bandeja»: pulsarla abre un popover con `SidebarInboxList`.
- *
- * ⚠️ Hay dos instancias (barra de escritorio y cajón móvil) que comparten el
- * estado `abierta`. La que está oculta por CSS ni pinta la lista ni reacciona al
- * clic fuera: sin ese filtro, pulsar dentro del popover visible cerraría el
- * estado compartido desde la instancia invisible, y la lista pediría datos dos
- * veces.
+ * pestaña «Bandeja»: pulsarla cambia el contenido de la barra, bajo las
+ * pestañas, por `SidebarInboxList`; pulsar una pestaña —o la campana otra
+ * vez— devuelve el contenido de siempre.
  */
 function BandejaBoton({
   abierta,
   onCambiar,
   sinLeer,
-  zonePath,
-  plegada = false,
 }: {
   abierta: boolean;
   onCambiar: (abierta: boolean) => void;
   sinLeer: number;
-  zonePath: string;
-  plegada?: boolean;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const enPantalla = (ref.current?.getClientRects().length ?? 0) > 0;
-    setVisible(abierta && enPantalla);
-    if (!abierta || !enPantalla) return;
-
-    function fuera(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onCambiar(false);
-    }
-    function tecla(e: KeyboardEvent) {
-      if (e.key === 'Escape') onCambiar(false);
-    }
-    document.addEventListener('mousedown', fuera);
-    document.addEventListener('keydown', tecla);
-    return () => {
-      document.removeEventListener('mousedown', fuera);
-      document.removeEventListener('keydown', tecla);
-    };
-  }, [abierta, onCambiar]);
-
   return (
-    <div ref={ref} className="shrink-0">
-      <button
-        type="button"
-        onClick={() => onCambiar(!abierta)}
-        aria-expanded={abierta}
-        aria-haspopup="dialog"
-        aria-label={sinLeer > 0 ? `Avisos, ${sinLeer} sin leer` : 'Avisos'}
-        title="Avisos"
-        className={`relative flex items-center justify-center rounded-full p-2.5 text-white transition-colors hover:bg-white/5 ${
-          abierta ? 'bg-white/10' : ''
-        }`}
+    <button
+      type="button"
+      onClick={() => onCambiar(!abierta)}
+      aria-pressed={abierta}
+      aria-label={sinLeer > 0 ? `Avisos, ${sinLeer} sin leer` : 'Avisos'}
+      title="Avisos"
+      className={`relative flex shrink-0 items-center justify-center rounded-full p-2.5 text-white transition-colors hover:bg-white/5 ${
+        abierta ? 'bg-white/10' : ''
+      }`}
+    >
+      <svg
+        className="h-5 w-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        aria-hidden="true"
       >
-        <svg
-          className="h-5 w-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={1.75}
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-          />
-        </svg>
-        {sinLeer > 0 && (
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-[#202020]" />
-        )}
-      </button>
-
-      {visible && (
-        <div
-          role="dialog"
-          aria-label="Avisos"
-          className={`absolute z-50 rounded-2xl border border-border bg-[#252525] py-3 shadow-xl ${
-            plegada ? 'bottom-0 left-full ml-2 w-80' : 'bottom-full left-2 right-2 mb-2'
-          }`}
-        >
-          <SidebarInboxList
-            zonePath={zonePath}
-            plegada={false}
-            className="max-h-[min(28rem,60dvh)]"
-          />
-        </div>
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+        />
+      </svg>
+      {sinLeer > 0 && (
+        <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-[#202020]" />
       )}
-    </div>
+    </button>
   );
 }
 
@@ -1331,9 +1290,12 @@ function SidebarTabs({
   activa,
   onCambiar,
   mensajesSinLeer,
+  bandejaAbierta = false,
   plegada = false,
 }: {
   activa: SidebarTab;
+  /** Con la bandeja abierta ninguna pestaña está puesta. */
+  bandejaAbierta?: boolean;
   onCambiar: (tab: SidebarTab) => void;
   mensajesSinLeer: number;
   /** Plegada: solo los iconos, en columna, y la insignia se reduce a un punto. */
@@ -1418,7 +1380,7 @@ function SidebarTabs({
       }
     >
       {pestanas.map((pestana) => {
-        const puesta = activa === pestana.id;
+        const puesta = activa === pestana.id && !bandejaAbierta;
         return (
           <button
             key={pestana.id}
