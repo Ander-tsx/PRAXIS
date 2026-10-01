@@ -113,7 +113,10 @@ const REDIRECCIONES_EXACTAS: Record<string, string> = {
   '/main': '/projects',
   /* Cortesía: la pantalla pasó de `perfil` a `profile` y los marcadores viejos
      no se pueden corregir desde aquí. */
-  '/main/perfil': '/main/profile',
+  '/main/perfil': '/projects',
+  /* 🚫 La pantalla de perfil se retiró: ahora es un panel de la barra lateral
+     (`PerfilEnBarra`), que se abre pulsando tu nombre y correo. */
+  '/main/profile': '/projects',
   /**
    * «Roles y permisos» de la barra lateral no es una pantalla: los papeles son
    * de una organización y viven en la pestaña de Equipo.

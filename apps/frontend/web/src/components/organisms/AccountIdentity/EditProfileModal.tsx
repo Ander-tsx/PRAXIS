@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   deleteAvatarAction,
   deleteCoverAction,
@@ -133,8 +134,10 @@ export function EditProfileModal({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+  /* Por portal: dentro del cajón móvil —que se mueve con `transform`— un `fixed`
+     queda atrapado en el cajón en vez de cubrir la pantalla. */
+  return createPortal(
+    <div className="fixed inset-0 z-[220] flex items-center justify-center">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative z-10 w-full max-w-2xl bg-[#191919] rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
@@ -328,6 +331,7 @@ export function EditProfileModal({
           }
         }}
       />
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -14,5 +14,5 @@ export const metadata: Metadata = {
  * solo para no romper enlaces y marcadores viejos.
  */
 export default function SettingsPage() {
-  redirect('/main/profile');
+  redirect('/projects');
 }

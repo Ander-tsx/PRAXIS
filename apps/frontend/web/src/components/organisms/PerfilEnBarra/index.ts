@@ -1,0 +1,1 @@
+export { PerfilEnBarra } from './PerfilEnBarra';

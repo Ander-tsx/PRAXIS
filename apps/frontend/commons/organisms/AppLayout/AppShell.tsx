@@ -168,6 +168,8 @@ export interface AppShellProps {
    * formulario vive en `web` (acción de servidor) y `commons` no puede importarlo.
    */
   nuevoProyectoSlot?: ReactNode;
+  /** El panel de perfil de la barra. Lo compone el `layout.tsx` (vive en `web`). */
+  perfilSlot?: ReactNode;
   children: ReactNode;
 }
 
@@ -261,7 +263,7 @@ const UN_ANO = 60 * 60 * 24 * 365;
  * así que había que salir de la zona con un `<a>` duro— y eso es exactamente la
  * recarga completa que la fusión viene a quitar.
  */
-const CUENTA_HREF = '/main/profile';
+/* 🚫 `/main/profile` ya no existe: el perfil es un panel de esta barra (`perfilSlot`). */
 
 /*
  * 🕳️ Aquí estaba `HREF_DE_MENSAJES = '/chat'`, espejo del `CHAT_HREF` de
@@ -338,6 +340,7 @@ function ArmazonInterno({
   mensajesSinLeer: mensajesIniciales = 0,
   avisosSinLeer: avisosIniciales = 0,
   nuevoProyectoSlot,
+  perfilSlot,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -383,6 +386,8 @@ function ArmazonInterno({
   });
   /** La bandeja: un popover junto al avatar, ya no una pestaña. */
   const [bandejaAbierta, setBandejaAbierta] = useState(false);
+  /** El perfil, dentro de la barra: ocupa el hueco bajo las pestañas. */
+  const [perfilAbierto, setPerfilAbierto] = useState(false);
 
   /* Se escribe desde el cliente, igual que la del pliegue: es una preferencia,
      no una credencial, y así el cambio vale ya para la siguiente navegación. */
@@ -473,8 +478,8 @@ function ArmazonInterno({
    * y no tiene entrada propia con la que competir. Se resuelve dejando la lista
    * sin nada activo y marcando la ficha de usuario, que es de donde se viene.
    */
-  const enCuenta = activePath === CUENTA_HREF || activePath.startsWith(`${CUENTA_HREF}/`);
-  const activePathDeSecciones = enCuenta ? '' : activePath;
+  const enCuenta = perfilAbierto;
+  const activePathDeSecciones = activePath;
   /**
    * 🔴 **Con la consulta, para el árbol de proyectos.** `usePathname()` no la
    * trae, y el árbol marca espacio, tablero y documento activos mirando
@@ -576,7 +581,11 @@ function ArmazonInterno({
              */}
             <SidebarTabs
               activa={activeTab}
-              onCambiar={setActiveTab}
+              onCambiar={(t) => {
+                setActiveTab(t);
+                setPerfilAbierto(false);
+              }}
+              ninguna={perfilAbierto}
               mensajesSinLeer={mensajesSinLeer}
               plegada={plegada}
             />
@@ -603,7 +612,7 @@ function ArmazonInterno({
              * se quiere: son tres suscripciones al mismo `EventSource` que ya
              * está abierto, no tres conexiones.
              */}
-            <div className={activeTab === 'home' ? 'flex flex-col gap-4' : 'hidden'}>
+            <div className={activeTab === 'home' && !perfilAbierto ? 'flex flex-col gap-4' : 'hidden'}>
               <SidebarProjectsTree
                 zonePath={zonePath}
                 plegada={plegada}
@@ -618,20 +627,21 @@ function ArmazonInterno({
                 plegada={plegada}
               />
             </div>
-            <div className={activeTab === 'chat' ? undefined : 'hidden'}>
+            <div className={activeTab === 'chat' && !perfilAbierto ? undefined : 'hidden'}>
               <SidebarChatList
                 zonePath={zonePath}
                 plegada={plegada}
                 organizacionActivaId={organizacionActivaId ?? null}
               />
             </div>
-            <div className={activeTab === 'settings' ? undefined : 'hidden'}>
+            <div className={activeTab === 'settings' && !perfilAbierto ? undefined : 'hidden'}>
               <NavList
                 navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
                 activePath={activePathDeSecciones}
                 plegada={plegada}
               />
             </div>
+            {perfilAbierto && !plegada && perfilSlot}
             </div>
           </div>
 
@@ -648,11 +658,15 @@ function ArmazonInterno({
                 }`}
               >
                 <span className="relative">
-                  <Link
-                    href={CUENTA_HREF}
-                    aria-current={enCuenta ? 'page' : undefined}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      alternarPliegue();
+                      setPerfilAbierto(true);
+                    }}
+                    aria-pressed={enCuenta}
                     className="block"
-                    title={`${user.name.trim() || user.email} — tu cuenta`}
+                    title={`${user.name.trim() || user.email} — tu perfil`}
                   >
                     {/* Sin `presence`: el punto lo pinta `estadoSlot`, que
                         además se puede pulsar. Ver el aviso de esa prop. */}
@@ -662,14 +676,19 @@ function ArmazonInterno({
                       size="md"
                       src={user.avatarSrc ?? null}
                     />
-                  </Link>
+                  </button>
                   {estadoSlot && <span className="absolute bottom-0 right-0">{estadoSlot}</span>}
                 </span>
               </div>
             ) : (
               <div className="flex items-start gap-1">
                 <div className="min-w-0 flex-1">
-                  <UserCard user={user} activa={enCuenta} estadoSlot={estadoSlot} />
+                  <UserCard
+                    user={user}
+                    activa={enCuenta}
+                    estadoSlot={estadoSlot}
+                    onAbrir={() => setPerfilAbierto((v) => !v)}
+                  />
                 </div>
                 {/* Solo el icono, a un lado del avatar: es la sección de avisos. */}
                 <BandejaBoton
@@ -823,7 +842,11 @@ function ArmazonInterno({
                    */}
                   <SidebarTabs
                     activa={activeTab}
-                    onCambiar={setActiveTab}
+                    onCambiar={(t) => {
+                setActiveTab(t);
+                setPerfilAbierto(false);
+              }}
+              ninguna={perfilAbierto}
                     mensajesSinLeer={mensajesSinLeer}
                   />
 
@@ -833,7 +856,7 @@ function ArmazonInterno({
                     las suscripciones de estas listas ya viven en la barra de
                     escritorio cuando la hay, y en un teléfono no hay ninguna
                     barra que mantener viva por detrás. */}
-                  {activeTab === 'home' && (
+                  {!perfilAbierto && activeTab === 'home' && (
                     <div className="flex flex-col gap-4">
                       {/* 🔴 El árbol de proyectos **también en móvil**: este cajón solo tenía el
                           enlace «Proyectos» de la lista, y al dejar Inicio con solo el
@@ -853,27 +876,33 @@ function ArmazonInterno({
                     />
                     </div>
                   )}
-                  {activeTab === 'settings' && (
+                  {!perfilAbierto && activeTab === 'settings' && (
                     <NavList
                       navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
                       activePath={activePathDeSecciones}
                       onNavigate={() => setMobileMenuOpen(false)}
                     />
                   )}
-                  {activeTab === 'chat' && (
+                  {!perfilAbierto && activeTab === 'chat' && (
                     <SidebarChatList
                       zonePath={zonePath}
                       plegada={false}
                       organizacionActivaId={organizacionActivaId ?? null}
                     />
                   )}
+                  {perfilAbierto && perfilSlot}
                   </div>
                 </div>
 
                 <div className="relative border-t border-border pt-4">
                   <div className="flex items-start gap-1">
                     <div className="min-w-0 flex-1">
-                      <UserCard user={user} activa={enCuenta} estadoSlot={estadoSlot} />
+                      <UserCard
+                    user={user}
+                    activa={enCuenta}
+                    estadoSlot={estadoSlot}
+                    onAbrir={() => setPerfilAbierto((v) => !v)}
+                  />
                     </div>
                     <BandejaBoton
                       abierta={bandejaAbierta}
@@ -904,11 +933,11 @@ function UserCard({
   user,
   activa = false,
   estadoSlot,
-}: { user: AppShellUser; activa?: boolean; estadoSlot?: ReactNode }) {
+  onAbrir,
+}: { user: AppShellUser; activa?: boolean; estadoSlot?: ReactNode; onAbrir: () => void }) {
   return (
     <div
-      title="Tu cuenta"
-      aria-current={activa ? 'page' : undefined}
+      title="Tu perfil"
       /* Resaltada cuando estás dentro: es la única «entrada» de la barra que no
          vive en la lista de secciones, así que si no se marcara aquí, estando
          en tu cuenta no habría nada marcado en ninguna parte. */
@@ -927,23 +956,28 @@ function UserCard({
        * de estado encima, fuera de él.
        */}
       <span className="relative shrink-0">
-        <Link href={CUENTA_HREF} className="block" title="Tu cuenta">
+        <button type="button" onClick={onAbrir} className="block" title="Tu perfil">
           <Avatar
             label={user.name.trim() || user.email}
             mine
             size="md"
             src={user.avatarSrc ?? null}
           />
-        </Link>
+        </button>
         {estadoSlot && <span className="absolute bottom-0 right-0">{estadoSlot}</span>}
       </span>
       {/* El texto sí es el enlace a tu cuenta. */}
-      <Link href={CUENTA_HREF} className="min-w-0 flex-1">
+      <button
+        type="button"
+        onClick={onAbrir}
+        aria-pressed={activa}
+        className="min-w-0 flex-1 text-left"
+      >
         {user.name.trim() && (
           <p className="truncate font-sans text-sm font-semibold text-white">{user.name}</p>
         )}
         <p className="truncate font-sans text-xs text-white">{user.email}</p>
-      </Link>
+      </button>
     </div>
   );
 }
@@ -1398,9 +1432,12 @@ function SidebarTabs({
   activa,
   onCambiar,
   mensajesSinLeer,
+  ninguna = false,
   plegada = false,
 }: {
   activa: SidebarTab;
+  /** Con el perfil abierto ninguna pestaña está puesta. */
+  ninguna?: boolean;
   onCambiar: (tab: SidebarTab) => void;
   mensajesSinLeer: number;
   /** Plegada: solo los iconos, en columna, y la insignia se reduce a un punto. */
@@ -1485,7 +1522,7 @@ function SidebarTabs({
       }
     >
       {pestanas.map((pestana) => {
-        const puesta = activa === pestana.id;
+        const puesta = activa === pestana.id && !ninguna;
         return (
           <button
             key={pestana.id}

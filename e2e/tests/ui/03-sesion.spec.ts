@@ -139,12 +139,15 @@ test.describe('Sesión en el navegador', () => {
   test('salir borra la sesión y devuelve al área pública', async ({ page, context }) => {
     await crearCuentaYEntrar(page);
 
-    /* ⚠️ **«Cerrar sesión» está en la pantalla de cuenta, no en la barra.**
+    /* ⚠️ **«Cerrar sesión» está en el panel de perfil de la barra.**
        Esta prueba lo buscaba en `/dashboard`, donde estuvo hasta que el pie de
        la barra lateral pasó a ser el selector de estado (ver `AppShell`). No se
        notó porque la suite de interfaz llevaba sin ejecutarse desde entonces:
        sin navegador instalado, estas 27 pruebas no daban ni un dato. */
-    await page.goto('/main/profile');
+    /* El perfil ya no es una pantalla: es un panel de la barra lateral que se
+       abre al pulsar tu nombre y correo. */
+    await page.goto('/projects');
+    await page.getByRole('button', { name: 'Tu perfil' }).first().click();
 
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
     await page.waitForURL((url) => !url.pathname.startsWith('/main'), { timeout: 30_000 });

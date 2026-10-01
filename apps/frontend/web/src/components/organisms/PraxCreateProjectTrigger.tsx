@@ -57,6 +57,23 @@ export function PraxCreateProjectTrigger({
     return () => URL.revokeObjectURL(url);
   }, [imagen]);
 
+  /* El panel entra y sale deslizándose: `montado` es si existe en el árbol y
+     `dentro` si está en su sitio. Al abrir se monta y **dos fotogramas después**
+     se pone dentro (si no, nace ya en destino y no hay transición); al cerrar se
+     saca primero y se desmonta cuando termina — espejo de `duration-300`. */
+  const [montado, setMontado] = useState(false);
+  const [dentro, setDentro] = useState(false);
+  useEffect(() => {
+    if (modalOpen) {
+      setMontado(true);
+      const f = requestAnimationFrame(() => requestAnimationFrame(() => setDentro(true)));
+      return () => cancelAnimationFrame(f);
+    }
+    setDentro(false);
+    const t = window.setTimeout(() => setMontado(false), 300);
+    return () => window.clearTimeout(t);
+  }, [modalOpen]);
+
   // Cierra con ESC
   useEffect(() => {
     if (!modalOpen) return;
@@ -107,19 +124,27 @@ export function PraxCreateProjectTrigger({
      definido aquí dentro se remontaba en cada render y vaciaba lo escrito al
      elegir un icono o al salir un error. */
   const renderModal = () => {
-    if (!modalOpen) return null;
+    if (!montado) return null;
     /* Por portal: dentro del cajón móvil —que se mueve con `transform`— un `fixed`
        queda atrapado en el cajón en vez de cubrir la pantalla. */
     return createPortal(
       <div
-        className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        className={`fixed inset-0 z-[210] bg-black/60 backdrop-blur-sm transition-opacity duration-300 motion-reduce:transition-none ${
+          dentro ? 'opacity-100' : 'opacity-0'
+        }`}
         onMouseDown={(e) => {
           if (e.target === e.currentTarget) setModalOpen(false);
         }}
       >
-        <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/[0.08] bg-[#0c0c0b] shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div
+          role="dialog"
+          aria-label="Nuevo proyecto"
+          className={`absolute inset-y-0 right-0 flex w-full max-w-md flex-col overflow-y-auto border-l border-white/[0.08] bg-[#0c0c0b] shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+            dentro ? 'translate-x-0' : 'translate-x-full'
+          }`}
+        >
           <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
-            <h2 className="text-sm font-semibold text-white">Nuevo Proyecto</h2>
+            <h2 className="text-base font-semibold text-white">Nuevo proyecto</h2>
             <button
               type="button"
               onClick={() => setModalOpen(false)}
