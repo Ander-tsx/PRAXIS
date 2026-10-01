@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface PraxCreateProjectTriggerProps {
-  triggerVariant?: 'boton' | 'tarjeta' | 'fila';
+  triggerVariant?: 'boton' | 'tarjeta' | 'fila' | 'icono';
   /**
    * En qué organización se crea. Es la **activa**, resuelta en el servidor
    * (`loadPrivateChrome` → `resolverOrganizacionActiva`), no la cookie en crudo.
@@ -182,6 +182,33 @@ export function PraxCreateProjectTrigger({
       document.body,
     );
   };
+
+  /* Un «+» pequeño para el encabezado de «Proyectos» de la barra lateral. */
+  if (triggerVariant === 'icono') {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          title="Nuevo proyecto"
+          aria-label="Nuevo proyecto"
+          className="rounded p-0.5 text-text-secondary/50 transition-colors hover:text-white"
+        >
+          <svg
+            className="h-3.5 w-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+        <Modal />
+      </>
+    );
+  }
 
   /* La fila del menú lateral: mismo aspecto que las entradas de `NavList`. */
   if (triggerVariant === 'fila') {

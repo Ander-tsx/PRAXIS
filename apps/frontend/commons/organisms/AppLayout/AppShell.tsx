@@ -609,6 +609,7 @@ function ArmazonInterno({
                 plegada={plegada}
                 activePath={activePathConConsulta}
                 organizacionActivaId={organizacionActivaId ?? null}
+                accionNueva={nuevoProyectoSlot}
               />
               <NavList
                 navItems={navItems.filter((i) => i.href === '/assistant')}
@@ -616,7 +617,6 @@ function ArmazonInterno({
                 activePath={activePathDeSecciones}
                 plegada={plegada}
               />
-              {nuevoProyectoSlot}
             </div>
             <div className={activeTab === 'chat' ? undefined : 'hidden'}>
               <SidebarChatList
@@ -843,6 +843,7 @@ function ArmazonInterno({
                         plegada={false}
                         activePath={activePathConConsulta}
                         organizacionActivaId={organizacionActivaId ?? null}
+                        accionNueva={nuevoProyectoSlot}
                       />
                     <NavList
                       navItems={navItems.filter((i) => i.href === '/assistant')}
@@ -850,7 +851,6 @@ function ArmazonInterno({
                       activePath={activePathDeSecciones}
                       onNavigate={() => setMobileMenuOpen(false)}
                     />
-                    {nuevoProyectoSlot}
                     </div>
                   )}
                   {activeTab === 'settings' && (
@@ -1579,11 +1579,14 @@ function SidebarProjectsTree({
   plegada,
   activePath,
   organizacionActivaId,
+  accionNueva,
 }: {
   zonePath: string;
   plegada: boolean;
   activePath: string;
   organizacionActivaId: string | null;
+  /** El «+» discreto del encabezado de la sección. Lo pone el layout: ver `nuevoProyectoSlot`. */
+  accionNueva?: ReactNode;
 }) {
   const router = useRouter();
   const [projects, setProjects] = useState<SidebarProject[]>([]);
@@ -1819,6 +1822,8 @@ function SidebarProjectsTree({
           <span className="text-[11px] font-semibold uppercase tracking-wider text-white select-none">
             Proyectos
           </span>
+          <span className="flex items-center gap-0.5">
+          {accionNueva}
           <Link
             href="/projects"
             title="Ver todos los proyectos"
@@ -1839,6 +1844,7 @@ function SidebarProjectsTree({
               />
             </svg>
           </Link>
+          </span>
         </div>
       )}
 

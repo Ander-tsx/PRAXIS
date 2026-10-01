@@ -87,7 +87,7 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
       mensajesSinLeer={mensajesSinLeer}
       avisosSinLeer={avisosSinLeer}
       nuevoProyectoSlot={
-        <PraxCreateProjectTrigger triggerVariant="fila" organizationId={organizacionActivaId} />
+        <PraxCreateProjectTrigger triggerVariant="icono" organizationId={organizacionActivaId} />
       }
       user={{
         name: displayName(profile),
