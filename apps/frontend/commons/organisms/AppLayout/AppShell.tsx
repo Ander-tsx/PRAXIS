@@ -1,6 +1,6 @@
 'use client';
 
-import { FileText, NotebookText, Plus, SquareKanban } from 'lucide-react';
+import { Columns3, File, Folder, Plus } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -1879,7 +1879,7 @@ function SidebarProjectsTree({
                         // URL correcta: /projects/{slug}?tab=espacios&ws={wsId}
                         const wsHref = `/projects/${project.slug}?tab=espacios&ws=${ws.id}`;
                         const isActiveWs = activePath.includes(`ws=${ws.id}`);
-                        const Icono = ws.kind === 'DOCUMENTS' ? NotebookText : SquareKanban;
+                        const Icono = Folder;
                         const wsAbierto = espaciosAbiertos.get(ws.id) ?? isActiveWs;
                         return (
                           <div key={ws.id} className="flex flex-col gap-0.5">
@@ -1908,7 +1908,7 @@ function SidebarProjectsTree({
                                 aria-current={isActiveWs ? 'page' : undefined}
                                 className="flex min-w-0 flex-1 items-center gap-2 py-[5px] pr-1 text-[12px]"
                               >
-                                <Icono className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <Icono className="h-3 w-3 shrink-0 opacity-60" aria-hidden="true" />
                                 <span className="truncate">{ws.name}</span>
                               </Link>
                               <MenuDeContenido
@@ -1945,8 +1945,8 @@ function SidebarProjectsTree({
                                       aria-current={tableroActivo ? 'page' : undefined}
                                       className="flex min-w-0 flex-1 items-center gap-2 px-2 py-[4px] text-[12px]"
                                     >
-                                      <SquareKanban
-                                        className="h-3.5 w-3.5 shrink-0"
+                                      <Columns3
+                                        className="h-3 w-3 shrink-0 opacity-60"
                                         aria-hidden="true"
                                       />
                                       <span className="truncate">{tablero.name}</span>
@@ -1986,8 +1986,8 @@ function SidebarProjectsTree({
                                     aria-current={docActivo ? 'page' : undefined}
                                     className="flex min-w-0 flex-1 items-center gap-2 px-2 py-[4px] text-[12px]"
                                   >
-                                    <FileText
-                                      className="h-3.5 w-3.5 shrink-0"
+                                    <File
+                                      className="h-3 w-3 shrink-0 opacity-60"
                                       aria-hidden="true"
                                     />
                                     <span className="truncate">{doc.title || 'Sin título'}</span>
