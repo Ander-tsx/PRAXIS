@@ -1223,7 +1223,9 @@ function BandejaBoton({
      poder animar las dos direcciones: al abrir se monta y **un fotograma después**
      se pone en su sitio (si no, nace ya en destino y no hay transición); al
      cerrar se saca primero y se desmonta cuando termina — espejo de
-     `duration-200`. */
+     `duration-300`. Como el efecto «génie» del Dock de macOS: el panel nace
+     encogido **desde la campana** (de ahí el `origin-*`) y crece hasta su sitio; al
+     cerrar vuelve a ser absorbido por ella. */
   const [visible, setVisible] = useState(false);
   const [entrada, setEntrada] = useState(false);
 
@@ -1235,7 +1237,7 @@ function BandejaBoton({
       return () => cancelAnimationFrame(f);
     }
     setEntrada(false);
-    const t = window.setTimeout(() => setVisible(false), 200);
+    const t = window.setTimeout(() => setVisible(false), 320);
     return () => window.clearTimeout(t);
   }, [abierta]);
 
@@ -1293,14 +1295,14 @@ function BandejaBoton({
         <div
           role="dialog"
           aria-label="Avisos"
-          className={`absolute z-50 rounded-2xl border border-border bg-[#252525] py-3 shadow-xl transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none ${
+          className={`absolute z-50 rounded-2xl border border-border bg-[#252525] py-3 shadow-xl transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
             plegada
               ? 'bottom-0 left-full ml-2 w-80 origin-bottom-left'
-              : 'bottom-full left-2 right-2 mb-2 origin-bottom'
+              : 'bottom-full left-2 right-2 mb-2 origin-bottom-right'
           } ${
             entrada
-              ? 'translate-y-0 scale-100 opacity-100'
-              : 'pointer-events-none translate-y-2 scale-95 opacity-0'
+              ? 'scale-100 opacity-100'
+              : 'pointer-events-none scale-[0.08] opacity-0'
           }`}
         >
           <SidebarInboxList
@@ -1834,7 +1836,7 @@ function SidebarProjectsTree({
           return (
             <div key={project.id} className="flex flex-col">
               <div
-                className={`group flex items-center gap-1.5 rounded-lg px-2 py-1 transition-colors hover:bg-white/[0.06] ${isActiveProject ? 'bg-white/10' : ''}`}
+                className={`group flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.06] ${isActiveProject ? 'bg-white/10' : ''}`}
               >
                 <button
                   type="button"
@@ -1846,7 +1848,7 @@ function SidebarProjectsTree({
                   <ChevronIcon open={isOpen} />
                 </button>
 
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[0.72]">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[0.82]">
                   <ProjectMonogram
                     id={project.id}
                     name={project.name}
@@ -1894,7 +1896,7 @@ function SidebarProjectsTree({
                   className="min-h-0 overflow-hidden"
                   style={{ opacity: isOpen ? 1 : 0, transition: 'opacity 200ms' }}
                 >
-                  <div className="flex flex-col gap-0.5 pl-7 pb-1 pt-0.5">
+                  <div className="flex flex-col gap-1 pl-7 pb-1.5 pt-1">
                     {project.workspaces.length === 0 ? (
                       <span className="px-2 py-1 text-[12px] text-white italic select-none">
                         Sin espacios
@@ -1907,7 +1909,7 @@ function SidebarProjectsTree({
                         const Icono = Folder;
                         const wsAbierto = espaciosAbiertos.get(ws.id) ?? isActiveWs;
                         return (
-                          <div key={ws.id} className="flex flex-col gap-0.5">
+                          <div key={ws.id} className="flex flex-col gap-1">
                             <div
                               className={`group flex items-center gap-1 rounded-md pr-1 transition-colors ${
                                 isActiveWs
@@ -1931,9 +1933,9 @@ function SidebarProjectsTree({
                               <Link
                                 href={wsHref}
                                 aria-current={isActiveWs ? 'page' : undefined}
-                                className="flex min-w-0 flex-1 items-center gap-2 py-[5px] pr-1 text-[12px]"
+                                className="flex min-w-0 flex-1 items-center gap-2 py-[6px] pr-1 text-[13px]"
                               >
-                                <Icono className="h-3 w-3 shrink-0 opacity-60" aria-hidden="true" />
+                                <Icono className="h-3.5 w-3.5 shrink-0 opacity-60" aria-hidden="true" />
                                 <span className="truncate">{ws.name}</span>
                               </Link>
                               <MenuDeContenido
@@ -1968,10 +1970,10 @@ function SidebarProjectsTree({
                                     <Link
                                       href={`${wsHref}&board=${tablero.id}`}
                                       aria-current={tableroActivo ? 'page' : undefined}
-                                      className="flex min-w-0 flex-1 items-center gap-2 px-2 py-[4px] text-[12px]"
+                                      className="flex min-w-0 flex-1 items-center gap-2 px-2 py-[6px] text-[13px]"
                                     >
                                       <Columns3
-                                        className="h-3 w-3 shrink-0 opacity-60"
+                                        className="h-3.5 w-3.5 shrink-0 opacity-60"
                                         aria-hidden="true"
                                       />
                                       <span className="truncate">{tablero.name}</span>
@@ -2009,10 +2011,10 @@ function SidebarProjectsTree({
                                   <Link
                                     href={`${wsHref}&doc=${doc.id}`}
                                     aria-current={docActivo ? 'page' : undefined}
-                                    className="flex min-w-0 flex-1 items-center gap-2 px-2 py-[4px] text-[12px]"
+                                    className="flex min-w-0 flex-1 items-center gap-2 px-2 py-[6px] text-[13px]"
                                   >
                                     <File
-                                      className="h-3 w-3 shrink-0 opacity-60"
+                                      className="h-3.5 w-3.5 shrink-0 opacity-60"
                                       aria-hidden="true"
                                     />
                                     <span className="truncate">{doc.title || 'Sin título'}</span>
@@ -2048,7 +2050,7 @@ function SidebarProjectsTree({
                                   });
                                   setCreandoEn(project.id);
                                 }}
-                                className="ml-7 flex items-center gap-2 rounded-md px-2 py-[4px] text-left text-[12px] text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-white"
+                                className="ml-7 flex items-center gap-2 rounded-md px-2 py-[6px] text-left text-[13px] text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-white"
                               >
                                 <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 <span className="truncate">
@@ -2111,11 +2113,11 @@ function FilaDePersona({
     <Link
       href={`/chat/${conversacion.peerId}`}
       aria-current={activo ? 'page' : undefined}
-      className={`group flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/10 ${
+      className={`group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/10 ${
         plegada ? 'justify-center px-0' : ''
       } ${activo ? 'bg-white/10' : ''}`}
     >
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[0.72]">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[1.1]">
         <Avatar
           label={nombre}
           size="sm"
@@ -2171,11 +2173,11 @@ function FilaDeProyecto({
     <Link
       href={`/chat/proyecto/${chat.project.id}`}
       aria-current={activo ? 'page' : undefined}
-      className={`group flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/10 ${
+      className={`group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/10 ${
         plegada ? 'justify-center px-0' : ''
       } ${activo ? 'bg-white/10' : ''}`}
     >
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[0.72]">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[0.82]">
         <ProjectMonogram
           id={chat.project.id}
           name={chat.project.name}
@@ -2340,7 +2342,7 @@ function SidebarChatList({
       )}
 
       {proyectosVisibles.length > 0 && (
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-1">
           {!plegada && (
             <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
               Proyectos
@@ -2359,7 +2361,7 @@ function SidebarChatList({
       )}
 
       {directasVisibles.length > 0 && (
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-1">
           {!plegada && (
             <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
               Privados
