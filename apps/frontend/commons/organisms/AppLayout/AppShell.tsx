@@ -588,6 +588,7 @@ function ArmazonInterno({
               />
               <NavList
                 navItems={navItems.filter((i) => i.href === '/assistant')}
+                sinEtiquetas
                 activePath={activePathDeSecciones}
                 plegada={plegada}
               />
@@ -808,6 +809,7 @@ function ArmazonInterno({
                   {activeTab === 'home' && (
                     <NavList
                       navItems={navItems.filter((i) => i.href === '/assistant')}
+                      sinEtiquetas
                       activePath={activePathDeSecciones}
                       onNavigate={() => setMobileMenuOpen(false)}
                     />

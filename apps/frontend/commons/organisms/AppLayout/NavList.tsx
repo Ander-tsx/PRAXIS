@@ -81,10 +81,13 @@ export function NavList({
   activePath,
   onNavigate,
   plegada = false,
+  sinEtiquetas = false,
 }: {
   navItems: AppNavItem[];
   activePath: string;
   onNavigate?: () => void;
+  /** Sin el rótulo de grupo ni su botón de compactar: «Inicio» solo lleva el asistente. */
+  sinEtiquetas?: boolean;
   /**
    * Solo los iconos.
    *
@@ -136,7 +139,7 @@ export function NavList({
   return (
     <nav className="flex flex-col gap-4" aria-label="Secciones">
       {grupos.map((grupo) => {
-        const compactado = !plegada && compactados.has(grupo.clave);
+        const compactado = !plegada && !sinEtiquetas && compactados.has(grupo.clave);
 
         return (
           <div key={grupo.clave} className="flex flex-col gap-1">
@@ -149,7 +152,7 @@ export function NavList({
               }
               aria-hidden="true"
             />
-            {!plegada && (
+            {!plegada && !sinEtiquetas && (
               <button
                 type="button"
                 onClick={() => alternar(grupo.clave)}
