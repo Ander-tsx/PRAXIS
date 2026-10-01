@@ -1,7 +1,7 @@
 'use client';
 
 import { setPresenceAction } from '@/app/(privado)/main/profile/actions';
-import { PRESENCES, type Presence, alpha, colors, presenceOf } from '@praxis/commons';
+import { PRESENCES, type Presence, presenceOf } from '@praxis/commons';
 import { useState } from 'react';
 
 export interface PresencePickerProps {
@@ -34,6 +34,7 @@ export interface PresencePickerProps {
 export function PresencePicker({ inicial }: PresencePickerProps) {
   const [presencia, setPresencia] = useState(inicial);
   const [guardando, setGuardando] = useState(false);
+  const [abierto, setAbierto] = useState(false);
 
   async function elegir(siguiente: Presence) {
     if (siguiente === presencia) return;
@@ -46,42 +47,98 @@ export function PresencePicker({ inicial }: PresencePickerProps) {
     setPresencia(confirmada ?? anterior);
   }
 
+  const actual = presenceOf(presencia);
+
   return (
-    /* `fieldset` deshabilitado mientras guarda: bloquea las seis de una vez sin
-       repetir `disabled` en cada botón. */
-    <fieldset className="flex flex-wrap gap-3" disabled={guardando} aria-busy={guardando}>
-      <legend className="sr-only">Tu estado</legend>
+    /* Plegado: **una sola fila** con tu estado de ahora. Se abre para cambiarlo y
+       se vuelve a plegar al elegir — es un ajuste que se toca de pasada, no una
+       lista que deba estar siempre a la vista. */
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-white/5"
+      >
+        <span
+          aria-hidden="true"
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ background: actual.color }}
+        />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="font-sans text-[10px] uppercase tracking-wider text-text-secondary">
+            Tu estado
+          </span>
+          <span className="font-sans text-[13px] font-semibold text-white">{actual.etiqueta}</span>
+        </span>
+        <svg
+          className={`h-4 w-4 shrink-0 text-text-secondary transition-transform duration-200 ${abierto ? '-rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
 
-      {PRESENCES.filter((clave) => clave !== 'AWAY').map((clave) => {
-        const descripcion = presenceOf(clave);
-        const puesta = clave === presencia;
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-200 ease-in-out motion-reduce:transition-none ${
+          abierto ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
+      >
+        <fieldset
+          className="flex min-h-0 flex-col gap-0.5 overflow-hidden"
+          disabled={guardando || !abierto}
+          aria-busy={guardando}
+        >
+          <legend className="sr-only">Tu estado</legend>
+          {PRESENCES.filter((clave) => clave !== 'AWAY').map((clave) => {
+            const descripcion = presenceOf(clave);
+            const puesta = clave === presencia;
 
-        return (
-          <button
-            key={clave}
-            type="button"
-            onClick={() => void elegir(clave)}
-            aria-pressed={puesta}
-            className={`flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border p-3.5 text-left transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 disabled:transform-none ${puesta ? 'shadow-lg border-transparent' : 'border-white/10 hover:border-white/20'}`}
-            style={{
-              background: puesta ? alpha(descripcion.color, 15) : 'rgba(255, 255, 255, 0.02)',
-              boxShadow: puesta ? `0 0 0 1px ${descripcion.color}` : 'none',
-            }}
-          >
-            <span
-              aria-hidden="true"
-              className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
-              style={{ background: descripcion.color }}
-            />
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="font-sans text-sm font-medium text-text-primary">
-                {descripcion.etiqueta}
-              </span>
-              <span className="font-sans text-xs text-white">{descripcion.ayuda}</span>
-            </span>
-          </button>
-        );
-      })}
-    </fieldset>
+            return (
+              <button
+                key={clave}
+                type="button"
+                onClick={() => {
+                  void elegir(clave);
+                  setAbierto(false);
+                }}
+                aria-pressed={puesta}
+                title={descripcion.ayuda}
+                className={`ml-3 flex min-w-0 cursor-pointer items-center gap-3 rounded-lg px-3 py-1.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  puesta ? 'bg-white/10' : 'hover:bg-white/5'
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: descripcion.color }}
+                />
+                <span
+                  className={`flex-1 font-sans text-[13px] ${puesta ? 'font-semibold text-white' : 'font-medium text-text-secondary'}`}
+                >
+                  {descripcion.etiqueta}
+                </span>
+                {puesta && (
+                  <svg
+                    className="h-4 w-4 shrink-0 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2.25}
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </fieldset>
+      </div>
+    </div>
   );
 }

@@ -58,7 +58,7 @@ export function PraxCreateProjectTrigger({
   }, [imagen]);
 
   /* El panel entra y sale deslizándose: `montado` es si existe en el árbol y
-     `dentro` si está en su sitio. Al abrir se monta y **dos fotogramas después**
+     `dentro` si está en su sitio. Al abrir se monta y **un instante después**
      se pone dentro (si no, nace ya en destino y no hay transición); al cerrar se
      saca primero y se desmonta cuando termina — espejo de `duration-300`. */
   const [montado, setMontado] = useState(false);
@@ -66,8 +66,10 @@ export function PraxCreateProjectTrigger({
   useEffect(() => {
     if (modalOpen) {
       setMontado(true);
-      const f = requestAnimationFrame(() => requestAnimationFrame(() => setDentro(true)));
-      return () => cancelAnimationFrame(f);
+      /* `setTimeout` y no `requestAnimationFrame`: en una pestaña en segundo plano los
+         fotogramas se pausan y el panel se quedaba montado pero fuera de pantalla. */
+      const t = window.setTimeout(() => setDentro(true), 30);
+      return () => window.clearTimeout(t);
     }
     setDentro(false);
     const t = window.setTimeout(() => setMontado(false), 300);
