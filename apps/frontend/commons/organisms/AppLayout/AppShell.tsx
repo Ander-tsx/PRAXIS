@@ -339,6 +339,11 @@ function ArmazonInterno({
   const browserPath = zonePath + (pathname === '/' ? '' : pathname);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  /* Navegar desde el árbol de proyectos del cajón móvil no pasa por `onNavigate`:
+     se cierra cuando cambia la ruta. */
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
   /**
    * 🔴 **Determinista: la ruta y una prop, nada del navegador.**
    *
@@ -822,12 +827,23 @@ function ArmazonInterno({
                     escritorio cuando la hay, y en un teléfono no hay ninguna
                     barra que mantener viva por detrás. */}
                   {activeTab === 'home' && (
+                    <div className="flex flex-col gap-4">
+                      {/* 🔴 El árbol de proyectos **también en móvil**: este cajón solo tenía el
+                          enlace «Proyectos» de la lista, y al dejar Inicio con solo el
+                          asistente se quedó sin ninguna puerta a los proyectos. */}
+                      <SidebarProjectsTree
+                        zonePath={zonePath}
+                        plegada={false}
+                        activePath={activePathConConsulta}
+                        organizacionActivaId={organizacionActivaId ?? null}
+                      />
                     <NavList
                       navItems={navItems.filter((i) => i.href === '/assistant')}
                       sinEtiquetas
                       activePath={activePathDeSecciones}
                       onNavigate={() => setMobileMenuOpen(false)}
                     />
+                    </div>
                   )}
                   {activeTab === 'settings' && (
                     <NavList
