@@ -7,6 +7,7 @@ import {
 import {
   CompartirDocumento,
   DocumentEditor,
+  ExportarDocumento,
   HistorialDeVersiones,
 } from '@/components/organisms/DocumentEditor';
 import { DOCUMENT_INITIAL_STATE } from '@/lib/projects/action-state';
@@ -88,6 +89,7 @@ export function DocumentView({
         }
         acciones={(modo, editor) => (
           <>
+            <ExportarDocumento editor={editor} titulo={documento.title} />
             {modo === 'edit' && (
               <HistorialDeVersiones
                 documentId={documento.id}

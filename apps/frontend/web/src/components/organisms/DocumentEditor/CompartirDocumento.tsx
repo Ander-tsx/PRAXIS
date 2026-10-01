@@ -43,6 +43,7 @@ export function CompartirDocumento({ documentId }: { documentId: string }) {
   const [aviso, setAviso] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
+    setError(null);
     pedir<Compartido>(rutaDeDocumento(documentId, '/share'))
       .then(setDatos)
       .catch((e: Error) => setError(e.message));
@@ -50,6 +51,10 @@ export function CompartirDocumento({ documentId }: { documentId: string }) {
 
   useEffect(() => {
     if (abierto) cargar();
+    else {
+      setAviso(null);
+      setError(null);
+    }
   }, [abierto, cargar]);
 
   async function cambiar(cuerpo: { linkAccess?: Acceso; regenerateLink?: boolean }) {
@@ -96,35 +101,61 @@ export function CompartirDocumento({ documentId }: { documentId: string }) {
     }
   }
 
-  async function cambiarPapel(email: string, role: Papel) {
-    setDatos(
-      await pedir<Compartido>(rutaDeDocumento(documentId, '/invites'), {
+  /** Lanza una petición que devuelve el estado nuevo; si falla, lo dice en vez de callarlo. */
+  async function aplicar(peticion: () => Promise<Compartido>) {
+    setError(null);
+    setAviso(null);
+    try {
+      setDatos(await peticion());
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  const cambiarPapel = (email: string, role: Papel) =>
+    aplicar(() =>
+      pedir<Compartido>(rutaDeDocumento(documentId, '/invites'), {
         method: 'POST',
         body: JSON.stringify({ email, role }),
-      }).catch(() => datos),
+      }),
     );
-  }
 
-  async function quitar(inviteId: string) {
-    setDatos(
-      await pedir<Compartido>(rutaDeDocumento(documentId, `/invites/${inviteId}`), {
-        method: 'DELETE',
-      }).catch(() => datos),
+  const quitar = (inviteId: string) =>
+    aplicar(() =>
+      pedir<Compartido>(rutaDeDocumento(documentId, `/invites/${inviteId}`), { method: 'DELETE' }),
     );
-  }
 
-  function copiar() {
-    const enlace =
-      datos?.linkAccess !== 'NONE' && datos?.link
-        ? datos.link
-        : `${window.location.origin}/d/${documentId}`;
-    void navigator.clipboard.writeText(enlace).then(() => {
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 1800);
-    });
-  }
+  const publico = !!datos && datos.linkAccess !== 'NONE';
+  /* Con acceso por enlace, el que lleva su token (`?k=`); si no, el simple, que
+     solo abre a quien ya tiene acceso. */
+  const enlace = publico && datos?.link ? datos.link : `${window.location.origin}/d/${documentId}`;
 
-  const publico = datos && datos.linkAccess !== 'NONE';
+  async function copiar() {
+    let bien = false;
+    try {
+      await navigator.clipboard.writeText(enlace);
+      bien = true;
+    } catch {
+      /* Sin HTTPS o sin permiso: el método antiguo. */
+      const area = document.createElement('textarea');
+      area.value = enlace;
+      area.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+      document.body.append(area);
+      area.select();
+      try {
+        bien = document.execCommand('copy');
+      } catch {
+        bien = false;
+      }
+      area.remove();
+    }
+    if (!bien) {
+      setError('No se pudo copiar; selecciona el enlace y cópialo a mano.');
+      return;
+    }
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 1800);
+  }
 
   return (
     <>
@@ -138,9 +169,17 @@ export function CompartirDocumento({ documentId }: { documentId: string }) {
         onClose={() => setAbierto(false)}
         title="Compartir"
         size="md"
+        overflowVisible
       >
         {!datos ? (
-          <p className="font-sans text-sm text-text-secondary">{error ?? 'Cargando…'}</p>
+          <div className="flex flex-col items-start gap-3">
+            <p className="font-sans text-sm text-text-secondary">{error ?? 'Cargando…'}</p>
+            {error && (
+              <Button size="sm" variant="secondary" onClick={cargar}>
+                Reintentar
+              </Button>
+            )}
+          </div>
         ) : (
           <div className="flex flex-col gap-6">
             <form onSubmit={invitar} className="flex items-end gap-2">
@@ -257,6 +296,14 @@ export function CompartirDocumento({ documentId }: { documentId: string }) {
               </p>
             )}
 
+            <input
+              readOnly
+              value={enlace}
+              aria-label="Enlace del documento"
+              onFocus={(e) => e.currentTarget.select()}
+              className="h-9 w-full truncate rounded-lg border border-border bg-transparent px-3 font-sans text-xs text-text-secondary outline-none"
+            />
+
             <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
               {publico ? (
                 <button
@@ -270,7 +317,7 @@ export function CompartirDocumento({ documentId }: { documentId: string }) {
               ) : (
                 <span />
               )}
-              <Button size="sm" variant="secondary" onClick={copiar}>
+              <Button size="sm" variant="secondary" onClick={() => void copiar()}>
                 {copiado ? (
                   <Check className="mr-1.5 h-3.5 w-3.5" />
                 ) : (

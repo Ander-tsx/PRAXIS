@@ -1,6 +1,10 @@
 'use client';
 
-import { DocumentEditor, HistorialDeVersiones } from '@/components/organisms/DocumentEditor';
+import {
+  DocumentEditor,
+  ExportarDocumento,
+  HistorialDeVersiones,
+} from '@/components/organisms/DocumentEditor';
 import { projectHref } from '@praxis/commons';
 import Link from 'next/link';
 import { useCallback } from 'react';
@@ -66,11 +70,12 @@ export function DocumentoCompartido({
             conSesion={conSesion}
             titulo={meta.title}
             alPedirSesion={irAEntrar}
-            acciones={(modo, editor) =>
-              modo === 'edit' ? (
-                <HistorialDeVersiones documentId={id} k={k} editor={editor} />
-              ) : null
-            }
+            acciones={(modo, editor) => (
+              <>
+                <ExportarDocumento editor={editor} titulo={meta.title} k={k} />
+                {modo === 'edit' && <HistorialDeVersiones documentId={id} k={k} editor={editor} />}
+              </>
+            )}
           />
         ) : (
           <Mensaje estado={estado} login={login} />
