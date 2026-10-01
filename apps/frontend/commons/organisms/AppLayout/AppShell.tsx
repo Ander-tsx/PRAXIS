@@ -1219,11 +1219,28 @@ function BandejaBoton({
   plegada?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  /* `visible` es si está montado; `entrada`, si está en su sitio. Son dos para
+     poder animar las dos direcciones: al abrir se monta y **un fotograma después**
+     se pone en su sitio (si no, nace ya en destino y no hay transición); al
+     cerrar se saca primero y se desmonta cuando termina — espejo de
+     `duration-200`. */
   const [visible, setVisible] = useState(false);
+  const [entrada, setEntrada] = useState(false);
 
   useEffect(() => {
     const enPantalla = (ref.current?.getClientRects().length ?? 0) > 0;
-    setVisible(abierta && enPantalla);
+    if (abierta && enPantalla) {
+      setVisible(true);
+      const f = requestAnimationFrame(() => requestAnimationFrame(() => setEntrada(true)));
+      return () => cancelAnimationFrame(f);
+    }
+    setEntrada(false);
+    const t = window.setTimeout(() => setVisible(false), 200);
+    return () => window.clearTimeout(t);
+  }, [abierta]);
+
+  useEffect(() => {
+    const enPantalla = (ref.current?.getClientRects().length ?? 0) > 0;
     if (!abierta || !enPantalla) return;
 
     function fuera(e: MouseEvent) {
@@ -1276,8 +1293,14 @@ function BandejaBoton({
         <div
           role="dialog"
           aria-label="Avisos"
-          className={`absolute z-50 rounded-2xl border border-border bg-[#252525] py-3 shadow-xl ${
-            plegada ? 'bottom-0 left-full ml-2 w-80' : 'bottom-full left-2 right-2 mb-2'
+          className={`absolute z-50 rounded-2xl border border-border bg-[#252525] py-3 shadow-xl transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none ${
+            plegada
+              ? 'bottom-0 left-full ml-2 w-80 origin-bottom-left'
+              : 'bottom-full left-2 right-2 mb-2 origin-bottom'
+          } ${
+            entrada
+              ? 'translate-y-0 scale-100 opacity-100'
+              : 'pointer-events-none translate-y-2 scale-95 opacity-0'
           }`}
         >
           <SidebarInboxList
@@ -1306,7 +1329,7 @@ function InsigniaDePestana({ cuantos }: { cuantos: number }) {
   if (cuantos <= 0) return null;
   return (
     <span
-      className="ml-0.5 min-w-[18px] rounded-full bg-primary px-1.5 py-px text-center font-sans text-[10px] font-semibold text-primary-foreground"
+      className="absolute -right-2 -top-2 min-w-[16px] rounded-full bg-primary px-1 py-px text-center font-sans text-[9px] font-semibold leading-tight text-primary-foreground ring-2 ring-[#202020]"
       aria-label={`${cuantos} sin leer`}
     >
       {cuantos > 99 ? '99+' : cuantos}
@@ -1444,16 +1467,21 @@ function SidebarTabs({
                 : 'text-text-secondary hover:bg-white/5 hover:text-white'
             }`}
           >
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              {pestana.icono}
-            </svg>
+            {/* La insignia va **sobre el icono**, no al lado: inline ensanchaba la pestaña
+                y «Configuraciones» se salía por el borde de la barra. */}
+            <span className="relative inline-flex">
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                {pestana.icono}
+              </svg>
+              {!plegada && <InsigniaDePestana cuantos={pestana.insignia} />}
+            </span>
             {plegada ? (
               /* El número no cabe en 36 px: se reduce a un punto, que es lo que
                  hace falta saber —hay algo— con el `title` para el resto. */
@@ -1464,10 +1492,7 @@ function SidebarTabs({
                 />
               )
             ) : (
-              <>
-                {pestana.etiqueta}
-                <InsigniaDePestana cuantos={pestana.insignia} />
-              </>
+              pestana.etiqueta
             )}
           </button>
         );
@@ -1869,7 +1894,7 @@ function SidebarProjectsTree({
                   className="min-h-0 overflow-hidden"
                   style={{ opacity: isOpen ? 1 : 0, transition: 'opacity 200ms' }}
                 >
-                  <div className="flex flex-col gap-0.5 pl-6 pb-1 pt-0.5">
+                  <div className="flex flex-col gap-0.5 pl-7 pb-1 pt-0.5">
                     {project.workspaces.length === 0 ? (
                       <span className="px-2 py-1 text-[12px] text-white italic select-none">
                         Sin espacios
@@ -1934,7 +1959,7 @@ function SidebarProjectsTree({
                                 return (
                                   <div
                                     key={tablero.id}
-                                    className={`group ml-4 flex items-center gap-1 rounded-md pr-1 transition-colors ${
+                                    className={`group ml-7 flex items-center gap-1 rounded-md pr-1 transition-colors ${
                                       tableroActivo
                                         ? 'bg-white/10 text-white'
                                         : 'text-text-secondary hover:text-white hover:bg-white/[0.06]'
@@ -1975,7 +2000,7 @@ function SidebarProjectsTree({
                               return (
                                 <div
                                   key={doc.id}
-                                  className={`group ml-4 flex items-center gap-1 rounded-md pr-1 transition-colors ${
+                                  className={`group ml-7 flex items-center gap-1 rounded-md pr-1 transition-colors ${
                                     docActivo
                                       ? 'bg-white/10 text-white'
                                       : 'text-text-secondary hover:text-white hover:bg-white/[0.06]'
@@ -2023,7 +2048,7 @@ function SidebarProjectsTree({
                                   });
                                   setCreandoEn(project.id);
                                 }}
-                                className="ml-4 flex items-center gap-2 rounded-md px-2 py-[4px] text-left text-[12px] text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-white"
+                                className="ml-7 flex items-center gap-2 rounded-md px-2 py-[4px] text-left text-[12px] text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-white"
                               >
                                 <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 <span className="truncate">
