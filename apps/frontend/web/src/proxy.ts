@@ -90,7 +90,7 @@ const DESTINO_TRAS_ENTRAR = '/projects';
  * una sesión que falta. `e2e/tests/ui/02-guards.spec.ts` lo cubre para las
  * cinco.
  */
-const PREFIJOS_PRIVADOS = ['/assistant', '/chat', '/admin', '/main', '/projects'];
+const PREFIJOS_PRIVADOS = ['/assistant', '/chat', '/admin', '/main', '/projects', '/ayuda'];
 
 /**
  * Rutas que no tienen pantalla: solo llevan a otra.

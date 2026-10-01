@@ -243,7 +243,6 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     label: 'Ayuda',
     href: '/ayuda',
     section: SECTION_CONFIGURACION,
-    disabled: true,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
