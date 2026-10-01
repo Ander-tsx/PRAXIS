@@ -530,7 +530,7 @@ function ArmazonInterno({
           </div>
 
           <div
-            className={`scrollbar-none flex-1 overflow-y-auto py-6 ${plegada ? 'px-2' : 'px-4'}`}
+            className={`scrollbar-none flex-1 overflow-y-auto pb-6 pt-2 ${plegada ? 'px-2' : 'px-4'}`}
           >
             <div className="mb-4">
               <OrgSwitcher
@@ -746,7 +746,7 @@ function ArmazonInterno({
                 de dentro se montarían y pedirían datos también en escritorio. */}
             {cajonMontado && (
               <>
-                <div className="flex items-start justify-between mb-6">
+                <div className="flex items-start justify-between mb-3">
                   <div className="flex items-baseline gap-2 mt-1">
                     <Wordmark />
                     <ByKyloo />
@@ -1412,7 +1412,7 @@ function SidebarTabs({
       className={
         plegada
           ? 'mb-4 flex shrink-0 flex-col items-center gap-1'
-          : 'mb-4 flex shrink-0 items-center gap-1.5 overflow-x-auto whitespace-nowrap px-1 scrollbar-none'
+          : 'mb-4 flex shrink-0 items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none'
       }
     >
       {pestanas.map((pestana) => {
@@ -1427,10 +1427,10 @@ function SidebarTabs({
             /* Plegada, la etiqueta se va y hace falta un `title`: un icono solo
                no dice qué es, y aquí no hay texto al lado que lo explique. */
             title={plegada ? pestana.etiqueta : undefined}
-            className={`flex shrink-0 items-center font-sans text-[13px] font-semibold transition-colors ${
+            className={`flex shrink-0 items-center font-sans text-[12px] font-semibold transition-colors ${
               plegada
                 ? 'relative justify-center rounded-lg p-2'
-                : 'gap-1.5 rounded-full px-3 py-1.5'
+                : 'gap-1 rounded-full px-2.5 py-1.5'
             } ${
               puesta
                 ? 'bg-white/10 text-white'
