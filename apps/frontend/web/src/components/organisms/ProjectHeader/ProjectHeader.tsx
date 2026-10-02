@@ -20,6 +20,8 @@ export interface ProjectHeaderProps {
    * configuración: quien solo mira no tiene nada que tocar.
    */
   canEdit: boolean;
+  /** Estás en `?tab=ajustes`: el engranaje se marca. */
+  ajustesActivos?: boolean;
   /**
    * La cabecera en una sola línea.
    *
@@ -60,6 +62,7 @@ export function ProjectHeader({
   labelCount,
   canDelete,
   canEdit,
+  ajustesActivos = false,
   compacto = false,
 }: ProjectHeaderProps) {
   /* La píldora «DUEÑO / MIEMBRO» se retiró: no aportaba —quien entra ya sabe si
@@ -70,20 +73,10 @@ export function ProjectHeader({
 
   const settings = (
     <ProjectSettingsButton
-      projectId={project.id}
-      projectName={project.name}
-      projectDescription={project.description ?? ''}
-      projectIconKey={project.iconKey ?? null}
-      projectImageUrl={project.imageUrl ?? null}
-      projectColor={project.color ?? null}
+      project={project}
       canEdit={canEdit}
       canDelete={canDelete}
-      workspaceCount={project.workspaces.length}
-      boardCount={boardCount}
-      columnCount={columnCount}
-      labelCount={labelCount}
-      memberCount={memberCount}
-      roleCount={project.roles.length}
+      activo={ajustesActivos}
       compacto={compacto}
     />
   );

@@ -41,16 +41,22 @@
    `bg-info-muted`, cero). `static` fuerza a Tailwind a emitir todas las
    variables del bloque siempre, las use o no un `className`. */
 @theme static {
+  /* 🎨 Paleta neutra (2026-10-02). Estos fondos, textos y bordes eran el azul
+     marino de la versión anterior y la paleta neutra solo existía bajo
+     `[data-tone="dark"]`: todo lo que no lo llevara —los diálogos, las páginas de
+     acceso, los modales por portal— salía azulado al lado de una barra gris.
+     Con el modo claro retirado no hay nada que justifique dos oscuros: los
+     valores de `[data-tone="dark"]` son ahora los de base. */
   /* ── FONDOS ─────────────────────────────────────────────── */
-  --color-background: #0d0f14; /* Fondo base de la app */
-  --color-surface: #161b27; /* Cards, modales, panels */
-  --color-surface-elevated: #1e2535; /* Elevado sobre surface */
-  --color-overlay: #080a0f; /* Overlays, drawers */
+  --color-background: #0c0c0b; /* Fondo base de la app */
+  --color-surface: #191919; /* Cards, modales, panels */
+  --color-surface-elevated: #1c1c1b; /* Elevado sobre surface */
+  --color-overlay: #000000; /* Overlays, drawers */
   /* Sombra hacia dentro del lienzo del tablero (BoardStrip): a diferencia de
      overlay, que se queda oscuro en los dos temas porque es un scrim, esta sí
      cambia — un hundido oscuro en tema claro se ve como suciedad, no como
      profundidad. */
-  --color-canvas-shadow: #080a0f;
+  --color-canvas-shadow: #000000;
 
   /* ── MARCA / COLOR PRIMARIO ─────────────────────────────── */
   --color-primary: #6c63ff; /* Botones, links activos, estados */
@@ -75,15 +81,15 @@
   --color-accent-foreground: #0d0f14; /* Texto sobre accent */
 
   /* ── TEXTO ───────────────────────────────────────────────── */
-  --color-text-primary: #e8eaf0; /* Texto principal */
-  --color-text-secondary: #9aa0b4; /* Texto secundario, placeholders */
-  --color-text-disabled: #4a5168; /* Texto deshabilitado */
+  --color-text-primary: #ffffff; /* Texto principal */
+  --color-text-secondary: rgba(255, 255, 255, 0.55); /* Texto secundario, placeholders */
+  --color-text-disabled: rgba(255, 255, 255, 0.38); /* Texto deshabilitado */
   --color-text-inverse: #0d0f14; /* Texto sobre fondos claros */
 
   /* ── BORDES ─────────────────────────────────────────────── */
-  --color-border: rgba(255, 255, 255, 0.1); /* Bordes normales */
-  --color-border-subtle: rgba(255, 255, 255, 0.05); /* Bordes muy sutiles */
-  --color-border-strong: rgba(255, 255, 255, 0.2); /* Bordes con énfasis */
+  --color-border: rgba(255, 255, 255, 0.12); /* Bordes normales */
+  --color-border-subtle: rgba(255, 255, 255, 0.07); /* Bordes muy sutiles */
+  --color-border-strong: rgba(255, 255, 255, 0.22); /* Bordes con énfasis */
 
   /* ── ESTADOS / FEEDBACK ──────────────────────────────────── */
   --color-success: #4ade80;
@@ -402,6 +408,24 @@ button:disabled,
 .animate-desplegar-panel > * {
   min-height: 0;
   overflow: hidden;
+}
+
+/* Un menú flotante que se abre desde su botón: entra escalando y subiendo un
+   poco, no de golpe. El `transform-origin` lo pone quien lo usa (`origin-top-right`).
+   Con `prefers-reduced-motion` el bloque global lo deja en su estado final. */
+@keyframes desplegar-menu {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-desplegar-menu {
+  animation: desplegar-menu 160ms cubic-bezier(0.22, 0.85, 0.28, 1);
 }
 
 /* Los tres puntos del paso en curso del asistente (FlujoDePensamiento).

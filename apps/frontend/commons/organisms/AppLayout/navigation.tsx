@@ -55,7 +55,7 @@ const SECTION_GENERAL = 'General';
  * de desarrollo que documenta `NavList`.
  */
 const iconProps = {
-  className: 'h-5 w-5 shrink-0',
+  className: 'h-4 w-4 shrink-0',
   fill: 'none',
   viewBox: '0 0 24 24',
   stroke: 'currentColor',

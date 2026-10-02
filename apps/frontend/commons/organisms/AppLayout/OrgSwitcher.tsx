@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 import { Glyph, glyphByKey } from '../../atoms/GlyphPicker';
 import { createApiClient } from '../../api/client';
 import { ImagePicker } from '../../molecules/ImagePicker';
-import { OrgIdentityModal } from './OrgIdentityModal';
 import type { OrgDelSelector } from './AppShell';
 
 /**
@@ -72,10 +72,9 @@ export function OrgSwitcher({
   activaId: string | null;
   zonePath: string;
 }) {
+  const router = useRouter();
   const [abierto, setAbierto] = useState(false);
-  const [activeModal, setActiveModal] = useState<
-    'invite' | 'newSpace' | 'upgrade' | 'config' | null
-  >(null);
+  const [activeModal, setActiveModal] = useState<'invite' | 'newSpace' | 'upgrade' | null>(null);
 
   const lista = organizaciones ?? [];
   const activa = lista.find((org) => org.id === activaId) ?? null;
@@ -205,18 +204,15 @@ export function OrgSwitcher({
                 Invitar a miembros
               </button>
 
-              {/* Nombre, icono y color de la organización. Ya no abre un modal:
-                  navega a su portal (`#configuracion`), donde vive toda la
-                  configuración de la organización. Ruta absoluta
-                  con `/dashboard` porque el destino lo sirve otra zona del
-                  multi-zone y este selector se monta en las siete. El backend
-                  sigue exigiendo `canManageOrganization`; la pantalla enseña la
-                  identidad a todo el mundo y el formulario solo a quien puede. */}
+              {/* Nombre, icono y color de la organización: sin modal, navega a la
+                  pestaña «Ajustes» de Equipo. El backend exige `canManageOrganization`;
+                  la pantalla enseña la identidad a todo el mundo y el formulario solo
+                  a quien puede. */}
               {activaId && (
                 <button
                   onClick={() => {
                     setAbierto(false);
-                    setActiveModal('config');
+                    router.push('/main/team?tab=ajustes');
                   }}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-text-secondary hover:text-white transition-colors text-left w-full"
                 >
@@ -255,7 +251,12 @@ export function OrgSwitcher({
                 <OpcionDeOrg
                   key={org.id}
                   activa={org.id === activaId}
-                  cara={<CaraDeOrg org={org} inicial={(org.name ?? primerNombre ?? 'P').charAt(0).toUpperCase()} />}
+                  cara={
+                    <CaraDeOrg
+                      org={org}
+                      inicial={(org.name ?? primerNombre ?? 'P').charAt(0).toUpperCase()}
+                    />
+                  }
                   etiqueta={org.name ?? `Organización de ${primerNombre || 'Praxis'}`}
                   detalle={org.kind === 'PERSONAL' ? 'Tu espacio' : 'Equipo'}
                   onClick={() => elegir(org.id)}
@@ -302,10 +303,6 @@ export function OrgSwitcher({
           onClose={() => setActiveModal(null)}
           zonePath={zonePath}
         />
-      )}
-
-      {activeModal === 'config' && activa && (
-        <OrgIdentityModal org={activa} zonePath={zonePath} onClose={() => setActiveModal(null)} />
       )}
 
       {activeModal === 'newSpace' && (

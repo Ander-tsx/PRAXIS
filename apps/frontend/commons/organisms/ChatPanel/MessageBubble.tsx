@@ -717,7 +717,7 @@ export function MessageBubble({
         <div className={`flex min-w-0 max-w-[78%] flex-col gap-1 ${mine ? 'items-end' : ''}`}>
           {!continued && (
             <span className="flex items-center gap-2 px-1 mb-1">
-              <span className="font-display font-medium text-sm text-text-primary">
+              <span className="font-sans font-medium text-sm text-text-primary">
                 {mine ? 'Tú' : nombre}
               </span>
               <span className="font-sans text-[10px] text-text-secondary">
@@ -815,7 +815,7 @@ export function MessageBubble({
           <span className="flex items-center gap-2 px-1 font-sans text-xs">
             {dePrax ? (
               <span className="flex items-baseline gap-2">
-                <span className="font-display font-medium text-[15px] text-text-primary">PRAX</span>
+                <span className="font-sans font-medium text-[15px] text-text-primary">PRAX</span>
                 <span className="font-sans text-[11px] text-text-secondary">
                   a petición de {nombreDelAutor}
                 </span>
@@ -824,12 +824,12 @@ export function MessageBubble({
               <a
                 href={hrefDePersona}
                 title={`Escribir a ${nombre} en privado`}
-                className="font-display font-medium text-[15px] text-text-primary underline-offset-2 hover:underline"
+                className="font-sans font-medium text-[15px] text-text-primary underline-offset-2 hover:underline"
               >
                 {nombre}
               </a>
             ) : (
-              <span className="font-display font-medium text-[15px] text-text-primary">
+              <span className="font-sans font-medium text-[15px] text-text-primary">
                 {mine ? 'Tú' : nombre}
               </span>
             )}

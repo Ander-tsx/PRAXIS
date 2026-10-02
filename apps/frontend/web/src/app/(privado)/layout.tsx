@@ -1,5 +1,4 @@
 import { setPresenceAction } from '@/app/(privado)/presence-actions';
-import { PraxCreateProjectTrigger } from '@/components/organisms/PraxCreateProjectTrigger';
 import { PerfilEnBarra } from '@/components/organisms/PerfilEnBarra';
 import { AvisoAsientoCongelado } from '@/components/organisms/Billing/AvisoAsientoCongelado';
 import { AppShell, PresenceFooter, avatarHref, displayName } from '@praxis/commons';
@@ -49,7 +48,6 @@ export const metadata: Metadata = {
 export default async function PrivadoLayout({ children }: { children: React.ReactNode }) {
   const {
     profile,
-    roles,
     navItems,
     organizaciones,
     organizacionActivaId,
@@ -88,21 +86,13 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
          escuchando el flujo. Ver `AppShellProps.mensajesSinLeer`. */
       mensajesSinLeer={mensajesSinLeer}
       avisosSinLeer={avisosSinLeer}
-      nuevoProyectoSlot={
-        <PraxCreateProjectTrigger triggerVariant="icono" organizationId={organizacionActivaId} />
-      }
       perfilSlot={
         <PerfilEnBarra
           nombre={displayName(profile)}
           email={profile.credential.email}
           avatarSrc={avatarHref(profile.avatarUrl, '/api/gateway')}
-          coverSrc={avatarHref(profile.coverUrl, '/api/gateway')}
           googleAvatarSrc={avatarHref(profile.googleAvatarUrl, '/api/gateway')}
-          biography={profile.biography ?? null}
-          location={profile.location ?? null}
           presencia={profile.presence ?? 'AVAILABLE'}
-          roles={roles}
-          miembroDesde={mesYAno(profile.createdAt)}
           initialFirstName={profile.firstName ?? ''}
           initialLastName={profile.lastName ?? ''}
         />
@@ -129,10 +119,4 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
       {children}
     </AppShell>
   );
-}
-
-/* Formateado en el servidor, para que el HTML servido y el hidratado coincidan. */
-const MES_Y_ANO = new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' });
-function mesYAno(iso: string): string {
-  return MES_Y_ANO.format(new Date(iso));
 }

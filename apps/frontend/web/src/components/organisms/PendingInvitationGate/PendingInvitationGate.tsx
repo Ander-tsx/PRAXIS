@@ -2,7 +2,7 @@
 
 import { respondInvitationAction } from '@/app/(privado)/projects/[id]/invitation-actions';
 import { INVITATION_RESPONSE_INITIAL_STATE } from '@/lib/projects/action-state';
-import { Badge, Button, type MyInvitation, alpha, colors, useAccion } from '@praxis/commons';
+import { Badge, Button, type MyInvitation, colors, useAccion } from '@praxis/commons';
 
 export interface PendingInvitationGateProps {
   invitation: MyInvitation;
@@ -29,16 +29,11 @@ export function PendingInvitationGate({ invitation }: PendingInvitationGateProps
   return (
     <section
       aria-label="Invitación pendiente"
-      className="mx-auto flex max-w-xl flex-col gap-5 rounded-2xl border p-8"
-      style={{
-        borderColor: alpha(colors.accent, 25),
-        background: `radial-gradient(120% 120% at 0% 0%, ${alpha(colors.accent, 9)}, transparent 55%), ${colors.surface}`,
-      }}
+      className="mx-auto flex max-w-xl flex-col gap-5 rounded-2xl border border-border bg-surface p-8"
     >
       <span
         aria-hidden="true"
-        className="flex h-12 w-12 items-center justify-center rounded-full"
-        style={{ background: alpha(colors.accent, 15), color: colors.accent }}
+        className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white"
       >
         <svg
           className="h-6 w-6"
@@ -57,7 +52,7 @@ export function PendingInvitationGate({ invitation }: PendingInvitationGateProps
       </span>
 
       <div className="flex flex-col gap-2">
-        <h2 className="font-display text-2xl text-text-primary">
+        <h2 className="font-sans font-semibold text-2xl text-text-primary">
           Te invitaron a «{invitation.project.name}»
         </h2>
         <p className="font-sans text-sm text-white">
@@ -68,7 +63,7 @@ export function PendingInvitationGate({ invitation }: PendingInvitationGateProps
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-sans text-xs text-white">Entrarás como</span>
-        <Badge variant="primary">{invitation.projectRole.name}</Badge>
+        <Badge variant="default">{invitation.projectRole.name}</Badge>
       </div>
 
       {invitation.project.description && (

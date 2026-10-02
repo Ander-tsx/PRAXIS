@@ -2,6 +2,7 @@ import { TabIcon } from '@/components/atoms/TabIcon';
 import { PendingInvitationGate } from '@/components/organisms/PendingInvitationGate';
 import { PraxProjectButton } from '@/components/organisms/PraxProjectButton';
 import { ProjectChatPreview } from '@/components/organisms/ProjectChat';
+import { ProjectSettingsPanel } from '@/components/organisms/ProjectHeader/ProjectSettingsPanel';
 import { ProjectHeader } from '@/components/organisms/ProjectHeader';
 import { ProjectMembers } from '@/components/organisms/ProjectMembers';
 import { ProjectRoles } from '@/components/organisms/ProjectRoles';
@@ -120,7 +121,11 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   const { userId } = await loadCurrentUser();
   const api = createServerApiClient();
 
-  const activeTab: TabId = TABS.some((t) => t.id === tab)
+  /* `ajustes` no está en `TABS` a propósito: no es una pestaña de la barra, se
+     llega por el engranaje de la cabecera. */
+  const activeTab: TabId | 'ajustes' = tab === 'ajustes'
+    ? 'ajustes'
+    : TABS.some((t) => t.id === tab)
     ? (tab as TabId)
     : /* Los dos nombres que tuvo esta sección antes. Ver `TABS`. */
       tab === 'automatizaciones' || tab === 'reglas'
@@ -606,6 +611,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           /* `canEditProject`, permiso propio desde esta sesión: el `PATCH`
              pedía `canEditBoard`, que es de otra cosa. */
           canEdit={can.canEditProject}
+          ajustesActivos={activeTab === 'ajustes'}
         />
 
         {/* `shrink-0`: en la pestaña del tablero esta columna es de alto fijo y
@@ -736,6 +742,25 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
          * tres dejan de hacer falta y las filas dejan de desentonar del resto
          * del proyecto.
          */}
+        {activeTab === 'ajustes' && (
+          <ProjectSettingsPanel
+            projectId={project.id}
+            initialName={project.name}
+            initialDescription={project.description ?? ''}
+            initialIconKey={project.iconKey ?? null}
+            initialColor={project.color ?? null}
+            initialImageUrl={project.imageUrl ?? null}
+            canEdit={can.canEditProject}
+            canDelete={can.canDeleteProject}
+            workspaceCount={project.workspaces.length}
+            boardCount={boardCount}
+            columnCount={columnCount}
+            labelCount={labels.length}
+            memberCount={members.length}
+            roleCount={project.roles.length}
+          />
+        )}
+
         {activeTab === 'equipo' && (
           <div data-tone="dark">
             <ProjectMembers

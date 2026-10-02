@@ -6,7 +6,7 @@ import {
   projectInventoryAction,
 } from '@/app/(privado)/projects/[id]/actions';
 import { DELETE_PROJECT_INITIAL_STATE } from '@/lib/projects/action-state';
-import { Button, Dialog, Input, alpha, colors, useAccion } from '@praxis/commons';
+import { Button, Input, useAccion } from '@praxis/commons';
 import { useEffect, useId, useState, useTransition } from 'react';
 
 export interface DeleteProjectButtonProps {
@@ -112,82 +112,96 @@ export function DeleteProjectButton({
   const visible = lines.filter((line) => line.count === null || line.count > 0);
 
   return (
-    <>
+    <div className="flex flex-col gap-3">
       <button
         type="button"
-        className="font-sans text-sm font-medium text-white transition-colors hover:text-red-400"
-        onClick={() => setOpen(true)}
+        aria-expanded={open}
+        className="self-start font-sans text-sm font-medium text-text-primary transition-colors hover:text-error"
+        onClick={() => setOpen((v) => !v)}
       >
         Eliminar proyecto
       </button>
 
-      <Dialog
-        open={open}
-        onClose={() => setOpen(false)}
-        title={`Eliminar «${projectName}»`}
-        description="Esto no se puede deshacer, y se lleva por delante todo lo que hay dentro."
+      {/* Se despliega aquí mismo: nada de modal. Mismo truco de grid `0fr ↔ 1fr`
+          que usa la barra lateral. */}
+      <div
+        className="grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,0.85,0.28,1)] motion-reduce:transition-none"
+        style={{ gridTemplateRows: open ? '1fr' : '0fr', opacity: open ? 1 : 0 }}
       >
-        <form action={formAction} className="flex flex-col gap-4">
-          <input type="hidden" name="projectId" value={projectId} />
+        <div className="min-h-0 overflow-hidden">
+          <form
+            action={formAction}
+            aria-hidden={!open}
+            className="flex flex-col gap-4 rounded-lg border border-error/30 bg-error-muted p-4"
+          >
+            <input type="hidden" name="projectId" value={projectId} />
 
-          <div className="flex flex-col gap-2 rounded-lg border px-4 py-3 border-red-500/30 bg-red-500/10">
-            <p className="font-sans text-sm font-semibold text-white">Se eliminarán:</p>
+            <div className="flex flex-col gap-2">
+              <p className="font-sans text-sm font-semibold text-white">
+                Se eliminarán, sin vuelta atrás:
+              </p>
 
-            {counting && !inventory ? (
-              <p className="font-sans text-sm text-white">Contando lo que hay dentro…</p>
-            ) : (
-              <ul className="flex flex-col gap-1">
-                {visible.map((line) => (
-                  <li key={line.plural} className="font-sans text-sm text-white">
-                    {line.count === null ? (
-                      <>
-                        Sus <strong className="text-white">{line.plural}</strong> — no se pudieron
-                        contar
-                      </>
-                    ) : (
-                      <>
-                        <strong className="tabular-nums text-white">{line.count}</strong>{' '}
-                        {line.count === 1 ? line.singular : line.plural}
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              {counting && !inventory ? (
+                <p className="font-sans text-sm text-text-secondary">Contando lo que hay dentro…</p>
+              ) : (
+                <ul className="flex flex-col gap-1">
+                  {visible.map((line) => (
+                    <li key={line.plural} className="font-sans text-sm text-text-primary">
+                      {line.count === null ? (
+                        <>
+                          Sus <strong className="text-white">{line.plural}</strong> — no se pudieron
+                          contar
+                        </>
+                      ) : (
+                        <>
+                          <strong className="tabular-nums text-white">{line.count}</strong>{' '}
+                          {line.count === 1 ? line.singular : line.plural}
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <Input
+              id={confirmId}
+              label={`Escribe «${projectName}» para confirmar`}
+              value={confirmation}
+              onChange={(event) => setConfirmation(event.target.value)}
+              autoComplete="off"
+              tabIndex={open ? 0 : -1}
+              fullWidth
+            />
+
+            {state.error && (
+              <p role="alert" className="font-sans text-sm text-error">
+                {state.error}
+              </p>
             )}
-          </div>
 
-          <Input
-            id={confirmId}
-            label={`Escribe «${projectName}» para confirmar`}
-            value={confirmation}
-            onChange={(event) => setConfirmation(event.target.value)}
-            autoComplete="off"
-            fullWidth
-          />
-
-          {state.error && (
-            <p
-              role="alert"
-              className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
-              style={{
-                background: alpha(colors.error, 10),
-                borderColor: alpha(colors.error, 30),
-              }}
-            >
-              {state.error}
-            </p>
-          )}
-
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" variant="danger" isLoading={pending} disabled={!canDelete}>
-              Eliminar proyecto
-            </Button>
-          </div>
-        </form>
-      </Dialog>
-    </>
+            <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="ghost"
+                tabIndex={open ? 0 : -1}
+                onClick={() => setOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                variant="danger"
+                isLoading={pending}
+                disabled={!canDelete}
+                tabIndex={open ? 0 : -1}
+              >
+                Eliminar proyecto
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   );
 }

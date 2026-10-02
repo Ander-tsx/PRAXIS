@@ -1,6 +1,7 @@
 'use client';
 
 import { AuthForm, Button, Input } from '@praxis/commons';
+import { AuthPanel } from '@/components/organisms/AuthPanel';
 import Link from 'next/link';
 import { type FormEvent, useState } from 'react';
 
@@ -20,9 +21,9 @@ export default function ForgotPasswordPage() {
      a la izquierda, porque el layout de la zona no centra nada — lo hace cada
      página con su propio `<main>`. */
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-12">
+    <AuthPanel>
       <Contenido />
-    </main>
+    </AuthPanel>
   );
 }
 
@@ -67,6 +68,7 @@ function Contenido() {
 
   return (
     <AuthForm
+      bare
       title="¿Olvidaste tu contraseña?"
       subtitle="Escribe tu correo y te mandamos un enlace para elegir otra."
       errorMessage={error ?? undefined}
@@ -77,7 +79,7 @@ function Contenido() {
         </Button>
       }
       footer={
-        <Link href="/auth/login" className="text-primary hover:underline">
+        <Link href="/auth/login" className="text-text-primary underline underline-offset-2 hover:opacity-70">
           Volver a entrar
         </Link>
       }
@@ -100,10 +102,10 @@ function Contenido() {
 /** Pantalla de «ya está», con el mismo marco que el formulario. */
 function Aviso({ titulo, texto }: { titulo: string; texto: string }) {
   return (
-    <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8">
+    <div className="w-full max-w-md">
       <h1 className="mb-2 font-display text-3xl text-text-primary">{titulo}</h1>
       <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">{texto}</p>
-      <Link href="/auth/login" className="font-sans text-sm text-primary hover:underline">
+      <Link href="/auth/login" className="font-sans text-sm text-text-primary underline underline-offset-2 hover:opacity-70">
         Volver a entrar
       </Link>
     </div>

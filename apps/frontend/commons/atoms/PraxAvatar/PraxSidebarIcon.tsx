@@ -23,7 +23,7 @@ export function PraxSidebarIcon({ className = '' }: { className?: string }) {
     <svg
       role="img"
       aria-label="PRAX, listo"
-      className={`inline-flex shrink-0 select-none h-5 w-5 ${className}`}
+      className={`inline-flex shrink-0 select-none h-4 w-4 ${className}`}
       viewBox="0 0 20 20"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"

@@ -163,7 +163,7 @@ export function ProjectConversation({
                 color={projectColor}
                 size="sm"
               />
-              <h2 className="truncate font-display text-lg text-text-primary md:text-2xl">{projectName}</h2>
+              <h2 className="truncate font-sans font-semibold text-lg text-text-primary md:text-2xl">{projectName}</h2>
             </div>
             <p className="font-sans text-xs text-white">
               Chat del equipo ·{' '}
@@ -220,7 +220,7 @@ function BotonSilenciar({ projectId, inicial }: { projectId: string; inicial: bo
           ? 'Los avisos de este chat están apagados. Los mensajes sin leer se siguen contando.'
           : 'Apagar la tarjeta y el sonido de este chat. Los mensajes sin leer se siguen contando.'
       }
-      className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 font-sans text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+      className="flex h-8 shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 font-sans text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
       style={{
         borderColor: colors.border,
         background: muted ? alpha(colors.textSecondary, 10) : 'transparent',

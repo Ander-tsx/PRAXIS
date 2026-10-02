@@ -4,6 +4,13 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { colors } from '../../tokens';
 import type { AppNavItem } from './navigation';
+import {
+  SIDEBAR_FILA,
+  SIDEBAR_FILA_ACTIVA,
+  SIDEBAR_FILA_REPOSO,
+  SIDEBAR_INICIO,
+  SidebarSection,
+} from './SidebarPrimitives';
 
 /**
  * ⚠️ **Aviso de React en desarrollo, sin resolver: «Each child in a list should
@@ -137,152 +144,84 @@ export function NavList({
   }
 
   return (
-    <nav className="flex flex-col gap-4" aria-label="Secciones">
-      {grupos.map((grupo) => {
-        const compactado = !plegada && !sinEtiquetas && compactados.has(grupo.clave);
+    <nav className="flex flex-col gap-3" aria-label="Secciones">
+      {grupos.map((grupo) => (
+        <SidebarSection
+          key={grupo.clave}
+          etiqueta={grupo.section}
+          plegada={plegada}
+          sinCabecera={sinEtiquetas}
+          compactada={compactados.has(grupo.clave)}
+          onAlternar={() => alternar(grupo.clave)}
+        >
+          {grupo.items.map((item, idx) => {
+            const active = !item.disabled && item.href === activeHref;
+            const claveItem = `${grupo.clave}::${item.href}::${idx}`;
+            const forma = plegada ? 'justify-center px-0' : '';
 
-        return (
-          <div key={grupo.clave} className="flex flex-col gap-1">
-            {/* Una raya fina encima de **cada** sección, no solo a partir de la
-                segunda: el grupo de arriba también necesita despegarse de lo que
-                tiene encima (el árbol de proyectos, el selector de organización). */}
-            <div
-              className={
-                plegada ? 'mx-1 mb-1 border-t border-border' : 'mb-1 border-t border-border'
-              }
-              aria-hidden="true"
-            />
-            {!plegada && !sinEtiquetas && (
-              <button
-                type="button"
-                onClick={() => alternar(grupo.clave)}
-                aria-expanded={!compactado}
-                className="group/section mx-1 flex items-center justify-between gap-2 rounded-full px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white transition-colors hover:text-white"
-              >
-                {grupo.section}
-                <svg
-                  className={`h-3.5 w-3.5 shrink-0 text-white transition-transform duration-200 ease-out group-hover/section:text-white ${
-                    compactado ? '-rotate-90' : ''
-                  }`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.25}
-                  aria-hidden="true"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
-                </svg>
-              </button>
-            )}
-
-            {/* El truco del grid para animar 0↔auto: la fila colapsa a
-                `0fr` con una transición normal —a diferencia de una
-                `@keyframes`, esta sí interpola en las dos direcciones— y el
-                hijo necesita su propio `overflow-hidden` + `min-height: 0`
-                para poder encogerse por debajo de lo que mide su
-                contenido. */}
-            <div
-              className="grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,0.85,0.28,1)]"
-              style={{ gridTemplateRows: compactado ? '0fr' : '1fr' }}
-            >
-              <div
-                className="flex min-h-0 flex-col gap-1 overflow-hidden transition-opacity duration-200"
-                style={{ opacity: compactado ? 0 : 1 }}
-              >
-                {grupo.items.map((item, idx) => {
-                  const active = !item.disabled && item.href === activeHref;
-                  const claveItem = `${grupo.clave}::${item.href}::${idx}`;
-
-                  if (item.disabled) {
-                    return (
-                      <span
-                        key={claveItem}
-                        aria-disabled="true"
-                        title={
-                          plegada
-                            ? `${item.label} — disponible próximamente`
-                            : 'Disponible próximamente'
-                        }
-                        className={`flex cursor-not-allowed items-center rounded-full font-sans text-[13px] font-medium text-white ${
-                          plegada ? 'justify-center px-0 py-2.5' : 'gap-3 px-4 py-2.5'
-                        }`}
-                      >
-                        {item.icon}
-                        <span className={plegada ? 'sr-only' : 'flex-1'}>{item.label}</span>
-                        {!plegada && (
-                          <span className="font-sans text-[9px] uppercase tracking-wider text-white">
-                            Pronto
-                          </span>
-                        )}
-                      </span>
-                    );
+            if (item.disabled) {
+              return (
+                <span
+                  key={claveItem}
+                  aria-disabled="true"
+                  title={
+                    plegada ? `${item.label} — disponible próximamente` : 'Disponible próximamente'
                   }
+                  className={`${SIDEBAR_FILA} ${forma} cursor-not-allowed font-medium text-text-secondary opacity-60`}
+                >
+                  <span className={SIDEBAR_INICIO}>{item.icon}</span>
+                  <span className={plegada ? 'sr-only' : 'flex-1'}>{item.label}</span>
+                  {!plegada && (
+                    <span className="font-sans text-[9px] uppercase tracking-wider">Pronto</span>
+                  )}
+                </span>
+              );
+            }
 
-                  return (
-                    /**
-                     * 🔴 **`next/link`, y ese es el premio entero de la fusión.**
-                     *
-                     * Eran `<a>` duros por obligación: cada destino lo servía otra
-                     * aplicación del multi-zone y el router habría prefijado la ruta con
-                     * el `basePath` de la zona actual. El precio era que **cambiar de
-                     * sección recargaba la página**: se remontaba el armazón, se volvía a
-                     * pedir el directorio de chats y se cerraba y reabría la conexión SSE.
-                     *
-                     * Desde F8 las cinco secciones cuelgan del mismo layout, así que esto
-                     * es navegación del router: la barra no parpadea y el flujo no se
-                     * corta. ⚠️ Volver a poner un `<a>` aquí deshace la fusión sin que
-                     * falle nada.
-                     */
-                    <Link
-                      key={claveItem}
-                      href={item.href}
-                      onClick={onNavigate}
-                      aria-current={active ? 'page' : undefined}
-                      title={plegada ? item.label : undefined}
-                      className={[
-                        'relative flex items-center rounded-full font-sans text-[13px] transition-colors duration-150',
-                        plegada ? 'justify-center px-0 py-2.5' : 'gap-3 px-4 py-2.5',
-                        active
-                          ? 'font-semibold text-white bg-white/10 hover:bg-white/15'
-                          : 'font-medium text-white hover:bg-white/5 hover:text-white',
-                      ].join(' ')}
+            return (
+              <Link
+                key={claveItem}
+                href={item.href}
+                onClick={onNavigate}
+                aria-current={active ? 'page' : undefined}
+                title={plegada ? item.label : undefined}
+                className={`relative ${SIDEBAR_FILA} ${forma} ${
+                  active ? SIDEBAR_FILA_ACTIVA : SIDEBAR_FILA_REPOSO
+                }`}
+              >
+                <span className={SIDEBAR_INICIO}>{item.icon}</span>
+                <span className={plegada ? 'sr-only' : 'flex-1'}>{item.label}</span>
+
+                {/* Sin no leídos no hay insignia: un cero no informa de nada. */}
+                {item.badge !== undefined &&
+                  item.badge > 0 &&
+                  (plegada ? (
+                    /* Plegada, la insignia no cabe al lado: se convierte en un punto
+                       sobre la esquina del icono. El número se pierde a propósito
+                       —no cabe legible en 8 px— pero el hecho de que haya algo sin
+                       leer es justo lo que no se puede perder al plegar. */
+                    <span
+                      aria-label={`${item.badge} sin leer`}
+                      className="absolute right-2 top-2 h-2 w-2 rounded-full ring-2"
+                      style={{
+                        background: colors.primary,
+                        ['--tw-ring-color' as string]: colors.surface,
+                      }}
+                    />
+                  ) : (
+                    <span
+                      aria-label={`${item.badge} sin leer`}
+                      className="min-w-5 rounded-full px-1.5 py-0.5 text-center font-sans text-[10px] font-semibold tabular-nums"
+                      style={{ background: colors.primary, color: colors.primaryForeground }}
                     >
-                      {item.icon}
-                      <span className={plegada ? 'sr-only' : 'flex-1'}>{item.label}</span>
-
-                      {/* Sin no leídos no hay insignia: un cero no informa de nada. */}
-                      {item.badge !== undefined &&
-                        item.badge > 0 &&
-                        (plegada ? (
-                          /* Plegada, la insignia no cabe al lado: se convierte en un punto
-                           sobre la esquina del icono. El número se pierde a propósito
-                           —no cabe legible en 8 px— pero el hecho de que haya algo sin
-                           leer es justo lo que no se puede perder al plegar. */
-                          <span
-                            aria-label={`${item.badge} sin leer`}
-                            className="absolute right-2 top-2 h-2 w-2 rounded-full ring-2"
-                            style={{
-                              background: colors.primary,
-                              ['--tw-ring-color' as string]: colors.surface,
-                            }}
-                          />
-                        ) : (
-                          <span
-                            aria-label={`${item.badge} sin leer`}
-                            className="min-w-5 rounded-full px-1.5 py-0.5 text-center font-sans text-[10px] font-semibold tabular-nums"
-                            style={{ background: colors.primary, color: colors.primaryForeground }}
-                          >
-                            {item.badge > 99 ? '99+' : item.badge}
-                          </span>
-                        ))}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        );
-      })}
+                      {item.badge > 99 ? '99+' : item.badge}
+                    </span>
+                  ))}
+              </Link>
+            );
+          })}
+        </SidebarSection>
+      ))}
     </nav>
   );
 }

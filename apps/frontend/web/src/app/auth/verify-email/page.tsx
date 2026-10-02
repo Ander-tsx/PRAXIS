@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@praxis/commons';
+import { AuthPanel } from '@/components/organisms/AuthPanel';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
@@ -21,11 +22,11 @@ type Estado = 'comprobando' | 'listo' | 'fallo' | 'sin-token';
  */
 export default function VerifyEmailPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-12">
+    <AuthPanel>
       <Suspense fallback={<p className="font-sans text-sm text-text-secondary">Comprobando…</p>}>
         <Comprobacion />
       </Suspense>
-    </main>
+    </AuthPanel>
   );
 }
 
@@ -58,7 +59,7 @@ function Comprobacion() {
   }, [token]);
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8">
+    <div className="w-full max-w-md">
       {estado === 'comprobando' && (
         <>
           <h1 className="mb-2 font-display text-3xl text-text-primary">Confirmando…</h1>

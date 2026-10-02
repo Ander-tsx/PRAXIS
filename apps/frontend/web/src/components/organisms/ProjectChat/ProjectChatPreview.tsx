@@ -56,7 +56,7 @@ export function ProjectChatPreview({
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h3 className="font-display text-2xl text-text-primary">Chat del equipo</h3>
+          <h3 className="font-sans font-semibold text-2xl text-text-primary">Chat del equipo</h3>
           <p className="font-sans text-sm text-white">
             Lo que se escriba aquí lo ve todo el equipo de {projectName}.
           </p>

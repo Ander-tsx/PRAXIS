@@ -110,7 +110,7 @@ export default async function ChatVacioPage({ searchParams }: PageProps) {
       {/* Escritorio: la barra lateral ya lista los chats, así que aquí solo
           hace falta decir qué hacer. Sin buscador, sin lista duplicada. */}
       <div className="mx-auto hidden w-full max-w-md flex-1 flex-col items-center justify-center gap-1 p-8 text-center md:flex">
-        <p className="font-display text-xl text-text-primary">Selecciona un chat</p>
+        <p className="font-sans font-semibold text-xl text-text-primary">Selecciona un chat</p>
         <p className="font-sans text-sm text-text-secondary">
           Elige una conversación de la barra lateral para empezar a escribir.
         </p>
@@ -121,7 +121,7 @@ export default async function ChatVacioPage({ searchParams }: PageProps) {
           es «con quién puedes hablar», y aquí es «con quién ya hablas». */}
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 p-4 md:hidden">
         <header className="flex flex-col gap-1">
-          <h2 className="font-display text-2xl text-text-primary">Tus mensajes</h2>
+          <h2 className="font-sans font-semibold text-2xl text-text-primary">Tus mensajes</h2>
           <p className="font-sans text-sm text-text-secondary">
             {hayConversaciones
               ? 'Sigue donde lo dejaste.'

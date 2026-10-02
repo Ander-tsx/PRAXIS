@@ -1,6 +1,7 @@
 'use client';
 
 import { AuthForm, Button, Input } from '@praxis/commons';
+import { AuthPanel } from '@/components/organisms/AuthPanel';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { type FormEvent, Suspense, useState } from 'react';
@@ -19,11 +20,11 @@ import { type FormEvent, Suspense, useState } from 'react';
  */
 export default function ResetPasswordPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-12">
+    <AuthPanel>
       <Suspense fallback={<p className="font-sans text-sm text-text-secondary">Cargando…</p>}>
         <Formulario />
       </Suspense>
-    </main>
+    </AuthPanel>
   );
 }
 
@@ -80,7 +81,7 @@ function Formulario() {
         </p>
         <Link
           href="/auth/forgot-password"
-          className="font-sans text-sm text-primary hover:underline"
+          className="font-sans text-sm text-text-primary underline underline-offset-2 hover:opacity-70"
         >
           Pedir un enlace
         </Link>
@@ -95,7 +96,7 @@ function Formulario() {
           Ya puedes entrar con la nueva. Por seguridad hemos cerrado las sesiones que hubiera
           abiertas en otros dispositivos.
         </p>
-        <Link href="/auth/login" className="font-sans text-sm text-primary hover:underline">
+        <Link href="/auth/login" className="font-sans text-sm text-text-primary underline underline-offset-2 hover:opacity-70">
           Entrar
         </Link>
       </Marco>
@@ -104,6 +105,7 @@ function Formulario() {
 
   return (
     <AuthForm
+      bare
       title="Elige una contraseña nueva"
       subtitle="Al guardarla se cerrarán las sesiones abiertas en otros dispositivos."
       errorMessage={error ?? undefined}
@@ -144,7 +146,7 @@ function Formulario() {
 
 function Marco({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8">
+    <div className="w-full max-w-md">
       <h1 className="mb-2 font-display text-3xl text-text-primary">{titulo}</h1>
       {children}
     </div>

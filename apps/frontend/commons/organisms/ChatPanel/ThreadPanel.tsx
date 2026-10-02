@@ -178,7 +178,7 @@ export function ThreadPanel({
       </div>
       <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
         <div className="min-w-0">
-          <h4 className="font-display text-base text-text-primary">Hilo</h4>
+          <h4 className="font-sans font-semibold text-base text-text-primary">Hilo</h4>
           <p className="truncate font-sans text-xs text-text-secondary">
             {cargando
               ? 'Cargando…'

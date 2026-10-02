@@ -29,10 +29,10 @@ export default async function InvitacionPage({
         <AcceptInvitation token={token} />
       ) : (
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-2">
-          <h2 className="font-display text-2xl leading-tight text-text-primary">
+          <h2 className="font-sans font-semibold text-2xl leading-tight text-text-primary">
             Este enlace está incompleto
           </h2>
-          <p className="max-w-xl font-serif text-base italic text-white">
+          <p className="max-w-xl font-sans text-base text-white">
             No trae el código de la invitación, así que no hay nada que aceptar. Pide que te lo
             vuelvan a enviar: el anterior sigue valiendo mientras no caduque.
           </p>

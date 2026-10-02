@@ -57,7 +57,7 @@ export function OrganizationForm() {
   return (
     <form action={formAction} className="flex flex-col gap-5 border-t border-border pt-8">
       <div className="flex flex-col gap-2">
-        <label htmlFor={nombreId} className="font-display text-xl text-text-primary">
+        <label htmlFor={nombreId} className="font-sans font-semibold text-xl text-text-primary">
           ¿Cómo se llama?
         </label>
         <p className="font-serif text-sm italic text-white">

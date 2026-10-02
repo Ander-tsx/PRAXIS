@@ -1,6 +1,6 @@
 'use client';
 
-import { Columns3, File, Folder, Plus } from 'lucide-react';
+import { Columns3, File, FolderBookmark, FolderKanban, FolderPlus, Plus } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -39,9 +39,25 @@ import { useMessageCount } from '../../realtime/useMessageCount';
 import { avisarDeAvisosLeidos, useNoticeCount } from '../../realtime/useNoticeCount';
 import { alpha, colors } from '../../tokens';
 import { KylooWordmark } from '../KylooWordmark';
-import { CrearEnProyecto, type TipoDeEspacio } from './CrearEnProyecto';
+import {
+  FilaDeAccion,
+  type TipoDeEspacio,
+  NuevoContenidoEnLinea,
+  NuevoEspacioEnLinea,
+  NuevoProyectoEnLinea,
+} from './CrearEnLinea';
 import { DirectorioDeChatsProvider, useDirectorioDeChats } from './DirectorioDeChats';
-import { MenuDeContenido } from './MenuDeContenido';
+import { FilaDeArbol } from './FilaDeArbol';
+import {
+  claseDePopover,
+  Desplegable,
+  MenuFlotante,
+  SIDEBAR_FILA,
+  SIDEBAR_ICONO,
+  SIDEBAR_INICIO,
+  SidebarSection,
+  usePopover,
+} from './SidebarPrimitives';
 import { DockColumn, DockProvider } from './DockPanel';
 import { NavList } from './NavList';
 import { OrgSwitcher } from './OrgSwitcher';
@@ -163,11 +179,6 @@ export interface AppShellProps {
    */
   mensajesSinLeer?: number;
   avisosSinLeer?: number;
-  /**
-   * La fila «Nuevo proyecto» de «Inicio». La pone el `layout.tsx` porque el
-   * formulario vive en `web` (acción de servidor) y `commons` no puede importarlo.
-   */
-  nuevoProyectoSlot?: ReactNode;
   /** El panel de perfil de la barra. Lo compone el `layout.tsx` (vive en `web`). */
   perfilSlot?: ReactNode;
   children: ReactNode;
@@ -339,7 +350,6 @@ function ArmazonInterno({
   organizacionActivaId,
   mensajesSinLeer: mensajesIniciales = 0,
   avisosSinLeer: avisosIniciales = 0,
-  nuevoProyectoSlot,
   perfilSlot,
   children,
 }: AppShellProps) {
@@ -557,9 +567,7 @@ function ArmazonInterno({
           </div>
 
           {/* ⚠️ Selector y pestañas **fuera** del scroll: solo se desplaza el contenido de la pestaña. */}
-          <div
-            className={`flex min-h-0 flex-1 flex-col pt-2 ${plegada ? 'px-2' : 'px-4'}`}
-          >
+          <div className={`flex min-h-0 flex-1 flex-col pt-2 ${plegada ? 'px-2' : 'px-4'}`}>
             <div className="mb-4">
               <OrgSwitcher
                 name={user.name}
@@ -585,63 +593,62 @@ function ArmazonInterno({
                 setActiveTab(t);
                 setPerfilAbierto(false);
               }}
-              ninguna={perfilAbierto}
               mensajesSinLeer={mensajesSinLeer}
               plegada={plegada}
             />
             <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto pb-6">
-            {/**
-             * 🔴 **Las tres pestañas se montan siempre; se esconden con CSS.**
-             *
-             * Estaban tras `{activeTab === '…' && …}`, así que la que no se
-             * mira **no existe en el árbol**. Y estas listas no son pantallas:
-             * son suscripciones. Desmontadas,
-             *
-             * - `SidebarChatList` pierde sus `useLiveEvent('chat.mensaje')` y
-             *   `('chat.leido')`, así que las burbujas por conversación no se
-             *   acumulan mientras no la mires: al volver se pide todo de cero y
-             *   se ve un esqueleto;
-             * - se pierde también el buscador escrito y la posición del
-             *   desplazamiento, en cada ida y vuelta.
-             *
-             * `hidden` de Tailwind es `display:none`, que saca el panel del
-             * flujo y del foco por teclado sin desmontar nada. Es la diferencia
-             * entre esconder una lista y tirarla.
-             *
-             * ⚠️ **Sí paga el coste de mantenerlas vivas**, que es justo lo que
-             * se quiere: son tres suscripciones al mismo `EventSource` que ya
-             * está abierto, no tres conexiones.
-             */}
-            <div className={activeTab === 'home' && !perfilAbierto ? 'flex flex-col gap-4' : 'hidden'}>
-              <SidebarProjectsTree
-                zonePath={zonePath}
-                plegada={plegada}
-                activePath={activePathConConsulta}
-                organizacionActivaId={organizacionActivaId ?? null}
-                accionNueva={nuevoProyectoSlot}
-              />
-              <NavList
-                navItems={navItems.filter((i) => i.href === '/assistant')}
-                sinEtiquetas
-                activePath={activePathDeSecciones}
-                plegada={plegada}
-              />
-            </div>
-            <div className={activeTab === 'chat' && !perfilAbierto ? undefined : 'hidden'}>
-              <SidebarChatList
-                zonePath={zonePath}
-                plegada={plegada}
-                organizacionActivaId={organizacionActivaId ?? null}
-              />
-            </div>
-            <div className={activeTab === 'settings' && !perfilAbierto ? undefined : 'hidden'}>
-              <NavList
-                navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
-                activePath={activePathDeSecciones}
-                plegada={plegada}
-              />
-            </div>
-            {perfilAbierto && !plegada && perfilSlot}
+              {/**
+               * 🔴 **Las tres pestañas se montan siempre; se esconden con CSS.**
+               *
+               * Estaban tras `{activeTab === '…' && …}`, así que la que no se
+               * mira **no existe en el árbol**. Y estas listas no son pantallas:
+               * son suscripciones. Desmontadas,
+               *
+               * - `SidebarChatList` pierde sus `useLiveEvent('chat.mensaje')` y
+               *   `('chat.leido')`, así que las burbujas por conversación no se
+               *   acumulan mientras no la mires: al volver se pide todo de cero y
+               *   se ve un esqueleto;
+               * - se pierde también el buscador escrito y la posición del
+               *   desplazamiento, en cada ida y vuelta.
+               *
+               * `hidden` de Tailwind es `display:none`, que saca el panel del
+               * flujo y del foco por teclado sin desmontar nada. Es la diferencia
+               * entre esconder una lista y tirarla.
+               *
+               * ⚠️ **Sí paga el coste de mantenerlas vivas**, que es justo lo que
+               * se quiere: son tres suscripciones al mismo `EventSource` que ya
+               * está abierto, no tres conexiones.
+               */}
+              <div className={activeTab === 'home' ? 'flex flex-col gap-3' : 'hidden'}>
+                <SidebarProjectsTree
+                  zonePath={zonePath}
+                  plegada={plegada}
+                  activePath={activePathConConsulta}
+                  organizacionActivaId={organizacionActivaId ?? null}
+                />
+                <div className={`border-t border-border pt-3 ${plegada ? 'mx-1' : ''}`}>
+                  <NavList
+                    navItems={navItems.filter((i) => i.href === '/assistant')}
+                    sinEtiquetas
+                    activePath={activePathDeSecciones}
+                    plegada={plegada}
+                  />
+                </div>
+              </div>
+              <div className={activeTab === 'chat' ? undefined : 'hidden'}>
+                <SidebarChatList
+                  zonePath={zonePath}
+                  plegada={plegada}
+                  organizacionActivaId={organizacionActivaId ?? null}
+                />
+              </div>
+              <div className={activeTab === 'settings' ? undefined : 'hidden'}>
+                <NavList
+                  navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
+                  activePath={activePathDeSecciones}
+                  plegada={plegada}
+                />
+              </div>
             </div>
           </div>
 
@@ -652,18 +659,19 @@ function ArmazonInterno({
             {plegada ? (
               /* Plegada, el enlace y el selector siguen siendo hermanos por lo
                  mismo que desplegada: un botón dentro de un enlace no vale. */
-              <div
-                className={`mb-2 flex justify-center rounded-full p-1 transition-colors hover:bg-white/5 ${
+              <PerfilFlotante
+                plegada
+                abierto={perfilAbierto}
+                onCambiar={setPerfilAbierto}
+                contenido={perfilSlot}
+                className={`mb-2 flex justify-center rounded-lg p-1 transition-colors hover:bg-white/5 ${
                   enCuenta ? 'bg-white/5' : ''
                 }`}
               >
                 <span className="relative">
                   <button
                     type="button"
-                    onClick={() => {
-                      alternarPliegue();
-                      setPerfilAbierto(true);
-                    }}
+                    onClick={() => setPerfilAbierto((v) => !v)}
                     aria-pressed={enCuenta}
                     className="block"
                     title={`${user.name.trim() || user.email} — tu perfil`}
@@ -679,17 +687,22 @@ function ArmazonInterno({
                   </button>
                   {estadoSlot && <span className="absolute bottom-0 right-0">{estadoSlot}</span>}
                 </span>
-              </div>
+              </PerfilFlotante>
             ) : (
-              <div className="flex items-start gap-1">
-                <div className="min-w-0 flex-1">
+              <div className="flex items-stretch gap-1">
+                <PerfilFlotante
+                  abierto={perfilAbierto}
+                  onCambiar={setPerfilAbierto}
+                  contenido={perfilSlot}
+                  className="min-w-0 flex-1"
+                >
                   <UserCard
                     user={user}
                     activa={enCuenta}
                     estadoSlot={estadoSlot}
                     onAbrir={() => setPerfilAbierto((v) => !v)}
                   />
-                </div>
+                </PerfilFlotante>
                 {/* Solo el icono, a un lado del avatar: es la sección de avisos. */}
                 <BandejaBoton
                   abierta={bandejaAbierta}
@@ -843,67 +856,71 @@ function ArmazonInterno({
                   <SidebarTabs
                     activa={activeTab}
                     onCambiar={(t) => {
-                setActiveTab(t);
-                setPerfilAbierto(false);
-              }}
-              ninguna={perfilAbierto}
+                      setActiveTab(t);
+                      setPerfilAbierto(false);
+                    }}
                     mensajesSinLeer={mensajesSinLeer}
                   />
 
                   <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto">
-                  {/* Aquí sí se monta y se desmonta, al revés que en el escritorio:
+                    {/* Aquí sí se monta y se desmonta, al revés que en el escritorio:
                     el cajón entero solo existe mientras está abierto, así que
                     las suscripciones de estas listas ya viven en la barra de
                     escritorio cuando la hay, y en un teléfono no hay ninguna
                     barra que mantener viva por detrás. */}
-                  {!perfilAbierto && activeTab === 'home' && (
-                    <div className="flex flex-col gap-4">
-                      {/* 🔴 El árbol de proyectos **también en móvil**: este cajón solo tenía el
+                    {activeTab === 'home' && (
+                      <div className="flex flex-col gap-3">
+                        {/* 🔴 El árbol de proyectos **también en móvil**: este cajón solo tenía el
                           enlace «Proyectos» de la lista, y al dejar Inicio con solo el
                           asistente se quedó sin ninguna puerta a los proyectos. */}
-                      <SidebarProjectsTree
+                        <SidebarProjectsTree
+                          zonePath={zonePath}
+                          plegada={false}
+                          activePath={activePathConConsulta}
+                          organizacionActivaId={organizacionActivaId ?? null}
+                        />
+                        <div className="border-t border-border pt-3">
+                          <NavList
+                            navItems={navItems.filter((i) => i.href === '/assistant')}
+                            sinEtiquetas
+                            activePath={activePathDeSecciones}
+                            onNavigate={() => setMobileMenuOpen(false)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {activeTab === 'settings' && (
+                      <NavList
+                        navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
+                        activePath={activePathDeSecciones}
+                        onNavigate={() => setMobileMenuOpen(false)}
+                      />
+                    )}
+                    {activeTab === 'chat' && (
+                      <SidebarChatList
                         zonePath={zonePath}
                         plegada={false}
-                        activePath={activePathConConsulta}
                         organizacionActivaId={organizacionActivaId ?? null}
-                        accionNueva={nuevoProyectoSlot}
                       />
-                    <NavList
-                      navItems={navItems.filter((i) => i.href === '/assistant')}
-                      sinEtiquetas
-                      activePath={activePathDeSecciones}
-                      onNavigate={() => setMobileMenuOpen(false)}
-                    />
-                    </div>
-                  )}
-                  {!perfilAbierto && activeTab === 'settings' && (
-                    <NavList
-                      navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
-                      activePath={activePathDeSecciones}
-                      onNavigate={() => setMobileMenuOpen(false)}
-                    />
-                  )}
-                  {!perfilAbierto && activeTab === 'chat' && (
-                    <SidebarChatList
-                      zonePath={zonePath}
-                      plegada={false}
-                      organizacionActivaId={organizacionActivaId ?? null}
-                    />
-                  )}
-                  {perfilAbierto && perfilSlot}
+                    )}
                   </div>
                 </div>
 
                 <div className="relative border-t border-border pt-4">
-                  <div className="flex items-start gap-1">
-                    <div className="min-w-0 flex-1">
+                  <div className="flex items-stretch gap-1">
+                    <PerfilFlotante
+                      abierto={perfilAbierto}
+                      onCambiar={setPerfilAbierto}
+                      contenido={perfilSlot}
+                      className="min-w-0 flex-1"
+                    >
                       <UserCard
-                    user={user}
-                    activa={enCuenta}
-                    estadoSlot={estadoSlot}
-                    onAbrir={() => setPerfilAbierto((v) => !v)}
-                  />
-                    </div>
+                        user={user}
+                        activa={enCuenta}
+                        estadoSlot={estadoSlot}
+                        onAbrir={() => setPerfilAbierto((v) => !v)}
+                      />
+                    </PerfilFlotante>
                     <BandejaBoton
                       abierta={bandejaAbierta}
                       onCambiar={setBandejaAbierta}
@@ -918,6 +935,44 @@ function ArmazonInterno({
         </div>
       </div>
     </AppShellContext.Provider>
+  );
+}
+
+/**
+ * El perfil como **flotante sobre la tarjeta de usuario**, igual que los avisos:
+ * se abre hacia arriba con una animación y se cierra con un clic fuera, con
+ * Escape o al abrir otra cosa. Antes sustituía el contenido de la barra, y para
+ * volver había que pulsar una pestaña.
+ *
+ * `className` es del contenedor que envuelve la tarjeta y el flotante (el clic en
+ * la tarjeta no cuenta como «fuera»). El flotante se ancla al contenedor
+ * `relative` de la zona de usuario, no a este.
+ */
+function PerfilFlotante({
+  abierto,
+  onCambiar,
+  plegada = false,
+  contenido,
+  className,
+  children,
+}: {
+  abierto: boolean;
+  onCambiar: (abierto: boolean) => void;
+  plegada?: boolean;
+  contenido: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  const { ref, visible, entrada } = usePopover(abierto, () => onCambiar(false));
+  return (
+    <div ref={ref} className={className}>
+      {children}
+      {visible && (
+        <div role="dialog" aria-label="Tu perfil" className={claseDePopover(entrada, plegada)}>
+          {contenido}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -941,7 +996,7 @@ function UserCard({
       /* Resaltada cuando estás dentro: es la única «entrada» de la barra que no
          vive en la lista de secciones, así que si no se marcara aquí, estando
          en tu cuenta no habría nada marcado en ninguna parte. */
-      className={`mb-3 flex items-center gap-3 rounded-full p-1 transition-colors hover:bg-white/5 ${
+      className={`flex h-full items-center gap-3 rounded-lg p-1.5 transition-colors hover:bg-white/5 ${
         activa ? 'bg-white/5' : ''
       }`}
     >
@@ -1287,51 +1342,12 @@ function BandejaBoton({
   zonePath: string;
   plegada?: boolean;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  /* `visible` es si está montado; `entrada`, si está en su sitio. Son dos para
-     poder animar las dos direcciones: al abrir se monta y **un fotograma después**
-     se pone en su sitio (si no, nace ya en destino y no hay transición); al
-     cerrar se saca primero y se desmonta cuando termina — espejo de
-     `duration-300`. Como el efecto «génie» del Dock de macOS: el panel nace
-     encogido **desde la campana** (de ahí el `origin-*`) y crece hasta su sitio; al
-     cerrar vuelve a ser absorbido por ella. */
-  const [visible, setVisible] = useState(false);
-  const [entrada, setEntrada] = useState(false);
-
-  useEffect(() => {
-    const enPantalla = (ref.current?.getClientRects().length ?? 0) > 0;
-    if (abierta && enPantalla) {
-      setVisible(true);
-      const f = requestAnimationFrame(() => requestAnimationFrame(() => setEntrada(true)));
-      return () => cancelAnimationFrame(f);
-    }
-    setEntrada(false);
-    const t = window.setTimeout(() => setVisible(false), 320);
-    return () => window.clearTimeout(t);
-  }, [abierta]);
-
-  useEffect(() => {
-    const enPantalla = (ref.current?.getClientRects().length ?? 0) > 0;
-    if (!abierta || !enPantalla) return;
-
-    function fuera(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onCambiar(false);
-    }
-    function tecla(e: KeyboardEvent) {
-      if (e.key === 'Escape') onCambiar(false);
-    }
-    document.addEventListener('mousedown', fuera);
-    document.addEventListener('keydown', tecla);
-    return () => {
-      document.removeEventListener('mousedown', fuera);
-      document.removeEventListener('keydown', tecla);
-    };
-  }, [abierta, onCambiar]);
+  const { ref, visible, entrada } = usePopover(abierta, () => onCambiar(false));
 
   /* `mt-1`: la tarjeta de usuario mide 48 px y la campana 40; empezar arriba la
      dejaba por encima del nombre y del avatar. */
   return (
-    <div ref={ref} className={plegada ? 'shrink-0' : 'mt-1 shrink-0'}>
+    <div ref={ref} className={plegada ? 'shrink-0' : 'flex shrink-0 self-stretch'}>
       <button
         type="button"
         onClick={() => onCambiar(!abierta)}
@@ -1339,12 +1355,12 @@ function BandejaBoton({
         aria-haspopup="dialog"
         aria-label={sinLeer > 0 ? `Avisos, ${sinLeer} sin leer` : 'Avisos'}
         title="Avisos"
-        className={`relative flex items-center justify-center rounded-full p-2.5 text-white transition-colors hover:bg-white/5 ${
-          abierta ? 'bg-white/10' : ''
-        }`}
+        className={`relative flex items-center justify-center rounded-lg text-white transition-colors hover:bg-white/5 ${
+          plegada ? 'h-10 w-10' : 'h-full w-12'
+        } ${abierta ? 'bg-white/10' : ''}`}
       >
         <svg
-          className="h-5 w-5"
+          className="h-[18px] w-[18px]"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -1366,15 +1382,7 @@ function BandejaBoton({
         <div
           role="dialog"
           aria-label="Avisos"
-          className={`absolute z-50 rounded-2xl border border-border bg-[#252525] py-3 shadow-xl transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-            plegada
-              ? 'bottom-0 left-full ml-2 w-80 origin-bottom-left'
-              : 'bottom-full left-2 right-2 mb-2 origin-bottom-right'
-          } ${
-            entrada
-              ? 'scale-100 opacity-100'
-              : 'pointer-events-none scale-[0.08] opacity-0'
-          }`}
+          className={`${claseDePopover(entrada, plegada)} py-3`}
         >
           <SidebarInboxList
             zonePath={zonePath}
@@ -1432,12 +1440,9 @@ function SidebarTabs({
   activa,
   onCambiar,
   mensajesSinLeer,
-  ninguna = false,
   plegada = false,
 }: {
   activa: SidebarTab;
-  /** Con el perfil abierto ninguna pestaña está puesta. */
-  ninguna?: boolean;
   onCambiar: (tab: SidebarTab) => void;
   mensajesSinLeer: number;
   /** Plegada: solo los iconos, en columna, y la insignia se reduce a un punto. */
@@ -1522,7 +1527,7 @@ function SidebarTabs({
       }
     >
       {pestanas.map((pestana) => {
-        const puesta = activa === pestana.id && !ninguna;
+        const puesta = activa === pestana.id;
         return (
           <button
             key={pestana.id}
@@ -1560,18 +1565,16 @@ function SidebarTabs({
               </svg>
               {!plegada && <InsigniaDePestana cuantos={pestana.insignia} />}
             </span>
-            {plegada ? (
-              /* El número no cabe en 36 px: se reduce a un punto, que es lo que
+            {plegada
+              ? /* El número no cabe en 36 px: se reduce a un punto, que es lo que
                  hace falta saber —hay algo— con el `title` para el resto. */
-              pestana.insignia > 0 && (
-                <span
-                  className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"
-                  aria-label={`${pestana.insignia} sin leer`}
-                />
-              )
-            ) : (
-              pestana.etiqueta
-            )}
+                pestana.insignia > 0 && (
+                  <span
+                    className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"
+                    aria-label={`${pestana.insignia} sin leer`}
+                  />
+                )
+              : pestana.etiqueta}
           </button>
         );
       })}
@@ -1616,25 +1619,24 @@ function SidebarProjectsTree({
   plegada,
   activePath,
   organizacionActivaId,
-  accionNueva,
 }: {
   zonePath: string;
   plegada: boolean;
   activePath: string;
   organizacionActivaId: string | null;
-  /** El «+» discreto del encabezado de la sección. Lo pone el layout: ver `nuevoProyectoSlot`. */
-  accionNueva?: ReactNode;
 }) {
   const router = useRouter();
   const [projects, setProjects] = useState<SidebarProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(() => desplegadosGuardados());
-  /** El proyecto en el que se está creando algo desde la barra, si hay uno. */
+  /** «Nuevo proyecto» del menú ⋯ de la cabecera: el campo está abierto. */
+  const [creandoProyecto, setCreandoProyecto] = useState(false);
+  /** «Nuevo documento / tablero» del menú ⋯ de un espacio: en cuál. */
   const [creandoEn, setCreandoEn] = useState<string | null>(null);
-  /** Si se pulsó el «+» de un espacio: qué crear y dónde, ya elegido. */
-  const [presetDeCrear, setPresetDeCrear] = useState<{
-    que: 'documento' | 'tablero';
-    espacioId: string;
+  /** Si se eligió «Agregar espacio» en el menú ⋯ de un proyecto: cuál y de qué tipo. */
+  const [agregandoEspacio, setAgregandoEspacio] = useState<{
+    id: string;
+    tipo: TipoDeEspacio;
   } | null>(null);
   /**
    * Los espacios abiertos o cerrados **por decisión de quien usa la barra**.
@@ -1810,99 +1812,41 @@ function SidebarProjectsTree({
     });
   }
 
+  const gatewayPath = `${zonePath}/api/gateway`;
+
   if (loading) {
     return (
-      <div className="flex flex-col gap-1 px-1">
+      <SidebarSection etiqueta="Proyectos" plegada={plegada}>
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-7 rounded-lg bg-white/5 animate-pulse" />
+          <div key={i} className="h-9 animate-pulse rounded-lg bg-white/5" />
         ))}
-      </div>
+      </SidebarSection>
     );
   }
 
-  if (projects.length === 0 && !plegada) {
+  /** «Agregar espacio» del menú ⋯: abre el proyecto y el campo donde se escribe el nombre. */
+  function abrirEspacioNuevo(id: string, tipo: TipoDeEspacio) {
+    refrescarProyecto(id);
+    setAgregandoEspacio({ id, tipo });
+  }
+
+  if (plegada) {
     return (
-      <div className="px-3 py-1">
-        <div className="-mx-3 mb-1.5 border-t border-border" aria-hidden="true" />
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-white select-none block mb-1">
-          Proyectos
-        </span>
-        <Link
-          href="/projects"
-          className="flex items-center gap-2 text-text-secondary hover:text-white text-[12px] py-1 transition-colors"
-        >
-          <svg
-            className="h-3.5 w-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          Crear primer proyecto
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col">
-      {/* Raya fina encima de la sección, igual que las de `NavList`. */}
-      <div
-        className={`${plegada ? 'mx-1' : ''} mb-1.5 border-t border-border`}
-        aria-hidden="true"
-      />
-      {!plegada && (
-        <div className="flex items-center justify-between px-3 mb-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-white select-none">
-            Proyectos
-          </span>
-          <span className="flex items-center gap-0.5">
-          {accionNueva}
-          <Link
-            href="/projects"
-            title="Ver todos los proyectos"
-            className="rounded p-0.5 text-text-secondary hover:text-white transition-colors"
-          >
-            <svg
-              className="h-3.5 w-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 6h16M4 10h16M4 14h16M4 18h16"
-              />
-            </svg>
-          </Link>
-          </span>
-        </div>
-      )}
-
-      <nav aria-label="Proyectos" className="flex flex-col">
-        {projects.map((project) => {
-          const isOpen = expanded.has(project.id);
-          // Las URLs de proyecto usan el SLUG, no el id
-          const projectHref = `/projects/${project.slug}`;
-          const isActiveProject =
-            activePath === projectHref ||
-            activePath.startsWith(`${projectHref}?`) ||
-            activePath.startsWith(`${projectHref}/`);
-
-          if (plegada) {
+      <SidebarSection etiqueta="Proyectos" plegada>
+        <nav aria-label="Proyectos" className="flex flex-col gap-0.5">
+          {projects.map((project) => {
+            const projectHref = `/projects/${project.slug}`;
+            const activo =
+              activePath === projectHref ||
+              activePath.startsWith(`${projectHref}?`) ||
+              activePath.startsWith(`${projectHref}/`);
             return (
               <Link
                 key={project.id}
                 href={projectHref}
                 title={project.name}
-                aria-current={isActiveProject ? 'page' : undefined}
-                className={`flex justify-center py-1 rounded-lg transition-colors hover:bg-white/[0.06] ${isActiveProject ? 'bg-white/10' : ''}`}
+                aria-current={activo ? 'page' : undefined}
+                className={`flex justify-center rounded-lg py-1 transition-colors hover:bg-white/5 ${activo ? 'bg-white/10' : ''}`}
               >
                 <ProjectMonogram
                   id={project.id}
@@ -1913,264 +1857,278 @@ function SidebarProjectsTree({
                 />
               </Link>
             );
-          }
+          })}
+        </nav>
+      </SidebarSection>
+    );
+  }
+
+  return (
+    <SidebarSection
+      etiqueta="Proyectos"
+      accion={
+        <MenuFlotante
+          etiquetaAria="Acciones de proyectos"
+          gatewayPath={gatewayPath}
+          activa
+          items={[
+            {
+              clave: 'nuevo-proyecto',
+              etiqueta: 'Nuevo proyecto',
+              icono: <FolderPlus />,
+              onElegir: () => setCreandoProyecto(true),
+            },
+          ]}
+        />
+      }
+    >
+      {creandoProyecto && (
+        <NuevoProyectoEnLinea
+          gatewayPath={gatewayPath}
+          organizacionId={organizacionActivaId}
+          onCreado={cargar}
+          onCerrar={() => setCreandoProyecto(false)}
+        />
+      )}
+      <nav aria-label="Proyectos" className="flex flex-col gap-0.5">
+        {projects.map((project) => {
+          const isOpen = expanded.has(project.id);
+          // Las URLs de proyecto usan el SLUG, no el id
+          const projectHref = `/projects/${project.slug}`;
+          const isActiveProject =
+            activePath === projectHref ||
+            activePath.startsWith(`${projectHref}?`) ||
+            activePath.startsWith(`${projectHref}/`);
+          const agregando = agregandoEspacio?.id === project.id ? agregandoEspacio : null;
 
           return (
             <div key={project.id} className="flex flex-col">
-              <div
-                className={`group flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.06] ${isActiveProject ? 'bg-white/10' : ''}`}
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleProject(project.id)}
-                  aria-expanded={isOpen}
-                  aria-label={isOpen ? `Colapsar ${project.name}` : `Expandir ${project.name}`}
-                  className="flex shrink-0 items-center justify-center w-4 h-4 rounded text-text-secondary hover:text-white transition-colors"
-                >
-                  <ChevronIcon open={isOpen} />
-                </button>
+              <FilaDeArbol
+                activo={isActiveProject}
+                href={projectHref}
+                nombre={project.name}
+                projectId={project.id}
+                gatewayPath={gatewayPath}
+                inicio={
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => toggleProject(project.id)}
+                      aria-expanded={isOpen}
+                      aria-label={isOpen ? `Colapsar ${project.name}` : `Expandir ${project.name}`}
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:text-white"
+                    >
+                      <ChevronIcon open={isOpen} />
+                    </button>
+                    <span
+                      className={`${SIDEBAR_INICIO} [&>*]:shrink-0 [&>*]:scale-[0.82]`}
+                      aria-hidden="true"
+                    >
+                      <ProjectMonogram
+                        id={project.id}
+                        name={project.name}
+                        iconKey={project.iconKey}
+                        imageUrl={project.imageUrl}
+                        color={project.color}
+                      />
+                    </span>
+                  </>
+                }
+                itemsExtra={[
+                  {
+                    clave: 'espacio-tableros',
+                    grupo: 'Agregar espacio',
+                    etiqueta: 'De tableros',
+                    icono: <FolderKanban />,
+                    permiso: 'canEditBoard',
+                    onElegir: () => abrirEspacioNuevo(project.id, 'BOARDS'),
+                  },
+                  {
+                    clave: 'espacio-documentos',
+                    grupo: 'Agregar espacio',
+                    etiqueta: 'De documentos',
+                    icono: <FolderBookmark />,
+                    permiso: 'canEditBoard',
+                    onElegir: () => abrirEspacioNuevo(project.id, 'DOCUMENTS'),
+                  },
+                ]}
+                edicion={{
+                  tipo: 'proyecto',
+                  path: `/projects/${project.id}`,
+                  cuerpoDeNombre: (name) => ({ name }),
+                  permisoRenombrar: 'canEditProject',
+                  permisoEliminar: 'canDeleteProject',
+                  confirmarEscribiendo: true,
+                  onCambiado: cargar,
+                  alEliminar: () => router.push('/projects'),
+                  /* El slug se regenera al renombrar: la URL abierta dejaría de resolver. */
+                  alRenombrar: (guardado) => {
+                    if (isActiveProject && guardado.slug && guardado.slug !== project.slug) {
+                      router.replace(`/projects/${guardado.slug}`);
+                    }
+                  },
+                }}
+              />
 
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[0.82]">
-                  <ProjectMonogram
-                    id={project.id}
-                    name={project.name}
-                    iconKey={project.iconKey}
-                    imageUrl={project.imageUrl}
-                    color={project.color}
-                  />
-                </span>
-
-                <Link
-                  href={projectHref}
-                  className={`flex-1 min-w-0 truncate text-[13px] transition-colors ${
-                    isActiveProject
-                      ? 'text-white font-semibold'
-                      : 'text-white font-medium opacity-75 hover:opacity-100'
-                  }`}
-                >
-                  {project.name}
-                </Link>
-
-                {/* Crear sin entrar al proyecto: documento, tablero o espacio. */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    /* Los espacios se piden al desplegar; el formulario los
-                       necesita para ofrecer dónde crear. */
-                    refrescarProyecto(project.id);
-                    setCreandoEn(project.id);
-                  }}
-                  aria-label={`Nuevo en ${project.name}`}
-                  title="Nuevo documento, tablero o espacio"
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-secondary transition hover:bg-white/10 hover:text-white focus-visible:opacity-100 ${
-                    isActiveProject ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                  }`}
-                >
-                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                </button>
-              </div>
-
-              <div
-                className="grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,0.85,0.28,1)]"
-                style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
-              >
-                <div
-                  className="min-h-0 overflow-hidden"
-                  style={{ opacity: isOpen ? 1 : 0, transition: 'opacity 200ms' }}
-                >
-                  <div className="flex flex-col gap-1 pl-7 pb-1.5 pt-1">
-                    {project.workspaces.length === 0 ? (
-                      <span className="px-2 py-1 text-[12px] text-white italic select-none">
-                        Sin espacios
-                      </span>
-                    ) : (
-                      project.workspaces.map((ws) => {
-                        // URL correcta: /projects/{slug}?tab=espacios&ws={wsId}
-                        const wsHref = `/projects/${project.slug}?tab=espacios&ws=${ws.id}`;
-                        const isActiveWs = activePath.includes(`ws=${ws.id}`);
-                        const Icono = Folder;
-                        const wsAbierto = espaciosAbiertos.get(ws.id) ?? isActiveWs;
-                        return (
-                          <div key={ws.id} className="flex flex-col gap-1">
-                            <div
-                              className={`group flex items-center gap-1 rounded-md pr-1 transition-colors ${
-                                isActiveWs
-                                  ? 'bg-white/10 text-white font-medium'
-                                  : 'text-text-secondary hover:text-white hover:bg-white/[0.06]'
-                              }`}
-                            >
-                              <button
-                                type="button"
-                                onClick={() =>
+              <Desplegable abierto={isOpen}>
+                <div className="flex flex-col gap-0.5 pb-1 pl-6 pt-0.5">
+                  {agregando && (
+                    <NuevoEspacioEnLinea
+                      proyecto={project}
+                      tipo={agregando.tipo}
+                      gatewayPath={gatewayPath}
+                      onCreado={() => refrescarProyecto(project.id)}
+                      onCerrar={() => setAgregandoEspacio(null)}
+                    />
+                  )}
+                  {project.workspaces.length === 0 && !agregando ? (
+                    <span className="select-none px-2.5 py-1 font-sans text-[12px] italic text-text-secondary">
+                      Sin espacios
+                    </span>
+                  ) : (
+                    project.workspaces.map((ws) => {
+                      // URL correcta: /projects/{slug}?tab=espacios&ws={wsId}
+                      const wsHref = `/projects/${project.slug}?tab=espacios&ws=${ws.id}`;
+                      const isActiveWs = activePath.includes(`ws=${ws.id}`);
+                      const wsAbierto = espaciosAbiertos.get(ws.id) ?? isActiveWs;
+                      /* El icono dice qué guarda el espacio: tableros o documentos. */
+                      const Icono = ws.kind === 'DOCUMENTS' ? FolderBookmark : FolderKanban;
+                      const refrescar = () => refrescarProyecto(project.id);
+                      return (
+                        <div key={ws.id} className="flex flex-col gap-0.5">
+                          <FilaDeArbol
+                            compacta
+                            activo={isActiveWs}
+                            href={wsHref}
+                            nombre={ws.name}
+                            projectId={project.id}
+                            gatewayPath={gatewayPath}
+                            itemsExtra={[
+                              {
+                                clave: 'nuevo-contenido',
+                                etiqueta:
+                                  ws.kind === 'DOCUMENTS' ? 'Nuevo documento' : 'Nuevo tablero',
+                                icono: <Plus />,
+                                permiso:
+                                  ws.kind === 'DOCUMENTS' ? 'canEditDocuments' : 'canCreateBoard',
+                                onElegir: () => {
                                   setEspaciosAbiertos((previos) =>
-                                    new Map(previos).set(ws.id, !wsAbierto),
-                                  )
-                                }
-                                aria-expanded={wsAbierto}
-                                aria-label={wsAbierto ? `Colapsar ${ws.name}` : `Expandir ${ws.name}`}
-                                className="ml-1 flex h-4 w-4 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:text-white"
-                              >
-                                <ChevronIcon open={wsAbierto} />
-                              </button>
-                              <Link
-                                href={wsHref}
-                                aria-current={isActiveWs ? 'page' : undefined}
-                                className="flex min-w-0 flex-1 items-center gap-2 py-[6px] pr-1 text-[13px]"
-                              >
-                                <Icono className="h-3.5 w-3.5 shrink-0 opacity-60" aria-hidden="true" />
-                                <span className="truncate">{ws.name}</span>
-                              </Link>
-                              <MenuDeContenido
-                                projectId={project.id}
-                                gatewayPath={`${zonePath}/api/gateway`}
-                                activo={isActiveWs}
-                                onCambiado={() => refrescarProyecto(project.id)}
-                                alEliminar={() => router.push(projectHref)}
-                                objetivo={{
-                                  tipo: 'espacio',
-                                  name: ws.name,
-                                  path: `/workspaces/${ws.id}`,
-                                  cuerpoDeNombre: (name) => ({ name }),
-                                  permisoRenombrar: 'canEditBoard',
-                                  permisoEliminar: 'canDeleteBoard',
-                                  confirmarEscribiendo: true,
-                                }}
-                              />
-                            </div>
-                            {wsAbierto &&
-                              ws.boards.map((tablero) => {
+                                    new Map(previos).set(ws.id, true),
+                                  );
+                                  setCreandoEn(ws.id);
+                                },
+                              },
+                            ]}
+                            inicio={
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setEspaciosAbiertos((previos) =>
+                                      new Map(previos).set(ws.id, !wsAbierto),
+                                    )
+                                  }
+                                  aria-expanded={wsAbierto}
+                                  aria-label={
+                                    wsAbierto ? `Colapsar ${ws.name}` : `Expandir ${ws.name}`
+                                  }
+                                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:text-white"
+                                >
+                                  <ChevronIcon open={wsAbierto} />
+                                </button>
+                                <Icono className={SIDEBAR_ICONO} aria-hidden="true" />
+                              </>
+                            }
+                            edicion={{
+                              tipo: 'espacio',
+                              path: `/workspaces/${ws.id}`,
+                              cuerpoDeNombre: (name) => ({ name }),
+                              permisoRenombrar: 'canEditBoard',
+                              permisoEliminar: 'canDeleteBoard',
+                              confirmarEscribiendo: true,
+                              onCambiado: refrescar,
+                              alEliminar: () => router.push(projectHref),
+                            }}
+                          />
+                          <Desplegable abierto={wsAbierto}>
+                            <div className="flex flex-col gap-0.5 pl-6">
+                              {ws.boards.map((tablero) => {
                                 const tableroActivo = activePath.includes(`board=${tablero.id}`);
                                 return (
-                                  <div
+                                  <FilaDeArbol
                                     key={tablero.id}
-                                    className={`group ml-7 flex items-center gap-1 rounded-md pr-1 transition-colors ${
-                                      tableroActivo
-                                        ? 'bg-white/10 text-white'
-                                        : 'text-text-secondary hover:text-white hover:bg-white/[0.06]'
-                                    }`}
-                                  >
-                                    <Link
-                                      href={`${wsHref}&board=${tablero.id}`}
-                                      aria-current={tableroActivo ? 'page' : undefined}
-                                      className="flex min-w-0 flex-1 items-center gap-2 px-2 py-[6px] text-[13px]"
-                                    >
-                                      <Columns3
-                                        className="h-3.5 w-3.5 shrink-0 opacity-60"
-                                        aria-hidden="true"
-                                      />
-                                      <span className="truncate">{tablero.name}</span>
-                                    </Link>
-                                    <MenuDeContenido
-                                      projectId={project.id}
-                                      gatewayPath={`${zonePath}/api/gateway`}
-                                      activo={tableroActivo}
-                                      onCambiado={() => refrescarProyecto(project.id)}
-                                      alEliminar={() => router.push(wsHref)}
-                                      objetivo={{
-                                        tipo: 'tablero',
-                                        name: tablero.name,
-                                        path: `/boards/${tablero.id}`,
-                                        cuerpoDeNombre: (name) => ({ name }),
-                                        permisoRenombrar: 'canEditBoard',
-                                        permisoEliminar: 'canDeleteBoard',
-                                        confirmarEscribiendo: true,
-                                      }}
-                                    />
-                                  </div>
+                                    compacta
+                                    activo={tableroActivo}
+                                    href={`${wsHref}&board=${tablero.id}`}
+                                    nombre={tablero.name}
+                                    projectId={project.id}
+                                    gatewayPath={gatewayPath}
+                                    inicio={
+                                      <Columns3 className={SIDEBAR_ICONO} aria-hidden="true" />
+                                    }
+                                    edicion={{
+                                      tipo: 'tablero',
+                                      path: `/boards/${tablero.id}`,
+                                      cuerpoDeNombre: (name) => ({ name }),
+                                      permisoRenombrar: 'canEditBoard',
+                                      permisoEliminar: 'canDeleteBoard',
+                                      confirmarEscribiendo: true,
+                                      onCambiado: refrescar,
+                                      alEliminar: () => router.push(wsHref),
+                                    }}
+                                  />
                                 );
                               })}
-                            {wsAbierto && ws.documents.map((doc) => {
-                              const docActivo = activePath.includes(`doc=${doc.id}`);
-                              return (
-                                <div
-                                  key={doc.id}
-                                  className={`group ml-7 flex items-center gap-1 rounded-md pr-1 transition-colors ${
-                                    docActivo
-                                      ? 'bg-white/10 text-white'
-                                      : 'text-text-secondary hover:text-white hover:bg-white/[0.06]'
-                                  }`}
-                                >
-                                  <Link
-                                    href={`${wsHref}&doc=${doc.id}`}
-                                    aria-current={docActivo ? 'page' : undefined}
-                                    className="flex min-w-0 flex-1 items-center gap-2 px-2 py-[6px] text-[13px]"
-                                  >
-                                    <File
-                                      className="h-3.5 w-3.5 shrink-0 opacity-60"
-                                      aria-hidden="true"
-                                    />
-                                    <span className="truncate">{doc.title || 'Sin título'}</span>
-                                  </Link>
-                                  <MenuDeContenido
-                                    projectId={project.id}
-                                    gatewayPath={`${zonePath}/api/gateway`}
+                              {ws.documents.map((doc) => {
+                                const docActivo = activePath.includes(`doc=${doc.id}`);
+                                return (
+                                  <FilaDeArbol
+                                    key={doc.id}
+                                    compacta
                                     activo={docActivo}
-                                    onCambiado={() => refrescarProyecto(project.id)}
-                                    alEliminar={() => router.push(wsHref)}
-                                    objetivo={{
+                                    href={`${wsHref}&doc=${doc.id}`}
+                                    nombre={doc.title || 'Sin título'}
+                                    projectId={project.id}
+                                    gatewayPath={gatewayPath}
+                                    inicio={<File className={SIDEBAR_ICONO} aria-hidden="true" />}
+                                    edicion={{
                                       tipo: 'documento',
-                                      name: doc.title || 'Sin título',
                                       path: `/workspaces/${ws.id}/documents/${doc.id}`,
                                       cuerpoDeNombre: (title) => ({ title }),
                                       permisoRenombrar: 'canEditDocuments',
                                       permisoEliminar: 'canEditDocuments',
                                       confirmarEscribiendo: false,
+                                      onCambiado: refrescar,
+                                      alEliminar: () => router.push(wsHref),
                                     }}
                                   />
-                                </div>
-                              );
-                            })}
-                            {wsAbierto && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  /* Los espacios se piden al desplegar; el formulario los necesita. */
-                                  refrescarProyecto(project.id);
-                                  setPresetDeCrear({
-                                    que: ws.kind === 'DOCUMENTS' ? 'documento' : 'tablero',
-                                    espacioId: ws.id,
-                                  });
-                                  setCreandoEn(project.id);
-                                }}
-                                className="ml-7 flex items-center gap-2 rounded-md px-2 py-[6px] text-left text-[13px] text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-white"
-                              >
-                                <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                <span className="truncate">
-                                  {ws.kind === 'DOCUMENTS' ? 'Nuevo documento' : 'Nuevo tablero'}
-                                </span>
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
+                                );
+                              })}
+                              {creandoEn === ws.id && (
+                                <NuevoContenidoEnLinea
+                                  espacio={ws}
+                                  proyecto={project}
+                                  gatewayPath={gatewayPath}
+                                  onCreado={refrescar}
+                                  onCerrar={() => setCreandoEn(null)}
+                                />
+                              )}
+                            </div>
+                          </Desplegable>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
-              </div>
+              </Desplegable>
             </div>
           );
         })}
       </nav>
-      {(() => {
-        const proyecto = projects.find((p) => p.id === creandoEn);
-        if (!proyecto) return null;
-        return (
-          <CrearEnProyecto
-            abierto
-            onCerrar={() => {
-              setCreandoEn(null);
-              setPresetDeCrear(null);
-            }}
-            queInicial={presetDeCrear?.que}
-            espacioInicialId={presetDeCrear?.espacioId}
-            proyecto={proyecto}
-            espacios={proyecto.workspaces}
-            gatewayPath={`${zonePath}/api/gateway`}
-            onCreado={() => refrescarProyecto(proyecto.id)}
-          />
-        );
-      })()}
-    </div>
+      {projects.length === 0 && !creandoProyecto && (
+        <FilaDeAccion etiqueta="Crear primer proyecto" onClick={() => setCreandoProyecto(true)} />
+      )}
+    </SidebarSection>
   );
 }
 
@@ -2195,9 +2153,9 @@ function FilaDePersona({
     <Link
       href={`/chat/${conversacion.peerId}`}
       aria-current={activo ? 'page' : undefined}
-      className={`group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/10 ${
+      className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors ${
         plegada ? 'justify-center px-0' : ''
-      } ${activo ? 'bg-white/10' : ''}`}
+      } ${activo ? 'bg-white/10' : 'hover:bg-white/5'}`}
     >
       <span className="flex h-7 w-7 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[1.1]">
         <Avatar
@@ -2255,9 +2213,9 @@ function FilaDeProyecto({
     <Link
       href={`/chat/proyecto/${chat.project.id}`}
       aria-current={activo ? 'page' : undefined}
-      className={`group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/10 ${
+      className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors ${
         plegada ? 'justify-center px-0' : ''
-      } ${activo ? 'bg-white/10' : ''}`}
+      } ${activo ? 'bg-white/10' : 'hover:bg-white/5'}`}
     >
       <span className="flex h-7 w-7 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[0.82]">
         <ProjectMonogram
@@ -2402,34 +2360,27 @@ function SidebarChatList({
   if (cargando) {
     return (
       <div className="flex flex-col gap-2 px-1">
-        <div className="h-10 animate-pulse rounded-xl bg-white/5" />
-        <div className="h-10 animate-pulse rounded-xl bg-white/5" />
+        <div className="h-11 animate-pulse rounded-lg bg-white/5" />
+        <div className="h-11 animate-pulse rounded-lg bg-white/5" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2 px-1 pb-4">
+    <div className="flex flex-col gap-3">
       {!plegada && (
-        <div className="px-2">
-          <input
-            type="search"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar chats..."
-            aria-label="Buscar conversaciones"
-            className="w-full rounded-md bg-white/5 px-2 py-1 font-sans text-sm text-white placeholder-text-secondary focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-          />
-        </div>
+        <input
+          type="search"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar chats..."
+          aria-label="Buscar conversaciones"
+          className={`${SIDEBAR_FILA} w-full bg-white/5 text-white placeholder:text-text-secondary ring-1 ring-inset ring-white/10 focus:outline-none focus:ring-white/35`}
+        />
       )}
 
       {proyectosVisibles.length > 0 && (
-        <div className="flex flex-col gap-1">
-          {!plegada && (
-            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-              Proyectos
-            </span>
-          )}
+        <SidebarSection etiqueta="Proyectos" plegada={plegada}>
           {proyectosVisibles.map((chat) => (
             <FilaDeProyecto
               key={chat.project.id}
@@ -2439,16 +2390,11 @@ function SidebarChatList({
               plegada={plegada}
             />
           ))}
-        </div>
+        </SidebarSection>
       )}
 
       {directasVisibles.length > 0 && (
-        <div className="flex flex-col gap-1">
-          {!plegada && (
-            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-              Privados
-            </span>
-          )}
+        <SidebarSection etiqueta="Privados" plegada={plegada}>
           {directasVisibles.map((conversacion) => (
             <FilaDePersona
               key={conversacion.peerId}
@@ -2459,7 +2405,7 @@ function SidebarChatList({
               gatewayPath={gatewayPath}
             />
           ))}
-        </div>
+        </SidebarSection>
       )}
 
       {/* Un buscador que no encuentra nada tiene que decirlo: con los dos grupos
@@ -2512,6 +2458,40 @@ function destinoDeUnAviso(aviso: AppNotification): string | undefined {
       proyectoRef: aviso.projectId,
       taskId: aviso.taskId,
     }) ?? undefined
+  );
+}
+
+/** Alto de la bandeja sin avisos y del esqueleto que la precede: el mismo, a propósito. */
+const ALTO_VACIO = 'h-24';
+
+/**
+ * Anima el **alto** de lo que lleva dentro cuando cambia.
+ *
+ * Mide el contenido con un `ResizeObserver` y se lo da al contenedor como `height`
+ * con una transición: pasar del esqueleto a la lista, o de la lista a «Nada
+ * nuevo por aquí», se expande o se encoge en vez de saltar. El tope (`max-h`) lo
+ * pone quien lo usa; con él el contenedor hace scroll y deja de crecer.
+ */
+function AlturaSuave({ children, className = '' }: { children: ReactNode; className?: string }) {
+  const interior = useRef<HTMLDivElement>(null);
+  const [alto, setAlto] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const el = interior.current;
+    if (!el) return;
+    setAlto(el.offsetHeight);
+    const observador = new ResizeObserver(() => setAlto(el.offsetHeight));
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, []);
+
+  return (
+    <div
+      style={{ height: alto }}
+      className={`transition-[height] duration-300 ease-[cubic-bezier(0.22,0.85,0.28,1)] motion-reduce:transition-none ${className}`}
+    >
+      <div ref={interior}>{children}</div>
+    </div>
   );
 }
 
@@ -2620,16 +2600,18 @@ function SidebarInboxList({
       .catch(() => undefined);
   }
 
+  /* ⚠️ Mide **lo mismo que el estado vacío** (`ALTO_VACIO`): antes eran tres filas
+     de 48 px y, al terminar de cargar sin avisos, el flotante pegaba un salto de
+     golpe de una altura a la otra. */
   const loader = (
-    <div className="flex flex-col gap-2 px-1 py-2">
-      <div className="h-12 rounded-xl bg-white/5 animate-pulse" />
-      <div className="h-12 rounded-xl bg-white/5 animate-pulse" />
-      <div className="h-12 rounded-xl bg-white/5 animate-pulse" />
+    <div className={`flex flex-col justify-center gap-2.5 px-4 ${ALTO_VACIO}`} aria-hidden="true">
+      <div className="h-3 w-3/4 animate-pulse rounded bg-white/5" />
+      <div className="h-3 w-1/2 animate-pulse rounded bg-white/5" />
     </div>
   );
 
   return (
-    <div className={`flex flex-col ${className}`}>
+    <div className="flex flex-col">
       {!plegada && (
         <div className="mx-3 mb-3 flex shrink-0 rounded-lg bg-white/5 p-0.5">
           <button
@@ -2657,76 +2639,80 @@ function SidebarInboxList({
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto scrollbar-none px-1 pb-4">
-        {loading ? (
-          loader
-        ) : items.length === 0 ? (
-          <div className="px-4 py-8 text-center font-sans text-[13px] text-text-secondary">
-            {mostrarTodos ? 'No tienes avisos.' : 'Nada nuevo por aquí.'}
-          </div>
-        ) : (
-          items.map((aviso) => {
-            const actor = aviso.actorId ? directorio.get(aviso.actorId) : undefined;
-            const sinLeer = !aviso.readAt;
-            return (
-              <Link
-                key={aviso.id}
-                /**
-                 * ⚠️ `?? '#'`, y no estaba antes.
-                 *
-                 * `destinoDeUnAviso` devuelve `undefined` para los avisos que no
-                 * llevan a ninguna parte —los que no traen proyecto—, y un `<a>`
-                 * sin `href` es válido: se pinta como texto y no navega. `Link`
-                 * exige una URL, así que se le da una que no sale de aquí. El
-                 * comportamiento es el mismo; lo que cambia es el tipo. */
-                href={destinoDeUnAviso(aviso) ?? '#'}
-                onClick={() => alPulsar(aviso)}
-                className={`relative flex items-start gap-3 rounded-xl p-3 transition-colors hover:bg-white/5 ${
-                  sinLeer ? 'bg-white/[0.04]' : ''
-                }`}
-              >
-                {!plegada && (
+      <AlturaSuave className={`scrollbar-none overflow-y-auto ${className}`}>
+        <div className="flex flex-col gap-1 px-1 pb-4">
+          {loading ? (
+            loader
+          ) : items.length === 0 ? (
+            <div
+              className={`flex items-center justify-center px-4 text-center font-sans text-[13px] text-text-secondary ${ALTO_VACIO}`}
+            >
+              {mostrarTodos ? 'No tienes avisos.' : 'Nada nuevo por aquí.'}
+            </div>
+          ) : (
+            items.map((aviso) => {
+              const actor = aviso.actorId ? directorio.get(aviso.actorId) : undefined;
+              const sinLeer = !aviso.readAt;
+              return (
+                <Link
+                  key={aviso.id}
                   /**
-                   * El mismo `Avatar` que el tablero y la ficha de la barra, no
-                   * un círculo dibujado aquí.
+                   * ⚠️ `?? '#'`, y no estaba antes.
                    *
-                   * ⚠️ **Sin foto pintaba UNA sola letra**, mientras que el
-                   * resto del producto pinta dos: la misma persona salía como
-                   * «A» en la bandeja y «AT» en su tarea, que es aprenderse dos
-                   * veces lo mismo. `Avatar` ya trae la regla de iniciales, el
-                   * repliegue cuando la foto no carga y el tono de «eres tú»;
-                   * copiarla aquí era garantizar que divergieran.
-                   */
-                  <Avatar
-                    size="base"
-                    label={actor ? personLabel(actor) : 'Sistema'}
-                    src={avatarHref(actor?.avatarUrl, `${zonePath}/api/gateway`)}
-                    className="shrink-0"
-                  />
-                )}
-                <div className={`flex min-w-0 flex-1 flex-col ${plegada ? 'hidden' : ''}`}>
-                  {/* Sin leer pesa más y va en blanco; leído baja a secundario.
+                   * `destinoDeUnAviso` devuelve `undefined` para los avisos que no
+                   * llevan a ninguna parte —los que no traen proyecto—, y un `<a>`
+                   * sin `href` es válido: se pinta como texto y no navega. `Link`
+                   * exige una URL, así que se le da una que no sale de aquí. El
+                   * comportamiento es el mismo; lo que cambia es el tipo. */
+                  href={destinoDeUnAviso(aviso) ?? '#'}
+                  onClick={() => alPulsar(aviso)}
+                  className={`relative flex items-start gap-3 rounded-xl p-3 transition-colors hover:bg-white/5 ${
+                    sinLeer ? 'bg-white/[0.04]' : ''
+                  }`}
+                >
+                  {!plegada && (
+                    /**
+                     * El mismo `Avatar` que el tablero y la ficha de la barra, no
+                     * un círculo dibujado aquí.
+                     *
+                     * ⚠️ **Sin foto pintaba UNA sola letra**, mientras que el
+                     * resto del producto pinta dos: la misma persona salía como
+                     * «A» en la bandeja y «AT» en su tarea, que es aprenderse dos
+                     * veces lo mismo. `Avatar` ya trae la regla de iniciales, el
+                     * repliegue cuando la foto no carga y el tono de «eres tú»;
+                     * copiarla aquí era garantizar que divergieran.
+                     */
+                    <Avatar
+                      size="base"
+                      label={actor ? personLabel(actor) : 'Sistema'}
+                      src={avatarHref(actor?.avatarUrl, `${zonePath}/api/gateway`)}
+                      className="shrink-0"
+                    />
+                  )}
+                  <div className={`flex min-w-0 flex-1 flex-col ${plegada ? 'hidden' : ''}`}>
+                    {/* Sin leer pesa más y va en blanco; leído baja a secundario.
                       Los dos decían `text-white`: el ternario existía y devolvía
                       lo mismo en las dos ramas desde el rediseño monocromo. */}
-                  <p
-                    className={`line-clamp-2 font-sans text-[12px] leading-snug ${
-                      sinLeer ? 'font-medium text-white' : 'text-text-secondary'
-                    }`}
-                  >
-                    {textoDeAviso(aviso, actor)}
-                  </p>
-                  <span className="mt-1 font-sans text-[10px] text-text-secondary">
-                    {new Date(aviso.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-                {sinLeer && (
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                )}
-              </Link>
-            );
-          })
-        )}
-      </div>
+                    <p
+                      className={`line-clamp-2 font-sans text-[12px] leading-snug ${
+                        sinLeer ? 'font-medium text-white' : 'text-text-secondary'
+                      }`}
+                    >
+                      {textoDeAviso(aviso, actor)}
+                    </p>
+                    <span className="mt-1 font-sans text-[10px] text-text-secondary">
+                      {new Date(aviso.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  {sinLeer && (
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                  )}
+                </Link>
+              );
+            })
+          )}
+        </div>
+      </AlturaSuave>
     </div>
   );
 }

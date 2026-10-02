@@ -20,14 +20,14 @@ export function AnimatedSearchButton({
 
   return (
     <div
-      className={`flex shrink-0 items-center overflow-hidden rounded-full border border-border bg-[#191919] transition-all duration-300 ${abierta ? 'w-48' : 'w-8 hover:bg-white/5'}`}
+      className={`flex h-8 shrink-0 items-center overflow-hidden rounded-lg border border-border bg-[#191919] transition-all duration-300 ${abierta ? 'w-48' : 'w-8 hover:bg-white/5'}`}
     >
       <button
         type="button"
         onClick={() => setAbierta(!abierta)}
         aria-label="Buscar"
         title="Buscar"
-        className="flex h-8 w-8 shrink-0 items-center justify-center text-text-secondary transition-colors hover:text-text-primary"
+        className="flex h-full w-[30px] shrink-0 items-center justify-center text-text-secondary transition-colors hover:text-text-primary"
       >
         {abierta ? (
           <svg

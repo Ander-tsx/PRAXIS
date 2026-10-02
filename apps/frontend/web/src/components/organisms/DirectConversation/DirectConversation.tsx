@@ -279,7 +279,7 @@ function Encabezado({
                 </div>
               )}
               <div className="text-center">
-                <h3 className="font-display text-2xl text-white drop-shadow-md">{nombre}</h3>
+                <h3 className="font-sans font-semibold text-2xl text-white drop-shadow-md">{nombre}</h3>
                 {proyectos.length > 0 && (
                   <p className="font-sans text-sm text-white drop-shadow-md">
                     Coinciden en {proyectos.length}{' '}
@@ -292,7 +292,7 @@ function Encabezado({
         )}
 
         <div className="flex min-w-0 flex-col gap-1.5">
-          <h2 className="truncate font-display text-lg text-text-primary md:text-2xl">{nombre}</h2>
+          <h2 className="truncate font-sans font-semibold text-lg text-text-primary md:text-2xl">{nombre}</h2>
 
           {proyectos.length === 0 ? (
             <p className="font-sans text-xs text-text-secondary">

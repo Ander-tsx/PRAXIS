@@ -13,7 +13,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-primary text-primary-foreground hover:bg-primary-hover active:scale-[0.98]',
+  /* Blanco sobre negro, como el resto de la aplicación: el morado de marca se queda para el logotipo. */
+  primary: 'bg-white text-black hover:bg-white/90 active:scale-[0.98]',
   secondary:
     'bg-surface-elevated text-text-primary border border-border hover:border-border-strong hover:bg-surface active:scale-[0.98]',
   ghost:
@@ -53,7 +54,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         className={[
           'inline-flex items-center justify-center font-sans font-medium',
           'transition-all duration-150 cursor-pointer select-none',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
           'disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
           variantClasses[variant],
           sizeClasses[size],

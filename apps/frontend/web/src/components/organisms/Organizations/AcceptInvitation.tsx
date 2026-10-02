@@ -66,10 +66,10 @@ export function AcceptInvitation({ token }: { token: string }) {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-10">
       <div className="flex flex-col gap-2">
-        <h2 className="font-display text-2xl leading-tight text-text-primary">
+        <h2 className="font-sans font-semibold text-2xl leading-tight text-text-primary">
           Te han invitado a una organización
         </h2>
-        <p className="max-w-xl font-serif text-base italic text-white">
+        <p className="max-w-xl font-sans text-base text-white">
           Solo entras si aceptas. Nadie te ha metido todavía.
         </p>
       </div>
@@ -122,7 +122,7 @@ function Razon({ n, titulo, texto }: { n: string; titulo: string; texto: string 
     <li className="flex items-baseline gap-5 border-b border-dotted border-border py-5 last:border-b-0">
       <span className="w-6 shrink-0 font-mono text-xs tabular-nums text-white">{n}</span>
       <span className="flex min-w-0 flex-col gap-1">
-        <span className="font-display text-lg text-text-primary">{titulo}</span>
+        <span className="font-sans font-semibold text-lg text-text-primary">{titulo}</span>
         <span className="font-sans text-sm text-white">{texto}</span>
       </span>
     </li>

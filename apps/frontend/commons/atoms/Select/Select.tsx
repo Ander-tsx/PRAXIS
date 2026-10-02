@@ -246,7 +246,7 @@ export function Select({
           className={[
             'flex h-10 w-full items-center gap-2 rounded-xl border bg-surface py-2 pl-3 pr-9 shadow-sm',
             'font-sans text-sm text-text-primary outline-none transition-all duration-150',
-            'focus-visible:ring-2 focus-visible:ring-primary',
+            'focus-visible:ring-2 focus-visible:ring-white/60',
             'disabled:cursor-not-allowed disabled:opacity-50 hover:shadow-md',
             variantClasses[variant],
             className,

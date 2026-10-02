@@ -1,4 +1,4 @@
-import { MembersPanel, RolesPanel } from '@/components/organisms/Organizations';
+import { MembersPanel, OrgIdentityForm, RolesPanel } from '@/components/organisms/Organizations';
 import { AppHeader } from '@praxis/commons';
 import { createServerApiClient, loadPrivateChrome } from '@praxis/commons/auth';
 import type {
@@ -74,7 +74,7 @@ export default async function TeamPage({
 
         <div>
           <TeamTabs
-            inicial={tab === 'roles' ? 'roles' : 'members'}
+            inicial={tab === 'roles' ? 'roles' : tab === 'ajustes' ? 'ajustes' : 'members'}
             members={
               <Seccion
                 titulo="Directorio de miembros"
@@ -91,6 +91,23 @@ export default async function TeamPage({
                 ) : (
                   <Vacio>No se pudo leer la lista de miembros.</Vacio>
                 )}
+              </Seccion>
+            }
+            ajustes={
+              <Seccion
+                titulo="Identidad de la organización"
+                entradilla="El nombre, el icono, el color y la imagen con que se ve en la barra lateral."
+              >
+                <div className="max-w-xl">
+                  <OrgIdentityForm
+                    organizationId={organizationId}
+                    initialName={org.name ?? ''}
+                    initialIconKey={org.iconKey}
+                    initialColor={org.color}
+                    initialImageUrl={org.imageUrl ?? null}
+                    puedeEditar={permisos.canManageOrganization}
+                  />
+                </div>
               </Seccion>
             }
             roles={

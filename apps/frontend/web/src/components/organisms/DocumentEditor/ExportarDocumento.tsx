@@ -2,7 +2,19 @@
 
 import { jsonAMarkdown } from '@praxis/editor-schema';
 import type { Editor } from '@tiptap/core';
-import { Check, ClipboardCopy, Code2, Download, FileText, Printer, Type } from 'lucide-react';
+import {
+  Check,
+  ClipboardCopy,
+  ClipboardType,
+  Code2,
+  Download,
+  FileCode2,
+  FileText,
+  FileType2,
+  Loader2,
+  Printer,
+  Type,
+} from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { srcDeImagen } from './contexto';
 
@@ -191,24 +203,31 @@ export function ExportarDocumento({ editor, titulo, k = null }: Props) {
 
   const acciones: {
     id: string;
+    grupo: 'copiar' | 'exportar';
     icono: ReactNode;
     etiqueta: string;
     ayuda: string;
+    /** El formato, en la etiqueta de la derecha. */
+    formato: string;
     fn: () => Promise<string | undefined>;
   }[] = [
     {
       id: 'copiar-md',
-      icono: <ClipboardCopy className="h-4 w-4" />,
-      etiqueta: 'Copiar todo',
-      ayuda: 'Markdown',
+      grupo: 'copiar',
+      icono: <ClipboardCopy />,
+      etiqueta: 'Copiar como Markdown',
+      ayuda: 'Todo el documento, listo para pegar',
+      formato: 'Markdown',
       fn: async () =>
         (await copiarTexto(markdown())) ? 'Copiado como Markdown' : 'No se pudo copiar',
     },
     {
       id: 'copiar-fmt',
-      icono: <Type className="h-4 w-4" />,
+      grupo: 'copiar',
+      icono: <ClipboardType />,
       etiqueta: 'Copiar con formato',
-      ayuda: 'Para pegar en Word o Docs',
+      ayuda: 'Conserva títulos, listas e imágenes',
+      formato: 'Con formato',
       fn: async () =>
         (await copiarTexto(texto(), await cuerpoHtml(editor, k)))
           ? 'Copiado con formato'
@@ -216,16 +235,20 @@ export function ExportarDocumento({ editor, titulo, k = null }: Props) {
     },
     {
       id: 'copiar-txt',
-      icono: <FileText className="h-4 w-4" />,
+      grupo: 'copiar',
+      icono: <Type />,
       etiqueta: 'Copiar texto plano',
-      ayuda: 'Sin formato',
+      ayuda: 'Solo el texto, sin estilos',
+      formato: 'Texto',
       fn: async () => ((await copiarTexto(texto())) ? 'Copiado como texto' : 'No se pudo copiar'),
     },
     {
       id: 'pdf',
-      icono: <Printer className="h-4 w-4" />,
+      grupo: 'exportar',
+      icono: <Printer />,
       etiqueta: 'PDF',
-      ayuda: 'Imprimir o guardar como PDF',
+      ayuda: 'Abre el diálogo de impresión',
+      formato: 'PDF',
       fn: async () => {
         const html = await paginaHtml(editor, titulo, k);
         const marco = document.createElement('iframe');
@@ -251,9 +274,11 @@ export function ExportarDocumento({ editor, titulo, k = null }: Props) {
     },
     {
       id: 'word',
-      icono: <Download className="h-4 w-4" />,
+      grupo: 'exportar',
+      icono: <FileType2 />,
       etiqueta: 'Word',
-      ayuda: '.doc',
+      ayuda: 'Se abre en Word y Docs',
+      formato: '.doc',
       fn: async () => {
         descargar(
           `﻿${await paginaHtml(editor, titulo, k, true)}`,
@@ -265,9 +290,11 @@ export function ExportarDocumento({ editor, titulo, k = null }: Props) {
     },
     {
       id: 'md',
-      icono: <Download className="h-4 w-4" />,
+      grupo: 'exportar',
+      icono: <FileCode2 />,
       etiqueta: 'Markdown',
-      ayuda: '.md',
+      ayuda: 'Para editores y repositorios',
+      formato: '.md',
       fn: async () => {
         descargar(markdown(), 'text/markdown;charset=utf-8', `${nombre}.md`);
         return 'Descargado';
@@ -275,9 +302,11 @@ export function ExportarDocumento({ editor, titulo, k = null }: Props) {
     },
     {
       id: 'html',
-      icono: <Code2 className="h-4 w-4" />,
+      grupo: 'exportar',
+      icono: <Code2 />,
       etiqueta: 'HTML',
-      ayuda: '.html, con imágenes incluidas',
+      ayuda: 'Una página, con las imágenes dentro',
+      formato: '.html',
       fn: async () => {
         descargar(await paginaHtml(editor, titulo, k), 'text/html;charset=utf-8', `${nombre}.html`);
         return 'Descargado';
@@ -285,14 +314,21 @@ export function ExportarDocumento({ editor, titulo, k = null }: Props) {
     },
     {
       id: 'txt',
-      icono: <Download className="h-4 w-4" />,
+      grupo: 'exportar',
+      icono: <FileText />,
       etiqueta: 'Texto',
-      ayuda: '.txt',
+      ayuda: 'Texto sin formato',
+      formato: '.txt',
       fn: async () => {
         descargar(texto(), 'text/plain;charset=utf-8', `${nombre}.txt`);
         return 'Descargado';
       },
     },
+  ];
+
+  const grupos: { clave: 'copiar' | 'exportar'; titulo: string }[] = [
+    { clave: 'copiar', titulo: 'Copiar al portapapeles' },
+    { clave: 'exportar', titulo: 'Descargar o imprimir' },
   ];
 
   return (
@@ -302,8 +338,10 @@ export function ExportarDocumento({ editor, titulo, k = null }: Props) {
         onClick={() => setAbierto((a) => !a)}
         aria-haspopup="menu"
         aria-expanded={abierto}
-        title="Copiar o exportar el documento"
-        className="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 font-sans text-xs text-text-secondary transition-colors hover:bg-white/[0.07] hover:text-text-primary"
+        aria-label="Copiar o exportar el documento"
+        className={`flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 font-sans text-xs transition-colors hover:bg-white/[0.07] hover:text-text-primary ${
+          abierto ? 'bg-white/[0.07] text-text-primary' : 'text-text-secondary'
+        }`}
       >
         {mensaje ? <Check className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
         {mensaje ?? 'Exportar'}
@@ -312,22 +350,39 @@ export function ExportarDocumento({ editor, titulo, k = null }: Props) {
         <div
           role="menu"
           data-tone="dark"
-          className="absolute right-0 top-full z-50 mt-1 w-64 rounded-xl border border-border bg-surface py-1 shadow-2xl"
+          className="absolute right-0 top-full z-50 mt-1.5 max-h-[calc(100dvh-9rem)] w-[22rem] max-w-[calc(100vw-1.5rem)] origin-top-right overflow-y-auto scrollbar-none animate-desplegar-menu rounded-xl border border-border bg-surface p-1.5 shadow-2xl"
         >
-          {acciones.map((a, i) => (
-            <div key={a.id}>
-              {(i === 3 || i === 5) && <div className="my-1 border-t border-border" />}
-              <button
-                type="button"
-                role="menuitem"
-                disabled={trabajando}
-                onClick={() => void ejecutar(a.fn)}
-                className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-left font-sans text-sm text-text-primary transition-colors hover:bg-white/[0.07] disabled:cursor-wait disabled:opacity-60"
-              >
-                <span className="text-text-secondary">{a.icono}</span>
-                <span className="flex-1">{a.etiqueta}</span>
-                <span className="text-xs text-text-secondary">{a.ayuda}</span>
-              </button>
+          {grupos.map((grupo, g) => (
+            <div key={grupo.clave}>
+              {g > 0 && <div className="mx-1 my-1.5 border-t border-border" />}
+              <p className="px-2.5 pb-1 pt-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+                {grupo.titulo}
+              </p>
+              {acciones
+                .filter((a) => a.grupo === grupo.clave)
+                .map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    role="menuitem"
+                    disabled={trabajando}
+                    onClick={() => void ejecutar(a.fn)}
+                    className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-left font-sans transition-colors hover:bg-white/[0.07] disabled:cursor-wait disabled:opacity-60"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-text-secondary [&>svg]:h-4 [&>svg]:w-4">
+                      {trabajando ? <Loader2 className="animate-spin" /> : a.icono}
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-[13px] font-medium text-text-primary">
+                        {a.etiqueta}
+                      </span>
+                      <span className="truncate text-[11px] text-text-secondary">{a.ayuda}</span>
+                    </span>
+                    <span className="shrink-0 rounded-md bg-white/[0.06] px-1.5 py-0.5 font-mono text-[10px] text-text-secondary">
+                      {a.formato}
+                    </span>
+                  </button>
+                ))}
             </div>
           ))}
         </div>

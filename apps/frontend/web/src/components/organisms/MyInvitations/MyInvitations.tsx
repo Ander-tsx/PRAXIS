@@ -28,7 +28,7 @@ export function MyInvitations({ invitations }: MyInvitationsProps) {
 
   return (
     <NoticePanel
-      tone={colors.accent}
+      tone={colors.textPrimary}
       icon={<InvitationIcon />}
       count={invitations.length > 1 ? invitations.length : undefined}
       title={invitations.length === 1 ? 'Tienes una invitación' : 'Tienes invitaciones'}
@@ -59,7 +59,7 @@ function InvitationRow({ invitation }: { invitation: MyInvitation }) {
           <span className="truncate font-sans text-sm font-semibold text-text-primary">
             {invitation.project.name}
           </span>
-          <Badge variant="primary">{invitation.projectRole.name}</Badge>
+          <Badge variant="default">{invitation.projectRole.name}</Badge>
         </span>
 
         {invitation.project.description && (
