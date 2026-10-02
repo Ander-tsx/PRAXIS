@@ -3,6 +3,11 @@
 > Documento interno, sin decisión tomada (2026-09-29). Lo pidió el encargo de
 > [PLAN-PRAX-SEMIAGENTICO](PLAN-PRAX-SEMIAGENTICO.md) como algo que evaluar
 > **después** de esa etapa, no durante. Nada de esto está empezado.
+>
+> ➡️ **La dirección A ya está decidida y planificada en [PLAN-MCP](PLAN-MCP.md)**
+> (2026-09-30): el MCP no es PRAX, no le aplica «propone; nunca ejecuta» y tiene
+> los poderes del usuario. Lo de abajo sobre A es el razonamiento previo; la
+> decisión (a)/(b) quedó en (b). **Sigue abierta solo la B.**
 
 ## Qué puede significar «un MCP con Praxis»
 
