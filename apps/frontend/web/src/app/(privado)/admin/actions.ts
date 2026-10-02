@@ -182,3 +182,61 @@ function describeError(error: unknown): string {
   }
   return 'No se pudo aplicar el cambio. Vuelve a intentarlo.';
 }
+
+const PLANES_CONCEDIBLES = ['PRO', 'TEAM', 'BUSINESS', 'ENTERPRISE'];
+
+/**
+ * Concede un plan a una organización sin cobrar (docs/PLAN-PRO-INTEGRACIONES).
+ *
+ * Desde ese momento Stripe no toca su plan: se puede cancelar lo que se pagaba
+ * antes sin que la baja la devuelva a Gratis. Se confirma contra el `tier` que
+ * devuelve el servidor.
+ */
+export async function grantOrganizationPlanAction(
+  _prev: AdminUserState,
+  formData: FormData,
+): Promise<AdminUserState> {
+  if (!(await getSession())) {
+    return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', done: null };
+  }
+  const organizationId = String(formData.get('organizationId') ?? '');
+  const tier = String(formData.get('tier') ?? '');
+  if (!PLANES_CONCEDIBLES.includes(tier)) return { error: 'Elige un plan.', done: null };
+
+  try {
+    const suscripcion = await createServerApiClient().post<{ tier?: string }>(
+      `/admin/organizations/${organizationId}/plan`,
+      { tier },
+    );
+    if (suscripcion?.tier !== tier) {
+      return { error: 'El servidor respondió correctamente pero no guardó el plan.', done: null };
+    }
+  } catch (error) {
+    return { error: describeError(error), done: null };
+  }
+  revalidatePath('/admin/organizations');
+  return { error: null, done: tier };
+}
+
+/** Retira un plan concedido: la organización vuelve a Gratis y a mandar Stripe. */
+export async function revokeOrganizationPlanAction(
+  _prev: AdminUserState,
+  formData: FormData,
+): Promise<AdminUserState> {
+  if (!(await getSession())) {
+    return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', done: null };
+  }
+  const organizationId = String(formData.get('organizationId') ?? '');
+  try {
+    const suscripcion = await createServerApiClient().delete<{ tier?: string }>(
+      `/admin/organizations/${organizationId}/plan`,
+    );
+    if (suscripcion?.tier !== 'FREE') {
+      return { error: 'El servidor respondió correctamente pero no retiró el plan.', done: null };
+    }
+  } catch (error) {
+    return { error: describeError(error), done: null };
+  }
+  revalidatePath('/admin/organizations');
+  return { error: null, done: 'FREE' };
+}

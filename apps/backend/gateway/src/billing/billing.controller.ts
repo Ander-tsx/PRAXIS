@@ -332,6 +332,14 @@ export class BillingController {
         : Promise.resolve(false),
     ]);
 
+    /* Un plan concedido desde administración no se compra encima: Stripe no
+       lo podría tocar (ver `grantedBy`) y se cobraría por nada. */
+    if (suscripcion?.grantedBy) {
+      throw new BadRequestException(
+        'Esta organización tiene un plan concedido por Praxis. Para cambiarlo, habla con administración.',
+      );
+    }
+
     return this.stripe.createCheckout({
       organizationId,
       userId,
@@ -420,10 +428,10 @@ export class BillingController {
 
   private suscripcion(organizationId: string) {
     return firstValueFrom(
-      this.billingClient.send<{ stripeCustomerId: string | null } | null>(
-        { cmd: 'billing_subscription_of' },
-        { organizationId },
-      ),
+      this.billingClient.send<{
+        stripeCustomerId: string | null;
+        grantedBy?: string | null;
+      } | null>({ cmd: 'billing_subscription_of' }, { organizationId }),
     ).catch(() => null);
   }
 

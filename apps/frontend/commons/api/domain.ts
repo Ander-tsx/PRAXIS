@@ -124,6 +124,12 @@ export const ADMIN_ACTIONS = [
   'PROJECT_ARCHIVED',
   'PROJECT_RESTORED',
   'ASSISTANT_PLAN_CHANGED',
+  /* Faltaban: el backend los registra desde el borrado definitivo de cuentas y
+     proyectos, y aquí salían sin etiqueta. */
+  'USER_DELETED',
+  'PROJECT_DELETED',
+  'ORGANIZATION_PLAN_GRANTED',
+  'ORGANIZATION_PLAN_REVOKED',
 ] as const;
 
 export type AdminActionName = (typeof ADMIN_ACTIONS)[number];
@@ -140,7 +146,7 @@ export interface AdminActivityEntry {
   actorId: string;
   actorLabel: string | null;
   action: AdminActionName;
-  targetType: 'USER' | 'PROJECT';
+  targetType: 'USER' | 'PROJECT' | 'ORGANIZATION';
   targetId: string;
   targetLabel: string | null;
   reason: string | null;

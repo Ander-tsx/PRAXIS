@@ -1,11 +1,33 @@
-import { Controller, Get, HttpCode, HttpStatus, Inject, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { GLOBAL_ROLES } from '@praxis/contracts';
+import {
+  AdminActionType,
+  AdminTargetType,
+  GLOBAL_ROLES,
+  GrantOrganizationPlanBodyDto,
+  PLANS,
+} from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { oFalla } from '../billing/fallos';
 import { RequireGlobalRole } from '../common/decorators/require-global-role.decorator';
 import { GlobalRoleGuard } from '../common/guards/global-role.guard';
+import { AdminActivityRecorder } from './admin-activity.recorder';
 
 interface PerfilCrudo {
   id: string;
@@ -24,6 +46,8 @@ interface OrganizacionCruda {
   status: string;
   seats: number;
   seatsUsed: number;
+  /** El plan lo concedió administración, sin Stripe. */
+  granted?: boolean;
   createdAt: string;
 }
 
@@ -38,7 +62,11 @@ interface OrganizacionCruda {
  * plataforma. Son dos pantallas distintas para dos preguntas distintas, y es la
  * misma separación que ya hay entre «tus proyectos» y `/admin/projects`.
  *
- * ## Solo lectura, y eso es una decisión
+ * ## Casi solo lectura, y eso es una decisión
+ *
+ * La única escritura es **conceder o retirar un plan sin Stripe** (para las
+ * organizaciones del propio equipo, que no deberían pagarse a sí mismas), y
+ * queda en el registro de administración.
  *
  * 🔴 No hay aquí ningún botón de suspender ni de borrar. **La palanca que existe
  * es la del proyecto** (`Project.status`), y ya está en `/admin/projects`:
@@ -65,7 +93,90 @@ export class AdminOrganizationsController {
   constructor(
     @Inject('BILLING_SERVICE') private readonly billingClient: ClientProxy,
     @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
+    private readonly actividad: AdminActivityRecorder,
   ) {}
+
+  /**
+   * Concede un plan a una organización **sin cobrar**.
+   *
+   * 🔴 Desde ese momento Stripe no toca su plan (`grantedBy` en la
+   * suscripción): se puede cancelar lo que se pagaba antes sin que la baja la
+   * devuelva a Gratis. Para volver a cobrar, se retira la concesión.
+   */
+  @Post(':id/plan')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Concede un plan a una organización, sin Stripe' })
+  async conceder(
+    @Request() req: Express.Request,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: GrantOrganizationPlanBodyDto,
+  ) {
+    const actorId = req.user!.userId;
+    const suscripcion = await firstValueFrom(
+      this.billingClient.send<{ tier: string }>(
+        { cmd: 'billing_admin_grant_plan' },
+        { organizationId: id, tier: body.tier, grantedBy: actorId },
+      ),
+    );
+
+    await this.actividad.record({
+      actorId,
+      actorLabel: await this.etiquetaDe(actorId),
+      action: AdminActionType.ORGANIZATION_PLAN_GRANTED,
+      targetType: AdminTargetType.ORGANIZATION,
+      targetId: id,
+      targetLabel: await this.nombreDeOrganizacion(id),
+      metadata: { tier: body.tier, plan: PLANS[body.tier]?.nombre },
+    });
+
+    return suscripcion;
+  }
+
+  /** Retira un plan concedido: vuelve a Gratis y a mandar Stripe. */
+  @Delete(':id/plan')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Retira un plan concedido; la organización vuelve a Gratis' })
+  async retirar(@Request() req: Express.Request, @Param('id', ParseUUIDPipe) id: string) {
+    const actorId = req.user!.userId;
+    const suscripcion = oFalla(
+      await firstValueFrom(
+        this.billingClient.send(
+          { cmd: 'billing_admin_revoke_plan' },
+          { organizationId: id, by: actorId },
+        ),
+      ),
+    );
+
+    await this.actividad.record({
+      actorId,
+      actorLabel: await this.etiquetaDe(actorId),
+      action: AdminActionType.ORGANIZATION_PLAN_REVOKED,
+      targetType: AdminTargetType.ORGANIZATION,
+      targetId: id,
+      targetLabel: await this.nombreDeOrganizacion(id),
+    });
+
+    return suscripcion;
+  }
+
+  /** Nombre de quien administra, para la copia que guarda el registro. */
+  private async etiquetaDe(userId: string): Promise<string> {
+    const [perfil] = await firstValueFrom(
+      this.credentialsClient.send<PerfilCrudo[]>({ cmd: 'user_find_by_ids' }, { ids: [userId] }),
+    ).catch(() => [] as PerfilCrudo[]);
+    const nombre = [perfil?.firstName, perfil?.lastName].filter(Boolean).join(' ').trim();
+    return nombre || userId;
+  }
+
+  private async nombreDeOrganizacion(id: string): Promise<string | undefined> {
+    const organizacion = await firstValueFrom(
+      this.billingClient.send<{ name?: string | null } | null>(
+        { cmd: 'billing_org_by_id' },
+        { organizationId: id },
+      ),
+    ).catch(() => null);
+    return organizacion?.name ?? undefined;
+  }
 
   @Get()
   @HttpCode(HttpStatus.OK)

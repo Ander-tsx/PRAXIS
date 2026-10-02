@@ -13,7 +13,8 @@ describe('SubscriptionsService', () => {
     organizationId: string;
     stripeSubscriptionId: string | null;
   }[] = [];
-  let escrito: { seats?: number } = {};
+  let escrito: { seats?: number; grantedBy?: string | null; tier?: string } = {};
+  let fila: { grantedBy: string | null; tier: string } | null = null;
 
   const prisma = {
     trialRedemption: {
@@ -33,9 +34,14 @@ describe('SubscriptionsService', () => {
       }),
     },
     subscription: {
-      upsert: jest.fn(async ({ create }: { create: { seats: number } }) => {
+      findUnique: jest.fn(async () => fila),
+      upsert: jest.fn(async ({ create }: { create: typeof escrito }) => {
         escrito = create;
         return create;
+      }),
+      update: jest.fn(async ({ data }: { data: typeof escrito }) => {
+        escrito = data;
+        return data;
       }),
     },
     billingEvent: { create: jest.fn(async () => ({})) },
@@ -46,6 +52,8 @@ describe('SubscriptionsService', () => {
   beforeEach(() => {
     canjes.length = 0;
     escrito = {};
+    fila = null;
+    jest.clearAllMocks();
   });
 
   const canje = (userId: string, organizationId: string, stripeSubscriptionId: string) =>
@@ -100,5 +108,43 @@ describe('SubscriptionsService', () => {
       seats: 4,
     });
     expect(escrito.seats).toBe(4);
+  });
+
+  it('🔴 con un plan concedido, los eventos de Stripe no tocan la fila', async () => {
+    fila = { grantedBy: 'admin', tier: PlanTier.ENTERPRISE };
+    await servicio.aplicar({
+      organizationId: 'org-1',
+      tier: PlanTier.FREE,
+      status: SubscriptionStatus.CANCELED,
+      seats: 7,
+    });
+    expect(prisma.subscription.upsert).not.toHaveBeenCalled();
+  });
+
+  it('conceder Empresa deja la fila activa, sin Stripe y con asientos de sobra', async () => {
+    await servicio.conceder({
+      organizationId: 'org-1',
+      tier: PlanTier.ENTERPRISE,
+      grantedBy: 'admin',
+    });
+    expect(escrito).toMatchObject({
+      tier: PlanTier.ENTERPRISE,
+      status: SubscriptionStatus.ACTIVE,
+      seats: 1_000,
+      grantedBy: 'admin',
+      stripeSubscriptionId: null,
+      trialEndsAt: null,
+    });
+  });
+
+  it('retirar solo vale con un plan concedido, y vuelve a Gratis', async () => {
+    expect(await servicio.retirarConcesion({ organizationId: 'org-1', by: 'admin' })).toMatchObject(
+      {
+        codigo: 'NO_EXISTE',
+      },
+    );
+    fila = { grantedBy: 'admin', tier: PlanTier.ENTERPRISE };
+    await servicio.retirarConcesion({ organizationId: 'org-1', by: 'admin' });
+    expect(escrito).toMatchObject({ tier: PlanTier.FREE, grantedBy: null });
   });
 });

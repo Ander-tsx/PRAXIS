@@ -194,6 +194,26 @@ export class OrganizationsController {
     return this.suscripciones.aplicar(dto);
   }
 
+  /**
+   * Conceder o retirar un plan sin Stripe. Solo lo llama `/admin`, que ya
+   * comprobó el rol global; `grantedBy`/`by` es quien lo pidió.
+   */
+  /** Solo el nombre, para el registro de administración. Sin comprobar pertenencia. */
+  @MessagePattern({ cmd: 'billing_org_by_id' })
+  nombre(@Payload() dto: { organizationId: string }) {
+    return this.organizaciones.nombre(dto.organizationId);
+  }
+
+  @MessagePattern({ cmd: 'billing_admin_grant_plan' })
+  concederPlan(@Payload() dto: { organizationId: string; tier: PlanTier; grantedBy: string }) {
+    return this.suscripciones.conceder(dto);
+  }
+
+  @MessagePattern({ cmd: 'billing_admin_revoke_plan' })
+  retirarPlan(@Payload() dto: { organizationId: string; by: string }) {
+    return this.suscripciones.retirarConcesion(dto);
+  }
+
   @MessagePattern({ cmd: 'billing_by_stripe_subscription' })
   porSuscripcion(@Payload() dto: { stripeSubscriptionId: string }) {
     return this.suscripciones.porSuscripcionDeStripe(dto.stripeSubscriptionId);

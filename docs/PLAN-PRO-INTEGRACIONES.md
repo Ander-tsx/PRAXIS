@@ -376,6 +376,26 @@ recibidos. Si nadie los usa, no se invierte en OAuth ni en más conectores.
    tiene 8 GB).
 5. Marca la casilla de cada fase al cerrarla.
 
+## Planes concedidos (2026-10-02)
+
+Pedido del dueño: que el equipo no se pague a sí mismo. En `/admin/organizations`
+cualquier **Admin** global puede **conceder un plan sin cobrar** a una
+organización, y retirarlo.
+
+- Queda en la suscripción (`grantedBy`, `grantedAt`): es la única fuente de
+  verdad del plan, así que vale en asientos, cuotas, congelados y MCP sin tocar
+  nada más. Empresa concedida guarda 1.000 asientos (su tope real es «sin tope»).
+- 🔴 **Mientras hay concesión, los eventos de Stripe no tocan la fila** (se
+  anotan como `evento_ignorado_por_concesion`). Así se puede cancelar lo que se
+  pagaba antes sin que la baja devuelva la organización a Gratis. Probado con un
+  evento firmado de verdad.
+- El checkout se niega sobre una organización con plan concedido.
+- Conceder y retirar quedan en el registro de administración
+  (`ORGANIZATION_PLAN_GRANTED` / `_REVOKED`).
+- Se descartó «los Admin tienen Empresa automáticamente»: el plan se lee en
+  muchos sitios y uno implícito por rol fallaría en silencio en el que se
+  olvidara, y regalaría Empresa sin rastro a cualquier organización que crearan.
+
 ## Registro
 
 | Fase | Estado | Nota |

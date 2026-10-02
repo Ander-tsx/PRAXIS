@@ -50,6 +50,8 @@ enum AdminActionType {
   ASSISTANT_PLAN_CHANGED
   USER_DELETED
   PROJECT_DELETED
+  ORGANIZATION_PLAN_GRANTED
+  ORGANIZATION_PLAN_REVOKED
 
   @@schema("permissions")
 }
@@ -57,6 +59,7 @@ enum AdminActionType {
 enum AdminTargetType {
   USER
   PROJECT
+  ORGANIZATION
 
   @@schema("permissions")
 }

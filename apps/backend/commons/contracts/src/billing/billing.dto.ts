@@ -223,3 +223,15 @@ export class CheckoutBodyDto {
   @IsUUID()
   organizationId?: string;
 }
+
+/**
+ * Cuerpo de `POST /admin/organizations/:id/plan`: conceder un plan sin Stripe.
+ *
+ * `FREE` no está: para volver a Gratis se **retira** la concesión (`DELETE`),
+ * que es lo que devuelve el control a Stripe.
+ */
+export class GrantOrganizationPlanBodyDto {
+  @ApiProperty({ enum: [PlanTier.PRO, PlanTier.TEAM, PlanTier.BUSINESS, PlanTier.ENTERPRISE] })
+  @IsIn([PlanTier.PRO, PlanTier.TEAM, PlanTier.BUSINESS, PlanTier.ENTERPRISE])
+  tier: PlanTier;
+}

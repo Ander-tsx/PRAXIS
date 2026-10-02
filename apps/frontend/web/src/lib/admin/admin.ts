@@ -37,6 +37,8 @@ export interface AdminOrganization {
   status: string;
   seats: number;
   seatsUsed: number;
+  /** El plan lo concedió administración, sin Stripe. Se puede retirar. */
+  granted?: boolean;
   createdAt: string;
   /** Quien la lleva. `null` si credentials no contestó: ver el controlador. */
   owner?: { id: string; name: string | null; email: string | null } | null;
@@ -154,6 +156,10 @@ export const ACCIONES: Record<
   PROJECT_ARCHIVED: { etiqueta: 'Archivó el proyecto', variante: 'warning' },
   ASSISTANT_PLAN_CHANGED: { etiqueta: 'Cambió el plan de IA', variante: 'info' },
   PROJECT_RESTORED: { etiqueta: 'Recuperó el proyecto', variante: 'success' },
+  USER_DELETED: { etiqueta: 'Borró la cuenta', variante: 'error' },
+  PROJECT_DELETED: { etiqueta: 'Borró el proyecto', variante: 'error' },
+  ORGANIZATION_PLAN_GRANTED: { etiqueta: 'Concedió un plan sin cobrar', variante: 'info' },
+  ORGANIZATION_PLAN_REVOKED: { etiqueta: 'Retiró el plan concedido', variante: 'warning' },
 };
 
 /** `4 ago 2026, 14:18` — fecha y hora, que en un registro hace falta. */

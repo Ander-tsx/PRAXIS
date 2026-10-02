@@ -1096,6 +1096,14 @@ export class OrganizationsService {
    * en cada petición, y una entrada recién creada tiene que salir: es el mismo
    * criterio que ya tiene el registro de actividad.
    */
+  /** Solo el nombre de una organización. Lo pide el registro de administración. */
+  nombre(organizationId: string) {
+    return this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { name: true },
+    });
+  }
+
   async todas(datos: { page?: number; limit?: number; search?: string }) {
     const page = Math.max(1, datos.page ?? 1);
     const limit = Math.min(100, Math.max(1, datos.limit ?? 20));
@@ -1128,6 +1136,9 @@ export class OrganizationsService {
         status: fila.subscription?.status ?? SubscriptionStatus.ACTIVE,
         seats: fila.subscription?.seats ?? 1,
         seatsUsed: fila._count.members,
+        /* Si el plan lo concedió administración (sin Stripe): la pantalla lo
+           marca y ofrece retirarlo. */
+        granted: Boolean(fila.subscription?.grantedBy),
         createdAt: fila.createdAt.toISOString(),
       })),
       total,

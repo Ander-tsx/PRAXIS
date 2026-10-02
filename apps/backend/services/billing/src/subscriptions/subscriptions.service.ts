@@ -1,5 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PlanTier, SubscriptionStatus, asientosContratados } from '@praxis/contracts';
+import {
+  PLANS,
+  PlanTier,
+  SIN_TOPE,
+  SubscriptionStatus,
+  asientosContratados,
+} from '@praxis/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -45,6 +51,30 @@ export class SubscriptionsService {
     cancelAt?: string | null;
     stripeEventId?: string | null;
   }) {
+    /* 🔴 **Un plan concedido no lo pisa Stripe.** Cancelar la suscripción de
+       pago que había antes de la concesión manda eventos de esa suscripción, y
+       aplicarlos bajaría la organización a Gratis. Se anotan y se ignoran. */
+    const actual = await this.prisma.subscription.findUnique({
+      where: { organizationId: datos.organizationId },
+      select: { grantedBy: true },
+    });
+    if (actual?.grantedBy) {
+      this.log.warn(
+        `Evento de Stripe ignorado para ${datos.organizationId}: tiene un plan concedido.`,
+      );
+      await this.registrar(
+        datos.organizationId,
+        'evento_ignorado_por_concesion',
+        datos.stripeEventId ?? null,
+        {
+          tier: datos.tier,
+          status: datos.status,
+          stripeSubscriptionId: datos.stripeSubscriptionId ?? null,
+        },
+      );
+      return actual;
+    }
+
     const fecha = (valor?: string | null) => (valor ? new Date(valor) : null);
     /* 🔴 En un plan de precio fijo la cantidad de Stripe es 1 y no son los
        asientos: se guarda el tope del plan. Ver `precioFijo` en contracts. */
@@ -76,6 +106,80 @@ export class SubscriptionsService {
       trialEndsAt: datos.trialEndsAt ?? null,
     });
 
+    return suscripcion;
+  }
+
+  /**
+   * Concede un plan a una organización **sin Stripe**, desde administración.
+   *
+   * Deja la fila como una suscripción `ACTIVE` del plan, sin fechas de prueba
+   * ni de baja, y con `grantedBy`: desde ese momento el webhook no la toca. El
+   * `stripeCustomerId` se conserva a propósito —el portal sigue sirviendo para
+   * cancelar lo que se pagaba antes—, pero se suelta el de la suscripción.
+   *
+   * Los asientos: el tope del plan, o 1.000 en uno sin tope (Empresa).
+   * `min(seats, quotas.asientos)` usa este número cuando el plan no tiene
+   * tope, así que no puede quedarse en el 1 de una organización personal.
+   */
+  async conceder(datos: { organizationId: string; tier: PlanTier; grantedBy: string }) {
+    const tope = PLANS[datos.tier]?.quotas.asientos;
+    const seats = tope === SIN_TOPE || tope === undefined ? 1_000 : tope;
+    const comun = {
+      tier: datos.tier,
+      status: SubscriptionStatus.ACTIVE,
+      seats,
+      stripeSubscriptionId: null,
+      stripePriceId: null,
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      cancelAt: null,
+      canceledAt: null,
+      grantedBy: datos.grantedBy,
+      grantedAt: new Date(),
+    };
+    const suscripcion = await this.prisma.subscription.upsert({
+      where: { organizationId: datos.organizationId },
+      create: { organizationId: datos.organizationId, ...comun },
+      update: comun,
+    });
+    await this.registrar(datos.organizationId, 'plan_concedido', null, {
+      tier: datos.tier,
+      grantedBy: datos.grantedBy,
+    });
+    return suscripcion;
+  }
+
+  /**
+   * Retira un plan concedido: la organización vuelve a Gratis y, desde ese
+   * momento, vuelve a mandar Stripe. Una organización sin concesión no se toca
+   * (404): esto no sirve para cancelar un plan pagado.
+   */
+  async retirarConcesion(datos: { organizationId: string; by: string }) {
+    const actual = await this.prisma.subscription.findUnique({
+      where: { organizationId: datos.organizationId },
+      select: { grantedBy: true, tier: true },
+    });
+    if (!actual?.grantedBy) {
+      return {
+        error: 'Esa organización no tiene un plan concedido.',
+        codigo: 'NO_EXISTE' as const,
+      };
+    }
+
+    const suscripcion = await this.prisma.subscription.update({
+      where: { organizationId: datos.organizationId },
+      data: {
+        tier: PlanTier.FREE,
+        status: SubscriptionStatus.ACTIVE,
+        seats: 1,
+        grantedBy: null,
+        grantedAt: null,
+      },
+    });
+    await this.registrar(datos.organizationId, 'plan_retirado', null, {
+      tier: actual.tier,
+      by: datos.by,
+    });
     return suscripcion;
   }
 

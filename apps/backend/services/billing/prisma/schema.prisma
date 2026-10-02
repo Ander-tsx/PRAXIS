@@ -311,6 +311,16 @@ model Subscription {
   cancelAt         DateTime?
   canceledAt       DateTime?
 
+  /// Quién concedió este plan **sin Stripe**, desde administración. Nulo =
+  /// lo decide Stripe, como siempre.
+  ///
+  /// 🔴 **Mientras haya concesión, los eventos de Stripe no tocan esta fila.**
+  /// Si no, cancelar la suscripción de pago que había antes —que es justo lo
+  /// que se hace después de conceder— mandaría un `deleted` y bajaría la
+  /// organización a Gratis. Ver `SubscriptionsService.aplicar`.
+  grantedBy        String?
+  grantedAt        DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -77,7 +77,7 @@ export default async function OrganizationsPage({ searchParams }: PageProps) {
       <div data-tone="dark" className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
         <AdminHeader
           titulo="Organizaciones"
-          descripcion="Quién ha contratado qué, y cuántos asientos hay ocupados de los que paga. Solo se mira: la palanca de suspender es la del proyecto."
+          descripcion="Quién ha contratado qué y cuántos asientos ocupa. Desde aquí se puede conceder un plan sin cobrar; suspender sigue siendo cosa del proyecto."
           cifras={[
             { etiqueta: 'En total', valor: total, tono: colors.textPrimary },
             { etiqueta: 'De pago (esta página)', valor: dePago, tono: colors.success },

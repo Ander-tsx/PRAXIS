@@ -3,6 +3,7 @@
 import { type AdminOrganization, fechaYHora } from '@/lib/admin/admin';
 import { Badge, type DataColumn, DataTable } from '@praxis/commons';
 import { useMemo } from 'react';
+import { PlanGrantControl } from './PlanGrantControl';
 
 export interface OrganizationsTableProps {
   organizaciones: AdminOrganization[];
@@ -11,9 +12,10 @@ export interface OrganizationsTableProps {
 /**
  * Las organizaciones de la instalación, con su plan y sus asientos.
  *
- * ## Sin columna de acciones, y no es un olvido
+ * ## Una sola acción: conceder o retirar un plan sin cobrar
  *
- * 🔴 Esta tabla **solo lee**. La palanca de suspender es la del proyecto y vive
+ * Para las organizaciones del propio equipo (`PlanGrantControl`). Nada más:
+ * la palanca de suspender es la del proyecto y vive
  * en `/admin/projects`; apagar una organización entera dejaría a varios equipos
  * sin escribir de un clic y sin ninguna pantalla que se lo explique. Cuando haga
  * falta, primero se diseña qué se les dice. Ver la cabecera de la página.
@@ -31,6 +33,14 @@ export interface OrganizationsTableProps {
  * mentalmente, que es la pregunta con la que se abre esta pantalla: cuánto se
  * está pagando de más.
  */
+const NOMBRE_DEL_PLAN: Record<string, string> = {
+  FREE: 'Gratis',
+  PRO: 'Pro',
+  TEAM: 'Equipo',
+  BUSINESS: 'Negocio',
+  ENTERPRISE: 'Empresa',
+};
+
 export function OrganizationsTable({ organizaciones }: OrganizationsTableProps) {
   const columnas = useMemo<DataColumn<AdminOrganization>[]>(
     () => [
@@ -68,9 +78,14 @@ export function OrganizationsTable({ organizaciones }: OrganizationsTableProps) 
         header: 'Plan',
         track: { fr: 0.9 },
         cell: (organizacion) => (
-          <p className="truncate font-sans text-xs uppercase tracking-wider text-white">
-            {organizacion.tier === 'FREE' ? 'Gratis' : organizacion.tier}
-          </p>
+          <div className="min-w-0">
+            <p className="truncate font-sans text-xs uppercase tracking-wider text-text-primary">
+              {NOMBRE_DEL_PLAN[organizacion.tier] ?? organizacion.tier}
+            </p>
+            {organizacion.granted && (
+              <p className="truncate font-sans text-xs text-text-secondary">concedido</p>
+            )}
+          </div>
         ),
       },
       {
@@ -80,7 +95,9 @@ export function OrganizationsTable({ organizaciones }: OrganizationsTableProps) 
         cell: (organizacion) => (
           <p className="truncate font-sans text-xs tabular-nums text-white">
             <span className="font-semibold text-text-primary">{organizacion.seatsUsed}</span> /{' '}
-            {organizacion.seats}
+            {/* Un plan concedido sin tope guarda 1.000 por dentro (ver
+                `SubscriptionsService.conceder`); enseñar ese número confunde. */}
+            {organizacion.tier === 'ENTERPRISE' ? 'sin tope' : organizacion.seats}
           </p>
         ),
       },
@@ -93,6 +110,12 @@ export function OrganizationsTable({ organizaciones }: OrganizationsTableProps) 
             {fechaYHora(organizacion.createdAt)}
           </p>
         ),
+      },
+      {
+        key: 'acciones',
+        header: 'Plan sin cobrar',
+        track: { fr: 1.6 },
+        cell: (organizacion) => <PlanGrantControl organizacion={organizacion} />,
       },
     ],
     [],

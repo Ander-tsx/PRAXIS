@@ -72,12 +72,20 @@ export enum AdminActionType {
    * servicios. No es `PROJECT_ARCHIVED`, que es un estado reversible.
    */
   PROJECT_DELETED = 'PROJECT_DELETED',
+  /**
+   * Se concedió un plan a una organización **sin pasar por Stripe**. El plan va
+   * en `metadata.tier`. Es la única prueba de quién lo regaló y cuándo.
+   */
+  ORGANIZATION_PLAN_GRANTED = 'ORGANIZATION_PLAN_GRANTED',
+  /** Se retiró un plan concedido: la organización vuelve a Gratis. */
+  ORGANIZATION_PLAN_REVOKED = 'ORGANIZATION_PLAN_REVOKED',
 }
 
 /** Sobre qué clase de cosa se actuó. */
 export enum AdminTargetType {
   USER = 'USER',
   PROJECT = 'PROJECT',
+  ORGANIZATION = 'ORGANIZATION',
 }
 
 /**
