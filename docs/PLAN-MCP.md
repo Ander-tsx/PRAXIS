@@ -435,9 +435,18 @@ el MCP.**
    `WWW-Authenticate`.
 6. **El límite de M9 vive en memoria**: el backend es un proceso. Con dos
    réplicas el tope real sería el doble — no un agujero.
-7. **Claude Desktop se conecta con `mcp-remote`** (`npx -y mcp-remote <url>
-   --header "Authorization:Bearer …"`): su «Añadir conector» exige OAuth (M7).
-   Claude Code y Cursor aceptan la cabecera directamente.
+7. **Cuatro agentes con guía propia**, y el código sale con el token ya dentro
+   (petición del dueño):
+   - **Claude Code**: `claude mcp add --scope user --transport http …`. No deja
+     añadir otro `praxis`: para cambiar de token hay que `claude mcp remove
+     praxis --scope user` primero — el dueño lo tropezó.
+   - **Codex**: `~/.codex/config.toml` con `url` y `http_headers`; lo comparten
+     el CLI, la extensión y la app. Validado con `codex mcp list` (lo reconoce
+     como «Bearer token»).
+   - **Cursor**: `~/.cursor/mcp.json` con `url` y `headers`.
+   - **Claude Desktop**: con `mcp-remote` (`npx -y mcp-remote <url> --header
+     "Authorization:Bearer …"`), porque su «Añadir conector» exige OAuth.
+   - **ChatGPT y Claude web**: no se puede hasta M7 (OAuth), y la pantalla lo dice.
 
 **Trampas que aparecieron**
 
