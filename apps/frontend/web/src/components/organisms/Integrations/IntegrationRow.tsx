@@ -39,10 +39,12 @@ export function IntegrationRow({
         aria-expanded={desplegable ? abierta : undefined}
         aria-controls={desplegable ? panelId : undefined}
         disabled={!desplegable}
-        className="flex w-full items-start justify-between gap-6 py-5 text-left disabled:cursor-default"
+        className="flex w-full items-start justify-between gap-6 py-6 text-left disabled:cursor-default"
       >
         <span className="flex flex-col gap-1">
-          <span className="font-sans text-base font-medium text-text-primary">{title}</span>
+          <span className="font-sans text-lg font-semibold tracking-tight text-text-primary">
+            {title}
+          </span>
           <span className="max-w-2xl font-sans text-sm text-text-secondary">{description}</span>
         </span>
         <span className="flex shrink-0 items-center gap-3 pt-0.5">
@@ -70,7 +72,11 @@ export function IntegrationRow({
           className={`grid transition-[grid-template-rows] duration-200 ${abierta ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
         >
           <div className="overflow-hidden">
-            <div className="flex flex-col gap-8 pb-8">{children}</div>
+            {/* Sangrado bajo una raya: todo lo de dentro es de ESTA integración y
+                no de la siguiente (lo pidió el dueño: la jerarquía no se leía). */}
+            <div className="mb-8 ml-1 flex flex-col gap-8 border-l border-border pl-6">
+              {children}
+            </div>
           </div>
         </div>
       )}
