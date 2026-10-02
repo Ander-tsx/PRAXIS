@@ -426,6 +426,7 @@ export class OrganizationsService {
       iconKey: string | null;
       color: string | null;
       imageUrl?: string | null;
+      mcpAllowed?: boolean;
       createdAt: Date;
       subscription: { tier: string; status: string; seats: number } | null;
       _count?: { members: number };
@@ -463,6 +464,7 @@ export class OrganizationsService {
       iconKey: organizacion.iconKey,
       color: organizacion.color,
       imageUrl: organizacion.imageUrl ?? null,
+      mcpAllowed: organizacion.mcpAllowed ?? true,
       createdAt: organizacion.createdAt.toISOString(),
     };
   }
@@ -681,6 +683,46 @@ export class OrganizationsService {
       where: { organizationId },
       select: { mimeType: true, size: true, bytes: true },
     });
+  }
+
+  /**
+   * Permite o no que los miembros conecten su agente por MCP (M14).
+   *
+   * Misma puerta que renombrar: `canManageOrganization`. No toca ningún token;
+   * el gateway lo mira en cada llamada.
+   */
+  async permitirMcp(organizationId: string, userId: string, mcpAllowed: boolean) {
+    const permiso = await this.exigirPermiso(
+      organizationId,
+      userId,
+      OrganizationPermission.CAN_MANAGE_ORGANIZATION,
+    );
+    if (esFallo(permiso)) return permiso;
+
+    const organizacion = await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { mcpAllowed },
+      include: { subscription: true, _count: { select: { members: true } } },
+    });
+    await this.olvidar(organizationId, userId);
+    await this.registrar(organizationId, 'mcp_permitido', { mcpAllowed, userId });
+    return this.vista(
+      organizacion,
+      { role: { name: permiso.roleName ?? '', permissions: permiso.permisos } },
+      userId,
+    );
+  }
+
+  /**
+   * Lo que necesita saber el MCP en cada llamada: si esa persona sigue dentro
+   * y si la organización lo permite. Una sola consulta.
+   */
+  async accesoMcp(organizationId: string, userId: string) {
+    const membresia = await this.prisma.organizationMember.findFirst({
+      where: { organizationId, userId, status: MembershipStatus.ACTIVE },
+      select: { organization: { select: { mcpAllowed: true } } },
+    });
+    return { miembro: membresia !== null, mcpAllowed: membresia?.organization.mcpAllowed ?? false };
   }
 
   async renombrar(

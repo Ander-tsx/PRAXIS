@@ -1,7 +1,8 @@
 # Plan MCP — Praxis como servidor, para el agente que el usuario ya usa
 
 > Etapa **por empezar** (plan redactado el 2026-09-30, sin una línea de código).
-> **M0 cerrada el 2026-10-02**: backend acordado; siguiente, M1.
+> **M0–M6 cerradas el 2026-10-02** (ver «Registro de la entrega»). Solo queda
+> M7 (OAuth), condicionado a que M12 enseñe uso real.
 > Sale de [PRAX-MCP-SEGUNDA-ITERACION](PRAX-MCP-SEGUNDA-ITERACION.md), que planteó
 > la dirección A (Praxis servidor) y dejó sin decidir qué poderes tiene. Este plan
 > **decide**, y por eso lo sustituye en esa dirección. La dirección B (PRAX como
@@ -383,10 +384,82 @@ Para contestar en M0. Ninguna bloquea el plan, todas cambian un detalle.
 | Fase | Estado | Nota |
 |---|---|---|
 | M0 — Acordar con backend | ✅ | 2026-10-02. Acordado; M13–M15 y las respuestas, en «Cerradas en M0» |
-| M1 — Emisor de tokens | ☐ | |
-| M2 — Canje PAT → access | ☐ | |
-| M3 — `/api/mcp` + 4 lecturas (spike) | ☐ | incluye el paso de `web` (M15) |
-| M4 — Catálogo completo | ☐ | |
-| M5 — Pantalla de Integraciones | ☐ | |
-| M6 — Límites y endurecimiento | ☐ | |
+| M1 — Emisor de tokens | ✅ | 2026-10-02. `PersonalAccessToken` en credentials, `pat_create/list/revoke` |
+| M2 — Canje PAT → access | ✅ | `pat_exchange`: JWT `access` de 2 min, estado de cuenta en cada canje |
+| M3 — `/api/mcp` + 4 lecturas (spike) | ✅ | Probado con curl y con el **MCP Inspector oficial** (SDK de cliente), directo y a través de `web` (M15) |
+| M4 — Catálogo completo | ✅ | 48 herramientas: 15 de lectura, 23 de escritura y 10 de borrado; tres son lotes |
+| M5 — Pantalla de Integraciones | ✅ | `/main/integrations`: interruptor, tokens, enseñar una vez, revocar, guía de conexión |
+| M6 — Límites y endurecimiento | ✅ | 60/min por token, `mcp_tool_call` en el registro (M12), revocar al cambiar contraseña |
 | M7 — OAuth 2.1 | ☐ | condicional a M12 |
+
+## Registro de la entrega (2026-10-02)
+
+Lo que cambió respecto a lo escrito arriba, y por qué. **Léelo antes de tocar
+el MCP.**
+
+**Dónde vive cada cosa**
+
+| Pieza | Archivo |
+|---|---|
+| Tokens (hash, canje, revocación) | `services/credentials/src/personal-tokens/` |
+| Alcances, topes, DTO | `commons/contracts/src/mcp/personal-tokens.ts` |
+| Catálogo de herramientas (**la única lista**) | `gateway/src/mcp/mcp-tools.ts` |
+| Acceso por llamada (token, plan, interruptor, I2, M9) | `gateway/src/mcp/mcp-access.service.ts` |
+| JSON-RPC y ejecución | `gateway/src/mcp/mcp.service.ts` |
+| Entrada pública | `frontend/web/src/app/api/mcp/route.ts` |
+| Pantalla | `frontend/web/src/app/(privado)/main/integrations/` |
+| Interruptor | `Organization.mcpAllowed` (billing), `PATCH /organizations/:id/integrations` |
+
+**Decisiones tomadas al implementar**
+
+1. **Los nombres de herramienta van en inglés** (`list_projects`, no
+   `listar_proyectos`): son identificadores (regla de idioma de CLAUDE.md). Las
+   descripciones, en español.
+2. 🔴 **I2 se comprueba en la capa MCP, no en los guards.** Cada herramienta
+   declara su `anchor` (`projectId`, `workspaceId`, `boardId` o `taskId`) y,
+   antes de llamar, se resuelve su proyecto **con los mismos mensajes que
+   `ProjectPermissionGuard`** y se compara su organización con la del token
+   (403 `OUT_OF_SCOPE`). Sin esto, un token de la organización A abría los
+   proyectos de la B en los que esa persona también está: el guard mira
+   permisos, no organizaciones. `list_my_tasks` filtra además por los
+   proyectos de la organización, porque `/me/tasks` no sabe de ellas.
+3. **`status` lo pone el MCP**: la API exige que sea el nombre de la columna, y
+   pedírselo al agente es pedirle que adivine. `create_task(s)` y
+   `move_task(s)` lo sacan de la columna, y rechazan una columna de otro
+   tablero.
+4. **Sin estado y sin SSE**: cada `POST` se contesta con JSON; `GET`/`DELETE`
+   dan 405. Ninguna herramienta lo necesita, y así el monolito puede dormir.
+5. **Errores (M8)**: los de una herramienta salen como resultado `isError` con
+   `{ status, code, message, details }` del gateway; los de acceso (token,
+   plan, interruptor) como HTTP 401/402/403 con cuerpo JSON-RPC, y el 401 con
+   `WWW-Authenticate`.
+6. **El límite de M9 vive en memoria**: el backend es un proceso. Con dos
+   réplicas el tope real sería el doble — no un agujero.
+7. **Claude Desktop se conecta con `mcp-remote`** (`npx -y mcp-remote <url>
+   --header "Authorization:Bearer …"`): su «Añadir conector» exige OAuth (M7).
+   Claude Code y Cursor aceptan la cabecera directamente.
+
+**Trampas que aparecieron**
+
+- 🔴 **Una ruta mal escrita no da error de compilación**: el agente recibe un
+  404 «Cannot GET». Pasó en el spike con el detalle de un tablero, que es
+  `/boards/:boardId` y no anidado en su espacio. Ahora `mcp-tools.spec.ts`
+  lee los decoradores de los controladores y comprueba cada ruta del catálogo.
+- ⚠️ **Los ids sembrados no son UUID hexadecimales** (`task0003-0003-…`) y la
+  API los acepta. El validador del MCP exige solo caracteres seguros para una
+  ruta (`ID_SEGURO`), no el formato UUID estricto: con él, en local no se
+  podía tocar ni una tarea de la semilla.
+- ⚠️ **`IdentityThrottlerGuard` se salta en `/api/mcp`** (`@SkipThrottle`):
+  sin JWT caería a la IP, que es la de `web` para todo el mundo. El límite de
+  esa puerta es el de M9; el de cuenta sigue aplicando a cada llamada que
+  hacen las herramientas por dentro.
+- ⚠️ **I4 a medias, a propósito**: cambiar la contraseña revoca los tokens;
+  cerrar sesión **no**, porque `logout` sin refresh también es el camino de
+  «no sé qué sesión es» y revocaría los tokens de quien solo salió de un
+  navegador. Suspender la cuenta no los revoca: el canje mira el estado en
+  cada llamada y vuelven al reactivarla.
+
+**Fuera del catálogo, a propósito**: cerrar un sprint (pide decidir qué pasa
+con cada tarea pendiente), editar el contenido de un documento (solo en vivo,
+E4 de PLAN-DOCUMENTOS), chat, miembros, roles e invitaciones. Se añaden cuando
+alguien los pida, con su ruta y su prueba.

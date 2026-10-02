@@ -136,4 +136,6 @@ const SALIDAS: Record<QuotaKind, (detalle: QuotaExceededDetails) => string> = {
     'Pausar una regla libera su sitio sin borrarla, y se puede volver a encender cuando haga falta.',
   almacenamiento: () =>
     'Lo que ocupan los adjuntos de toda la organización. Borrar un archivo pesado de una tarea antigua suele bastar.',
+  integraciones: () =>
+    'Las integraciones (tu agente por MCP y GitHub) empiezan en el plan Pro, que es de precio fijo.',
 };

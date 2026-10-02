@@ -280,6 +280,15 @@ export interface PlanSpec {
    * 3. No se compran ni se quitan asientos sueltos: para más gente, otro plan.
    */
   precioFijo: boolean;
+  /**
+   * Si el plan trae las integraciones: el MCP de Praxis y GitHub.
+   *
+   * `PRO` es el primero que las tiene (D2 de `docs/PLAN-PRO-INTEGRACIONES.md`)
+   * y los de arriba las heredan. No es un número de `PlanQuotas` sino una
+   * capacidad, pero vale la trampa 23 igual: **se comprueba en el gateway** al
+   * crear un token y en cada llamada al MCP (`McpAccessService`).
+   */
+  integraciones: boolean;
 }
 
 /**
@@ -322,6 +331,7 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     envPrecio: null,
     asientosMinimos: 1,
     precioFijo: false,
+    integraciones: false,
   },
   [PlanTier.PRO]: {
     tier: PlanTier.PRO,
@@ -360,6 +370,7 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     envPrecio: 'STRIPE_PRICE_PRO',
     asientosMinimos: 1,
     precioFijo: true,
+    integraciones: true,
   },
   [PlanTier.TEAM]: {
     tier: PlanTier.TEAM,
@@ -380,6 +391,7 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     envPrecio: 'STRIPE_PRICE_TEAM',
     asientosMinimos: 1,
     precioFijo: false,
+    integraciones: true,
   },
   [PlanTier.BUSINESS]: {
     tier: PlanTier.BUSINESS,
@@ -399,6 +411,7 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     envPrecio: 'STRIPE_PRICE_BUSINESS',
     asientosMinimos: 5,
     precioFijo: false,
+    integraciones: true,
   },
   [PlanTier.ENTERPRISE]: {
     tier: PlanTier.ENTERPRISE,
@@ -418,6 +431,7 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     envPrecio: null,
     asientosMinimos: 10,
     precioFijo: false,
+    integraciones: true,
   },
 };
 
@@ -530,6 +544,11 @@ export enum QuotaKind {
   ORGANIZACIONES = 'organizaciones',
   AUTOMATIZACIONES = 'automatizaciones',
   ALMACENAMIENTO = 'almacenamiento',
+  /**
+   * El plan no trae integraciones (MCP, GitHub). No es un número que se agote
+   * sino una capacidad que falta: `tope` y `actual` van a 0.
+   */
+  INTEGRACIONES = 'integraciones',
 }
 
 /**

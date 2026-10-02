@@ -167,6 +167,14 @@ describe('cuotas de un plan', () => {
       }
     });
 
+    it('las integraciones empiezan en Pro y ningún escalón de arriba las pierde', () => {
+      expect(PLANS[PlanTier.FREE].integraciones).toBe(false);
+      expect(PLANS[PlanTier.PRO].integraciones).toBe(true);
+      for (let i = 1; i < PLAN_LIST.length; i++) {
+        if (PLAN_LIST[i - 1].integraciones) expect(PLAN_LIST[i].integraciones).toBe(true);
+      }
+    });
+
     it('el techo total de IA no baja al subir de plan', () => {
       /* La de arriba no basta por sí sola: lo que cuesta dinero no son los
          mensajes **por persona** sino los mensajes, y su techo es ese número por

@@ -4,6 +4,7 @@ import * as Joi from 'joi';
 
 import { ObservabilityModule } from '@praxis/observability';
 import { AuthModule } from './auth/auth.module';
+import { PersonalTokensModule } from './personal-tokens/personal-tokens.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
@@ -62,6 +63,7 @@ import { UsersModule } from './users/users.module';
     RedisModule,
     AuthModule,
     UsersModule,
+    PersonalTokensModule,
   ],
 })
 export class AppModule {}

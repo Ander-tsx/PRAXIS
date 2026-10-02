@@ -93,3 +93,15 @@ export interface OrganizacionState {
 }
 
 export const ORGANIZACION_INITIAL_STATE: OrganizacionState = { error: null, done: null };
+
+/**
+ * Crear un token del MCP. `token` lleva el token en claro **solo** en la
+ * respuesta a la creación: es la única vez que existe fuera de la base, y la
+ * pantalla lo enseña una vez para copiarlo.
+ */
+export interface CrearTokenState {
+  error: string | null;
+  token: string | null;
+}
+
+export const CREAR_TOKEN_INITIAL_STATE: CrearTokenState = { error: null, token: null };

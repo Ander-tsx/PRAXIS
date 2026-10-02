@@ -2061,3 +2061,28 @@ Las herramientas se filtran por permisos antes de declarárselas: sin
 `canCreateTask` no existe `proponer_tarea`, así que el modelo **no puede ni
 sugerirlo**. Con cero herramientas responde diciendo que esa persona no puede
 hacerlo, en vez de quedarse mudo.
+
+## MCP e integraciones 🔒
+
+Praxis como servidor MCP para el agente de cada persona (docs/PLAN-MCP.md). **No
+es PRAX**: el agente es el usuario usando la API con su token.
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `GET` | `/me/tokens` | Tus tokens del MCP. **Nunca** trae el token ni su hash |
+| `POST` | `/me/tokens` | `{ name, organizationId, scopes: ('read'\|'write'\|'delete')[], expiresInDays? }` → `{ token, personalToken }`. El `token` en claro **solo aquí** |
+| `DELETE` | `/me/tokens/:id` | Revoca. Deja de funcionar al instante |
+| `PATCH` | `/organizations/:organizationId/integrations` | `{ mcpAllowed }`. Exige `canManageOrganization` |
+| `POST` | `/mcp` | JSON-RPC 2.0 (Streamable HTTP, sin estado). `Authorization: Bearer prx_…`. Sin sobre `{success,data}` |
+
+Trampas:
+
+- **Crear un token comprueba, en este orden**: pertenencia (403 `NOT_IN_ORG`),
+  plan con integraciones (402 `QUOTA_EXCEEDED`, `kind: 'integraciones'`, con
+  `puedeAmpliar`) y el interruptor de la organización (403 `MCP_DISABLED`). El
+  MCP repite las tres **en cada llamada**: bajar de plan o apagar el
+  interruptor deja fuera a los tokens que ya existían, sin borrarlos.
+- **Desde fuera se entra por `web`**: `https://<dominio de web>/api/mcp`. El
+  gateway no tiene dominio público.
+- `OrganizationView.mcpAllowed` dice si está permitido; `PlanSpec.integraciones`,
+  si el plan lo trae (Pro y superiores).

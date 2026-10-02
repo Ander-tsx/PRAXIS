@@ -114,6 +114,15 @@ model Organization {
   imageUrl String?
   image    OrganizationImage?
 
+  /// Si sus miembros pueden conectar su propio agente por MCP (M14 de
+  /// docs/PLAN-MCP.md). Lo cambia quien tiene `canManageOrganization`.
+  ///
+  /// ⚠️ **Apagarlo no borra ningún token**: el gateway lo comprueba en cada
+  /// llamada, así que dejan de funcionar al instante y vuelven al encenderlo.
+  /// `true` por defecto porque solo sirve con un plan que traiga integraciones,
+  /// y eso ya lo comprueba el plan.
+  mcpAllowed Boolean @default(true)
+
   members       OrganizationMember[]
   roles         OrganizationRole[]
   roleTemplates ProjectRoleTemplate[]

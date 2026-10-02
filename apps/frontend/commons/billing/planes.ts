@@ -127,6 +127,8 @@ export interface PlanSpec {
   diasDePrueba: number;
   envPrecio: string | null;
   asientosMinimos: number;
+  /** Si trae las integraciones (MCP y GitHub). Pro y superiores. */
+  integraciones: boolean;
   /**
    * Un precio para toda la organización, no por asiento (Pro). Trae sus
    * asientos: no se compran sueltos y la pantalla no ofrece cambiarlos.
@@ -252,6 +254,8 @@ export interface OrganizationView {
   color: string | null;
   /** Imagen subida (ruta relativa al gateway). Gana al icono. */
   imageUrl?: string | null;
+  /** Si sus miembros pueden conectar su agente por MCP (M14 de PLAN-MCP). */
+  mcpAllowed?: boolean;
   createdAt: string;
 }
 
@@ -369,7 +373,8 @@ export type QuotaKind =
   | 'asientos'
   | 'organizaciones'
   | 'automatizaciones'
-  | 'almacenamiento';
+  | 'almacenamiento'
+  | 'integraciones';
 
 /** El código del sobre. Espejo de `QUOTA_EXCEEDED_CODE` en `@praxis/contracts`. */
 export const QUOTA_EXCEEDED_CODE = 'QUOTA_EXCEEDED';
@@ -398,6 +403,7 @@ const QUOTA_KINDS: QuotaKind[] = [
   'organizaciones',
   'automatizaciones',
   'almacenamiento',
+  'integraciones',
 ];
 
 /**

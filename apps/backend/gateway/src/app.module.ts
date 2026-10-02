@@ -13,6 +13,7 @@ import { AssistantModule } from './assistant/assistant.module';
 import { AuthModule } from './auth/auth.module';
 import { AutomationModule } from './automation/automation.module';
 import { BillingModule } from './billing/billing.module';
+import { McpModule } from './mcp/mcp.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { PresenceModule } from './presence/presence.module';
@@ -76,6 +77,7 @@ import { UserModule } from './users/user.module';
     AutomationModule,
     AdminModule,
     BillingModule,
+    McpModule,
   ],
   /* El health check. ⚠️ Estaba escrito y **sin declarar aquí**, así que la ruta
      salía en el inventario al escanear decoradores y respondía 404. Ver la nota

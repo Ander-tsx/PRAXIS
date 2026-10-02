@@ -5,6 +5,7 @@ export * from './auth';
 export * from './billing';
 export * from './credentials';
 export * from './events';
+export * from './mcp';
 export * from './notifications';
 export * from './pagination.dto';
 export * from './permissions';

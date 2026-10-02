@@ -375,6 +375,8 @@ export interface OrganizationView {
   color: string | null;
   /** Imagen subida (ruta relativa al gateway, con versión). Gana al icono. */
   imageUrl: string | null;
+  /** Si sus miembros pueden conectar su agente por MCP. Ver `mcpAllowed` en billing. */
+  mcpAllowed: boolean;
   createdAt: string;
 }
 

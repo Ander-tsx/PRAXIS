@@ -6,6 +6,7 @@ import { RpcException } from '@nestjs/microservices';
 import * as bcrypt from 'bcrypt';
 import { type LoginTicket, OAuth2Client, type TokenPayload } from 'google-auth-library';
 
+import { PersonalTokensService } from '../personal-tokens/personal-tokens.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { TokensService } from './tokens.service';
@@ -85,6 +86,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly tokens: TokensService,
+    private readonly personalTokens: PersonalTokensService,
   ) {}
 
   private tokenHash(token: string): string {
@@ -309,6 +311,9 @@ export class AuthService {
          aquí: quien la cambia suele estar echando a alguien. Un `DEL` sobre el
          hash se las lleva todas de una vez, igual que antes. */
       await this.redis.del(claveDeSesiones(credential.user.id));
+      /* Y los tokens del MCP (I4 de docs/PLAN-MCP.md): un agente con un token
+         de antes seguiría dentro aunque se hayan cerrado todas las sesiones. */
+      await this.personalTokens.revocarTodos(credential.user.id);
     }
 
     return { restablecida: true };

@@ -45,6 +45,7 @@ import {
   PlanTier,
   ProjectRoleTemplateBodyDto,
   RenameOrganizationBodyDto,
+  SetOrganizationIntegrationsBodyDto,
   TransferOrganizationBodyDto,
 } from '@praxis/contracts';
 import type { Response } from 'express';
@@ -250,6 +251,31 @@ export class OrganizationsController {
             iconKey: body.iconKey,
             color: body.color,
           },
+        ),
+      ),
+    );
+  }
+
+  /**
+   * Permite o no que los miembros conecten su agente por MCP (M14 de
+   * docs/PLAN-MCP.md). Misma puerta que renombrar (`canManageOrganization`).
+   *
+   * ⚠️ No toca ningún token: el MCP lo comprueba en cada llamada, así que
+   * apagarlo los deja fuera al instante y encenderlo los devuelve.
+   */
+  @Patch('integrations')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Permite o no el MCP a los miembros de la organización' })
+  async integraciones(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Body() body: SetOrganizationIntegrationsBodyDto,
+  ) {
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send<OrganizationView>(
+          { cmd: 'billing_org_set_mcp' },
+          { organizationId, userId: req.user!.userId, mcpAllowed: body.mcpAllowed },
         ),
       ),
     );

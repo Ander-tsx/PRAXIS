@@ -668,6 +668,49 @@ export class QuotaService {
   }
 
   /**
+   * ¿Trae el plan de esta organización las integraciones (MCP, GitHub)?
+   *
+   * D2 de `docs/PLAN-PRO-INTEGRACIONES.md`: Pro y superiores. Lo llaman la
+   * creación de un token del MCP **y cada llamada al MCP**, porque la
+   * organización puede bajar de plan con tokens ya repartidos (trampa 23: una
+   * capacidad que no se comprueba no da ningún error).
+   *
+   * ⚠️ `planDe` ya devuelve FREE si esa persona no está dentro de la
+   * organización o si billing-service no contesta: los dos casos fallan hacia
+   * el lado de negar.
+   */
+  async exigirIntegraciones(userId: string, organizationId: string): Promise<void> {
+    const plan = await this.planDe(userId, organizationId);
+    if (PLANS[plan.tier]?.integraciones) return;
+
+    const permisos = await firstValueFrom(
+      this.billingClient.send<{ permisos: Record<string, boolean> } | null>(
+        { cmd: 'billing_org_permissions' },
+        { organizationId, userId },
+      ),
+    ).catch(() => null);
+
+    const detalle: QuotaExceededDetails = {
+      kind: QuotaKind.INTEGRACIONES,
+      tier: plan.tier,
+      tope: 0,
+      actual: 0,
+      ...(permisos
+        ? { puedeAmpliar: permisos.permisos[OrganizationPermission.CAN_MANAGE_BILLING] === true }
+        : {}),
+    };
+
+    throw new HttpException(
+      {
+        code: QUOTA_EXCEEDED_CODE,
+        message: `Las integraciones (MCP y GitHub) empiezan en el plan Pro, y esta organización está en ${PLANS[plan.tier]?.nombre ?? plan.tier}.`,
+        details: detalle,
+      },
+      HttpStatus.PAYMENT_REQUIRED,
+    );
+  }
+
+  /**
    * Que quien pide mande sobre los proyectos de una organización.
    *
    * ⚠️ **No es `canManageBilling` ni ser dueño**: es `canManageAllProjects`, que
@@ -1065,4 +1108,8 @@ const MENSAJES: Record<QuotaKind, (tope: number) => string> = {
     `Este proyecto ya tiene ${tope} automatizaciones activas. Pausa una o amplía el plan.`,
   [QuotaKind.ALMACENAMIENTO]: (tope) =>
     `Los adjuntos de tu organización ocupan los ${tope} MB del plan. Borra alguno o amplía.`,
+  /* Existe para que el `Record` esté completo: `exigirIntegraciones` lanza su
+     propio mensaje, porque «tu plan llega hasta ahí» no tiene sentido para una
+     capacidad que falta entera. */
+  [QuotaKind.INTEGRACIONES]: () => 'Las integraciones empiezan en el plan Pro.',
 };

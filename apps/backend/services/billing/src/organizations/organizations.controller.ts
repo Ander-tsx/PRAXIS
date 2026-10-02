@@ -90,6 +90,18 @@ export class OrganizationsController {
     );
   }
 
+  /** El interruptor del MCP de la organización. Exige `canManageOrganization`. */
+  @MessagePattern({ cmd: 'billing_org_set_mcp' })
+  permitirMcp(@Payload() dto: { organizationId: string; userId: string; mcpAllowed: boolean }) {
+    return this.organizaciones.permitirMcp(dto.organizationId, dto.userId, dto.mcpAllowed);
+  }
+
+  /** Si esa persona sigue dentro y si la organización permite el MCP. Una consulta. */
+  @MessagePattern({ cmd: 'billing_org_mcp_access' })
+  accesoMcp(@Payload() dto: { organizationId: string; userId: string }) {
+    return this.organizaciones.accesoMcp(dto.organizationId, dto.userId);
+  }
+
   @MessagePattern({ cmd: 'billing_org_set_image' })
   ponerImagen(
     @Payload() dto: { organizationId: string; userId: string; mimeType: string; base64: string },

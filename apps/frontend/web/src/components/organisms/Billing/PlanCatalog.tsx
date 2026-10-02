@@ -269,6 +269,10 @@ const REBASADO: Record<QuotaExcedida['kind'], (excedida: QuotaExcedida) => strin
     `Un proyecto tiene ${e.actual} automatizaciones activas y el plan da ${e.tope}. Pausa alguna.`,
   organizaciones: (e) =>
     `Tienes ${e.actual} organizaciones a tu nombre y el máximo por persona es ${e.tope}.`,
+  /* Tampoco llega aquí: no es un número que se rebase sino una capacidad que
+     el plan no trae. Los tokens que hubiera dejan de funcionar solos. */
+  integraciones: () =>
+    'Este plan no trae integraciones: los agentes conectados por MCP dejan de funcionar hasta volver a Pro.',
 };
 
 /**

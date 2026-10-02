@@ -141,7 +141,6 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     label: 'Integraciones',
     href: '/main/integrations',
     section: SECTION_GENERAL,
-    disabled: true,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path

@@ -381,7 +381,7 @@ recibidos. Si nadie los usa, no se invierte en OAuth ni en más conectores.
 | Fase | Estado | Nota |
 |---|---|---|
 | P0 — Decisiones y acuerdo con backend | ✅ | 2026-10-02. D4–D13 con el dueño; backend acordado. Pendiente solo anotar el modo de cada objeto de Stripe antes de escribir |
-| P1 — Pro a precio fijo | 🟡 | 2026-10-02, rama `feature/pro-integraciones`. Código hecho y en verde (catálogo, `precioFijo`, asientos = tope, checkout sin cantidad, `trial_redemptions` + corte en el webhook, Equipo sin prueba, tabla de precios). Sandbox configurado. **Falta:** el precio en real y las variables de Railway (a mano), aplicar la migración, y la prueba con checkout |
-| P2 — MCP (M0–M6 de PLAN-MCP, con la puerta por plan) | ☐ | |
+| P1 — Pro a precio fijo | ✅ | 2026-10-02, rama `feature/pro-integraciones`. Código hecho y en verde (catálogo, `precioFijo`, asientos = tope, checkout sin cantidad, `trial_redemptions` + corte en el webhook, Equipo sin prueba, tabla de precios). Sandbox configurado. En `main` (`49865f2b`). Precio real verificado y comprobado por el dueño en producción |
+| P2 — MCP (M0–M6 de PLAN-MCP, con la puerta por plan) | ✅ | 2026-10-02. Puerta por plan (`PlanSpec.integraciones`, 402 `kind: integraciones`) al crear y en cada llamada; interruptor por organización; registro en PLAN-MCP |
 | P3 — GitHub | ☐ | |
 | P4 — Medir | ☐ | |
