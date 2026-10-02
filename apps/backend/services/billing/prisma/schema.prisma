@@ -309,6 +309,33 @@ model Subscription {
   @@map("subscriptions")
 }
 
+/// Quién ya usó el mes gratis, y en qué organización.
+///
+/// 🔴 **El mes gratis es uno por persona, y también uno por organización.**
+/// Sin esto bastaba con suscribirse, cancelar antes del cobro y volver a
+/// suscribirse —o hacerlo en cada una de las tres organizaciones propias— para
+/// no pagar nunca. Por persona cierra lo primero; por organización, que una
+/// organización que ya lo disfrutó lo vuelva a tener al cambiar de dueño.
+///
+/// `userId` es único **y esa es la garantía**: el checkout lo consulta para no
+/// ofrecer la prueba, pero dos checkouts abiertos a la vez pasarían los dos; el
+/// webhook escribe aquí y, si el índice rechaza la fila, corta la prueba
+/// sobrante. Ver `stripe-webhook.controller.ts`.
+///
+/// ⚠️ No caduca ni se borra al cancelar: es la memoria de que ya se dio.
+model TrialRedemption {
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  organizationId       String
+  stripeSubscriptionId String?  @unique
+  tier                 PlanTier
+  createdAt            DateTime @default(now())
+
+  @@index([organizationId])
+  @@schema("billing")
+  @@map("trial_redemptions")
+}
+
 /// El registro de todo lo que movió dinero o plan, con su instante.
 ///
 /// 🔴 **Existe por la trampa 3 del encargo**, y no es un log: es la prueba. Todo

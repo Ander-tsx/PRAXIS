@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PlanTier, SubscriptionStatus } from '@praxis/contracts';
+import { PlanTier, SubscriptionStatus, asientosContratados } from '@praxis/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -46,11 +46,14 @@ export class SubscriptionsService {
     stripeEventId?: string | null;
   }) {
     const fecha = (valor?: string | null) => (valor ? new Date(valor) : null);
+    /* 🔴 En un plan de precio fijo la cantidad de Stripe es 1 y no son los
+       asientos: se guarda el tope del plan. Ver `precioFijo` en contracts. */
+    const seats = asientosContratados(datos.tier, datos.seats);
 
     const comun = {
       tier: datos.tier,
       status: datos.status,
-      ...(datos.seats !== undefined ? { seats: datos.seats } : {}),
+      ...(seats !== undefined ? { seats } : {}),
       stripeCustomerId: datos.stripeCustomerId ?? undefined,
       stripeSubscriptionId: datos.stripeSubscriptionId ?? undefined,
       stripePriceId: datos.stripePriceId ?? undefined,
@@ -62,7 +65,7 @@ export class SubscriptionsService {
 
     const suscripcion = await this.prisma.subscription.upsert({
       where: { organizationId: datos.organizationId },
-      create: { organizationId: datos.organizationId, seats: datos.seats ?? 1, ...comun },
+      create: { organizationId: datos.organizationId, seats: seats ?? 1, ...comun },
       update: comun,
     });
 
@@ -88,6 +91,63 @@ export class SubscriptionsService {
       where: { stripeSubscriptionId },
       select: { organizationId: true, tier: true, seats: true },
     });
+  }
+
+  /**
+   * ¿Puede esta persona estrenar el mes gratis en esta organización?
+   *
+   * No, si ya lo usó ella —en cualquier organización— o si esa organización ya
+   * lo tuvo con otra persona. Ver `TrialRedemption` en el esquema.
+   */
+  async pruebaDisponible(userId: string, organizationId: string): Promise<boolean> {
+    const usada = await this.prisma.trialRedemption.findFirst({
+      where: { OR: [{ userId }, { organizationId }] },
+      select: { id: true },
+    });
+    return usada === null;
+  }
+
+  /**
+   * Deja escrito que una suscripción estrenó el mes gratis.
+   *
+   * 🔴 **Es la garantía, no el checkout.** Devuelve `{ canjeada: false }` cuando
+   * esta persona u organización ya tenía una prueba **de otra suscripción**: dos
+   * checkouts abiertos a la vez pasan los dos la comprobación previa, y quien
+   * llama tiene que cortar la prueba sobrante en Stripe.
+   *
+   * Idempotente: Stripe repite eventos, y la misma suscripción vuelve a dar
+   * `true`.
+   */
+  async canjearPrueba(datos: {
+    userId: string;
+    organizationId: string;
+    stripeSubscriptionId: string;
+    tier: PlanTier;
+  }): Promise<{ canjeada: boolean }> {
+    const previa = await this.prisma.trialRedemption.findFirst({
+      where: { OR: [{ userId: datos.userId }, { organizationId: datos.organizationId }] },
+    });
+    if (previa) return { canjeada: previa.stripeSubscriptionId === datos.stripeSubscriptionId };
+
+    try {
+      await this.prisma.trialRedemption.create({ data: datos });
+    } catch (error) {
+      /* La carrera: otra suscripción de esta persona se escribió entre la
+         lectura y aquí. El índice único lo decide. */
+      if ((error as { code?: string }).code === 'P2002') {
+        const ganadora = await this.prisma.trialRedemption.findUnique({
+          where: { userId: datos.userId },
+        });
+        return { canjeada: ganadora?.stripeSubscriptionId === datos.stripeSubscriptionId };
+      }
+      throw error;
+    }
+
+    await this.registrar(datos.organizationId, 'prueba_canjeada', null, {
+      userId: datos.userId,
+      tier: datos.tier,
+    });
+    return { canjeada: true };
   }
 
   /** La suscripción de una organización, o `null` si nunca ha pagado nada. */

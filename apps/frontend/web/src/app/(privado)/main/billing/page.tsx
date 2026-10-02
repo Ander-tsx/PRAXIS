@@ -195,31 +195,45 @@ export default async function BillingPage({
          * separadas —una aquí y otra en la tabla de abajo— es exactamente lo que
          * hacía leer «Equipo: 15 asientos» como «tengo 15».
          */}
-        <p className="max-w-2xl rounded-r-lg border-l-2 border-primary bg-primary/5 py-3 pl-4 pr-4 font-sans text-sm text-white/80">
-          Tienes <strong className="font-semibold text-white">{organizacion.seats}</strong>{' '}
-          {organizacion.seats === 1 ? 'asiento contratado' : 'asientos contratados'}
-          {topeDeAsientos !== null ? (
-            <>
-              , y {spec?.nombre ?? 'tu plan'} admite hasta{' '}
-              <strong className="font-semibold text-white">{topeDeAsientos}</strong>.
-            </>
-          ) : (
-            <>, y {spec?.nombre ?? 'tu plan'} no tiene tope.</>
-          )}{' '}
-          <strong className="font-semibold text-white">
-            Pagar el plan no compra los asientos:
-          </strong>{' '}
-          el precio es por asiento y los añades tú aquí abajo. El tope del plan es hasta dónde
-          puedes llegar, no lo que ya tienes.
-        </p>
+        {spec?.precioFijo ? (
+          /* Un precio fijo trae sus asientos: no hay nada que comprar ni
+             selector que enseñar. El servidor rechaza cambiarlos (400). */
+          <p className="max-w-2xl rounded-r-lg border-l-2 border-primary bg-primary/5 py-3 pl-4 pr-4 font-sans text-sm text-white/80">
+            {spec.nombre} incluye{' '}
+            <strong className="font-semibold text-white">{organizacion.seats}</strong> asientos por
+            un precio fijo, y ocupas{' '}
+            <strong className="font-semibold text-white">{organizacion.seatsUsed}</strong>. Para más
+            gente, el siguiente plan.
+          </p>
+        ) : (
+          <>
+            <p className="max-w-2xl rounded-r-lg border-l-2 border-primary bg-primary/5 py-3 pl-4 pr-4 font-sans text-sm text-white/80">
+              Tienes <strong className="font-semibold text-white">{organizacion.seats}</strong>{' '}
+              {organizacion.seats === 1 ? 'asiento contratado' : 'asientos contratados'}
+              {topeDeAsientos !== null ? (
+                <>
+                  , y {spec?.nombre ?? 'tu plan'} admite hasta{' '}
+                  <strong className="font-semibold text-white">{topeDeAsientos}</strong>.
+                </>
+              ) : (
+                <>, y {spec?.nombre ?? 'tu plan'} no tiene tope.</>
+              )}{' '}
+              <strong className="font-semibold text-white">
+                Pagar el plan no compra los asientos:
+              </strong>{' '}
+              el precio es por asiento y los añades tú aquí abajo. El tope del plan es hasta dónde
+              puedes llegar, no lo que ya tienes.
+            </p>
 
-        <SeatsPanel
-          organizationId={organizationId}
-          contratados={organizacion.seats}
-          ocupados={organizacion.seatsUsed}
-          tope={topeDeAsientos}
-          nombreDelPlan={spec?.nombre ?? organizacion.tier}
-        />
+            <SeatsPanel
+              organizationId={organizationId}
+              contratados={organizacion.seats}
+              ocupados={organizacion.seatsUsed}
+              tope={topeDeAsientos}
+              nombreDelPlan={spec?.nombre ?? organizacion.tier}
+            />
+          </>
+        )}
       </div>
     </div>
   );

@@ -210,6 +210,51 @@ export class StripeWebhookController {
       cancelAt: enIso(subscription.cancel_at),
       stripeEventId: eventId,
     });
+
+    if (subscription.status === 'trialing') {
+      await this.anotarPrueba(subscription, organizationId, tier);
+    }
+  }
+
+  /**
+   * Anota el mes gratis, y lo corta si ya se había dado.
+   *
+   * 🔴 **Aquí está la garantía de «un mes gratis por persona y organización».**
+   * El checkout solo evita ofrecerlo; dos checkouts abiertos a la vez lo pasan
+   * los dos. Si `billing_trial_redeem` dice que ya lo tenía otra suscripción,
+   * la prueba de ésta se termina ya y Stripe cobra el primer mes.
+   *
+   * ⚠️ Sin `userId` en los metadatos —suscripciones anteriores a esto, o
+   * creadas a mano en el panel— no se puede atribuir, y se deja como está.
+   */
+  private async anotarPrueba(
+    subscription: Stripe.Subscription,
+    organizationId: string,
+    tier: PlanTier,
+  ) {
+    const userId = subscription.metadata?.userId;
+    if (!userId) return;
+
+    const resultado = await firstValueFrom(
+      this.billingClient.send<{ canjeada: boolean }>(
+        { cmd: 'billing_trial_redeem' },
+        { userId, organizationId, stripeSubscriptionId: subscription.id, tier },
+      ),
+    ).catch((error: Error) => {
+      /* Mismo criterio que `aplicar`: no se devuelve un 500 a Stripe. Queda en
+         el registro para revisarlo a mano. */
+      this.log.error(`No se pudo anotar la prueba de ${subscription.id}: ${error.message}`);
+      return null;
+    });
+
+    if (resultado && !resultado.canjeada) {
+      this.log.warn(
+        `Segunda prueba de ${userId} en ${organizationId} (${subscription.id}): se corta.`,
+      );
+      await this.stripe.cortarPrueba(subscription.id).catch((error: Error) => {
+        this.log.error(`No se pudo cortar la prueba de ${subscription.id}: ${error.message}`);
+      });
+    }
   }
 
   /**

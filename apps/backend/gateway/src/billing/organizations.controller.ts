@@ -622,6 +622,13 @@ export class OrganizationsController {
     if (organizacion.ownerUserId !== userId) {
       throw new ForbiddenException('Solo quien creó la organización cambia sus asientos.');
     }
+    /* Un plan de precio fijo trae sus asientos: no se compran sueltos. Sin esto,
+       el `quantity` de Stripe subiría y se cobraría N veces el precio fijo. */
+    if (PLANS[organizacion.tier as PlanTier]?.precioFijo) {
+      throw new BadRequestException(
+        `El plan ${PLANS[organizacion.tier as PlanTier].nombre} trae sus asientos. Para más, el siguiente plan.`,
+      );
+    }
     if (body.seats < organizacion.seatsUsed) {
       throw new ConflictException(
         `Hay ${organizacion.seatsUsed} asientos ocupados, contando invitaciones pendientes. ` +

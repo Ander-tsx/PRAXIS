@@ -1,6 +1,7 @@
 # Plan MCP — Praxis como servidor, para el agente que el usuario ya usa
 
 > Etapa **por empezar** (plan redactado el 2026-09-30, sin una línea de código).
+> **M0 cerrada el 2026-10-02**: backend acordado; siguiente, M1.
 > Sale de [PRAX-MCP-SEGUNDA-ITERACION](PRAX-MCP-SEGUNDA-ITERACION.md), que planteó
 > la dirección A (Praxis servidor) y dejó sin decidir qué poderes tiene. Este plan
 > **decide**, y por eso lo sustituye en esa dirección. La dirección B (PRAX como
@@ -13,6 +14,8 @@
 > empezar M1.
 
 ---
+
+> 🔗 **Va junto a [PLAN-PRO-INTEGRACIONES.md](PLAN-PRO-INTEGRACIONES.md)** (2026-10-02): el MCP se ofrece primero en el plan **Pro**, que pasa a precio fijo. Allí están las decisiones de plan y el estado de Stripe; aquí, el diseño técnico.
 
 ## El encargo, en una frase
 
@@ -236,9 +239,11 @@ reglas de automatización, chat y miembros. Lotes (M7). Los borrados bajo `delet
 **Pruebas:** un test recorre el catálogo y comprueba I5 (método HTTP frente a
 alcance) y que ningún esquema declara un `organizationId` (I2).
 
-### M5 — Pantalla de Ajustes
+### M5 — Pantalla de Integraciones
 
-En `(privado)/main/settings`: crear token (nombre, organización, alcances,
+En `(privado)/main/integrations` (M13; antes decía `main/settings`), como
+tarjeta desplegable del catálogo de integraciones, con el interruptor de la
+organización (M14) para quien la administra. Crear token (nombre, organización, alcances,
 caducidad), copiarlo una vez, listar con prefijo y `lastUsedAt`, revocar. Con el
 texto claro de qué poder da cada alcance (M4) y **las instrucciones de conexión**
 para Claude Desktop, Claude Code y Cursor, con la URL ya puesta. Sigue
@@ -294,9 +299,52 @@ Escritas antes de empezar porque la mayoría no darán error.
 
 ---
 
+## Cerradas en M0 (2026-10-02)
+
+Backend **acordado** con el dueño: la tabla de PAT en credentials, la ruta en el
+gateway y el mapa de alcances siguen como están escritos arriba. Lo que cambia o
+se añade:
+
+**M13 — La pantalla no va en Ajustes: va en `/main/integrations`** (D12 de
+PLAN-PRO-INTEGRACIONES). Una página con todas las integraciones; el MCP es una
+tarjeta que se despliega para crear, listar y revocar **tus** tokens dentro de
+la organización activa. Sustituye a la ubicación de M5.
+
+**M14 — La organización puede no permitirlo.** Un interruptor por integración,
+visible para quien administra la organización. El gateway comprueba **en cada
+llamada** al MCP tres cosas: plan ≥ Pro, integración permitida y token vivo. Si
+la organización la apaga o baja de plan, los tokens dejan de funcionar al
+instante (igual que I4), sin borrarse: volver a encenderla los revive.
+
+**M15 — La entrada pública es un route handler de paso en `web`, no el
+gateway.** En Railway el gateway vive en la red privada y no tiene dominio
+(`docs/deploy/RAILWAY.md`). `POST /api/mcp` de `web` reenvía al `/api/mcp` del
+gateway con el `Authorization` del cliente intacto, el cuerpo crudo y la
+respuesta en flujo. Patrón: `web/src/app/api/webhooks/stripe/route.ts`. No vale
+`createGatewayProxy()` (borra `Authorization`), y la ruta **no** va en
+`PREFIJOS_PRIVADOS`. La URL que se le da al usuario es
+`https://<dominio de web>/api/mcp`.
+
+Respuestas a las preguntas de abajo, tomadas por defecto (el dueño no puso
+objeción; si cambian, se cambian aquí):
+
+1. **Un PAT por organización.** Con tres organizaciones, tres tokens.
+2. **Caducidad por defecto de 90 días**, con «sin caducidad» permitido y avisado.
+3. **Máximo 10 PAT por persona.**
+4. **De pago: Pro y superiores** (D2 de PLAN-PRO-INTEGRACIONES), con el
+   interruptor de M14. No es una cuota numérica de `PlanQuotas`, sino una
+   capacidad del plan, y **se aplica en el mismo commit que la declara**.
+5. **El dueño de la organización no ve los tokens de sus miembros**, pero puede
+   apagar la integración para todos (M14).
+6. Catálogo completo o por paquetes: **sigue abierta**, la decide M3.
+
+Límite de velocidad (M9): **60 llamadas por minuto por PAT** como punto de
+partida, a revisar con el contador de M12.
+
 ## Preguntas abiertas
 
 Para contestar en M0. Ninguna bloquea el plan, todas cambian un detalle.
+**Contestadas arriba, en «Cerradas en M0»**, salvo la 6.
 
 1. **¿Un PAT por organización, o uno que valga para varias?** El plan dice una
    (I2, simple, más seguro). Un usuario con tres organizaciones crearía tres.
@@ -334,11 +382,11 @@ Para contestar en M0. Ninguna bloquea el plan, todas cambian un detalle.
 
 | Fase | Estado | Nota |
 |---|---|---|
-| M0 — Acordar con backend | ☐ | |
+| M0 — Acordar con backend | ✅ | 2026-10-02. Acordado; M13–M15 y las respuestas, en «Cerradas en M0» |
 | M1 — Emisor de tokens | ☐ | |
 | M2 — Canje PAT → access | ☐ | |
-| M3 — `/api/mcp` + 4 lecturas (spike) | ☐ | |
+| M3 — `/api/mcp` + 4 lecturas (spike) | ☐ | incluye el paso de `web` (M15) |
 | M4 — Catálogo completo | ☐ | |
-| M5 — Pantalla de Ajustes | ☐ | |
+| M5 — Pantalla de Integraciones | ☐ | |
 | M6 — Límites y endurecimiento | ☐ | |
 | M7 — OAuth 2.1 | ☐ | condicional a M12 |

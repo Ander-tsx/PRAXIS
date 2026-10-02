@@ -14,7 +14,7 @@
  * precios prometa lo que el servidor niega, sin un solo error de compilación.
  */
 
-export type PlanTier = 'FREE' | 'TEAM' | 'BUSINESS' | 'ENTERPRISE';
+export type PlanTier = 'FREE' | 'PRO' | 'TEAM' | 'BUSINESS' | 'ENTERPRISE';
 
 /**
  * Cómo se contrata un plan.
@@ -127,6 +127,11 @@ export interface PlanSpec {
   diasDePrueba: number;
   envPrecio: string | null;
   asientosMinimos: number;
+  /**
+   * Un precio para toda la organización, no por asiento (Pro). Trae sus
+   * asientos: no se compran sueltos y la pantalla no ofrece cambiarlos.
+   */
+  precioFijo: boolean;
 }
 
 /** Lo que devuelve `GET /me/billing/planes`. */

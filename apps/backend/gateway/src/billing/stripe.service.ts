@@ -1,6 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PLANS, PlanTier } from '@praxis/contracts';
+import { PLANS, PlanTier, asientosContratados } from '@praxis/contracts';
 import Stripe from 'stripe';
 
 /**
@@ -117,8 +117,15 @@ export class StripeService {
    */
   async createCheckout(data: {
     organizationId: string;
+    /** Quien paga. Viaja en los metadatos para anotar su mes gratis. */
+    userId: string;
     tier: PlanTier;
     seats?: number;
+    /**
+     * Si esta compra lleva el mes gratis del plan. Lo decide quien llama,
+     * porque solo él sabe si esa persona u organización ya lo usaron.
+     */
+    conPrueba: boolean;
     email?: string;
     stripeCustomerId?: string | null;
     /** A dónde volver. La pantalla de planes o el portal de la organización. */
@@ -135,10 +142,11 @@ export class StripeService {
     }
 
     /* La cantidad **es** lo que se cobra: con `quantity: 1` sobre un precio por
-       unidad, cincuenta asientos costarían lo que uno. Ya no hay planes a tanto
-       alzado — desde 2026-08-26 todos van por asiento, y uno solo es el caso de
-       quien trabaja en su organización personal. */
-    const cantidad = Math.max(data.seats ?? spec.asientosMinimos, 1);
+       unidad, cincuenta asientos costarían lo que uno. La excepción es el
+       precio fijo (Pro, desde 2026-10-02): una unidad para toda la
+       organización, y los asientos los pone el plan. */
+    const cantidad = spec.precioFijo ? 1 : Math.max(data.seats ?? spec.asientosMinimos, 1);
+    const asientos = asientosContratados(data.tier, cantidad) ?? cantidad;
 
     /* ⚠️ `/main`, no `/dashboard`: el `basePath` de dashboard-front se renombró
        y estos literales del backend se quedaron atrás. Ver `volverA` en
@@ -166,7 +174,7 @@ export class StripeService {
        * plan escrito en la sesión, un despliegue al que le falte una variable
        * sigue aplicando bien el pago que ya se hizo.
        */
-      metadata: { tier: data.tier, seats: String(cantidad) },
+      metadata: { tier: data.tier, seats: String(asientos) },
       subscription_data: {
         /**
          * 🔴 **El mes gratis, y solo aquí.**
@@ -179,12 +187,14 @@ export class StripeService {
          * dentro del panel de Stripe, los dos se suman y quedarían dos meses
          * gratis. No da ningún error y no se nota hasta el recibo que no llega.
          */
-        ...(spec.diasDePrueba > 0 ? { trial_period_days: spec.diasDePrueba } : {}),
+        ...(data.conPrueba && spec.diasDePrueba > 0
+          ? { trial_period_days: spec.diasDePrueba }
+          : {}),
         /* ⚠️ Y aquí también, no solo en la sesión: los eventos de
            `customer.subscription.*` **no traen los metadatos de la sesión**, así
            que sin esto una renovación o una baja llegaría sin saber de qué plan
            ni de qué organización habla. */
-        metadata: { tier: data.tier, organizationId: data.organizationId },
+        metadata: { tier: data.tier, organizationId: data.organizationId, userId: data.userId },
       },
       success_url: `${this.appUrl}${vuelta}?pago=ok`,
       cancel_url: `${this.appUrl}${vuelta}?pago=cancelado`,
@@ -236,6 +246,22 @@ export class StripeService {
     await stripe.subscriptions.update(stripeSubscriptionId, {
       items: [{ id: linea.id, quantity: seats }],
       proration_behavior: 'create_prorations',
+    });
+  }
+
+  /**
+   * Acaba ya el mes gratis de una suscripción, y Stripe cobra el primer mes.
+   *
+   * ⚠️ **Mueve dinero**, y solo lo llama el webhook en un caso: una segunda
+   * prueba de la misma persona u organización que se coló por dos checkouts
+   * abiertos a la vez (`TrialRedemption`). Quien pagó aceptó ese precio en la
+   * página de Stripe; lo que no le corresponde es el mes gratis.
+   */
+  async cortarPrueba(stripeSubscriptionId: string): Promise<void> {
+    const stripe = this.requireStripe();
+    await stripe.subscriptions.update(stripeSubscriptionId, {
+      trial_end: 'now',
+      proration_behavior: 'none',
     });
   }
 

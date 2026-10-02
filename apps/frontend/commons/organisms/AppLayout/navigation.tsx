@@ -139,7 +139,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     label: 'Integraciones',
-    href: '/main/integraciones',
+    href: '/main/integrations',
     section: SECTION_GENERAL,
     disabled: true,
     icon: (

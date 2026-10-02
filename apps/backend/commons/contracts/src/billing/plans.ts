@@ -107,13 +107,13 @@ export enum PlanTier {
   /** Lo que tienes sin pagar nada. No se contrata: se es. */
   FREE = 'FREE',
   /**
-   * Una persona (o dos) que usan PRAX **en serio**.
+   * Un equipo pequeño, a precio fijo, con MCP y GitHub.
    *
-   * El escalón que faltaba: se saltaba de 3 proyectos y 13 mensajes de IA a 25
-   * y 100, con un salto de precio que solo tiene sentido si ya eres un equipo.
-   * Pro es para quien trabaja solo o de dos en dos y usa el asistente a diario:
-   * cinco proyectos, seis veces el gratuito en IA, y **por debajo de Equipo en
-   * todos los ejes** — lo que lo separa es el precio, no un cruce.
+   * Hasta 2026-10-02 era «una persona o dos que usan PRAX en serio», por
+   * asiento y con seis veces la IA del gratuito. Ahora es un precio fijo para
+   * toda la organización, con la IA del gratuito por persona y el argumento en
+   * las integraciones (`docs/PLAN-PRO-INTEGRACIONES.md`). Sigue **por debajo de
+   * Equipo en todos los ejes**: lo que los separa es el tamaño.
    *
    * ⚠️ **No confundir con el `PRO` viejo.** Hubo un `PRO` por persona en
    * `assistant.assistant_subscriptions`, anterior a las organizaciones, que se
@@ -124,7 +124,7 @@ export enum PlanTier {
    * la organización que lo paga.
    */
   PRO = 'PRO',
-  /** El primer peldaño de pago para un equipo. **Un mes gratis**. */
+  /** Un equipo que crece, por asiento. Sin mes gratis desde 2026-10-02. */
   TEAM = 'TEAM',
   /** Una empresa en marcha, con gente entrando y saliendo. */
   BUSINESS = 'BUSINESS',
@@ -241,7 +241,9 @@ export interface PlanSpec {
    * Días de prueba antes del primer cobro. `0` si no hay.
    *
    * 🔴 **Solo lo tiene el primer peldaño de pago, y es una decisión del dueño del
-   * producto**, no una promoción que se pueda mover. Lo aplica Stripe con
+   * producto**, no una promoción que se pueda mover. Ese peldaño es `PRO` desde
+   * 2026-10-02 (antes, `TEAM`). **Y se da una vez por persona y por
+   * organización**: lo comprueba el checkout contra `trial_redemptions`. Lo aplica Stripe con
    * `trial_period_days` —no un `setTimeout` nuestro— y queda registrado con su
    * instante en `BillingEvent`, porque «no me avisaron» es la queja más cara de
    * este terreno.
@@ -260,9 +262,24 @@ export interface PlanSpec {
    * Asientos mínimos al contratar.
    *
    * Es lo que hace que ampliar el equipo cueste algo y que el techo total de IA
-   * esté acotado: todos los planes de pago van por asiento.
+   * esté acotado en los planes que van por asiento. En uno de precio fijo no
+   * significa nada: se contrata uno y entran `quotas.asientos`.
    */
   asientosMinimos: number;
+  /**
+   * 🔴 **El precio es el mismo para toda la organización, no por asiento.**
+   *
+   * Solo `PRO`, desde 2026-10-02 (`docs/PLAN-PRO-INTEGRACIONES.md`, D1). Cambia
+   * tres cosas, y olvidar cualquiera no da error:
+   *
+   * 1. El checkout manda `quantity: 1`. La cantidad de Stripe **no** son los
+   *    asientos.
+   * 2. `Subscription.seats` no sale de esa cantidad sino del tope del plan
+   *    (`asientosContratados`). Con la cantidad, un Pro quedaría en **un**
+   *    asiento —`min(1, 7)`— y el resto del equipo, congelado.
+   * 3. No se compran ni se quitan asientos sueltos: para más gente, otro plan.
+   */
+  precioFijo: boolean;
 }
 
 /**
@@ -304,56 +321,51 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     diasDePrueba: 0,
     envPrecio: null,
     asientosMinimos: 1,
+    precioFijo: false,
   },
   [PlanTier.PRO]: {
     tier: PlanTier.PRO,
     nombre: 'Pro',
-    resumen: 'Cinco proyectos y seis veces más PRAX que el gratuito, por poco dinero.',
-    paraQuien: 'Una persona, o dos, que trabajan con PRAX a diario',
+    resumen: 'Un precio fijo para un equipo pequeño, con MCP y GitHub. El primer mes es gratis.',
+    paraQuien: 'Un equipo pequeño que quiere lo indispensable sin pagar por asiento',
+    /**
+     * ⚠️ **Desde 2026-10-02 es un plan de precio fijo** (`PLAN-PRO-INTEGRACIONES`,
+     * D4–D8): 99 MXN al mes para toda la organización. Lo que vende no es la IA
+     * —da la misma por persona que el gratuito— sino el tamaño y las
+     * integraciones (MCP y GitHub). Lo que lo separa de Equipo es el tamaño.
+     */
     quotas: {
-      /* Cinco y no uno, aunque sea el plan «individual»: con uno solo, meter a
-         la primera persona obliga a saltar a Equipo, y ahí el salto es de 5 a 25
-         proyectos por un problema que era de una silla. */
-      asientos: 5,
-      proyectos: 5,
+      /* Siete, y es tope duro: sin cobro por asiento, para el octavo hay que
+         pasar a Equipo. */
+      asientos: 7,
+      proyectos: 7,
       /**
-       * Seis veces el gratuito, y por debajo de Equipo.
+       * Lo mismo que el gratuito, por persona.
        *
-       * ⚠️ **Estuvo en 150 —por encima de los 100 de Equipo— y se bajó.** La
-       * idea era vender intensidad en vez de tamaño, y el número la llevaba
-       * demasiado lejos: rompía la escalera. Alguien que subiera de Pro a Equipo
-       * habría **perdido** 50 mensajes al mes, que es la peor forma de descubrir
-       * un plan — pagando más por menos.
-       *
-       * 75 mantiene la promesa sin romper nada: es **casi seis veces** los 13
-       * del gratuito, o sea de sobra para usarlo a diario sobre cinco proyectos,
-       * y sigue por debajo de los 100 de Equipo. Lo que separa a Pro de Equipo
-       * es el precio y el tamaño, no un cruce en un eje.
+       * ⚠️ **Estuvo en 1,5 M y se bajó** con el precio fijo: el coste de IA
+       * crece con cada persona y los 99 MXN no. El techo del equipo sí sube
+       * —7 × 250 mil frente a 3 × 250 mil—, y la escalera lo admite porque pide
+       * «al menos tanto», no «más».
        */
-      iaTokensMensualesPorPersona: 1_500_000,
-      automatizacionesPorProyecto: 10,
-      almacenamientoOrgMb: 2_048,
-      /* El punto medio real: 90 días no llegan a un trimestre cerrado y 365 es
-         lo que se paga en Equipo. */
-      historialAnalisisDias: 180,
+      iaTokensMensualesPorPersona: 250_000,
+      automatizacionesPorProyecto: 5,
+      almacenamientoOrgMb: 1_024,
+      historialAnalisisDias: 90,
     },
     contratacion: PlanContratacion.AUTOSERVICIO,
-    /**
-     * ⚠️ **Sin mes de prueba, y el de Equipo se queda donde está.**
-     *
-     * Los treinta días son «una decisión del dueño del producto, no una
-     * promoción que se pueda mover» (ver `diasDePrueba`), y están puestos en el
-     * primer peldaño **de equipo**. Regalarlos también aquí sería moverlos.
-     */
-    diasDePrueba: 0,
+    /* El mes gratis pasó de Equipo a aquí el 2026-10-02, por decisión del dueño
+       (D9): Pro es ahora el primer peldaño de pago. Uno por persona y por
+       organización — lo comprueba el checkout del gateway. */
+    diasDePrueba: 30,
     envPrecio: 'STRIPE_PRICE_PRO',
     asientosMinimos: 1,
+    precioFijo: true,
   },
   [PlanTier.TEAM]: {
     tier: PlanTier.TEAM,
     nombre: 'Equipo',
-    resumen: 'El primer mes es gratis. Veinticinco proyectos y PRAX a diario.',
-    paraQuien: 'Un equipo pequeño que ya trabaja junto',
+    resumen: 'Veinticinco proyectos, PRAX a diario y se paga por asiento.',
+    paraQuien: 'Un equipo que crece y paga por quien entra',
     quotas: {
       asientos: 15,
       proyectos: 25,
@@ -363,9 +375,11 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
       historialAnalisisDias: 365,
     },
     contratacion: PlanContratacion.AUTOSERVICIO,
-    diasDePrueba: 30,
+    /* Sin mes gratis desde 2026-10-02: se movió a Pro (D9). */
+    diasDePrueba: 0,
     envPrecio: 'STRIPE_PRICE_TEAM',
     asientosMinimos: 1,
+    precioFijo: false,
   },
   [PlanTier.BUSINESS]: {
     tier: PlanTier.BUSINESS,
@@ -384,6 +398,7 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     diasDePrueba: 0,
     envPrecio: 'STRIPE_PRICE_BUSINESS',
     asientosMinimos: 5,
+    precioFijo: false,
   },
   [PlanTier.ENTERPRISE]: {
     tier: PlanTier.ENTERPRISE,
@@ -402,6 +417,7 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     diasDePrueba: 0,
     envPrecio: null,
     asientosMinimos: 10,
+    precioFijo: false,
   },
 };
 
@@ -477,6 +493,26 @@ export const MAX_ORGANIZACIONES_PROPIAS = 3;
 export function quotasDe(tier: PlanTier | string | null | undefined): PlanQuotas {
   const spec = PLANS[tier as PlanTier];
   return (spec ?? PLANS[PLAN_POR_DEFECTO]).quotas;
+}
+
+/**
+ * Los asientos que se guardan en `Subscription.seats` para lo que dijo Stripe.
+ *
+ * En un plan por asiento son la cantidad de la línea de Stripe. En uno de
+ * **precio fijo** la cantidad es siempre 1 y no dice nada: los asientos son el
+ * tope del plan. ⚠️ Guardar la cantidad dejaría un Pro en **un** asiento y al
+ * resto del equipo congelado, sin un solo error (ver `precioFijo`).
+ *
+ * `undefined` si no hay nada que escribir: un evento sin cantidad no debe
+ * pisar los asientos que ya había.
+ */
+export function asientosContratados(
+  tier: PlanTier | string | null | undefined,
+  cantidad: number | undefined,
+): number | undefined {
+  const spec = PLANS[tier as PlanTier];
+  if (spec?.precioFijo && spec.quotas.asientos !== SIN_TOPE) return spec.quotas.asientos;
+  return cantidad;
 }
 
 /**

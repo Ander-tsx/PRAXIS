@@ -272,7 +272,9 @@ export class BillingController {
         `El plan ${spec.nombre} se contrata para una organización: elige cuál.`,
       );
     }
-    if ((body.seats ?? 0) < spec.asientosMinimos) {
+    /* Un plan de precio fijo no compra asientos: la cantidad la pone el plan y
+       lo que mande el cliente se ignora. */
+    if (!spec.precioFijo && (body.seats ?? 0) < spec.asientosMinimos) {
       throw new BadRequestException(
         `El plan ${spec.nombre} empieza en ${spec.asientosMinimos} asientos.`,
       );
@@ -299,7 +301,7 @@ export class BillingController {
      * restrictivo de todos. Aquí se pregunta si caben `seats`, así que se compara
      * `seats - 1` («¿cabe uno más sobre los que ya hay?»).
      */
-    if (!cabe((body.seats ?? 0) - 1, spec.quotas.asientos)) {
+    if (!spec.precioFijo && !cabe((body.seats ?? 0) - 1, spec.quotas.asientos)) {
       throw new BadRequestException(
         `El plan ${spec.nombre} llega hasta ${spec.quotas.asientos} asientos. ` +
           'Para más, el siguiente plan.',
@@ -308,15 +310,34 @@ export class BillingController {
 
     const organizationId = await this.organizacionPropia(body.organizationId, userId);
 
-    const [suscripcion, email] = await Promise.all([
+    const [suscripcion, email, pruebaDisponible] = await Promise.all([
       this.suscripcion(organizationId),
       this.correo(userId),
+      /**
+       * 🔴 **El mes gratis, una vez por persona y por organización.**
+       *
+       * No se comprobaba: suscribirse, cancelar antes del cobro y repetir daba
+       * el plan gratis para siempre. Si billing-service no contesta se niega la
+       * prueba —falla hacia el lado de cobrar, que se puede reembolsar; un mes
+       * regalado de más, no—. La garantía de verdad está en el webhook
+       * (`billing_trial_redeem`): esto solo evita ofrecerla.
+       */
+      spec.diasDePrueba > 0
+        ? firstValueFrom(
+            this.billingClient.send<boolean>(
+              { cmd: 'billing_trial_available' },
+              { userId, organizationId },
+            ),
+          ).catch(() => false)
+        : Promise.resolve(false),
     ]);
 
     return this.stripe.createCheckout({
       organizationId,
+      userId,
       tier: body.tier,
       seats: body.seats,
+      conPrueba: pruebaDisponible,
       email,
       stripeCustomerId: suscripcion?.stripeCustomerId ?? null,
       /**

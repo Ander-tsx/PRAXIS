@@ -7,6 +7,7 @@ import {
   type PlanQuotas,
   PlanTier,
   SIN_TOPE,
+  asientosContratados,
   cabe,
   mejorPlan,
   menorTope,
@@ -107,8 +108,19 @@ describe('cuotas de un plan', () => {
 
     it('solo el primer peldaño de pago da el mes gratis', () => {
       const conPrueba = PLAN_LIST.filter((plan) => plan.diasDePrueba > 0);
-      expect(conPrueba.map((plan) => plan.tier)).toEqual([PlanTier.TEAM]);
-      expect(PLANS[PlanTier.TEAM].diasDePrueba).toBe(30);
+      expect(conPrueba.map((plan) => plan.tier)).toEqual([PlanTier.PRO]);
+      expect(PLANS[PlanTier.PRO].diasDePrueba).toBe(30);
+    });
+
+    it('solo Pro es de precio fijo, y sus asientos salen del plan, no de Stripe', () => {
+      expect(PLAN_LIST.filter((plan) => plan.precioFijo).map((plan) => plan.tier)).toEqual([
+        PlanTier.PRO,
+      ]);
+      /* 🔴 La cantidad de Stripe de un precio fijo es 1. Guardarla dejaría el
+         Pro en un asiento y al resto del equipo congelado. */
+      expect(asientosContratados(PlanTier.PRO, 1)).toBe(7);
+      expect(asientosContratados(PlanTier.TEAM, 4)).toBe(4);
+      expect(asientosContratados(PlanTier.TEAM, undefined)).toBeUndefined();
     });
 
     it('el orden declarado y el de la tabla de precios son el mismo', () => {

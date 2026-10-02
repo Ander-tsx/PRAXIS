@@ -73,7 +73,9 @@ export function PlanCatalog({
               </th>
               {planes.map((plan) => {
                 const esActual = plan.tier === actual;
-                const destacado = plan.tier === 'TEAM';
+                /* Pro desde 2026-10-02: el plan fijo para equipos pequeños
+                   (docs/PLAN-PRO-INTEGRACIONES.md). */
+                const destacado = plan.tier === 'PRO';
                 return (
                   <th
                     key={plan.tier}
@@ -105,7 +107,12 @@ export function PlanCatalog({
                  secas, la fila decía «Equipo: 15» y se leía como «Equipo trae
                  15 asientos» — que es exactamente lo que no pasa: el precio es
                  por asiento y el 15 es el techo. Ver el aviso de `SeatsPanel`. */
-              { label: 'Asientos (máximo)', valor: (p: PlanSpec) => tope(p.quotas.asientos) },
+              {
+                label: 'Asientos (máximo)',
+                /* En un precio fijo el máximo viene incluido: no se compran. */
+                valor: (p: PlanSpec) =>
+                  p.precioFijo ? `${tope(p.quotas.asientos)}, incluidos` : tope(p.quotas.asientos),
+              },
               { label: 'Proyectos', valor: (p: PlanSpec) => tope(p.quotas.proyectos) },
               {
                 /* Tokens PRAX por persona (D8 de docs/PLAN-PRAX-SEMIAGENTICO.md): un
@@ -189,11 +196,13 @@ export function PlanCatalog({
       </p>
 
       <p className="max-w-3xl font-sans text-xs text-white/40">
-        Todos los planes de pago se cobran <strong className="text-white/60">por asiento</strong> y
-        se asocian a tu organización. Contratar un plan no compra sus asientos: las cifras de la
-        tabla son el <strong className="text-white/60">máximo</strong> al que deja llegar cada plan,
-        y los asientos se añaden uno a uno desde «Tu plan», arriba. Empieza gratis y cambia cuando
-        lo necesites.
+        Pro es un <strong className="text-white/60">precio fijo</strong> para toda la organización,
+        con sus asientos incluidos, y el primer mes es gratis —una vez por persona y por
+        organización—. Los demás planes de pago se cobran{' '}
+        <strong className="text-white/60">por asiento</strong>: contratarlos no compra sus asientos,
+        las cifras de la tabla son el <strong className="text-white/60">máximo</strong> al que deja
+        llegar cada plan, y los asientos se añaden uno a uno desde «Tu plan», arriba. Empieza gratis
+        y cambia cuando lo necesites.
       </p>
     </div>
   );
@@ -214,7 +223,9 @@ function Precio({ plan, precio }: { plan: PlanSpec; precio: string | null }) {
     <span className="mt-1 flex items-baseline gap-1">
       <span className="font-sans text-xl font-semibold text-white">{texto}</span>
       {plan.contratacion === 'AUTOSERVICIO' && precio !== null && (
-        <span className="font-sans text-xs font-normal text-white/40">/ asiento · mes</span>
+        <span className="font-sans text-xs font-normal text-white/40">
+          {plan.precioFijo ? '/ mes' : '/ asiento · mes'}
+        </span>
       )}
     </span>
   );

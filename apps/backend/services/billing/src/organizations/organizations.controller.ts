@@ -192,6 +192,25 @@ export class OrganizationsController {
     return this.suscripciones.clienteDe(dto.userId);
   }
 
+  /** ¿Queda mes gratis para esta persona en esta organización? */
+  @MessagePattern({ cmd: 'billing_trial_available' })
+  pruebaDisponible(@Payload() dto: { userId: string; organizationId: string }) {
+    return this.suscripciones.pruebaDisponible(dto.userId, dto.organizationId);
+  }
+
+  /**
+   * Anota que una suscripción estrenó el mes gratis. Solo lo llama el webhook,
+   * con la firma de Stripe comprobada; `userId` sale de los metadatos que puso
+   * nuestro checkout.
+   */
+  @MessagePattern({ cmd: 'billing_trial_redeem' })
+  canjearPrueba(
+    @Payload()
+    dto: { userId: string; organizationId: string; stripeSubscriptionId: string; tier: PlanTier },
+  ) {
+    return this.suscripciones.canjearPrueba(dto);
+  }
+
   @MessagePattern({ cmd: 'billing_subscription_of' })
   suscripcion(@Payload() dto: { organizationId: string }) {
     return this.suscripciones.deOrganizacion(dto.organizationId);

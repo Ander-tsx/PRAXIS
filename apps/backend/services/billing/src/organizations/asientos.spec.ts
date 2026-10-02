@@ -48,7 +48,7 @@ describe('tope de asientos', () => {
        bajando de plan con los asientos puestos. */
     const asientos = topeDeAsientos(vigente(PlanTier.PRO, 15));
 
-    expect(asientos.tope).toBe(5);
+    expect(asientos.tope).toBe(7);
     expect(asientos.loPoneElPlan).toBe(true);
   });
 
