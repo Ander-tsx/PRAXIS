@@ -38,7 +38,6 @@ import { usePresence } from '../../realtime/presence';
 import { useMessageCount } from '../../realtime/useMessageCount';
 import { avisarDeAvisosLeidos, useNoticeCount } from '../../realtime/useNoticeCount';
 import { alpha, colors } from '../../tokens';
-import { KylooWordmark } from '../KylooWordmark';
 import {
   FilaDeAccion,
   type TipoDeEspacio,
@@ -537,45 +536,23 @@ function ArmazonInterno({
             plegada ? 'w-[4.5rem]' : 'w-80'
           }`}
         >
-          {/* El pliegue vive **en la cabecera, al lado de la marca**: es donde
-              se busca por costumbre, y ahí no compite con «Cerrar sesión», que
-              era el vecino que tenía abajo y con el que se podía confundir. */}
-          {/**
-           * Plegada, la marca **no está**: no se encoge a una inicial.
-           *
-           * Estuvo como una «P» suelta y no funcionaba — una letra sola en una
-           * columna de iconos se lee como un icono más, no como la marca, y
-           * encima competía por el sitio con el botón. Quien está dentro de la
-           * aplicación ya sabe en qué aplicación está; el logotipo es para la
-           * landing y para la pantalla de entrada.
-           *
-           * Lo que queda es el botón, centrado, que es lo único accionable de
-           * esta franja cuando está plegada.
-           */}
-          <div
-            className={`flex items-center border-b border-border ${
-              plegada ? 'h-16 justify-center px-0' : 'h-16 justify-between px-6'
-            }`}
-          >
-            {!plegada && (
-              <div className="flex items-baseline gap-2">
-                <Wordmark />
-                <ByKyloo />
-              </div>
-            )}
-            <BotonDePliegue plegada={plegada} onClick={alternarPliegue} />
-          </div>
-
           {/* ⚠️ Selector y pestañas **fuera** del scroll: solo se desplaza el contenido de la pestaña. */}
           <div className={`flex min-h-0 flex-1 flex-col pt-2 ${plegada ? 'px-2' : 'px-4'}`}>
-            <div className="mb-4">
-              <OrgSwitcher
-                name={user.name}
-                plegada={plegada}
-                organizaciones={organizaciones}
-                activaId={organizacionActivaId ?? null}
-                zonePath={zonePath}
-              />
+            <div
+              className={`mb-4 flex shrink-0 items-start gap-1 ${plegada ? 'justify-center' : ''}`}
+            >
+              <div className={plegada ? 'hidden' : 'min-w-0 flex-1'}>
+                <OrgSwitcher
+                  name={user.name}
+                  plegada={plegada}
+                  organizaciones={organizaciones}
+                  activaId={organizacionActivaId ?? null}
+                  zonePath={zonePath}
+                />
+              </div>
+              <div className={plegada ? '' : 'mt-3.5'}>
+                <BotonDePliegue plegada={plegada} onClick={alternarPliegue} />
+              </div>
             </div>
 
             {/**
@@ -805,38 +782,39 @@ function ArmazonInterno({
                 de dentro se montarían y pedirían datos también en escritorio. */}
             {cajonMontado && (
               <>
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <Wordmark />
-                    <ByKyloo />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setMobileMenuOpen(false)}
-                    aria-label="Cerrar menú"
-                    className="rounded-md p-1 text-white transition-colors hover:text-text-primary"
-                  >
-                    <svg
-                      className="h-6 w-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.75}
-                      aria-hidden="true"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
                 <div className="flex flex-col gap-4 flex-1 min-h-0 mb-6">
-                  <OrgSwitcher
-                    name={user.name}
-                    plegada={false}
-                    organizaciones={organizaciones}
-                    activaId={organizacionActivaId ?? null}
-                    zonePath={zonePath}
-                  />
+                  <div className="flex shrink-0 items-start gap-1">
+                    <div className="min-w-0 flex-1">
+                      <OrgSwitcher
+                        name={user.name}
+                        plegada={false}
+                        organizaciones={organizaciones}
+                        activaId={organizacionActivaId ?? null}
+                        zonePath={zonePath}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMobileMenuOpen(false)}
+                      aria-label="Cerrar menú"
+                      className="mt-3 shrink-0 rounded-md p-1 text-white transition-colors hover:text-text-primary"
+                    >
+                      <svg
+                        className="h-6 w-6"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={1.75}
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
 
                   {/**
                    * 🔴 **Las tres pestañas, también aquí.**
@@ -1038,60 +1016,6 @@ function UserCard({
 }
 
 /**
- * El mismo logotipo que navbar/footer de la landing — `var(--font-grotesk)`
- * (Archivo 800), no `font-display` (Redaction 50, la voz del resto de la
- * app): el nombre de Praxis es una marca, no un titular, y las dos zonas
- * donde aparece tienen que decir lo mismo. Morado (`text-primary`) porque
- * aquí, a diferencia de la landing, la aplicación sí tiene color de marca.
- */
-function Wordmark() {
-  return (
-    <span
-      className="select-none text-2xl font-extrabold tracking-tight text-primary"
-      style={{ fontFamily: 'var(--font-grotesk)' }}
-    >
-      Praxis
-    </span>
-  );
-}
-
-/**
- * "By Kyloo" — el mismo lettermark real que el cierre del footer de la
- * landing y `AuthPanel` (`kyloo-design/SKILL.md` §8, §12), a escala de
- * esquina de barra lateral. Cada zona que monta `AppShell` tiene que cargar
- * Archivo y Khteka en su propio `layout.tsx` — sin la variable, el texto cae
- * a su *fallback* en silencio, no revienta.
- */
-function ByKyloo() {
-  return (
-    <span className="flex items-baseline gap-1.5 text-white">
-      <span className="font-mono text-xs uppercase tracking-[0.18em]">By</span>
-      {/**
-       * El lettermark **lleva a kyloo.com.mx**, y solo él: «By» se queda fuera
-       * del enlace porque es la preposición de la frase, no parte de la marca.
-       *
-       * ⚠️ `noopener` no es opcional: sin él la página que se abre recibe un
-       * `window.opener` con el que puede redirigir la nuestra. Es la misma regla
-       * que `CheckoutButton` al abrir el portal de Stripe.
-       *
-       * Es un `<a>` y no un `Link` de Next a propósito: sale de la aplicación,
-       * así que no hay nada que prefetchear ni ninguna ruta que resolver.
-       */}
-      <a
-        href="https://kyloo.com.mx"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Kyloo — abre kyloo.com.mx en una pestaña nueva"
-        title="kyloo.com.mx"
-        className="inline-flex rounded-sm opacity-100 transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-      >
-        <KylooWordmark className="h-3.5 w-auto translate-y-[3.5px]" />
-      </a>
-    </span>
-  );
-}
-
-/**
  * El selector de organización.
  *
  * ## Dejó de ser un dibujo
@@ -1127,7 +1051,7 @@ function ByKyloo() {
 /**
  * El botón de plegar: **un icono, sin texto**.
  *
- * Vive en la cabecera junto a la marca. Es un icono de paneles —no una flecha
+ * Vive junto al selector de organización. Es un icono de paneles —no una flecha
  * suelta— porque una flecha en un borde se lee como «atrás»; dos rectángulos con
  * uno estrecho dicen de qué va sin necesidad de leer nada.
  *
