@@ -24,6 +24,7 @@ import { Burbuja } from './Burbuja';
 import { VistaAviso } from './VistaAviso';
 import { VistaImagen } from './VistaImagen';
 import { VistaTarjeta } from './VistaTarjeta';
+import { VistaTabla } from './VistaTabla';
 import { crearBarra } from './barra';
 import { bloquesDisponibles } from './bloques';
 import { Contexto, type ContextoDelDocumento, rutaDeDocumento } from './contexto';
@@ -321,7 +322,11 @@ function EditorVivo({
       image: ImagenDeDocumento.extend({ addNodeView: () => ReactNodeViewRenderer(VistaImagen) }),
     };
     return [
-      ...extensionesDelDocumento().map((e) => vistas[e.name] ?? e),
+      ...extensionesDelDocumento().map((e) =>
+        e.name === 'tableKit'
+          ? e.configure({ table: { resizable: false, cellMinWidth: 120, View: VistaTabla } })
+          : (vistas[e.name] ?? e),
+      ),
       Collaboration.configure({ document: conexion.documento, field: CAMPO_YJS }),
       CollaborationCaret.configure({
         provider: conexion.proveedor,

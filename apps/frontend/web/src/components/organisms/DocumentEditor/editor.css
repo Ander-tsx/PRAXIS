@@ -190,6 +190,129 @@
   overflow-x: auto;
 }
 
+/* Los «+» acompañan a la tabla al crecer, también dentro del scroll horizontal. */
+.documento-praxis .tabla-superficie {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 3px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: calc(var(--tabla-ancho-minimo) + 62px);
+  padding: 28px 3px 3px 28px;
+}
+.documento-praxis .tabla-superficie table {
+  margin: 0;
+}
+.documento-praxis .tabla-agregar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.documento-praxis .tabla-agregar-fila {
+  grid-column: 1;
+  height: 28px;
+}
+.documento-praxis .tabla-agregar:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--color-text-primary);
+}
+.documento-praxis .tabla-agregar:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+.documento-praxis[contenteditable="false"] .tabla-agregar {
+  display: none;
+}
+.documento-praxis .tabla-controles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.documento-praxis .tabla-asa {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font: 18px var(--font-sans);
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 120ms, background 120ms;
+}
+.documento-praxis .tabla-asa:hover,
+.documento-praxis .tabla-asa[aria-expanded="true"] {
+  opacity: 1;
+}
+.documento-praxis .tabla-asa:hover,
+.documento-praxis .tabla-asa[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+}
+.documento-praxis .tabla-asa:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--color-primary);
+}
+.documento-praxis .tabla-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  min-width: 170px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-elevated);
+  color: var(--color-text-primary);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
+  font: 13px var(--font-sans);
+}
+.documento-praxis .tabla-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-error);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.documento-praxis .tabla-menu button:hover,
+.documento-praxis .tabla-menu button:focus-visible {
+  background: color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+  outline: none;
+}
+@media (hover: none) {
+  .documento-praxis .tabla-asa {
+    opacity: 1;
+  }
+}
+.documento-praxis[contenteditable="false"] .tabla-controles,
+.documento-praxis[contenteditable="false"] .tabla-menu {
+  display: none;
+}
+.documento-praxis[contenteditable="false"] .tabla-superficie {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: calc(var(--tabla-ancho-minimo) + 6px);
+  padding: 3px;
+}
+
 /* El marcador del bloque vacío en el que está el cursor. */
 .documento-praxis .is-empty::before {
   content: attr(data-placeholder);

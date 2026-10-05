@@ -135,11 +135,11 @@ export function bloquesDisponibles(abrirImagen: () => void): Bloque[] {
     {
       id: 'tabla',
       titulo: 'Tabla',
-      detalle: 'Tres por tres para empezar',
+      detalle: 'Dos columnas y una fila para empezar',
       grupo: 'Bloques',
       icono: <Table className={I} />,
       palabras: ['table', 'grid'],
-      ejecutar: (e, r) => desde(e, r).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+      ejecutar: (e, r) => desde(e, r).insertTable({ rows: 1, cols: 2, withHeaderRow: false }).run(),
     },
     {
       id: 'separador',
