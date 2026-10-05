@@ -65,12 +65,15 @@ export function OrgSwitcher({
   organizaciones,
   activaId,
   zonePath,
+  controlLateral,
 }: {
   name: string;
   plegada: boolean;
   organizaciones?: OrgDelSelector[];
   activaId: string | null;
   zonePath: string;
+  /** El control ocupa solo la cabecera; la tarjeta conserva todo el ancho. */
+  controlLateral?: React.ReactNode;
 }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
@@ -127,30 +130,33 @@ export function OrgSwitcher({
        con scroll, y sin esto el navegador lo comprime cuando el contenido de
        debajo crece. Ver el aviso de `SidebarTabs`. */
     <div className="relative shrink-0" ref={popoverRef}>
-      <button
-        type="button"
-        onClick={() => setAbierto((v) => !v)}
-        aria-expanded={abierto}
-        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/5"
-      >
-        {cuadro}
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="font-sans text-[10px] text-white">{etiquetaDePlan(activa?.tier)}</span>
-          <span className="truncate font-sans text-[13px] font-semibold text-text-primary">
-            {etiqueta}
-          </span>
-        </span>
-        <svg
-          className={`h-4 w-4 shrink-0 text-white transition-transform duration-200 ${abierto ? '-rotate-180' : ''}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-          aria-hidden="true"
+      <div className="flex items-start gap-1">
+        <button
+          type="button"
+          onClick={() => setAbierto((v) => !v)}
+          aria-expanded={abierto}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/5"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+          {cuadro}
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="font-sans text-[10px] text-white">{etiquetaDePlan(activa?.tier)}</span>
+            <span className="truncate font-sans text-[13px] font-semibold text-text-primary">
+              {etiqueta}
+            </span>
+          </span>
+          <svg
+            className={`h-4 w-4 shrink-0 text-white transition-transform duration-200 ${abierto ? '-rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        {controlLateral}
+      </div>
 
       <div
         className={`grid transition-all duration-200 ease-in-out ${abierto ? 'grid-rows-[1fr] opacity-100 mt-1.5' : 'grid-rows-[0fr] opacity-0'}`}

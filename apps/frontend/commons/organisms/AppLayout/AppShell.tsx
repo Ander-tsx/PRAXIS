@@ -532,25 +532,26 @@ function ArmazonInterno({
       <div className="flex h-dvh overflow-hidden bg-[#191919] font-sans text-text-primary">
         {/* ── Barra lateral (escritorio) ───────────────────────── */}
         <aside
-          className={`hidden shrink-0 flex-col border-r border-border bg-[#202020] transition-[width] duration-200 md:flex ${
+          className={`relative hidden shrink-0 flex-col border-r border-border bg-[#202020] transition-[width] duration-200 motion-reduce:transition-none md:flex ${
             plegada ? 'w-[4.5rem]' : 'w-80'
           }`}
         >
           {/* ⚠️ Selector y pestañas **fuera** del scroll: solo se desplaza el contenido de la pestaña. */}
           <div className={`flex min-h-0 flex-1 flex-col pt-2 ${plegada ? 'px-2' : 'px-4'}`}>
-            <div
-              className={`mb-4 flex shrink-0 items-start gap-1 ${plegada ? 'justify-center' : ''}`}
-            >
-              <div className={plegada ? 'hidden' : 'min-w-0 flex-1'}>
+            <div className="relative mb-4 min-h-[52px] shrink-0">
+              <div className={plegada ? 'hidden' : 'min-w-0'}>
                 <OrgSwitcher
                   name={user.name}
                   plegada={plegada}
                   organizaciones={organizaciones}
                   activaId={organizacionActivaId ?? null}
                   zonePath={zonePath}
+                  controlLateral={<span aria-hidden="true" className="w-7 shrink-0" />}
                 />
               </div>
-              <div className={plegada ? '' : 'mt-3.5'}>
+              <div
+                className={`absolute top-3 ${plegada ? 'left-1/2 -translate-x-1/2' : 'right-0'}`}
+              >
                 <BotonDePliegue plegada={plegada} onClick={alternarPliegue} />
               </div>
             </div>
@@ -791,29 +792,31 @@ function ArmazonInterno({
                         organizaciones={organizaciones}
                         activaId={organizacionActivaId ?? null}
                         zonePath={zonePath}
+                        controlLateral={
+                          <button
+                            type="button"
+                            onClick={() => setMobileMenuOpen(false)}
+                            aria-label="Cerrar menú"
+                            className="mt-3 shrink-0 rounded-md p-1 text-white transition-colors hover:text-text-primary"
+                          >
+                            <svg
+                              className="h-6 w-6"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={1.75}
+                              aria-hidden="true"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
+                        }
                       />
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setMobileMenuOpen(false)}
-                      aria-label="Cerrar menú"
-                      className="mt-3 shrink-0 rounded-md p-1 text-white transition-colors hover:text-text-primary"
-                    >
-                      <svg
-                        className="h-6 w-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={1.75}
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
                   </div>
 
                   {/**
@@ -1051,9 +1054,8 @@ function UserCard({
 /**
  * El botón de plegar: **un icono, sin texto**.
  *
- * Vive junto al selector de organización. Es un icono de paneles —no una flecha
- * suelta— porque una flecha en un borde se lee como «atrás»; dos rectángulos con
- * uno estrecho dicen de qué va sin necesidad de leer nada.
+ * Vive dentro de la cabecera, junto al selector de organización. Al plegar,
+ * queda centrado en la barra y sigue disponible para abrirla.
  *
  * El `aria-label` sí es texto completo y cambia con el estado: lo que se pierde
  * al quitar la palabra es para el ratón, no para quien navega con lector.
@@ -1065,11 +1067,11 @@ function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () =>
       onClick={onClick}
       aria-expanded={!plegada}
       aria-label={plegada ? 'Desplegar la barra lateral' : 'Plegar la barra lateral'}
-      title={plegada ? 'Desplegar' : 'Plegar'}
-      className="shrink-0 cursor-pointer rounded-md p-1.5 text-white transition-colors hover:bg-white/5 hover:text-text-primary"
+      title={plegada ? 'Desplegar la barra lateral' : 'Plegar la barra lateral'}
+      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-border bg-[#202020] text-text-secondary shadow-sm transition-colors hover:bg-[#2a2a2a] hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-[#202020]"
     >
       <svg
-        className="h-4 w-4"
+        className="h-3.5 w-3.5"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
