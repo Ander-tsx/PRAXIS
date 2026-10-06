@@ -35,5 +35,28 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     );
   }
 
-  return <>{children}</>;
+  /**
+   * En un teléfono, la administración no está (D12 de `docs/PLAN-MOVIL.md`):
+   * son tablas de cuentas, organizaciones y actividad con filtros y acciones
+   * que piden pantalla y cuidado. Se dice en vez de enseñar una tabla rota o un
+   * hueco, que se leería como una avería.
+   */
+  return (
+    <>
+      <div className="contents max-md:hidden">{children}</div>
+      <div className="contents md:hidden">
+        <AppHeader title="Administración">
+          <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+            <h1 className="font-sans text-xl font-semibold text-text-primary">
+              Administración, desde un ordenador
+            </h1>
+            <p className="max-w-sm font-sans text-sm leading-relaxed text-text-secondary">
+              El panel de administración necesita una pantalla grande. Ábrelo desde un ordenador o
+              una tableta en horizontal.
+            </p>
+          </div>
+        </AppHeader>
+      </div>
+    </>
+  );
 }

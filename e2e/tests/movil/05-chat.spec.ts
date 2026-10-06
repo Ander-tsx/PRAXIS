@@ -28,7 +28,7 @@ test.afterAll(async () => {
 
 test('una conversación ocupa la pantalla y su «atrás» se acierta con el dedo', async () => {
   await pagina.goto(`/chat/proyecto/${projectId}`);
-  await expect(pagina.getByRole('navigation', { name: 'Secciones' })).toBeHidden();
+  await expect(pagina.getByRole('navigation', { name: 'Secciones', exact: true })).toBeHidden();
   const atras = pagina.getByRole('link', { name: 'Conversaciones' }).filter({ visible: true });
   await expect(atras).toBeVisible();
   const caja = await atras.boundingBox();
@@ -49,7 +49,7 @@ test('se escribe, se envía, y la pulsación larga abre las acciones', async () 
   const mensaje = pagina.getByText('Hola desde el teléfono').filter({ visible: true }).first();
   await expect(mensaje).toBeVisible({ timeout: 15_000 });
   /* Al enviar, el teclado sigue abierto: la barra de abajo no debe asomar. */
-  await expect(pagina.getByRole('navigation', { name: 'Secciones' })).toBeHidden();
+  await expect(pagina.getByRole('navigation', { name: 'Secciones', exact: true })).toBeHidden();
 
   await mensaje.evaluate((el) => {
     const caja = el.getBoundingClientRect();
@@ -77,11 +77,11 @@ test('el «atrás» de la conversación lleva a la lista, con la barra de vuelta
   await pagina.goto(`/chat/proyecto/${projectId}`);
   await pagina.getByRole('link', { name: 'Conversaciones' }).filter({ visible: true }).click();
   await expect(pagina).toHaveURL(/\/chat\?lista=1/);
-  await expect(pagina.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
+  await expect(pagina.getByRole('navigation', { name: 'Secciones', exact: true })).toBeVisible();
 });
 
 test('PRAX se abre con su compositor a la vista', async () => {
   await pagina.goto('/assistant');
   await expect(pagina.getByPlaceholder(/Pregúntale a PRAX/)).toBeInViewport();
-  await expect(pagina.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
+  await expect(pagina.getByRole('navigation', { name: 'Secciones', exact: true })).toBeVisible();
 });

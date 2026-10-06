@@ -20,15 +20,16 @@ import { EditorContent, ReactNodeViewRenderer, useEditor } from '@tiptap/react';
 import { CloudOff, GripVertical, LoaderCircle, Plus } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Y from 'yjs';
+import { BarraDeFormatoMovil } from './BarraDeFormatoMovil';
 import { Burbuja } from './Burbuja';
+import { RevisionDePrax } from './RevisionDePrax';
 import { VistaAviso } from './VistaAviso';
 import { VistaImagen } from './VistaImagen';
-import { VistaTarjeta } from './VistaTarjeta';
 import { VistaTabla } from './VistaTabla';
+import { VistaTarjeta } from './VistaTarjeta';
 import { crearBarra } from './barra';
 import { bloquesDisponibles } from './bloques';
 import { Contexto, type ContextoDelDocumento, rutaDeDocumento } from './contexto';
-import { RevisionDePrax } from './RevisionDePrax';
 import './editor.css';
 
 /** Tope y formatos de las imágenes: los mismos que comprueba el gateway (E6). */
@@ -498,6 +499,10 @@ function EditorVivo({
               </>
             )}
             <EditorContent editor={editor} />
+            {/* Móvil: el formato pegado al teclado (M5 de docs/PLAN-MOVIL.md). */}
+            {editable && editor && (
+              <BarraDeFormatoMovil editor={editor} onImagen={() => inputImagen.current?.click()} />
+            )}
           </>
         )}
 

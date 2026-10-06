@@ -161,6 +161,19 @@ function Pestana({
   );
 }
 
+/** Si el elemento es un campo donde se escribe: lo que abre el teclado. */
+function esCampo(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.isContentEditable) return true;
+  if (el instanceof HTMLTextAreaElement) return true;
+  if (el instanceof HTMLInputElement) {
+    return !['button', 'checkbox', 'radio', 'range', 'submit', 'reset', 'file', 'color'].includes(
+      el.type,
+    );
+  }
+  return false;
+}
+
 /**
  * Si hay un campo de texto con el foco: la señal de que el teclado está
  * abierto. Se mira el foco y no el alto de la ventana porque, con
@@ -168,38 +181,33 @@ function Pestana({
  * la barra del navegador.
  */
 function useEscribiendo(): boolean {
-  const [escribiendo, setEscribiendo] = useState(false);
+  /* Al montarse mira quién tiene ya el foco, por si se monta con un campo
+     enfocado: arrancar en «no escribe» la dejaría encima del teclado hasta el
+     siguiente cambio de foco. */
+  const [escribiendo, setEscribiendo] = useState(
+    () => typeof document !== 'undefined' && esCampo(document.activeElement),
+  );
   useEffect(() => {
-    const esCampo = (el: EventTarget | null) => {
-      if (!(el instanceof HTMLElement)) return false;
-      if (el.isContentEditable) return true;
-      if (el instanceof HTMLTextAreaElement) return true;
-      if (el instanceof HTMLInputElement) {
-        return ![
-          'button',
-          'checkbox',
-          'radio',
-          'range',
-          'submit',
-          'reset',
-          'file',
-          'color',
-        ].includes(el.type);
-      }
-      return false;
-    };
+    setEscribiendo(esCampo(document.activeElement));
     const entra = (e: FocusEvent) => {
       if (esCampo(e.target)) setEscribiendo(true);
     };
-    /* `relatedTarget` es adónde va el foco: de un campo a otro no se enseña. */
-    const sale = (e: FocusEvent) => {
-      if (!esCampo(e.relatedTarget)) setEscribiendo(false);
+    /* Al salir se mira quién tiene el foco un tick después, y no
+       `relatedTarget`: es la respuesta directa a «¿sigue alguien escribiendo?»
+       y no depende de que el navegador rellene el destino del foco. */
+    let pendiente = 0;
+    const sale = () => {
+      window.clearTimeout(pendiente);
+      pendiente = window.setTimeout(() => setEscribiendo(esCampo(document.activeElement)), 0);
     };
-    document.addEventListener('focusin', entra);
-    document.addEventListener('focusout', sale);
+    /* En captura, para enterarse aunque algún componente detenga la
+       propagación del evento. */
+    document.addEventListener('focusin', entra, true);
+    document.addEventListener('focusout', sale, true);
     return () => {
-      document.removeEventListener('focusin', entra);
-      document.removeEventListener('focusout', sale);
+      document.removeEventListener('focusin', entra, true);
+      document.removeEventListener('focusout', sale, true);
+      window.clearTimeout(pendiente);
     };
   }, []);
   return escribiendo;

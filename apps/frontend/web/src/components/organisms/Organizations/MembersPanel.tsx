@@ -45,16 +45,19 @@ export function MembersPanel({
     <div className="flex flex-col gap-6">
       {puedeGestionar && <Invitar organizationId={organizationId} sinAsientos={!quedaSitio} />}
 
+      {/* En móvil cada fila es un bloque —miembro arriba, rol y acciones debajo—:
+          tres columnas no caben en 390 px y la tabla se desplazaba de lado (M6 de
+          docs/PLAN-MOVIL.md). Desde `md`, la tabla de siempre. */}
       <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#191919]">
-        <table className="w-full text-left font-sans text-sm text-white">
-          <thead className="border-b border-white/10 bg-white/5 text-xs uppercase text-white/60">
+        <table className="w-full text-left font-sans text-sm text-white max-md:block">
+          <thead className="border-b border-white/10 bg-white/5 text-xs uppercase text-white/60 max-md:hidden">
             <tr>
               <th className="px-4 py-3 font-medium">Miembro</th>
               <th className="px-4 py-3 font-medium">Rol</th>
               <th className="px-4 py-3 font-medium text-right">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/5">
+          <tbody className="divide-y divide-white/5 max-md:block">
             {miembros.map((miembro) => (
               <Fila
                 key={miembro.userId ?? miembro.email}
@@ -251,8 +254,8 @@ function Fila({
   const seLePuedeTocar = puedeGestionar && !esDueño;
 
   return (
-    <tr className="group transition-colors hover:bg-white/[0.02]">
-      <td className="px-4 py-3 align-middle">
+    <tr className="group transition-colors hover:bg-white/[0.02] max-md:flex max-md:flex-wrap max-md:items-center max-md:gap-x-2 max-md:px-4 max-md:py-3">
+      <td className="px-4 py-3 align-middle max-md:w-full max-md:p-0 max-md:pb-2">
         <div className="flex items-center gap-3">
           <Avatar
             label={miembro.name ?? miembro.email}
@@ -277,7 +280,7 @@ function Fila({
           </div>
         </div>
       </td>
-      <td className="px-4 py-3 align-middle">
+      <td className="px-4 py-3 align-middle max-md:p-0">
         {esDueño ? (
           <span className="inline-flex items-center rounded-md border border-primary/40 bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
             Dueño
@@ -306,7 +309,7 @@ function Fila({
           </span>
         )}
       </td>
-      <td className="px-4 py-3 text-right align-middle">
+      <td className="px-4 py-3 text-right align-middle max-md:ml-auto max-md:p-0">
         {seLePuedeTocar && (
           <form action={quitarAction} className="inline-block">
             <input type="hidden" name="organizationId" value={organizationId} />

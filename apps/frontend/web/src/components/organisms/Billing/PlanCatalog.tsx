@@ -62,11 +62,17 @@ export function PlanCatalog({
       {resumen && <TuConsumo resumen={resumen} />}
       {resumen && <TopesRebasados excedidas={resumen.excedidas} />}
 
+      {/* En móvil la tabla se desplaza de lado y la primera columna —qué se
+          compara— se queda fija (M6 de docs/PLAN-MOVIL.md): sin eso, a la
+          tercera columna ya no se sabía de qué fila hablaba cada número. */}
       <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#191919]">
         <table className="w-full min-w-[760px] text-left font-sans text-sm">
           <thead>
             <tr className="border-b border-white/10">
-              <th scope="col" className="w-[26%] px-5 py-5 align-bottom">
+              <th
+                scope="col"
+                className="w-[26%] px-5 py-5 align-bottom max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-[#191919]"
+              >
                 <span className="font-sans text-xs font-medium uppercase tracking-wider text-white/40">
                   Planes
                 </span>
@@ -138,7 +144,10 @@ export function PlanCatalog({
               },
             ].map((fila) => (
               <tr key={fila.label}>
-                <th scope="row" className="px-5 py-3.5 font-sans font-medium text-white/60">
+                <th
+                  scope="row"
+                  className="px-5 py-3.5 font-sans font-medium text-white/60 max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-[#191919]"
+                >
                   {fila.label}
                 </th>
                 {planes.map((plan) => {
@@ -160,7 +169,7 @@ export function PlanCatalog({
 
           <tfoot>
             <tr className="border-t border-white/10">
-              <td className="px-5 py-5" />
+              <td className="px-5 py-5 max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-[#191919]" />
               {planes.map((plan) => {
                 const esActual = plan.tier === actual;
                 const seVende = disponibles.includes(plan.tier);

@@ -12,7 +12,7 @@ let pagina: Page;
 let slug: string;
 let projectId: string;
 
-const barra = () => pagina.getByRole('navigation', { name: 'Secciones' });
+const barra = () => pagina.getByRole('navigation', { name: 'Secciones', exact: true });
 
 test.beforeAll(async ({ browser }, info) => {
   const contexto = await browser.newContext(info.project.use);

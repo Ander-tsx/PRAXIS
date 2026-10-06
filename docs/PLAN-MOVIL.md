@@ -114,12 +114,13 @@ escritorio no cambia nada.
 borde izquierdo (iOS no lo da en una PWA instalada), y tirar hacia abajo para
 refrescar en las listas. Respetan `prefers-reduced-motion`.
 
-**D12 — Lo que no viaja a móvil, a propósito.** Panel de administración,
-redimensionar barra y columnas de tabla, reordenar columnas arrastrando,
-arrastrar tarjetas (se mueven con «Mover a»), el editor de automatizaciones (se
-ven y se encienden/apagan; se editan en escritorio) y contratar plan (se ve el
-plan; se gestiona en escritorio, con enlace). Cada uno lo dice en su sitio: un
-hueco sin explicación parece una avería.
+**D12 — Lo que no viaja a móvil, a propósito.** Panel de administración (se
+dice en su lugar, no se esconde a secas), redimensionar barra y columnas de
+tabla, reordenar columnas arrastrando y arrastrar tarjetas (se mueven con
+«Mover a»). ⚠️ *Revisado en M6:* el editor de automatizaciones y la
+facturación se planearon fuera y **se quedan**: el editor cabe en una columna
+y la comparativa de planes se lee con su primera columna fija. Bloquearlos
+habría quitado más de lo que protegía.
 
 **D13 — Sin conexión es solo lectura.** Por defecto, sin respuesta del dueño a
 la pregunta. Escribir sin red significa una cola, reintentos y conflictos al
@@ -236,6 +237,6 @@ local**. Ninguna se sube.
 | M2 | ✅ | (este) | `BarraInferior` (Inicio · Chat · PRAX · Avisos · Tú) en lugar de la hamburguesa y el cajón, que se borran; se esconde al escribir y dentro de `/chat/<algo>`, y publica su alto en `--barra-inferior`. `HojaInferior` y `HojaDeAcciones` en `commons/molecules` (arrastrar para cerrar, `inert` en el fondo, foco, Escape). Avisos y Tú son hojas. **D9:** no se activa `experimental.viewTransition` (global, tocaría escritorio); la entrada es CSS encerrado en `@media (max-width: 767px)` con dirección por `popstate`/clic (`transicionDePantalla.ts`). `GestosMoviles`: volver desde el borde (no en la raíz de una pestaña) y tirar para refrescar (solo si `<main>` es quien desplaza). **D8 se aplica por pantalla en M3–M6**, no con una barra genérica: varias ya traen la suya (`ProjectHeader`, chat, PRAX) y otra encima la duplicaría. ⚠️ El `role="dialog"` es un `<div>`: `<dialog>` pelea con la animación y el arrastre. ⚠️ Playwright no arrastra con el dedo: el gesto de volver se prueba con `TouchEvent` sintéticos |
 | M3 | ✅ | (este) | Inicio en móvil = `ArbolDeProyectos` (el árbol de la barra, exportado) con título grande. Kanban: una columna por pantalla con `scroll-snap` y `PildorasDeColumnas`; sin reordenar columnas ni arrastre de cabecera con el dedo (D12); «Añadir tarea» siempre visible. «Mover a…» sobre `HojaDeAcciones` (`tambienEnTableta`: la pulsación larga llega también desde una tableta). `SlideOver` sube como hoja por debajo de `sm` y respeta el notch; la barra inferior baja a `z-30` para no taparlo. Calendario → agenda (`AgendaSemana`), tabla → tarjetas con «Ordenar por»; las dos por `useEsMovil` y no CSS, para no duplicar tareas en el DOM. Menús ⋯ siempre visibles y como hoja de acciones; filas de la barra de 44 px en móvil. PRAX y Chat del proyecto como iconos (sin cambiar su nombre accesible). ⚠️ El panel «Sin fecha» cerrado era `w-0` con alto y aplastaba la agenda en columna: ahora `max-lg:hidden`. ⚠️ **Los 10 fallos de la suite `ui` de escritorio no son de esta rama**: contra una build de `main`, `03-sesion` (2) y `04-invitaciones` (1) fallan igual, `07-reglas` falla en un subconjunto distinto en cada corrida y `09-scrum` depende de la hora (también falla en `main` corrida suelta) |
 | M4 | ✅ | (este) | Dentro de una conversación, sin barra, la columna reserva la zona segura de abajo (`--barra-inferior` = `env(safe-area-inset-bottom)`). 🍎 **Safari no soporta `interactive-widget`**: el teclado tapa sin encoger; `GestosMoviles` publica `--teclado` con `visualViewport` y la columna reserva `max(barra, teclado)` (en Android vale 0, la ventana ya encoge). «Conversaciones» de 44 px. Las acciones de un mensaje ya tenían pulsación larga con hoja propia (`MessageBubble`): no se tocan. Las propuestas de PRAX siguen como tarjetas en el hilo —en una columna se leen bien—: no hacía falta pasarlas a hojas. ⚠️ El ajuste del teclado de iOS **no se puede probar emulado**: va a la lista de la prueba a mano en un iPhone |
-| M5 | ⏳ | | |
-| M6 | ⏳ | | |
+| M5 | ✅ | (este) | `BarraDeFormatoMovil`: deshacer, rehacer, títulos, negrita, cursiva, tachado, listas, tareas, cita e imagen, pegada al teclado (`bottom: var(--teclado)`), solo con el editor enfocado; `pointerdown` con `preventDefault` para no cerrar el teclado. El editor ya iba a lo ancho desde la etapa anterior. ⚠️ Un falso rojo que costó tiempo: `getByRole('navigation', { name: 'Secciones' })` casa por subcadena con «Secciones **del proyecto**»; las pruebas móviles usan `exact: true` |
+| M6 | ✅ | (este) | Avisos y Tú ya eran hojas (M2). Equipo: cada miembro es un bloque en móvil (la tabla de tres columnas se desplazaba). Facturación: la primera columna de la comparativa se queda fija. Administración: aviso «desde un ordenador» en vez del panel. D12 revisada (ver arriba). ⚠️ La invitación a instalar no tiene entrada en «Tú»: tras descartarla, se instala desde el menú del navegador —pendiente de decidir si hace falta |
 | M7 | ⏳ | | |
