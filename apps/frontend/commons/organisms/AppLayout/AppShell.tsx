@@ -862,9 +862,10 @@ function ArmazonInterno({
         </aside>
 
         {/* ── Contenido ────────────────────────────────────────── */}
-        {/* En móvil reserva abajo el alto de la barra inferior, que la propia
-            barra publica en `--barra-inferior` (0 cuando se esconde). */}
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden max-md:pb-[var(--barra-inferior,0px)]">
+        {/* En móvil reserva abajo lo que tape: la barra inferior (que publica su
+            alto en `--barra-inferior`) o el teclado de iOS (`--teclado`, ver
+            `GestosMoviles`), el mayor de los dos. */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden max-md:pb-[max(var(--barra-inferior,0px),var(--teclado,0px))]">
           {children}
         </div>
 

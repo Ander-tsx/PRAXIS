@@ -46,6 +46,34 @@ export function GestosMoviles() {
   const refrescarRef = useRef(refrescar);
   refrescarRef.current = refrescar;
 
+  /**
+   * El alto del teclado, en `--teclado` (en `<html>`).
+   *
+   * Android con `interactive-widget=resizes-content` encoge la ventana al abrir
+   * el teclado y no hace falta nada. **Safari no lo soporta**: el teclado tapa
+   * la ventana sin encogerla, y un compositor pegado abajo quedaría debajo. Lo
+   * que sí da es `visualViewport`, que mide la parte visible: la diferencia con
+   * la ventana es el teclado, y la columna de contenido la reserva abajo.
+   */
+  useEffect(() => {
+    const vista = window.visualViewport;
+    if (!vista) return;
+    const raiz = document.documentElement;
+    const medir = () => {
+      const alto = Math.max(0, window.innerHeight - vista.height - vista.offsetTop);
+      /* Menos de 80 px no es un teclado: es la barra del navegador moviéndose. */
+      raiz.style.setProperty('--teclado', `${alto > 80 ? Math.round(alto) : 0}px`);
+    };
+    medir();
+    vista.addEventListener('resize', medir);
+    vista.addEventListener('scroll', medir);
+    return () => {
+      vista.removeEventListener('resize', medir);
+      vista.removeEventListener('scroll', medir);
+      raiz.style.removeProperty('--teclado');
+    };
+  }, []);
+
   useEffect(() => {
     const consulta = window.matchMedia(CONSULTA_MOVIL);
     let gesto: 'atras' | 'refresco' | null = null;

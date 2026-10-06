@@ -14,11 +14,11 @@ import {
   uploadDirectAttachmentAction,
 } from '@/app/(privado)/chat/actions';
 import {
+  AnimatedSearchButton,
   Avatar,
   Badge,
   type ChatMessagePage,
   ChatPanel,
-  AnimatedSearchButton,
   type ChatPanelHandle,
   type Directory,
   type UserProfile,
@@ -134,7 +134,7 @@ export function DirectConversation({
              **a la conversación que se acaba de dejar** — pulsar «Conversaciones»
              no hacía nada. Ver la cabecera de `(conversaciones)/page.tsx`. */
           href="/chat?lista=1"
-          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
+          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary max-md:-ml-1 max-md:min-h-11 max-md:text-[15px] max-md:text-text-primary"
         >
           <svg
             className="h-4 w-4"
@@ -279,7 +279,9 @@ function Encabezado({
                 </div>
               )}
               <div className="text-center">
-                <h3 className="font-sans font-semibold text-2xl text-white drop-shadow-md">{nombre}</h3>
+                <h3 className="font-sans font-semibold text-2xl text-white drop-shadow-md">
+                  {nombre}
+                </h3>
                 {proyectos.length > 0 && (
                   <p className="font-sans text-sm text-white drop-shadow-md">
                     Coinciden en {proyectos.length}{' '}
@@ -292,7 +294,9 @@ function Encabezado({
         )}
 
         <div className="flex min-w-0 flex-col gap-1.5">
-          <h2 className="truncate font-sans font-semibold text-lg text-text-primary md:text-2xl">{nombre}</h2>
+          <h2 className="truncate font-sans font-semibold text-lg text-text-primary md:text-2xl">
+            {nombre}
+          </h2>
 
           {proyectos.length === 0 ? (
             <p className="font-sans text-xs text-text-secondary">

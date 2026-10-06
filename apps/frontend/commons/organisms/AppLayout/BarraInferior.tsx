@@ -52,14 +52,22 @@ export function BarraInferior({
 
   useEffect(() => {
     const raiz = document.documentElement;
+    /* Oculta por la ruta (una conversación), lo de abajo sigue siendo la barra
+       de inicio del teléfono: se reserva su zona segura para que el compositor
+       no quede debajo. Oculta porque se escribe, 0: ahí manda el teclado
+       (`--teclado`, ver `GestosMoviles`). */
     raiz.style.setProperty(
       '--barra-inferior',
-      visible ? 'calc(env(safe-area-inset-bottom, 0px) + 3.5rem)' : '0px',
+      visible
+        ? 'calc(env(safe-area-inset-bottom, 0px) + 3.5rem)'
+        : oculta
+          ? 'env(safe-area-inset-bottom, 0px)'
+          : '0px',
     );
     return () => {
       raiz.style.removeProperty('--barra-inferior');
     };
-  }, [visible]);
+  }, [visible, oculta]);
 
   const nombre = usuario.name.trim() || usuario.email;
 

@@ -13,12 +13,12 @@ import {
   uploadProjectAttachmentAction,
 } from '@/app/(privado)/chat/proyecto-actions';
 import {
+  AnimatedSearchButton,
   type ChatMessagePage,
   ChatPanel,
-  AnimatedSearchButton,
-  ProjectMonogram,
   type ChatPanelHandle,
   type Directory,
+  ProjectMonogram,
   alpha,
   colors,
 } from '@praxis/commons';
@@ -117,7 +117,7 @@ export function ProjectConversation({
              —esta— y el enlace de volver no vuelve a ningún sitio. Ver la
              cabecera de `(conversaciones)/page.tsx`. */
           href="/chat?lista=1"
-          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
+          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary max-md:-ml-1 max-md:min-h-11 max-md:text-[15px] max-md:text-text-primary"
         >
           <svg
             className="h-4 w-4"
@@ -163,7 +163,9 @@ export function ProjectConversation({
                 color={projectColor}
                 size="sm"
               />
-              <h2 className="truncate font-sans font-semibold text-lg text-text-primary md:text-2xl">{projectName}</h2>
+              <h2 className="truncate font-sans font-semibold text-lg text-text-primary md:text-2xl">
+                {projectName}
+              </h2>
             </div>
             <p className="font-sans text-xs text-white">
               Chat del equipo ·{' '}
