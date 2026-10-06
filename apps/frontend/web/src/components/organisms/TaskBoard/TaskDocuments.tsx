@@ -1,6 +1,6 @@
 'use client';
 
-import { ApiError, createApiClient } from '@praxis/commons';
+import { ApiError, createApiClient, useRefrescoAgrupado } from '@praxis/commons';
 import { FileText, Link2, Plus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
@@ -39,6 +39,10 @@ export function TaskDocuments({
   canEdit: boolean;
 }) {
   const router = useRouter();
+  /* La tarjeta del tablero enseña los documentos vinculados (`Task.documents`),
+     y esto escribe por la API sin pasar por una Server Action que revalide:
+     sin refrescar, la marca seguiría diciendo lo de antes. */
+  const refrescar = useRefrescoAgrupado();
   const [vinculados, setVinculados] = useState<DocumentoVinculado[] | null>(null);
   const [espacios, setEspacios] = useState<EspacioDeDocumentos[] | null>(null);
   const [modo, setModo] = useState<'nada' | 'vincular' | 'crear'>('nada');
@@ -94,6 +98,7 @@ export function TaskDocuments({
       );
       setModo('nada');
       setBusqueda('');
+      refrescar();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo vincular.');
     } finally {
@@ -107,6 +112,7 @@ export function TaskDocuments({
         .delete<DocumentoVinculado[]>(`/tasks/${taskId}/documents/${documentId}`)
         .catch(() => vinculados),
     );
+    refrescar();
   }
 
   async function crear(evento: FormEvent<HTMLFormElement>) {

@@ -17,7 +17,7 @@ import { PageSkeleton, Skeleton, SkeletonCircle, SkeletonRow } from '@praxis/com
 export default function AdminLoading() {
   return (
     <PageSkeleton title="Administración">
-      <div data-tone="dark" className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
+      <div data-tone="dark" className="flex w-full flex-col gap-6 pb-16">
         {/* AdminHeader: título y entradilla a la izquierda, tres cifras a la derecha. */}
         <div className="flex flex-wrap items-start justify-between gap-6 border-b border-white/[0.08] pb-6">
           <div className="flex flex-col gap-3">

@@ -1,7 +1,7 @@
 'use client';
 
-import { ChevronDown, Loader2, MoreHorizontal } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { ChevronDown, Loader2, MoreHorizontal, Search, X } from 'lucide-react';
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { createApiClient } from '../../api/client';
 import type { EffectivePermissions, ProjectPermission } from '../../api/domain';
@@ -43,6 +43,181 @@ export const SIDEBAR_ETIQUETA =
 
 /** Curva de todas las animaciones de la barra. */
 const CURVA = 'ease-[cubic-bezier(0.22,0.85,0.28,1)]';
+
+/**
+ * ## El rail: la barra plegada
+ *
+ * Plegada, la barra tenía cinco tamaños a la vez —el pliegue en una caja de
+ * 28 px, «Inicio» en una de 50, Chat y Ajustes como iconos sueltos, los
+ * proyectos en 44 con un recuadro activo aún mayor, y tu avatar en 40— y el
+ * activo se pintaba de tres maneras. Nada decía qué era grupo y qué no.
+ *
+ * Ahora todo es la misma celda de 40 × 40, con dos contenidos posibles: un
+ * icono de 18 px o una imagen de 32 (organización, proyecto, persona, tú). La
+ * jerarquía la dan los grupos —separados por `RAIL_DIVISORIA`— y no el tamaño.
+ * El activo es siempre el mismo: fondo suave y una barrita de acento a la
+ * izquierda.
+ */
+export const RAIL_CELDA =
+  'relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60';
+export const RAIL_ACTIVA =
+  "bg-white/10 text-white before:absolute before:-left-2 before:top-2.5 before:bottom-2.5 before:w-[3px] before:rounded-full before:bg-primary before:content-['']";
+export const RAIL_REPOSO = 'text-text-secondary hover:bg-white/5 hover:text-white';
+/** El icono de una celda del rail. */
+export const RAIL_ICONO = 'h-[18px] w-[18px] shrink-0';
+/** Entre grupos del rail: la misma raya fina siempre. */
+export const RAIL_DIVISORIA = 'mx-auto my-2 h-px w-8 shrink-0 bg-border';
+
+/**
+ * El nombre de cada celda del rail, a la derecha y al pasar por encima.
+ *
+ * Delegado: las celdas solo llevan `data-rail-tip="Nombre"`, y esto escucha en
+ * el contenedor. Un `title` nativo tarda un segundo, sale con la tipografía del
+ * sistema y en otro sitio en cada navegador; y uno por celda dentro del área
+ * con scroll quedaría recortado por su `overflow`. Por eso se pinta en un
+ * portal con `position: fixed`.
+ *
+ * ⚠️ Con su propio estado, en su propio componente: si viviera en el armazón,
+ * cada `pointerover` repintaría la barra entera.
+ */
+export function RailTooltip({
+  contenedor,
+  activo,
+}: {
+  contenedor: RefObject<HTMLElement | null>;
+  activo: boolean;
+}) {
+  const [tip, setTip] = useState<{ texto: string; x: number; y: number } | null>(null);
+  const actual = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const raiz = contenedor.current;
+    if (!raiz || !activo) {
+      actual.current = null;
+      setTip(null);
+      return;
+    }
+    const mostrar = (objetivo: EventTarget | null) => {
+      const el = (objetivo as Element | null)?.closest?.('[data-rail-tip]') as HTMLElement | null;
+      if (el === actual.current) return;
+      actual.current = el;
+      if (!el?.dataset.railTip) {
+        setTip(null);
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      setTip({ texto: el.dataset.railTip, x: r.right + 10, y: r.top + r.height / 2 });
+    };
+    const esconder = () => {
+      actual.current = null;
+      setTip(null);
+    };
+    const alPasar = (e: Event) => mostrar(e.target);
+    raiz.addEventListener('pointerover', alPasar);
+    raiz.addEventListener('pointerleave', esconder);
+    raiz.addEventListener('focusin', alPasar);
+    raiz.addEventListener('focusout', esconder);
+    raiz.addEventListener('click', esconder);
+    raiz.addEventListener('scroll', esconder, true);
+    return () => {
+      raiz.removeEventListener('pointerover', alPasar);
+      raiz.removeEventListener('pointerleave', esconder);
+      raiz.removeEventListener('focusin', alPasar);
+      raiz.removeEventListener('focusout', esconder);
+      raiz.removeEventListener('click', esconder);
+      raiz.removeEventListener('scroll', esconder, true);
+    };
+  }, [contenedor, activo]);
+
+  if (!tip || typeof document === 'undefined') return null;
+  return createPortal(
+    <div
+      role="tooltip"
+      className="pointer-events-none fixed z-[200] -translate-y-1/2 whitespace-nowrap rounded-md border border-white/10 bg-[#2a2a2a] px-2 py-1 font-sans text-xs font-medium text-white shadow-lg"
+      style={{ left: tip.x, top: tip.y }}
+    >
+      {tip.texto}
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * El buscador de cada pestaña de la barra: Inicio, Chat y Configuraciones.
+ *
+ * Uno solo para las tres, y siempre en el mismo sitio —primera fila de la
+ * pestaña—, para que cambiar de pestaña no mueva lo de debajo: antes solo Chat
+ * tenía buscador y las otras dos empezaban más arriba.
+ *
+ * ⚠️ **`type="text"` con `role="searchbox"`, no `type="search"`.** El de
+ * búsqueda trae la X nativa del navegador, que en Chrome es un aspa azulada
+ * fuera de la paleta, en Safari un círculo gris, y en Firefox nada. El botón de
+ * limpiar es nuestro: el mismo en todos, solo cuando hay algo escrito, y Escape
+ * hace lo mismo.
+ */
+export function BuscadorDeBarra({
+  valor,
+  onCambiar,
+  placeholder,
+  etiqueta,
+}: {
+  valor: string;
+  onCambiar: (valor: string) => void;
+  placeholder: string;
+  /** Nombre accesible: qué se busca. */
+  etiqueta: string;
+}) {
+  const campo = useRef<HTMLInputElement>(null);
+  return (
+    <div className="group/buscador relative shrink-0">
+      <Search
+        className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-secondary transition-colors group-focus-within/buscador:text-text-primary"
+        aria-hidden="true"
+      />
+      <input
+        ref={campo}
+        type="text"
+        role="searchbox"
+        value={valor}
+        onChange={(e) => onCambiar(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && valor) {
+            e.preventDefault();
+            onCambiar('');
+          }
+        }}
+        placeholder={placeholder}
+        aria-label={etiqueta}
+        autoComplete="off"
+        spellCheck={false}
+        className="h-8 w-full rounded-lg bg-white/[0.04] pl-8 pr-8 font-sans text-[13px] text-text-primary outline-none ring-1 ring-inset ring-white/[0.08] transition-[box-shadow,background-color] placeholder:text-text-secondary hover:ring-white/15 focus:bg-white/[0.06] focus:ring-white/30"
+      />
+      {valor && (
+        <button
+          type="button"
+          onClick={() => {
+            onCambiar('');
+            campo.current?.focus();
+          }}
+          aria-label="Borrar la búsqueda"
+          title="Borrar (Esc)"
+          className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-white/10 hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
+        >
+          <X className="h-3 w-3" strokeWidth={2.25} aria-hidden="true" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Normaliza para buscar: minúsculas y sin acentos, así «diseno» encuentra «Diseño». */
+export function normalizarBusqueda(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+}
 
 /**
  * Anima entre 0 y la altura natural del contenido.
@@ -122,9 +297,11 @@ export function SidebarSection({
   return (
     <section
       aria-label={etiqueta}
-      className={`flex flex-col gap-1 [&:not(:first-child)]:border-t [&:not(:first-child)]:border-border [&:not(:first-child)]:pt-3 ${
-        plegada ? '[&:not(:first-child)]:mx-1' : ''
-      }`}
+      className={
+        plegada
+          ? 'flex flex-col gap-1'
+          : 'flex flex-col gap-1 [&:not(:first-child)]:border-t [&:not(:first-child)]:border-border [&:not(:first-child)]:pt-3'
+      }
     >
       {!plegada && !sinCabecera && (
         <div className="flex items-center gap-0.5">
@@ -146,7 +323,9 @@ export function SidebarSection({
         </div>
       )}
       <Desplegable abierto={!cerrada}>
-        <div className="flex flex-col gap-0.5">{children}</div>
+        <div className={plegada ? 'flex flex-col items-center gap-1' : 'flex flex-col gap-0.5'}>
+          {children}
+        </div>
       </Desplegable>
     </section>
   );
@@ -590,15 +769,28 @@ export function usePopover(abierto: boolean, onCerrar: () => void) {
   return { ref, visible, entrada };
 }
 
-/** La caja de un flotante anclado sobre la zona de usuario, con su animación de entrada. */
-export function claseDePopover(entrada: boolean, plegada: boolean): string {
+/**
+ * La caja de un flotante de la barra, con su animación de entrada.
+ *
+ * `anclaje` dice desde dónde crece: `'abajo'` para lo que vive en el pie
+ * (perfil, avisos) y `'arriba'` para lo de la cabecera (la organización con la
+ * barra plegada). Misma caja, mismo movimiento, solo cambia hacia dónde abre.
+ */
+export function claseDePopover(
+  entrada: boolean,
+  plegada: boolean,
+  anclaje: 'abajo' | 'arriba' = 'abajo',
+): string {
+  const arriba = anclaje === 'arriba';
   return `absolute z-50 rounded-2xl border border-border bg-[#252525] shadow-xl transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
     plegada
-      ? 'bottom-0 left-full ml-2 w-80 origin-bottom-left'
+      ? arriba
+        ? 'top-0 left-full ml-2 w-80 origin-top-left'
+        : 'bottom-0 left-full ml-2 w-80 origin-bottom-left'
       : 'bottom-full left-2 right-2 mb-2 origin-bottom'
   } ${
     entrada
       ? 'translate-y-0 scale-100 opacity-100'
-      : 'pointer-events-none translate-y-3 scale-95 opacity-0'
+      : `pointer-events-none ${arriba ? '-translate-y-3' : 'translate-y-3'} scale-95 opacity-0`
   }`;
 }

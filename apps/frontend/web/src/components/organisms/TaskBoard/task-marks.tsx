@@ -1,5 +1,8 @@
+import { Link2 } from 'lucide-react';
+
 /**
- * Los dos glifos que marcan lo que una tarea lleva dentro: notas y archivos.
+ * Los glifos que marcan lo que una tarea lleva dentro: notas, archivos y
+ * documentos vinculados.
  *
  * En un módulo propio porque los usan **dos sitios cada uno** —la cabecera de
  * su sección en el diálogo y la píldora de la tarjeta— y tienen que ser el
@@ -12,7 +15,13 @@
  * `!important` desde fuera.
  */
 
-/** Cuaderno con renglones. La marca de que hay notas. */
+/**
+ * Burbuja de conversación. La marca de que hay notas.
+ *
+ * Era un cuaderno con renglones, y al lado del clip de archivos se leían como
+ * dos documentos. Las notas son lo que el equipo se dice sobre la tarea: una
+ * burbuja lo cuenta sin abrirla.
+ */
 export function NotesGlyph({ className }: { className?: string }) {
   return (
     <svg
@@ -26,9 +35,8 @@ export function NotesGlyph({ className }: { className?: string }) {
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M8 4h9a2 2 0 012 2v12a2 2 0 01-2 2H8a2 2 0 01-2-2V6a2 2 0 012-2z"
+        d="M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
       />
-      <path strokeLinecap="round" d="M9.5 9h6M9.5 12.5h6M9.5 16h3.5" />
     </svg>
   );
 }
@@ -51,4 +59,14 @@ export function AttachmentGlyph({ className }: { className?: string }) {
       />
     </svg>
   );
+}
+
+/**
+ * La marca de que hay documentos vinculados: `Link2` de lucide, **el mismo**
+ * que el botón «Vincular» de la sección de documentos del panel. Era un eslabón
+ * dibujado aquí, parecido pero no igual, y una marca que no coincide con el
+ * botón que la produce deja de leerse como su resultado.
+ */
+export function LinkGlyph({ className }: { className?: string }) {
+  return <Link2 className={className} strokeWidth={2} aria-hidden="true" />;
 }

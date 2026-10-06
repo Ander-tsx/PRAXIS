@@ -82,7 +82,7 @@ export default async function ActivityPage({ searchParams }: PageProps) {
 
   return (
     <AppHeader title="Administración">
-      <div data-tone="dark" className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
+      <div data-tone="dark" className="flex w-full flex-col gap-6 pb-16">
         {/* Sin cifras: aquí el número que importa es el de la búsqueda en
             curso, y ese ya lo lleva el paginador. Un «12.480 acciones en total»
             no cambiaría ninguna decisión. */}

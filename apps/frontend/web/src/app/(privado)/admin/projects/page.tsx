@@ -97,7 +97,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
 
   return (
     <AppHeader title="Administración">
-      <div data-tone="dark" className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
+      <div data-tone="dark" className="flex w-full flex-col gap-6 pb-16">
         <AdminHeader
           titulo="Proyectos"
           descripcion="El inventario completo, archivados incluidos. Suspender y archivar son reversibles; el borrado de verdad es del dueño y no vive aquí."

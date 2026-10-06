@@ -11,8 +11,9 @@ import {
   colors,
   projectHref,
 } from '@praxis/commons';
-import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { TitulosDeDocumentosProvider } from '../TaskBoard/documentos-de-tarea';
 import { BoardStrip } from './BoardStrip';
 import { BoardTabs } from './BoardTabs';
 import { CreateBoardButton } from './CreateBoardButton';
@@ -178,6 +179,14 @@ export function WorkspaceCanvas({
   const router = useRouter();
   const boards = activeWorkspace?.boards ?? [];
 
+  /* Para la marca de documentos de cada tarjeta: el título por id, de todos los
+     espacios del proyecto. Ver `documentos-de-tarea.tsx`. */
+  const titulosDeDocumentos = useMemo(
+    () =>
+      new Map(workspaces.flatMap((w) => w.documents ?? []).map((d) => [d.id, d.title] as const)),
+    [workspaces],
+  );
+
   /**
    * El documento abierto, si hay uno. Mientras lo hay, ocupa el sitio del
    * tablero; elegir un tablero lo cierra. Estado de cliente, como el tablero:
@@ -210,6 +219,30 @@ export function WorkspaceCanvas({
   const [boardActivoId, setBoardActivoId] = useState<string | null>(
     () => boardIdInicial ?? boards[0]?.id ?? null,
   );
+
+  /**
+   * 🔴 **La URL manda cuando cambia desde fuera, también para el tablero.**
+   *
+   * Los documentos lo tenían y los tableros no: `?board=` solo se leía como
+   * valor de partida, así que elegir un tablero en la barra lateral navegaba
+   * —la URL cambiaba— y el lienzo seguía enseñando el anterior, hasta un
+   * segundo clic que coincidiera con otro render.
+   *
+   * Se mira `useSearchParams()` y no la prop `boardIdInicial`: con la prop,
+   * ir a B por las pestañas del lienzo (que solo hace `replaceState`) y volver
+   * a A desde la barra deja la prop en A antes y después, y no se ve ningún
+   * cambio. `useSearchParams` sigue también al `replaceState` de abajo, así que
+   * lo que escribimos nosotros llega igual al estado y no hace nada.
+   */
+  const boardDeLaUrl = useSearchParams().get('board');
+  const [boardUrlVisto, setBoardUrlVisto] = useState(boardDeLaUrl);
+  if (boardDeLaUrl !== boardUrlVisto) {
+    setBoardUrlVisto(boardDeLaUrl);
+    if (boardDeLaUrl && boardDeLaUrl !== boardActivoId && !documentoInicial) {
+      setBoardActivoId(boardDeLaUrl);
+      setDocumentoActivoId(null);
+    }
+  }
 
   /**
    * Si el tablero elegido deja de existir —se borró, o se cambió de espacio—,
@@ -483,37 +516,39 @@ export function WorkspaceCanvas({
   }
 
   return (
-    <BoardStrip
-      /* Remonta al cambiar de tablero: `BoardColumns` guarda el orden de las
+    <TitulosDeDocumentosProvider value={titulosDeDocumentos}>
+      <BoardStrip
+        /* Remonta al cambiar de tablero: `BoardColumns` guarda el orden de las
          columnas en estado local, y sin esto el tablero nuevo aparecería con el
          orden del anterior hasta el primer efecto. */
-      key={boardActivo.id}
-      board={boardActivo}
-      vista={vista}
-      titulo={barraDelTablero}
-      filtroMisTareas={controlesDeVista}
-      projectId={projectId}
-      canEditBoard={canEditBoard}
-      canDeleteBoard={canDeleteBoard}
-      canCreateColumn={canCreateColumn}
-      canEditColumn={canEditColumn}
-      canDeleteColumn={canDeleteColumn}
-      tasks={tasksByBoard.get(boardActivo.id) ?? SIN_TAREAS}
-      members={members}
-      labels={labels}
-      usersById={usersById}
-      currentUserId={currentUserId}
-      canCreateTask={canCreateTask}
-      canMoveTask={canMoveTask}
-      openTaskId={openTaskId}
-      canComment={canComment}
-      canManageLabels={canManageLabels}
-      canEditTask={canEditTask}
-      canDeleteTask={canDeleteTask}
-      scrum={boardActivo.scrumEnabled ? scrumByBoard.get(boardActivo.id) : undefined}
-      historial={historialByBoard.get(boardActivo.id)}
-      canManageSprint={canManageSprint}
-      onCambiarVista={cambiarVista}
-    />
+        key={boardActivo.id}
+        board={boardActivo}
+        vista={vista}
+        titulo={barraDelTablero}
+        filtroMisTareas={controlesDeVista}
+        projectId={projectId}
+        canEditBoard={canEditBoard}
+        canDeleteBoard={canDeleteBoard}
+        canCreateColumn={canCreateColumn}
+        canEditColumn={canEditColumn}
+        canDeleteColumn={canDeleteColumn}
+        tasks={tasksByBoard.get(boardActivo.id) ?? SIN_TAREAS}
+        members={members}
+        labels={labels}
+        usersById={usersById}
+        currentUserId={currentUserId}
+        canCreateTask={canCreateTask}
+        canMoveTask={canMoveTask}
+        openTaskId={openTaskId}
+        canComment={canComment}
+        canManageLabels={canManageLabels}
+        canEditTask={canEditTask}
+        canDeleteTask={canDeleteTask}
+        scrum={boardActivo.scrumEnabled ? scrumByBoard.get(boardActivo.id) : undefined}
+        historial={historialByBoard.get(boardActivo.id)}
+        canManageSprint={canManageSprint}
+        onCambiarVista={cambiarVista}
+      />
+    </TitulosDeDocumentosProvider>
   );
 }

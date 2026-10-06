@@ -10,7 +10,7 @@ import { PageSkeleton, Skeleton, SkeletonCircle, SkeletonRow } from '@praxis/com
 export default function TeamLoading() {
   return (
     <PageSkeleton title="Equipo">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-16">
+      <div className="flex w-full flex-col gap-8 pb-16">
         <header className="flex flex-col gap-3 border-b border-white/[0.08] pb-6">
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-4 w-full max-w-2xl" />

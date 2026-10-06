@@ -28,7 +28,7 @@ export default async function BillingPage({
   if (!organizationId) {
     return (
       <AppHeader title="Facturación">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-16">
+        <div className="flex w-full flex-col gap-8 pb-16">
           <header className="flex flex-col gap-2 border-b border-white/[0.08] pb-6">
             <h1 className="font-sans text-3xl font-semibold tracking-tight text-white">
               Facturación
@@ -56,7 +56,7 @@ export default async function BillingPage({
   if (!organizacion || !catalogo) {
     return (
       <AppHeader title="Facturación">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-16">
+        <div className="flex w-full flex-col gap-8 pb-16">
           <header className="flex flex-col gap-2 border-b border-white/[0.08] pb-6">
             <h1 className="font-sans text-3xl font-semibold tracking-tight text-white">
               Facturación
@@ -363,7 +363,7 @@ export default async function BillingPage({
 
   return (
     <AppHeader title="Facturación">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-16">
+      <div className="flex w-full flex-col gap-8 pb-16">
         <header className="flex flex-col gap-2 border-b border-white/[0.08] pb-6">
           <h1 className="font-sans text-3xl font-semibold tracking-tight text-white">
             Facturación

@@ -28,7 +28,7 @@ function ColumnaDePlan({ destacada = false }: { destacada?: boolean }) {
 export default function BillingLoading() {
   return (
     <PageSkeleton title="Facturación">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-16">
+      <div className="flex w-full flex-col gap-8 pb-16">
         <header className="flex flex-col gap-3 border-b border-white/[0.08] pb-6">
           <Skeleton className="h-8 w-52" />
           <Skeleton className="h-4 w-96" />

@@ -1,7 +1,6 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useSidebarPlegada } from './AppShell';
 
 export interface PageSkeletonProps {
   /** Lo mismo que en `AppHeader`: el nombre de la pantalla, para quien no la ve. */
@@ -39,11 +38,8 @@ export interface PageSkeletonProps {
  *
  * Ninguna de las dos cosas da un error. Solo parpadean.
  *
- * ⚠️ **`useSidebarPlegada` es seguro fuera del armazón**: devuelve `false` si no
- * hay contexto en vez de lanzar (a diferencia de `useAppShell`). Se usa por lo
- * mismo que en `AppHeader` — con la barra plegada el contenido reclama los
- * ~184 px que se liberan, y sin esto el esqueleto mediría 1400 y la pantalla
- * 1584.
+ * ⚠️ **El mismo contenedor que `AppHeader`, a ancho completo.** Si divergen, la
+ * pantalla salta de anchura al terminar de cargar.
  */
 export function PageSkeleton({
   title,
@@ -51,8 +47,6 @@ export function PageSkeleton({
   anchoCompleto = false,
   children,
 }: PageSkeletonProps) {
-  const plegada = useSidebarPlegada();
-
   return (
     /* `aria-busy` y un texto solo para lectores: sin esto, quien navega con uno
        oye un montón de cajas sin nombre y no sabe si la pantalla llegó o falló. */
@@ -65,9 +59,7 @@ export function PageSkeleton({
 
       <div
         className={`mx-auto w-full ${
-          anchoCompleto
-            ? 'max-w-full p-0'
-            : `px-4 pb-4 pt-16 sm:p-6 ${plegada ? 'max-w-[1584px]' : 'max-w-[1400px]'}`
+          anchoCompleto ? 'max-w-full p-0' : 'max-w-full px-4 pb-4 pt-16 sm:p-6 lg:px-8'
         } ${lleno ? 'flex h-full min-h-0 flex-col' : ''}`}
       >
         {children}

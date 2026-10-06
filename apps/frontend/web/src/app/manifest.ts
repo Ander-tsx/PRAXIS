@@ -56,6 +56,13 @@ import type { MetadataRoute } from 'next';
  * pequeña. `apple-icon.png` e `icon.png` (arriba) **no** llevan este margen:
  * ahí sí toca ir a sangre, uno porque iOS lo exige y el otro porque es la
  * pestaña del navegador, no el Dock.
+ *
+ * ⚠️ **`icon.png` es el ÚNICO favicon, y lleva las esquinas redondeadas.**
+ * Cada sección (`auth`, `main`, `projects`, `chat`, `assistant`, `admin`)
+ * tenía el suyo —el trébol de antes de la X— y Next le da prioridad al del
+ * segmento más profundo, así que la pestaña enseñaba la marca vieja en toda
+ * la aplicación y la nueva solo en la landing. Se borraron: sin ellos, todas
+ * heredan este. `apple-icon.png` sigue cuadrado porque iOS pone su máscara.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {

@@ -32,11 +32,43 @@ import { CURVA, DURACION_DE_REPOSICION_MS, movimientoReducido } from './arrastre
  * animar. Se pierde una animación de vez en cuando; la alternativa —seguirle la
  * pista al `scrollTop` de cada antepasado de cada tarjeta— cuesta mucho más de
  * lo que arregla.
+ *
+ * ### 🔴 Por qué se mide contra el padre y no contra la ventana
+ *
+ * Medía `getBoundingClientRect()` a secas en cada render, y cualquier cosa que
+ * moviera el tablero **entero** se leía como que cada tarjeta había cambiado de
+ * sitio: abrir el panel de una tarea (el lienzo pierde ~450 px de ancho), que
+ * llegue la tira del sprint por encima, un `router.refresh()` que reacomoda la
+ * cabecera. Cada tarjeta salía volando desde donde estaba antes del cambio —un
+ * zarandeo de toda la pantalla—. El filtro de «menos de 20 px» que hubo solo lo
+ * escondía cuando el salto era pequeño.
+ *
+ * Ahora la posición que se compara es **relativa a su contenedor**, con el
+ * desplazamiento de este sumado: si el tablero entero se mueve, contenedor y
+ * tarjeta se mueven juntos y la diferencia es cero. Solo viaja lo que de verdad
+ * cambió de sitio dentro de su lista. Si cambió **de lista** sin que nadie lo
+ * sembrara —un movimiento que llega en vivo de otra persona—, no hay contra qué
+ * compararlo y aparece en su sitio sin viajar.
  */
+type Medida = { caja: DOMRect; padre: Element | null; x: number; y: number };
+
+function medir(el: HTMLElement): Medida {
+  const caja = el.getBoundingClientRect();
+  const padre = el.parentElement;
+  if (!padre) return { caja, padre: null, x: caja.left, y: caja.top };
+  const marco = padre.getBoundingClientRect();
+  return {
+    caja,
+    padre,
+    x: caja.left - marco.left + padre.scrollLeft,
+    y: caja.top - marco.top + padre.scrollTop,
+  };
+}
+
 export function useReposicionAnimada() {
   const nodos = useRef(new Map<string, HTMLElement>());
-  const previos = useRef(new Map<string, DOMRect>());
-  const sembrados = useRef(new Set<string>());
+  const previos = useRef(new Map<string, Medida>());
+  const sembrados = useRef(new Map<string, DOMRect>());
   const sucio = useRef(false);
 
   /**
@@ -57,10 +89,11 @@ export function useReposicionAnimada() {
     else nodos.current.delete(id);
   }, []);
 
+  /* El «antes» sembrado es el rectángulo del fantasma, en coordenadas de
+     ventana: ese viaje sí es absoluto, de donde la mano soltó a donde cae. */
   const sembrar = useCallback((id: string, caja: DOMRect | null) => {
     if (!caja) return;
-    previos.current.set(id, caja);
-    sembrados.current.add(id);
+    sembrados.current.set(id, caja);
   }, []);
 
   const invalidar = useCallback(() => {
@@ -77,30 +110,29 @@ export function useReposicionAnimada() {
       if (!el.isConnected) continue;
       vistos.add(id);
 
-      const ahora = el.getBoundingClientRect();
+      const ahora = medir(el);
       const antes = previos.current.get(id);
       previos.current.set(id, ahora);
 
-      if (!antes) continue;
+      const semilla = sembrados.current.get(id);
+      if (semilla) {
+        sembrados.current.delete(id);
+        /* Un elemento sembrado siempre se anima: viene del fantasma y ese salto
+           es justo lo que hay que enseñar. */
+        animar(el, semilla.left - ahora.caja.left, semilla.top - ahora.caja.top);
+        continue;
+      }
 
-      const dx = antes.left - ahora.left;
-      const dy = antes.top - ahora.top;
-      const sembrado = sembrados.current.delete(id);
+      if (!antes || saltarAnimacion) continue;
+      /* Cambió de lista sin semilla: no hay un «antes» comparable. */
+      if (antes.padre !== ahora.padre) continue;
 
-      /* Un elemento sembrado siempre se anima: viene del fantasma y ese salto es
-         justo lo que hay que enseñar. El resto se salta si la pasada está sucia
-         por un desplazamiento. */
-      if (!sembrado && saltarAnimacion) continue;
+      const dx = antes.x - ahora.x;
+      const dy = antes.y - ahora.y;
+      /* Medio píxel de redondeo no es un movimiento. */
+      if (Math.abs(dx) < 2 && Math.abs(dy) < 2) continue;
 
-      // Filtro anti-zarandeos: si el movimiento es minúsculo (< 20px), es ruido del
-      // DOM reacomodándose (ej. Next.js reinyectando Server Components o HMR).
-      // Un cambio de orden real mueve una tarjeta entera (> 100px) o columna (> 250px).
-      if (!sembrado && Math.abs(dx) < 20 && Math.abs(dy) < 20) continue;
-
-      el.animate(
-        [{ transform: `translate3d(${dx}px, ${dy}px, 0)` }, { transform: 'translate3d(0,0,0)' }],
-        { duration: DURACION_DE_REPOSICION_MS, easing: CURVA, composite: 'replace' },
-      );
+      animar(el, dx, dy);
     }
 
     /* Lo que ya no está en pantalla no debe conservar su medida: si vuelve —al
@@ -112,4 +144,11 @@ export function useReposicionAnimada() {
   });
 
   return { registrar, sembrar, invalidar };
+}
+
+function animar(el: HTMLElement, dx: number, dy: number) {
+  el.animate(
+    [{ transform: `translate3d(${dx}px, ${dy}px, 0)` }, { transform: 'translate3d(0,0,0)' }],
+    { duration: DURACION_DE_REPOSICION_MS, easing: CURVA, composite: 'replace' },
+  );
 }

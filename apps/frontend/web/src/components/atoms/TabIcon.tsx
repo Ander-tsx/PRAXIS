@@ -1,4 +1,4 @@
-import { LayoutGrid, Shield, Users, Zap } from 'lucide-react';
+import { LayoutGrid, Settings, Shield, Users, Zap } from 'lucide-react';
 
 /**
  * El icono de cada sección del proyecto.
@@ -22,13 +22,15 @@ import { LayoutGrid, Shield, Users, Zap } from 'lucide-react';
  *
  * ⚠️ **El rayo es de Automatización a propósito.** Se probó con un engranaje y
  * se leía como «configuración» —que es otra sección, y en otro sitio—; el rayo
- * es lo que usa todo el mundo para «esto pasa solo».
+ * es lo que usa todo el mundo para «esto pasa solo». El engranaje es de
+ * Ajustes, que desde que es pestaña está justo a su derecha.
  */
 const ICONOS = {
   workspaces: LayoutGrid,
   team: Users,
   roles: Shield,
   automation: Zap,
+  settings: Settings,
 } as const;
 
 export type TabIconName = keyof typeof ICONOS;

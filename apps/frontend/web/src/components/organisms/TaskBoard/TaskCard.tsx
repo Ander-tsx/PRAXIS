@@ -14,7 +14,8 @@ import {
   personLabel,
 } from '@praxis/commons';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AttachmentGlyph, NotesGlyph } from './task-marks';
+import { useTitulosDeDocumentos } from './documentos-de-tarea';
+import { AttachmentGlyph, LinkGlyph, NotesGlyph } from './task-marks';
 
 /**
  * Cuántos píxeles puede desplazarse el puntero entre pulsar y soltar sin que
@@ -158,6 +159,17 @@ export function TaskCard({
    */
   const notas = task.comments.length;
   const adjuntos = task.attachments.length;
+
+  /**
+   * Los documentos vinculados, con su título. Uno que ya no existe —se borró y
+   * el vínculo quedó, ver `TaskDocument` en tasks-service— no tiene título y no
+   * se cuenta: una marca que promete un documento que no se abre es peor que
+   * ninguna.
+   */
+  const titulos = useTitulosDeDocumentos();
+  const documentos = (task.documents ?? [])
+    .map((d) => titulos.get(d.documentId))
+    .filter((t): t is string => !!t);
 
   /** Dónde se pulsó, para saber al soltar si aquello fue un clic o un arrastre. */
   const origenDelPuntero = useRef<{ x: number; y: number } | null>(null);
@@ -426,6 +438,19 @@ export function TaskCard({
             {adjuntos}
           </Mark>
         )}
+
+        {/* Documentos vinculados: el título del primero, recortado, y cuántos
+            más hay. El `title` los lista todos. */}
+        {documentos.length > 0 && (
+          <Mark
+            color={colors.info}
+            glyph={<LinkGlyph className="h-3 w-3" />}
+            title={`Documentos: ${documentos.join(', ')}`}
+          >
+            <span className="max-w-[9rem] truncate">{documentos[0]}</span>
+            {documentos.length > 1 && <span className="shrink-0">+{documentos.length - 1}</span>}
+          </Mark>
+        )}
       </div>
 
       {task.assignees.length > 0 && (
@@ -499,7 +524,7 @@ function Mark({
     <span
       title={title}
       aria-label={title}
-      className="flex items-center gap-1 rounded-full border px-1.5 py-0.5 font-sans text-[10px] font-semibold tabular-nums"
+      className="flex min-w-0 max-w-full items-center gap-1 rounded-full border px-1.5 py-0.5 font-sans text-[10px] font-semibold tabular-nums [&>svg]:shrink-0"
       style={{ borderColor: alpha(color, 35), background: alpha(color, 8), color }}
     >
       {glyph}

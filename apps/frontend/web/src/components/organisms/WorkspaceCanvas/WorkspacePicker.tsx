@@ -99,6 +99,13 @@ export function WorkspacePicker({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputId = useId();
+  /* Al abrir el desplegable el foco va al campo del nombre: quien lo abre con
+     permiso de crear casi siempre viene a eso, y elegir un espacio de la lista
+     sigue siendo un clic. Con `preventScroll` para no mover la página. */
+  const campoNombre = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (open) campoNombre.current?.focus({ preventScroll: true });
+  }, [open]);
 
   const active = workspaces.find((workspace) => workspace.id === activeId);
   const clientError = name.trim() ? validateWorkspace(name) : null;
@@ -334,18 +341,26 @@ export function WorkspacePicker({
 
                   <div className="flex items-center gap-2">
                     <input
+                      ref={campoNombre}
                       id={inputId}
                       name="name"
                       value={name}
                       onChange={(event) => setName(event.target.value)}
                       maxLength={WORKSPACE_NAME_MAX}
-                      placeholder={
-                        tipo === 'BOARDS'
-                          ? 'Nuevo espacio de tableros…'
-                          : 'Nuevo espacio de documentos…'
-                      }
+                      /* Corto: el tipo ya lo dicen los dos botones de encima, y el
+                         largo se cortaba en el ancho del desplegable. */
+                      placeholder="Nombre…"
                       autoComplete="off"
-                      className="h-8 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 font-sans text-sm text-white outline-none transition-colors placeholder:text-white hover:bg-[#1c1c1b] focus:bg-[#1c1c1b] focus:border-white/10"
+                      aria-label={
+                        tipo === 'BOARDS'
+                          ? 'Nombre del espacio de tableros'
+                          : 'Nombre del espacio de documentos'
+                      }
+                      /* Se tiene que leer como campo antes de tocarlo: era texto
+                         blanco sobre fondo y borde transparentes, y el placeholder
+                         pasaba por una etiqueta más del menú. Fondo hundido, borde
+                         visible, placeholder apagado y foco en el acento. */
+                      className="h-8 min-w-0 flex-1 rounded-lg border border-white/10 bg-[#141414] px-2.5 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary hover:border-white/20 focus:border-primary focus:ring-1 focus:ring-primary/40"
                     />
                     <Button
                       type="submit"

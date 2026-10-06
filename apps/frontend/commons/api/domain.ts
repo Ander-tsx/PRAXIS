@@ -844,6 +844,12 @@ export interface Task {
   comments: TaskComment[];
   /** Metadatos de los adjuntos. Los bytes se piden aparte al descargar. */
   attachments: TaskAttachment[];
+  /**
+   * Los documentos vinculados, solo su id. El título se cruza con los
+   * documentos del proyecto. Opcional porque las tareas que llegan por otras
+   * vías (eventos en vivo, el asistente) pueden no traerlo.
+   */
+  documents?: { documentId: string }[];
   subtasks: Task[];
 }
 

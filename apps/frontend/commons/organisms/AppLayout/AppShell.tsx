@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
   createContext,
   useCallback,
@@ -48,9 +50,17 @@ import {
 import { DirectorioDeChatsProvider, useDirectorioDeChats } from './DirectorioDeChats';
 import { FilaDeArbol } from './FilaDeArbol';
 import {
+  BuscadorDeBarra,
+  RAIL_ACTIVA,
+  RAIL_CELDA,
+  RAIL_DIVISORIA,
+  RAIL_ICONO,
+  RAIL_REPOSO,
+  RailTooltip,
   claseDePopover,
   Desplegable,
   MenuFlotante,
+  normalizarBusqueda,
   SIDEBAR_FILA,
   SIDEBAR_ICONO,
   SIDEBAR_INICIO,
@@ -137,6 +147,12 @@ export interface AppShellProps {
    * desplegada y se plegaría a la vista en cada navegación.
    */
   plegadaInicial?: boolean;
+  /**
+   * El ancho de la barra desplegada, en píxeles, **resuelto en el servidor**
+   * con `getSidebarAncho()` por lo mismo que `plegadaInicial`. Lo cambia la
+   * persona arrastrando el borde derecho.
+   */
+  anchoInicial?: number;
   /**
    * Con qué pestaña sale la barra —Inicio, Chat o Bandeja—, **resuelto en el
    * servidor**, exactamente por lo mismo que `plegadaInicial`.
@@ -259,6 +275,20 @@ export function useSidebarPlegada(): boolean {
  * índice de `theme/`. Si cambia allí, cambia aquí.
  */
 const SIDEBAR_COOKIE = 'praxis_sidebar';
+
+/**
+ * El ancho de la barra, y sus límites. Espejo de `commons/theme/sidebar.ts`,
+ * repetido por el mismo motivo que la cookie de arriba.
+ *
+ * Por debajo de `SIDEBAR_PLIEGUE_UMBRAL` al arrastrar, la barra **se pliega**
+ * en vez de seguir estrechándose: una barra de 150 px no cabe ni el nombre de
+ * un proyecto, y la plegada ya existe para eso.
+ */
+const SIDEBAR_WIDTH_COOKIE = 'praxis_sidebar_width';
+const SIDEBAR_ANCHO_POR_DEFECTO = 320;
+const SIDEBAR_ANCHO_MIN = 220;
+const SIDEBAR_ANCHO_MAX = 520;
+const SIDEBAR_PLIEGUE_UMBRAL = 160;
 /* La de la pestaña, espejo de `SIDEBAR_TAB_COOKIE` en `commons/theme/sidebar.ts`
    y repetida aquí por lo mismo que la de arriba: aquel es módulo de servidor. */
 const SIDEBAR_TAB_COOKIE = 'praxis_sidebar_tab';
@@ -344,6 +374,7 @@ function ArmazonInterno({
   user,
   estadoSlot,
   plegadaInicial = false,
+  anchoInicial = SIDEBAR_ANCHO_POR_DEFECTO,
   pestanaInicial = 'home',
   organizaciones,
   organizacionActivaId,
@@ -465,14 +496,103 @@ function ArmazonInterno({
    * con el ancho correcto y no hay nada que corregir.
    */
   const [plegada, setPlegada] = useState(plegadaInicial);
+  /* Para el tooltip del rail: escucha en la barra entera. Ver `RailTooltip`. */
+  const barraRef = useRef<HTMLElement>(null);
 
-  function alternarPliegue() {
-    const siguiente = !plegada;
+  function fijarPliegue(siguiente: boolean) {
     setPlegada(siguiente);
     /* Se escribe desde el cliente: no hace falta una Server Action para una
        preferencia de tamaño, y así el cambio es inmediato. `path=/` para que
        las cinco zonas la vean — sin eso, plegarla aquí no la pliega allí. */
     document.cookie = `${SIDEBAR_COOKIE}=${siguiente ? '1' : '0'}; path=/; max-age=${UN_ANO}; samesite=lax`;
+  }
+
+  function alternarPliegue() {
+    fijarPliegue(!plegada);
+  }
+
+  const [ancho, setAncho] = useState(anchoInicial);
+  /* Mientras se arrastra, sin la transición de `width`: con ella, la barra va
+     200 ms por detrás del puntero y el gesto se siente de goma. */
+  const [redimensionando, setRedimensionando] = useState(false);
+
+  function guardarAncho(valor: number) {
+    document.cookie = `${SIDEBAR_WIDTH_COOKIE}=${valor}; path=/; max-age=${UN_ANO}; samesite=lax`;
+  }
+
+  /**
+   * Arrastrar el borde derecho de la barra.
+   *
+   * El ancho se calcula contra el borde izquierdo de la propia barra, no con
+   * deltas acumulados: así no deriva si un `pointermove` se pierde. Plegada,
+   * arrastrar hacia fuera la despliega — es el mismo gesto al revés.
+   */
+  function empezarRedimension(evento: ReactPointerEvent<HTMLDivElement>) {
+    if (evento.button !== 0) return;
+    evento.preventDefault();
+    const asa = evento.currentTarget;
+    const origen = asa.parentElement?.getBoundingClientRect().left ?? 0;
+    asa.setPointerCapture(evento.pointerId);
+    setRedimensionando(true);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    let plegadaAhora = plegada;
+    let ultimo = ancho;
+
+    const mover = (e: PointerEvent) => {
+      const deseado = e.clientX - origen;
+      if (deseado < SIDEBAR_PLIEGUE_UMBRAL) {
+        if (!plegadaAhora) {
+          plegadaAhora = true;
+          fijarPliegue(true);
+        }
+        return;
+      }
+      if (plegadaAhora) {
+        plegadaAhora = false;
+        fijarPliegue(false);
+      }
+      ultimo = Math.min(SIDEBAR_ANCHO_MAX, Math.max(SIDEBAR_ANCHO_MIN, Math.round(deseado)));
+      setAncho(ultimo);
+    };
+    const soltar = () => {
+      asa.removeEventListener('pointermove', mover);
+      asa.removeEventListener('pointerup', soltar);
+      asa.removeEventListener('pointercancel', soltar);
+      setRedimensionando(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      guardarAncho(ultimo);
+    };
+    asa.addEventListener('pointermove', mover);
+    asa.addEventListener('pointerup', soltar);
+    asa.addEventListener('pointercancel', soltar);
+  }
+
+  /* Teclado: el asa es un separador enfocable y las flechas la mueven. */
+  function redimensionarConTeclado(evento: ReactKeyboardEvent<HTMLDivElement>) {
+    const paso = evento.shiftKey ? 48 : 16;
+    if (evento.key !== 'ArrowLeft' && evento.key !== 'ArrowRight') return;
+    evento.preventDefault();
+    if (plegada) {
+      if (evento.key === 'ArrowRight') fijarPliegue(false);
+      return;
+    }
+    const deseado = ancho + (evento.key === 'ArrowRight' ? paso : -paso);
+    if (deseado < SIDEBAR_ANCHO_MIN) {
+      fijarPliegue(true);
+      return;
+    }
+    const siguiente = Math.min(SIDEBAR_ANCHO_MAX, deseado);
+    setAncho(siguiente);
+    guardarAncho(siguiente);
+  }
+
+  function restaurarAncho() {
+    setAncho(SIDEBAR_ANCHO_POR_DEFECTO);
+    guardarAncho(SIDEBAR_ANCHO_POR_DEFECTO);
+    if (plegada) fijarPliegue(false);
   }
 
   /* `/` es la raíz de la zona: su ruta pública es el prefijo a secas. */
@@ -532,14 +652,23 @@ function ArmazonInterno({
       <div className="flex h-dvh overflow-hidden bg-[#191919] font-sans text-text-primary">
         {/* ── Barra lateral (escritorio) ───────────────────────── */}
         <aside
-          className={`relative hidden shrink-0 flex-col border-r border-border bg-[#202020] transition-[width] duration-200 motion-reduce:transition-none md:flex ${
-            plegada ? 'w-[4.5rem]' : 'w-80'
-          }`}
+          ref={barraRef}
+          className={`relative hidden shrink-0 flex-col border-r border-border bg-[#202020] md:flex ${
+            redimensionando ? '' : 'transition-[width] duration-200 motion-reduce:transition-none'
+          } ${plegada ? 'w-[4.5rem]' : ''}`}
+          style={plegada ? undefined : { width: ancho }}
         >
+          <RailTooltip contenedor={barraRef} activo={plegada} />
           {/* ⚠️ Selector y pestañas **fuera** del scroll: solo se desplaza el contenido de la pestaña. */}
           <div className={`flex min-h-0 flex-1 flex-col pt-2 ${plegada ? 'px-2' : 'px-4'}`}>
-            <div className="relative mb-4 min-h-[52px] shrink-0">
-              <div className={plegada ? 'hidden' : 'min-w-0'}>
+            <div
+              className={
+                plegada
+                  ? 'flex shrink-0 flex-col items-center gap-1'
+                  : 'relative mb-4 min-h-[52px] shrink-0'
+              }
+            >
+              <div className={plegada ? undefined : 'min-w-0'}>
                 <OrgSwitcher
                   name={user.name}
                   plegada={plegada}
@@ -549,12 +678,11 @@ function ArmazonInterno({
                   controlLateral={<span aria-hidden="true" className="w-7 shrink-0" />}
                 />
               </div>
-              <div
-                className={`absolute top-3 ${plegada ? 'left-1/2 -translate-x-1/2' : 'right-0'}`}
-              >
+              <div className={plegada ? undefined : 'absolute right-0 top-3'}>
                 <BotonDePliegue plegada={plegada} onClick={alternarPliegue} />
               </div>
             </div>
+            {plegada && <div className={RAIL_DIVISORIA} />}
 
             {/**
              * ⚠️ **Plegada también hay pestañas, solo que en columna.**
@@ -573,7 +701,12 @@ function ArmazonInterno({
               }}
               mensajesSinLeer={mensajesSinLeer}
               plegada={plegada}
+              /* Solo en el ancho mínimo, justo antes de plegarse. Entre el
+                 mínimo y el ancho en que caben las tres, las que no están
+                 puestas se encogen con «…» en vez de saltar a icono. */
+              compacta={ancho <= SIDEBAR_ANCHO_MIN}
             />
+            {plegada && <div className={RAIL_DIVISORIA} />}
             <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto pb-6">
               {/**
                * 🔴 **Las tres pestañas se montan siempre; se esconden con CSS.**
@@ -603,8 +736,12 @@ function ArmazonInterno({
                   plegada={plegada}
                   activePath={activePathConConsulta}
                   organizacionActivaId={organizacionActivaId ?? null}
+                  onDesplegar={() => fijarPliegue(false)}
                 />
-                <div className={`border-t border-border pt-3 ${plegada ? 'mx-1' : ''}`}>
+                <div
+                  className={plegada ? 'flex flex-col items-center' : 'border-t border-border pt-3'}
+                >
+                  {plegada && <div className={`${RAIL_DIVISORIA} mt-0`} />}
                   <NavList
                     navItems={navItems.filter((i) => i.href === '/assistant')}
                     sinEtiquetas
@@ -614,14 +751,10 @@ function ArmazonInterno({
                 </div>
               </div>
               <div className={activeTab === 'chat' ? undefined : 'hidden'}>
-                <SidebarChatList
-                  zonePath={zonePath}
-                  plegada={plegada}
-                  organizacionActivaId={organizacionActivaId ?? null}
-                />
+                <SidebarChatList zonePath={zonePath} plegada={plegada} />
               </div>
               <div className={activeTab === 'settings' ? undefined : 'hidden'}>
-                <NavList
+                <SidebarSettingsList
                   navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
                   activePath={activePathDeSecciones}
                   plegada={plegada}
@@ -630,42 +763,53 @@ function ArmazonInterno({
             </div>
           </div>
 
-          <div className={`relative border-t border-border ${plegada ? 'p-2' : 'p-4'}`}>
+          <div className={`relative border-t border-border ${plegada ? 'px-2 py-2' : 'p-4'}`}>
             {/* Plegada, la tarjeta de usuario se queda en el avatar: el nombre y
                 el correo no caben, y el avatar ya identifica de quién es la
                 sesión, que es lo que esa tarjeta viene a decir. */}
             {plegada ? (
               /* Plegada, el enlace y el selector siguen siendo hermanos por lo
-                 mismo que desplegada: un botón dentro de un enlace no vale. */
-              <PerfilFlotante
-                plegada
-                abierto={perfilAbierto}
-                onCambiar={setPerfilAbierto}
-                contenido={perfilSlot}
-                className={`mb-2 flex justify-center rounded-lg p-1 transition-colors hover:bg-white/5 ${
-                  enCuenta ? 'bg-white/5' : ''
-                }`}
-              >
-                <span className="relative">
+                 mismo que desplegada: un botón dentro de un enlace no vale.
+                 Campana arriba y tú abajo del todo, las dos en celda de rail:
+                 eras lo más grande de la columna (40 px) sin ser lo más
+                 importante. */
+              <div className="flex flex-col items-center gap-1">
+                <BandejaBoton
+                  abierta={bandejaAbierta}
+                  onCambiar={setBandejaAbierta}
+                  sinLeer={avisosSinLeer}
+                  zonePath={zonePath}
+                  plegada
+                />
+                <PerfilFlotante
+                  plegada
+                  abierto={perfilAbierto}
+                  onCambiar={setPerfilAbierto}
+                  contenido={perfilSlot}
+                  className={`${RAIL_CELDA} ${enCuenta ? RAIL_ACTIVA : RAIL_REPOSO}`}
+                >
                   <button
                     type="button"
                     onClick={() => setPerfilAbierto((v) => !v)}
                     aria-pressed={enCuenta}
-                    className="block"
-                    title={`${user.name.trim() || user.email} — tu perfil`}
+                    aria-label={`${user.name.trim() || user.email} — tu perfil`}
+                    data-rail-tip={user.name.trim() || user.email}
+                    className="block rounded-full"
                   >
                     {/* Sin `presence`: el punto lo pinta `estadoSlot`, que
                         además se puede pulsar. Ver el aviso de esa prop. */}
                     <Avatar
                       label={user.name.trim() || user.email}
                       mine
-                      size="md"
+                      size="base"
                       src={user.avatarSrc ?? null}
                     />
                   </button>
-                  {estadoSlot && <span className="absolute bottom-0 right-0">{estadoSlot}</span>}
-                </span>
-              </PerfilFlotante>
+                  {estadoSlot && (
+                    <span className="absolute bottom-0.5 right-0.5">{estadoSlot}</span>
+                  )}
+                </PerfilFlotante>
+              </div>
             ) : (
               <div className="flex items-stretch gap-1">
                 <PerfilFlotante
@@ -690,18 +834,27 @@ function ArmazonInterno({
                 />
               </div>
             )}
-            {plegada && (
-              <div className="flex justify-center">
-                <BandejaBoton
-                  abierta={bandejaAbierta}
-                  onCambiar={setBandejaAbierta}
-                  sinLeer={avisosSinLeer}
-                  zonePath={zonePath}
-                  plegada
-                />
-              </div>
-            )}
           </div>
+
+          {/* El asa de redimensionar: una franja de 6 px sobre el borde derecho,
+              invisible hasta pasar por encima. Doble clic vuelve al ancho de
+              siempre. Solo existe en escritorio, porque la barra también. */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Redimensionar la barra lateral"
+            aria-valuemin={SIDEBAR_ANCHO_MIN}
+            aria-valuemax={SIDEBAR_ANCHO_MAX}
+            aria-valuenow={plegada ? SIDEBAR_ANCHO_MIN : ancho}
+            tabIndex={0}
+            title="Arrastra para cambiar el ancho · doble clic para restaurarlo"
+            onPointerDown={empezarRedimension}
+            onKeyDown={redimensionarConTeclado}
+            onDoubleClick={restaurarAncho}
+            className={`absolute inset-y-0 -right-[3px] z-20 w-1.5 cursor-col-resize transition-colors hover:bg-primary/50 focus-visible:bg-primary/60 focus-visible:outline-none ${
+              redimensionando ? 'bg-primary/60' : ''
+            }`}
+          />
         </aside>
 
         {/* ── Contenido ────────────────────────────────────────── */}
@@ -871,18 +1024,15 @@ function ArmazonInterno({
                       </div>
                     )}
                     {activeTab === 'settings' && (
-                      <NavList
+                      <SidebarSettingsList
                         navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
                         activePath={activePathDeSecciones}
+                        plegada={false}
                         onNavigate={() => setMobileMenuOpen(false)}
                       />
                     )}
                     {activeTab === 'chat' && (
-                      <SidebarChatList
-                        zonePath={zonePath}
-                        plegada={false}
-                        organizacionActivaId={organizacionActivaId ?? null}
-                      />
+                      <SidebarChatList zonePath={zonePath} plegada={false} />
                     )}
                   </div>
                 </div>
@@ -1067,11 +1217,16 @@ function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () =>
       onClick={onClick}
       aria-expanded={!plegada}
       aria-label={plegada ? 'Desplegar la barra lateral' : 'Plegar la barra lateral'}
-      title={plegada ? 'Desplegar la barra lateral' : 'Plegar la barra lateral'}
-      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-border bg-[#202020] text-text-secondary shadow-sm transition-colors hover:bg-[#2a2a2a] hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-[#202020]"
+      title={plegada ? undefined : 'Plegar la barra lateral'}
+      data-rail-tip={plegada ? 'Desplegar' : undefined}
+      className={
+        plegada
+          ? `${RAIL_CELDA} ${RAIL_REPOSO} cursor-pointer`
+          : 'flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-border bg-[#202020] text-text-secondary shadow-sm transition-colors hover:bg-[#2a2a2a] hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-[#202020]'
+      }
     >
       <svg
-        className="h-3.5 w-3.5"
+        className={plegada ? RAIL_ICONO : 'h-3.5 w-3.5'}
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -1280,10 +1435,15 @@ function BandejaBoton({
         aria-expanded={abierta}
         aria-haspopup="dialog"
         aria-label={sinLeer > 0 ? `Avisos, ${sinLeer} sin leer` : 'Avisos'}
-        title="Avisos"
-        className={`relative flex items-center justify-center rounded-lg text-white transition-colors hover:bg-white/5 ${
-          plegada ? 'h-10 w-10' : 'h-full w-12'
-        } ${abierta ? 'bg-white/10' : ''}`}
+        title={plegada ? undefined : 'Avisos'}
+        data-rail-tip={plegada ? 'Avisos' : undefined}
+        className={
+          plegada
+            ? `${RAIL_CELDA} ${abierta ? RAIL_ACTIVA : RAIL_REPOSO}`
+            : `relative flex h-full w-12 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/5 ${
+                abierta ? 'bg-white/10' : ''
+              }`
+        }
       >
         <svg
           className="h-[18px] w-[18px]"
@@ -1367,12 +1527,19 @@ function SidebarTabs({
   onCambiar,
   mensajesSinLeer,
   plegada = false,
+  compacta = false,
 }: {
   activa: SidebarTab;
   onCambiar: (tab: SidebarTab) => void;
   mensajesSinLeer: number;
   /** Plegada: solo los iconos, en columna, y la insignia se reduce a un punto. */
   plegada?: boolean;
+  /**
+   * Barra estrecha pero no plegada: la pestaña puesta lleva icono y texto, las
+   * demás solo icono. Así la fila no se sale por el borde y sigue diciendo
+   * dónde estás.
+   */
+  compacta?: boolean;
 }) {
   const pestanas: Array<{
     id: SidebarTab;
@@ -1421,6 +1588,20 @@ function SidebarTabs({
     },
   ];
 
+  /**
+   * La única pestaña que cede espacio si la fila no cabe.
+   *
+   * - Compacta, la puesta: las otras ya son solo icono y no pueden encoger más
+   *   sin aplastarlo, así que se recorta su texto («Configurac…»).
+   * - Si no, la más larga de las que no están puestas: con el mismo peso para
+   *   todas, «Inicio» perdía cuatro píxeles y ya salía «Ini…».
+   */
+  const cede = compacta
+    ? activa
+    : pestanas
+        .filter((p) => p.id !== activa)
+        .reduce((larga, p) => (p.etiqueta.length > larga.etiqueta.length ? p : larga)).id;
+
   return (
     /* `role="tablist"` y no una lista de botones sueltos: son tres controles que
        se excluyen entre sí sobre paneles hermanos, que es literalmente lo que
@@ -1448,12 +1629,41 @@ function SidebarTabs({
        */
       className={
         plegada
-          ? 'mb-4 flex shrink-0 flex-col items-center gap-1'
+          ? 'relative flex shrink-0 flex-col items-center gap-0.5 self-center rounded-xl border border-white/10 bg-[#191919] p-0.5'
           : '-mt-2 mb-4 flex shrink-0 items-center gap-1 overflow-x-auto whitespace-nowrap pt-2 scrollbar-none'
       }
     >
+      {/**
+       * Plegada, las tres pestañas son un **interruptor vertical**: la misma
+       * caja hundida que el selector Kanban · Calendario · Tabla, de pie.
+       *
+       * Llevaban la barrita morada del activo, igual que el proyecto abierto
+       * justo debajo, y con dos barritas a la vez no se sabía cuál mandaba. Las
+       * pestañas no son un sitio al que se va: son un modo de la barra. Por eso
+       * el activo aquí es un fondo que **se desliza** de una a otra, y la
+       * barrita queda solo para dónde estás.
+       *
+       * El indicador es un único elemento movido con `translateY` (celda de
+       * 36 px + 2 de separación), no un fondo por botón: así viaja en vez de
+       * apagarse en uno y encenderse en otro.
+       */}
+      {plegada && (
+        <span
+          aria-hidden="true"
+          className="absolute left-0.5 top-0.5 h-9 w-9 rounded-lg bg-white/10 shadow-sm transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+          style={{
+            transform: `translateY(${
+              Math.max(
+                0,
+                pestanas.findIndex((p) => p.id === activa),
+              ) * 38
+            }px)`,
+          }}
+        />
+      )}
       {pestanas.map((pestana) => {
         const puesta = activa === pestana.id;
+        const soloIcono = compacta && !puesta;
         return (
           <button
             key={pestana.id}
@@ -1463,24 +1673,30 @@ function SidebarTabs({
             onClick={() => onCambiar(pestana.id)}
             /* Plegada, la etiqueta se va y hace falta un `title`: un icono solo
                no dice qué es, y aquí no hay texto al lado que lo explique. */
-            title={plegada ? pestana.etiqueta : undefined}
-            className={`flex shrink-0 items-center font-sans text-[12px] font-semibold transition-colors ${
+            title={soloIcono ? pestana.etiqueta : undefined}
+            data-rail-tip={plegada ? pestana.etiqueta : undefined}
+            /* Solo una pestaña encoge: ver `cede`. */
+            style={{ flexShrink: !plegada && pestana.id === cede ? 1 : 0 }}
+            aria-label={plegada || soloIcono ? pestana.etiqueta : undefined}
+            className={`flex items-center font-sans text-[12px] font-semibold transition-[background-color,color,padding] duration-200 ease-out motion-reduce:transition-none ${
               plegada
-                ? 'relative justify-center rounded-lg p-2'
-                : 'gap-1 rounded-full px-2.5 py-1.5'
-            } ${
-              puesta
-                ? 'bg-white/10 text-white'
-                : 'text-text-secondary hover:bg-white/5 hover:text-white'
+                ? `relative z-10 h-9 w-9 justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 ${
+                    puesta ? 'text-white' : 'text-text-secondary hover:text-white'
+                  }`
+                : `min-w-0 rounded-full py-1.5 ${soloIcono ? 'px-1.5' : 'px-2.5'} ${
+                    puesta
+                      ? 'bg-white/10 text-white'
+                      : 'text-text-secondary hover:bg-white/5 hover:text-white'
+                  }`
             }`}
           >
             {/* ⚠️ La fila lleva `pt-2` (y `-mt-2` para no moverla): `overflow-x-auto` recorta
                 también en vertical y cortaba por arriba la burbuja del contador. */}
             {/* La insignia va **sobre el icono**, no al lado: inline ensanchaba la pestaña
                 y «Configuraciones» se salía por el borde de la barra. */}
-            <span className="relative inline-flex">
+            <span className="relative inline-flex shrink-0">
               <svg
-                className="h-4 w-4"
+                className={plegada ? RAIL_ICONO : 'h-4 w-4'}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -1491,16 +1707,33 @@ function SidebarTabs({
               </svg>
               {!plegada && <InsigniaDePestana cuantos={pestana.insignia} />}
             </span>
-            {plegada
-              ? /* El número no cabe en 36 px: se reduce a un punto, que es lo que
+            {plegada ? (
+              /* El número no cabe en 36 px: se reduce a un punto, que es lo que
                  hace falta saber —hay algo— con el `title` para el resto. */
-                pestana.insignia > 0 && (
-                  <span
-                    className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"
-                    aria-label={`${pestana.insignia} sin leer`}
-                  />
-                )
-              : pestana.etiqueta}
+              pestana.insignia > 0 && (
+                <span
+                  className="absolute h-2 w-2 rounded-full bg-primary ring-2 right-1 top-1 ring-[#191919]"
+                  aria-label={`${pestana.insignia} sin leer`}
+                />
+              )
+            ) : (
+              /**
+               * La etiqueta entra y sale **animada**, con `max-width` y
+               * opacidad. Se probó con una rejilla de `0fr` a `1fr` —que anima
+               * hasta el ancho exacto del texto— y Chrome no la colapsaba
+               * cuando la pestaña no podía encoger: medía la columna `0fr` al
+               * ancho del texto. `max-width` no tiene esa ambigüedad. `min-w-0`
+               * deja que la que cede se recorte con «…» (ver `cede`).
+               */
+              <span
+                aria-hidden={soloIcono || undefined}
+                className={`min-w-0 overflow-hidden transition-[max-width,opacity,margin] duration-200 ease-out motion-reduce:transition-none ${
+                  soloIcono ? 'ml-0 max-w-0 opacity-0' : 'ml-1 max-w-[10rem] opacity-100'
+                }`}
+              >
+                <span className="block truncate">{pestana.etiqueta}</span>
+              </span>
+            )}
           </button>
         );
       })}
@@ -1545,11 +1778,14 @@ function SidebarProjectsTree({
   plegada,
   activePath,
   organizacionActivaId,
+  onDesplegar,
 }: {
   zonePath: string;
   plegada: boolean;
   activePath: string;
   organizacionActivaId: string | null;
+  /** Plegada: el «+» despliega la barra para escribir el nombre del proyecto. */
+  onDesplegar?: () => void;
 }) {
   const router = useRouter();
   const [projects, setProjects] = useState<SidebarProject[]>([]);
@@ -1570,6 +1806,17 @@ function SidebarProjectsTree({
    * mirando: así el árbol ocupa poco y aun así enseña dónde estás.
    */
   const [espaciosAbiertos, setEspaciosAbiertos] = useState<Map<string, boolean>>(new Map());
+  /**
+   * El buscador de Inicio. Busca en proyectos, espacios, tableros y documentos.
+   *
+   * ⚠️ Los espacios de un proyecto se piden **al desplegarlo** (ver el efecto de
+   * abajo), así que un tablero de un proyecto cerrado no estaría para
+   * encontrarlo. Mientras se busca, el efecto pide los que falten —una vez cada
+   * uno, por el mismo registro— y las ramas con coincidencias se abren solas.
+   */
+  const [busqueda, setBusqueda] = useState('');
+  const termino = normalizarBusqueda(busqueda);
+  const buscando = termino !== '';
 
   /**
    * Los proyectos cuyo detalle ya se pidió, para no volver a pedirlo.
@@ -1677,7 +1924,7 @@ function SidebarProjectsTree({
    */
   useEffect(() => {
     const pendientes = projects
-      .filter((p) => expanded.has(p.id) && !espaciosPedidos.current.has(p.id))
+      .filter((p) => (expanded.has(p.id) || buscando) && !espaciosPedidos.current.has(p.id))
       .map((p) => p.id);
     if (pendientes.length === 0) return;
 
@@ -1706,7 +1953,7 @@ function SidebarProjectsTree({
     return () => {
       vigente = false;
     };
-  }, [projects, expanded, zonePath]);
+  }, [projects, expanded, zonePath, buscando]);
 
   /** Tras crear algo desde la barra: vuelve a pedir los espacios de ese proyecto. */
   const refrescarProyecto = useCallback(
@@ -1740,11 +1987,30 @@ function SidebarProjectsTree({
 
   const gatewayPath = `${zonePath}/api/gateway`;
 
+  /* Lo que casa con la búsqueda: un proyecto que casa entero se enseña entero;
+     si no, solo las ramas que llevan dentro algo que casa. */
+  const casa = (texto: string) => normalizarBusqueda(texto).includes(termino);
+  const proyectosVisibles = !buscando
+    ? projects
+    : projects.flatMap((p) => {
+        if (casa(p.name)) return [p];
+        const espacios = p.workspaces.flatMap((w) => {
+          if (casa(w.name)) return [w];
+          const boards = w.boards.filter((b) => casa(b.name));
+          const documents = w.documents.filter((d) => casa(d.title || 'Sin título'));
+          return boards.length > 0 || documents.length > 0 ? [{ ...w, boards, documents }] : [];
+        });
+        return espacios.length > 0 ? [{ ...p, workspaces: espacios }] : [];
+      });
+
   if (loading) {
     return (
       <SidebarSection etiqueta="Proyectos" plegada={plegada}>
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-9 animate-pulse rounded-lg bg-white/5" />
+          <div
+            key={i}
+            className={`animate-pulse rounded-lg bg-white/5 ${plegada ? 'h-10 w-10' : 'h-9'}`}
+          />
         ))}
       </SidebarSection>
     );
@@ -1759,7 +2025,9 @@ function SidebarProjectsTree({
   if (plegada) {
     return (
       <SidebarSection etiqueta="Proyectos" plegada>
-        <nav aria-label="Proyectos" className="flex flex-col gap-0.5">
+        {/* `self-stretch`: centrado por su padre, el `<nav>` mediría 40 px y el
+            `overflow-hidden` del desplegable cortaría la barrita del activo. */}
+        <nav aria-label="Proyectos" className="flex flex-col items-center gap-1 self-stretch">
           {projects.map((project) => {
             const projectHref = `/projects/${project.slug}`;
             const activo =
@@ -1770,9 +2038,10 @@ function SidebarProjectsTree({
               <Link
                 key={project.id}
                 href={projectHref}
-                title={project.name}
+                aria-label={project.name}
+                data-rail-tip={project.name}
                 aria-current={activo ? 'page' : undefined}
-                className={`flex justify-center rounded-lg py-1 transition-colors hover:bg-white/5 ${activo ? 'bg-white/10' : ''}`}
+                className={`${RAIL_CELDA} ${activo ? RAIL_ACTIVA : RAIL_REPOSO}`}
               >
                 <ProjectMonogram
                   id={project.id}
@@ -1784,277 +2053,306 @@ function SidebarProjectsTree({
               </Link>
             );
           })}
+          {onDesplegar && (
+            <button
+              type="button"
+              onClick={() => {
+                onDesplegar();
+                setCreandoProyecto(true);
+              }}
+              aria-label="Nuevo proyecto"
+              data-rail-tip="Nuevo proyecto"
+              className={`${RAIL_CELDA} ${RAIL_REPOSO}`}
+            >
+              <Plus className={RAIL_ICONO} aria-hidden="true" />
+            </button>
+          )}
         </nav>
       </SidebarSection>
     );
   }
 
   return (
-    <SidebarSection
-      etiqueta="Proyectos"
-      accion={
-        <MenuFlotante
-          etiquetaAria="Acciones de proyectos"
-          gatewayPath={gatewayPath}
-          activa
-          items={[
-            {
-              clave: 'nuevo-proyecto',
-              etiqueta: 'Nuevo proyecto',
-              icono: <FolderPlus />,
-              onElegir: () => setCreandoProyecto(true),
-            },
-          ]}
-        />
-      }
-    >
-      {creandoProyecto && (
-        <NuevoProyectoEnLinea
-          gatewayPath={gatewayPath}
-          organizacionId={organizacionActivaId}
-          onCreado={cargar}
-          onCerrar={() => setCreandoProyecto(false)}
-        />
-      )}
-      <nav aria-label="Proyectos" className="flex flex-col gap-0.5">
-        {projects.map((project) => {
-          const isOpen = expanded.has(project.id);
-          // Las URLs de proyecto usan el SLUG, no el id
-          const projectHref = `/projects/${project.slug}`;
-          const isActiveProject =
-            activePath === projectHref ||
-            activePath.startsWith(`${projectHref}?`) ||
-            activePath.startsWith(`${projectHref}/`);
-          const agregando = agregandoEspacio?.id === project.id ? agregandoEspacio : null;
+    <div className="flex flex-col gap-3">
+      <BuscadorDeBarra
+        valor={busqueda}
+        onCambiar={setBusqueda}
+        placeholder="Buscar"
+        etiqueta="Buscar proyectos, espacios, tableros y documentos"
+      />
+      <SidebarSection
+        etiqueta="Proyectos"
+        accion={
+          <MenuFlotante
+            etiquetaAria="Acciones de proyectos"
+            gatewayPath={gatewayPath}
+            activa
+            items={[
+              {
+                clave: 'nuevo-proyecto',
+                etiqueta: 'Nuevo proyecto',
+                icono: <FolderPlus />,
+                onElegir: () => setCreandoProyecto(true),
+              },
+            ]}
+          />
+        }
+      >
+        {creandoProyecto && (
+          <NuevoProyectoEnLinea
+            gatewayPath={gatewayPath}
+            organizacionId={organizacionActivaId}
+            onCreado={cargar}
+            onCerrar={() => setCreandoProyecto(false)}
+          />
+        )}
+        <nav aria-label="Proyectos" className="flex flex-col gap-0.5">
+          {proyectosVisibles.map((project) => {
+            const isOpen = buscando || expanded.has(project.id);
+            // Las URLs de proyecto usan el SLUG, no el id
+            const projectHref = `/projects/${project.slug}`;
+            const isActiveProject =
+              activePath === projectHref ||
+              activePath.startsWith(`${projectHref}?`) ||
+              activePath.startsWith(`${projectHref}/`);
+            const agregando = agregandoEspacio?.id === project.id ? agregandoEspacio : null;
 
-          return (
-            <div key={project.id} className="flex flex-col">
-              <FilaDeArbol
-                activo={isActiveProject}
-                href={projectHref}
-                nombre={project.name}
-                projectId={project.id}
-                gatewayPath={gatewayPath}
-                inicio={
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => toggleProject(project.id)}
-                      aria-expanded={isOpen}
-                      aria-label={isOpen ? `Colapsar ${project.name}` : `Expandir ${project.name}`}
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:text-white"
-                    >
-                      <ChevronIcon open={isOpen} />
-                    </button>
-                    <span
-                      className={`${SIDEBAR_INICIO} [&>*]:shrink-0 [&>*]:scale-[0.82]`}
-                      aria-hidden="true"
-                    >
-                      <ProjectMonogram
-                        id={project.id}
-                        name={project.name}
-                        iconKey={project.iconKey}
-                        imageUrl={project.imageUrl}
-                        color={project.color}
+            return (
+              <div key={project.id} className="flex flex-col">
+                <FilaDeArbol
+                  activo={isActiveProject}
+                  href={projectHref}
+                  nombre={project.name}
+                  projectId={project.id}
+                  gatewayPath={gatewayPath}
+                  inicio={
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => toggleProject(project.id)}
+                        aria-expanded={isOpen}
+                        aria-label={
+                          isOpen ? `Colapsar ${project.name}` : `Expandir ${project.name}`
+                        }
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:text-white"
+                      >
+                        <ChevronIcon open={isOpen} />
+                      </button>
+                      <span
+                        className={`${SIDEBAR_INICIO} [&>*]:shrink-0 [&>*]:scale-[0.82]`}
+                        aria-hidden="true"
+                      >
+                        <ProjectMonogram
+                          id={project.id}
+                          name={project.name}
+                          iconKey={project.iconKey}
+                          imageUrl={project.imageUrl}
+                          color={project.color}
+                        />
+                      </span>
+                    </>
+                  }
+                  itemsExtra={[
+                    {
+                      clave: 'espacio-tableros',
+                      grupo: 'Agregar espacio',
+                      etiqueta: 'De tableros',
+                      icono: <FolderKanban />,
+                      permiso: 'canEditBoard',
+                      onElegir: () => abrirEspacioNuevo(project.id, 'BOARDS'),
+                    },
+                    {
+                      clave: 'espacio-documentos',
+                      grupo: 'Agregar espacio',
+                      etiqueta: 'De documentos',
+                      icono: <FolderBookmark />,
+                      permiso: 'canEditBoard',
+                      onElegir: () => abrirEspacioNuevo(project.id, 'DOCUMENTS'),
+                    },
+                  ]}
+                  edicion={{
+                    tipo: 'proyecto',
+                    path: `/projects/${project.id}`,
+                    cuerpoDeNombre: (name) => ({ name }),
+                    permisoRenombrar: 'canEditProject',
+                    permisoEliminar: 'canDeleteProject',
+                    confirmarEscribiendo: true,
+                    onCambiado: cargar,
+                    alEliminar: () => router.push('/projects'),
+                    /* El slug se regenera al renombrar: la URL abierta dejaría de resolver. */
+                    alRenombrar: (guardado) => {
+                      if (isActiveProject && guardado.slug && guardado.slug !== project.slug) {
+                        router.replace(`/projects/${guardado.slug}`);
+                      }
+                    },
+                  }}
+                />
+
+                <Desplegable abierto={isOpen}>
+                  <div className="flex flex-col gap-0.5 pb-1 pl-6 pt-0.5">
+                    {agregando && (
+                      <NuevoEspacioEnLinea
+                        proyecto={project}
+                        tipo={agregando.tipo}
+                        gatewayPath={gatewayPath}
+                        onCreado={() => refrescarProyecto(project.id)}
+                        onCerrar={() => setAgregandoEspacio(null)}
                       />
-                    </span>
-                  </>
-                }
-                itemsExtra={[
-                  {
-                    clave: 'espacio-tableros',
-                    grupo: 'Agregar espacio',
-                    etiqueta: 'De tableros',
-                    icono: <FolderKanban />,
-                    permiso: 'canEditBoard',
-                    onElegir: () => abrirEspacioNuevo(project.id, 'BOARDS'),
-                  },
-                  {
-                    clave: 'espacio-documentos',
-                    grupo: 'Agregar espacio',
-                    etiqueta: 'De documentos',
-                    icono: <FolderBookmark />,
-                    permiso: 'canEditBoard',
-                    onElegir: () => abrirEspacioNuevo(project.id, 'DOCUMENTS'),
-                  },
-                ]}
-                edicion={{
-                  tipo: 'proyecto',
-                  path: `/projects/${project.id}`,
-                  cuerpoDeNombre: (name) => ({ name }),
-                  permisoRenombrar: 'canEditProject',
-                  permisoEliminar: 'canDeleteProject',
-                  confirmarEscribiendo: true,
-                  onCambiado: cargar,
-                  alEliminar: () => router.push('/projects'),
-                  /* El slug se regenera al renombrar: la URL abierta dejaría de resolver. */
-                  alRenombrar: (guardado) => {
-                    if (isActiveProject && guardado.slug && guardado.slug !== project.slug) {
-                      router.replace(`/projects/${guardado.slug}`);
-                    }
-                  },
-                }}
-              />
-
-              <Desplegable abierto={isOpen}>
-                <div className="flex flex-col gap-0.5 pb-1 pl-6 pt-0.5">
-                  {agregando && (
-                    <NuevoEspacioEnLinea
-                      proyecto={project}
-                      tipo={agregando.tipo}
-                      gatewayPath={gatewayPath}
-                      onCreado={() => refrescarProyecto(project.id)}
-                      onCerrar={() => setAgregandoEspacio(null)}
-                    />
-                  )}
-                  {project.workspaces.length === 0 && !agregando ? (
-                    <span className="select-none px-2.5 py-1 font-sans text-[12px] italic text-text-secondary">
-                      Sin espacios
-                    </span>
-                  ) : (
-                    project.workspaces.map((ws) => {
-                      // URL correcta: /projects/{slug}?tab=espacios&ws={wsId}
-                      const wsHref = `/projects/${project.slug}?tab=espacios&ws=${ws.id}`;
-                      const isActiveWs = activePath.includes(`ws=${ws.id}`);
-                      const wsAbierto = espaciosAbiertos.get(ws.id) ?? isActiveWs;
-                      /* El icono dice qué guarda el espacio: tableros o documentos. */
-                      const Icono = ws.kind === 'DOCUMENTS' ? FolderBookmark : FolderKanban;
-                      const refrescar = () => refrescarProyecto(project.id);
-                      return (
-                        <div key={ws.id} className="flex flex-col gap-0.5">
-                          <FilaDeArbol
-                            compacta
-                            activo={isActiveWs}
-                            href={wsHref}
-                            nombre={ws.name}
-                            projectId={project.id}
-                            gatewayPath={gatewayPath}
-                            itemsExtra={[
-                              {
-                                clave: 'nuevo-contenido',
-                                etiqueta:
-                                  ws.kind === 'DOCUMENTS' ? 'Nuevo documento' : 'Nuevo tablero',
-                                icono: <Plus />,
-                                permiso:
-                                  ws.kind === 'DOCUMENTS' ? 'canEditDocuments' : 'canCreateBoard',
-                                onElegir: () => {
-                                  setEspaciosAbiertos((previos) =>
-                                    new Map(previos).set(ws.id, true),
-                                  );
-                                  setCreandoEn(ws.id);
-                                },
-                              },
-                            ]}
-                            inicio={
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() =>
+                    )}
+                    {project.workspaces.length === 0 && !agregando ? (
+                      <span className="select-none px-2.5 py-1 font-sans text-[12px] italic text-text-secondary">
+                        Sin espacios
+                      </span>
+                    ) : (
+                      project.workspaces.map((ws) => {
+                        // URL correcta: /projects/{slug}?tab=espacios&ws={wsId}
+                        const wsHref = `/projects/${project.slug}?tab=espacios&ws=${ws.id}`;
+                        const isActiveWs = activePath.includes(`ws=${ws.id}`);
+                        const wsAbierto = buscando || (espaciosAbiertos.get(ws.id) ?? isActiveWs);
+                        /* El icono dice qué guarda el espacio: tableros o documentos. */
+                        const Icono = ws.kind === 'DOCUMENTS' ? FolderBookmark : FolderKanban;
+                        const refrescar = () => refrescarProyecto(project.id);
+                        return (
+                          <div key={ws.id} className="flex flex-col gap-0.5">
+                            <FilaDeArbol
+                              compacta
+                              activo={isActiveWs}
+                              href={wsHref}
+                              nombre={ws.name}
+                              projectId={project.id}
+                              gatewayPath={gatewayPath}
+                              itemsExtra={[
+                                {
+                                  clave: 'nuevo-contenido',
+                                  etiqueta:
+                                    ws.kind === 'DOCUMENTS' ? 'Nuevo documento' : 'Nuevo tablero',
+                                  icono: <Plus />,
+                                  permiso:
+                                    ws.kind === 'DOCUMENTS' ? 'canEditDocuments' : 'canCreateBoard',
+                                  onElegir: () => {
                                     setEspaciosAbiertos((previos) =>
-                                      new Map(previos).set(ws.id, !wsAbierto),
-                                    )
-                                  }
-                                  aria-expanded={wsAbierto}
-                                  aria-label={
-                                    wsAbierto ? `Colapsar ${ws.name}` : `Expandir ${ws.name}`
-                                  }
-                                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:text-white"
-                                >
-                                  <ChevronIcon open={wsAbierto} />
-                                </button>
-                                <Icono className={SIDEBAR_ICONO} aria-hidden="true" />
-                              </>
-                            }
-                            edicion={{
-                              tipo: 'espacio',
-                              path: `/workspaces/${ws.id}`,
-                              cuerpoDeNombre: (name) => ({ name }),
-                              permisoRenombrar: 'canEditBoard',
-                              permisoEliminar: 'canDeleteBoard',
-                              confirmarEscribiendo: true,
-                              onCambiado: refrescar,
-                              alEliminar: () => router.push(projectHref),
-                            }}
-                          />
-                          <Desplegable abierto={wsAbierto}>
-                            <div className="flex flex-col gap-0.5 pl-6">
-                              {ws.boards.map((tablero) => {
-                                const tableroActivo = activePath.includes(`board=${tablero.id}`);
-                                return (
-                                  <FilaDeArbol
-                                    key={tablero.id}
-                                    compacta
-                                    activo={tableroActivo}
-                                    href={`${wsHref}&board=${tablero.id}`}
-                                    nombre={tablero.name}
-                                    projectId={project.id}
-                                    gatewayPath={gatewayPath}
-                                    inicio={
-                                      <Columns3 className={SIDEBAR_ICONO} aria-hidden="true" />
+                                      new Map(previos).set(ws.id, true),
+                                    );
+                                    setCreandoEn(ws.id);
+                                  },
+                                },
+                              ]}
+                              inicio={
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setEspaciosAbiertos((previos) =>
+                                        new Map(previos).set(ws.id, !wsAbierto),
+                                      )
                                     }
-                                    edicion={{
-                                      tipo: 'tablero',
-                                      path: `/boards/${tablero.id}`,
-                                      cuerpoDeNombre: (name) => ({ name }),
-                                      permisoRenombrar: 'canEditBoard',
-                                      permisoEliminar: 'canDeleteBoard',
-                                      confirmarEscribiendo: true,
-                                      onCambiado: refrescar,
-                                      alEliminar: () => router.push(wsHref),
-                                    }}
-                                  />
-                                );
-                              })}
-                              {ws.documents.map((doc) => {
-                                const docActivo = activePath.includes(`doc=${doc.id}`);
-                                return (
-                                  <FilaDeArbol
-                                    key={doc.id}
-                                    compacta
-                                    activo={docActivo}
-                                    href={`${wsHref}&doc=${doc.id}`}
-                                    nombre={doc.title || 'Sin título'}
-                                    projectId={project.id}
+                                    aria-expanded={wsAbierto}
+                                    aria-label={
+                                      wsAbierto ? `Colapsar ${ws.name}` : `Expandir ${ws.name}`
+                                    }
+                                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:text-white"
+                                  >
+                                    <ChevronIcon open={wsAbierto} />
+                                  </button>
+                                  <Icono className={SIDEBAR_ICONO} aria-hidden="true" />
+                                </>
+                              }
+                              edicion={{
+                                tipo: 'espacio',
+                                path: `/workspaces/${ws.id}`,
+                                cuerpoDeNombre: (name) => ({ name }),
+                                permisoRenombrar: 'canEditBoard',
+                                permisoEliminar: 'canDeleteBoard',
+                                confirmarEscribiendo: true,
+                                onCambiado: refrescar,
+                                alEliminar: () => router.push(projectHref),
+                              }}
+                            />
+                            <Desplegable abierto={wsAbierto}>
+                              <div className="flex flex-col gap-0.5 pl-6">
+                                {ws.boards.map((tablero) => {
+                                  const tableroActivo = activePath.includes(`board=${tablero.id}`);
+                                  return (
+                                    <FilaDeArbol
+                                      key={tablero.id}
+                                      compacta
+                                      activo={tableroActivo}
+                                      href={`${wsHref}&board=${tablero.id}`}
+                                      nombre={tablero.name}
+                                      projectId={project.id}
+                                      gatewayPath={gatewayPath}
+                                      inicio={
+                                        <Columns3 className={SIDEBAR_ICONO} aria-hidden="true" />
+                                      }
+                                      edicion={{
+                                        tipo: 'tablero',
+                                        path: `/boards/${tablero.id}`,
+                                        cuerpoDeNombre: (name) => ({ name }),
+                                        permisoRenombrar: 'canEditBoard',
+                                        permisoEliminar: 'canDeleteBoard',
+                                        confirmarEscribiendo: true,
+                                        onCambiado: refrescar,
+                                        alEliminar: () => router.push(wsHref),
+                                      }}
+                                    />
+                                  );
+                                })}
+                                {ws.documents.map((doc) => {
+                                  const docActivo = activePath.includes(`doc=${doc.id}`);
+                                  return (
+                                    <FilaDeArbol
+                                      key={doc.id}
+                                      compacta
+                                      activo={docActivo}
+                                      href={`${wsHref}&doc=${doc.id}`}
+                                      nombre={doc.title || 'Sin título'}
+                                      projectId={project.id}
+                                      gatewayPath={gatewayPath}
+                                      inicio={<File className={SIDEBAR_ICONO} aria-hidden="true" />}
+                                      edicion={{
+                                        tipo: 'documento',
+                                        path: `/workspaces/${ws.id}/documents/${doc.id}`,
+                                        cuerpoDeNombre: (title) => ({ title }),
+                                        permisoRenombrar: 'canEditDocuments',
+                                        permisoEliminar: 'canEditDocuments',
+                                        confirmarEscribiendo: false,
+                                        onCambiado: refrescar,
+                                        alEliminar: () => router.push(wsHref),
+                                      }}
+                                    />
+                                  );
+                                })}
+                                {creandoEn === ws.id && (
+                                  <NuevoContenidoEnLinea
+                                    espacio={ws}
+                                    proyecto={project}
                                     gatewayPath={gatewayPath}
-                                    inicio={<File className={SIDEBAR_ICONO} aria-hidden="true" />}
-                                    edicion={{
-                                      tipo: 'documento',
-                                      path: `/workspaces/${ws.id}/documents/${doc.id}`,
-                                      cuerpoDeNombre: (title) => ({ title }),
-                                      permisoRenombrar: 'canEditDocuments',
-                                      permisoEliminar: 'canEditDocuments',
-                                      confirmarEscribiendo: false,
-                                      onCambiado: refrescar,
-                                      alEliminar: () => router.push(wsHref),
-                                    }}
+                                    onCreado={refrescar}
+                                    onCerrar={() => setCreandoEn(null)}
                                   />
-                                );
-                              })}
-                              {creandoEn === ws.id && (
-                                <NuevoContenidoEnLinea
-                                  espacio={ws}
-                                  proyecto={project}
-                                  gatewayPath={gatewayPath}
-                                  onCreado={refrescar}
-                                  onCerrar={() => setCreandoEn(null)}
-                                />
-                              )}
-                            </div>
-                          </Desplegable>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </Desplegable>
-            </div>
-          );
-        })}
-      </nav>
-      {projects.length === 0 && !creandoProyecto && (
-        <FilaDeAccion etiqueta="Crear primer proyecto" onClick={() => setCreandoProyecto(true)} />
-      )}
-    </SidebarSection>
+                                )}
+                              </div>
+                            </Desplegable>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </Desplegable>
+              </div>
+            );
+          })}
+        </nav>
+        {projects.length === 0 && !creandoProyecto && (
+          <FilaDeAccion etiqueta="Crear primer proyecto" onClick={() => setCreandoProyecto(true)} />
+        )}
+        {buscando && projects.length > 0 && proyectosVisibles.length === 0 && (
+          <p className="px-3 py-6 text-center font-sans text-[13px] text-text-secondary">
+            Nada coincide con «{busqueda.trim()}».
+          </p>
+        )}
+      </SidebarSection>
+    </div>
   );
 }
 
@@ -2079,18 +2377,36 @@ function FilaDePersona({
     <Link
       href={`/chat/${conversacion.peerId}`}
       aria-current={activo ? 'page' : undefined}
-      className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors ${
-        plegada ? 'justify-center px-0' : ''
-      } ${activo ? 'bg-white/10' : 'hover:bg-white/5'}`}
+      aria-label={plegada ? nombre : undefined}
+      data-rail-tip={plegada ? nombre : undefined}
+      className={
+        plegada
+          ? `${RAIL_CELDA} ${activo ? RAIL_ACTIVA : RAIL_REPOSO}`
+          : `group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors ${
+              activo ? 'bg-white/10' : 'hover:bg-white/5'
+            }`
+      }
     >
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[1.1]">
+      <span
+        className={
+          plegada
+            ? 'flex shrink-0 items-center justify-center'
+            : 'flex h-7 w-7 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[1.1]'
+        }
+      >
         <Avatar
           label={nombre}
-          size="sm"
+          size={plegada ? 'base' : 'sm'}
           src={avatarHref(peer?.avatarUrl, gatewayPath)}
           presence={presencia}
         />
       </span>
+      {plegada && conversacion.unread > 0 && (
+        <span
+          aria-label={`${conversacion.unread} sin leer`}
+          className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-[#202020]"
+        />
+      )}
       {!plegada && (
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-baseline gap-2">
@@ -2139,11 +2455,23 @@ function FilaDeProyecto({
     <Link
       href={`/chat/proyecto/${chat.project.id}`}
       aria-current={activo ? 'page' : undefined}
-      className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors ${
-        plegada ? 'justify-center px-0' : ''
-      } ${activo ? 'bg-white/10' : 'hover:bg-white/5'}`}
+      aria-label={plegada ? chat.project.name : undefined}
+      data-rail-tip={plegada ? chat.project.name : undefined}
+      className={
+        plegada
+          ? `${RAIL_CELDA} ${activo ? RAIL_ACTIVA : RAIL_REPOSO}`
+          : `group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors ${
+              activo ? 'bg-white/10' : 'hover:bg-white/5'
+            }`
+      }
     >
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[0.82]">
+      <span
+        className={
+          plegada
+            ? 'flex shrink-0 items-center justify-center'
+            : 'flex h-7 w-7 shrink-0 items-center justify-center [&>*]:shrink-0 [&>*]:scale-[0.82]'
+        }
+      >
         <ProjectMonogram
           id={chat.project.id}
           name={chat.project.name}
@@ -2152,6 +2480,12 @@ function FilaDeProyecto({
           color={chat.project.color}
         />
       </span>
+      {plegada && chat.unread > 0 && (
+        <span
+          aria-label={`${chat.unread} sin leer`}
+          className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-[#202020]"
+        />
+      )}
       {!plegada && (
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-baseline gap-2">
@@ -2223,6 +2557,54 @@ function cuandoCorto(iso: string): string {
 }
 
 /**
+ * La pestaña Configuraciones: las entradas de ajustes, con su buscador.
+ *
+ * El buscador está por simetría con las otras dos pestañas —las tres empiezan
+ * igual, y cambiar de una a otra no desplaza la lista— y porque las entradas
+ * de ajustes son justo lo que se busca por nombre («facturación», «equipo»).
+ */
+function SidebarSettingsList({
+  navItems,
+  activePath,
+  plegada,
+  onNavigate,
+}: {
+  navItems: AppNavItem[];
+  activePath: string;
+  plegada: boolean;
+  onNavigate?: () => void;
+}) {
+  const [busqueda, setBusqueda] = useState('');
+  const termino = normalizarBusqueda(busqueda);
+  const visibles = termino
+    ? navItems.filter((i) => normalizarBusqueda(i.label).includes(termino))
+    : navItems;
+  return (
+    <div className="flex flex-col gap-3">
+      {!plegada && (
+        <BuscadorDeBarra
+          valor={busqueda}
+          onCambiar={setBusqueda}
+          placeholder="Buscar"
+          etiqueta="Buscar en configuraciones"
+        />
+      )}
+      <NavList
+        navItems={visibles}
+        activePath={activePath}
+        plegada={plegada}
+        onNavigate={onNavigate}
+      />
+      {!plegada && termino && visibles.length === 0 && (
+        <p className="px-3 py-6 text-center font-sans text-[13px] text-text-secondary">
+          Ningún ajuste coincide con «{busqueda.trim()}».
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
  * El directorio de conversaciones, en su pestaña de la barra lateral.
  *
  * ## ⚠️ Se monta **siempre**, aunque su pestaña no esté a la vista
@@ -2247,15 +2629,7 @@ function cuandoCorto(iso: string): string {
  * montaban igual, y los encabezados «Proyectos» y «Privados» se quedaban
  * puestos sobre cero resultados.
  */
-function SidebarChatList({
-  zonePath,
-  plegada,
-  organizacionActivaId,
-}: {
-  zonePath: string;
-  plegada: boolean;
-  organizacionActivaId: string | null;
-}) {
+function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boolean }) {
   const pathname = usePathname();
   const browserPath = zonePath + (pathname === '/' ? '' : pathname);
   const gatewayPath = `${zonePath}/api/gateway`;
@@ -2272,15 +2646,23 @@ function SidebarChatList({
   const { directas, deProyecto, directorio, cargando } = useDirectorioDeChats();
   const [busqueda, setBusqueda] = useState('');
 
-  const termino = busqueda.trim().toLowerCase();
-  const proyectosVisibles = deProyecto
-    .filter((c) => !organizacionActivaId || c.project.organizationId === organizacionActivaId)
-    .filter((c) => !termino || c.project.name.toLowerCase().includes(termino));
+  /**
+   * ⚠️ **Todos los chats, de todas tus organizaciones.** Los de proyecto se
+   * filtraban por la organización activa, y un mensaje de un proyecto de otra
+   * organización solo se encontraba cambiando de organización primero. Una
+   * conversación no es inventario del plan: es alguien esperando respuesta.
+   * Ni `/me/chats` ni `/me/chats/projects` filtran en el servidor; el filtro
+   * era solo este.
+   */
+  const termino = normalizarBusqueda(busqueda);
+  const proyectosVisibles = deProyecto.filter(
+    (c) => !termino || normalizarBusqueda(c.project.name).includes(termino),
+  );
 
   const directasVisibles = directas.filter((c) => {
     if (!termino) return true;
     const peer = directorio.get(c.peerId);
-    return (peer ? personLabel(peer) : 'Alguien').toLowerCase().includes(termino);
+    return normalizarBusqueda(peer ? personLabel(peer) : 'Alguien').includes(termino);
   });
 
   if (cargando) {
@@ -2295,13 +2677,11 @@ function SidebarChatList({
   return (
     <div className="flex flex-col gap-3">
       {!plegada && (
-        <input
-          type="search"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar chats..."
-          aria-label="Buscar conversaciones"
-          className={`${SIDEBAR_FILA} w-full bg-white/5 text-white placeholder:text-text-secondary ring-1 ring-inset ring-white/10 focus:outline-none focus:ring-white/35`}
+        <BuscadorDeBarra
+          valor={busqueda}
+          onCambiar={setBusqueda}
+          placeholder="Buscar"
+          etiqueta="Buscar conversaciones"
         />
       )}
 

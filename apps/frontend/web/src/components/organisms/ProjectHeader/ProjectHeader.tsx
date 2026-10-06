@@ -122,8 +122,7 @@ export function ProjectHeader({
             </p>
           )}
         </div>
-
-        {settings}
+        {/* Sin engranaje: los ajustes son una pestaña más de la barra. */}
       </header>
     );
   }

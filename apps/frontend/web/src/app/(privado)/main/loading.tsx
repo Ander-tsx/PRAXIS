@@ -20,7 +20,7 @@ import { PageSkeleton, Skeleton } from '@praxis/commons';
 export default function MainLoading() {
   return (
     <PageSkeleton title="Cuenta">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-16">
+      <div className="flex w-full flex-col gap-8 pb-16">
         <header className="flex flex-col gap-3 border-b border-white/[0.08] pb-6">
           <Skeleton className="h-8 w-56" />
           <Skeleton className="h-4 w-full max-w-lg" />

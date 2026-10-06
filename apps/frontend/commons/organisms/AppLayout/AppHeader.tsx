@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useAppShell, useSidebarPlegada } from './AppShell';
+import { useAppShell } from './AppShell';
 
 export interface AppHeaderProps {
   anchoCompleto?: boolean;
@@ -83,11 +83,10 @@ export function AppHeader({
   children,
 }: AppHeaderProps) {
   const { openMenu } = useAppShell();
-  /* El ancho máximo compensa el pliegue: sin esto, plegar la barra lateral
-     libera ~184px que esta columna nunca reclama —se queda en el margen
-     lateral en vez de dárselos al contenido— y en una pantalla ancha, plegar
-     no cambia nada de lo que se ve. */
-  const plegada = useSidebarPlegada();
+  /* ⚠️ **Sin ancho máximo.** Hubo uno (1400 px, 1584 con la barra plegada) y
+     en un monitor grande —o al alejar el zoom— dejaba dos franjas vacías a los
+     lados más anchas que la propia barra lateral. La columna ocupa lo que haya;
+     lo que necesite medida de lectura (un párrafo, un formulario) la pone él. */
 
   return (
     <>
@@ -146,7 +145,7 @@ export function AppHeader({
                    menú flota sobre esta esquina, y sin ese hueco taparía la
                    primera línea de cualquier pantalla. En escritorio no existe,
                    así que no se paga. */
-                `px-4 pb-4 pt-16 sm:p-6 ${plegada ? 'max-w-[1584px]' : 'max-w-[1400px]'}`
+                'max-w-full px-4 pb-4 pt-16 sm:p-6 lg:px-8'
           } ${lleno ? 'flex h-full min-h-0 flex-col' : ''}`}
         >
           {children}

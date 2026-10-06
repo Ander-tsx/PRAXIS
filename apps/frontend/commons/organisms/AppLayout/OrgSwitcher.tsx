@@ -7,6 +7,7 @@ import { Glyph, glyphByKey } from '../../atoms/GlyphPicker';
 import { createApiClient } from '../../api/client';
 import { ImagePicker } from '../../molecules/ImagePicker';
 import type { OrgDelSelector } from './AppShell';
+import { claseDePopover, RAIL_CELDA, RAIL_REPOSO, usePopover } from './SidebarPrimitives';
 
 /**
  * El `tier` que llega en `OrgDelSelector` es el plan **real** de esa
@@ -78,6 +79,8 @@ export function OrgSwitcher({
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [activeModal, setActiveModal] = useState<'invite' | 'newSpace' | 'upgrade' | null>(null);
+  /* Plegada: el flotante, con su cierre al pulsar fuera y con Escape. */
+  const flotante = usePopover(abierto && plegada, () => setAbierto(false));
 
   const lista = organizaciones ?? [];
   const activa = lista.find((org) => org.id === activaId) ?? null;
@@ -121,8 +124,205 @@ export function OrgSwitcher({
 
   const cuadro = <CaraDeOrg org={activa} inicial={inicial} />;
 
+  const modales = (
+    <>
+      {activeModal === 'invite' && activaId && (
+        <InviteMemberModal
+          organizationId={activaId}
+          organizationName={etiqueta}
+          onClose={() => setActiveModal(null)}
+          zonePath={zonePath}
+        />
+      )}
+
+      {activeModal === 'newSpace' && (
+        <NewSpaceModal onClose={() => setActiveModal(null)} zonePath={zonePath} />
+      )}
+
+      {activeModal === 'upgrade' && activaId && (
+        <UpgradeModal onClose={() => setActiveModal(null)} zonePath={zonePath} />
+      )}
+    </>
+  );
+
+  /**
+   * El menú de la organización. Desplegada va dentro de la barra, como un
+   * acordeón bajo la tarjeta; plegada va en el flotante de siempre —el mismo
+   * que perfil y avisos—, así que ahí no lleva caja propia: ya la pone él.
+   */
+  const menu = (enFlotante: boolean) => (
+    <div
+      className={`flex flex-col gap-0.5 p-1.5 ${enFlotante ? '' : 'rounded-xl border border-white/10 bg-[#202020] shadow-inner'}`}
+    >
+      <div className="flex flex-col mb-1 pb-1 border-b border-white/5">
+        {/* Contratar y cambiar el plan es **solo del dueño** — el gateway
+            responde 403 a cualquier otro (`checkout` → `organizacionPropia`).
+            A quien no lo es no se le enseña el botón: llevaría a un pago
+            que le van a rechazar. */}
+        {activa?.soyDueno && (
+          <button
+            onClick={() => setActiveModal('upgrade')}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-text-secondary hover:text-white transition-colors text-left w-full"
+          >
+            <svg
+              className="w-4 h-4 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+              />
+            </svg>
+            Mejorar plan
+          </button>
+        )}
+
+        <button
+          onClick={() => setActiveModal('invite')}
+          className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-text-secondary hover:text-white transition-colors text-left w-full"
+        >
+          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+            />
+          </svg>
+          Invitar a miembros
+        </button>
+
+        {/* Nombre, icono y color de la organización: sin modal, navega a la
+            pestaña «Ajustes» de Equipo. El backend exige `canManageOrganization`;
+            la pantalla enseña la identidad a todo el mundo y el formulario solo
+            a quien puede. */}
+        {activaId && (
+          <button
+            onClick={() => {
+              setAbierto(false);
+              router.push('/main/team?tab=ajustes');
+            }}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-text-secondary hover:text-white transition-colors text-left w-full"
+          >
+            <svg
+              className="w-4 h-4 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+            Configuración
+          </button>
+        )}
+      </div>
+
+      <div className="px-3 py-1">
+        <span className="text-[10px] font-medium text-white uppercase tracking-wider">{name}</span>
+      </div>
+
+      <div className="flex flex-col max-h-[220px] overflow-y-auto scrollbar-none">
+        {lista.map((org) => (
+          <OpcionDeOrg
+            key={org.id}
+            activa={org.id === activaId}
+            cara={
+              <CaraDeOrg
+                org={org}
+                inicial={(org.name ?? primerNombre ?? 'P').charAt(0).toUpperCase()}
+              />
+            }
+            etiqueta={org.name ?? `Organización de ${primerNombre || 'Praxis'}`}
+            detalle={org.kind === 'PERSONAL' ? 'Tu espacio' : 'Equipo'}
+            onClick={() => elegir(org.id)}
+          />
+        ))}
+      </div>
+
+      <div className="mt-1 pt-1 border-t border-white/5 px-2 py-2">
+        {caben ? (
+          <button
+            onClick={() => setActiveModal('newSpace')}
+            className="flex items-center gap-2.5 px-1 rounded-md hover:bg-white/5 text-[13px] text-text-secondary hover:text-white transition-colors text-left w-full"
+          >
+            <svg
+              className="w-4 h-4 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            Nuevo
+          </button>
+        ) : (
+          <p className="font-sans text-[11px] text-white leading-snug px-1">
+            Has creado {propias} de {MAX_ORGANIZACIONES_PROPIAS} espacios, que es el límite por
+            persona.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
   if (plegada) {
-    return null;
+    return (
+      <div ref={flotante.ref} className="relative">
+        <button
+          type="button"
+          onClick={() => setAbierto((v) => !v)}
+          aria-expanded={abierto}
+          aria-haspopup="dialog"
+          aria-label={`${etiqueta} — cambiar de organización`}
+          data-rail-tip={abierto ? undefined : etiqueta}
+          className={`${RAIL_CELDA} ${abierto ? 'bg-white/10' : RAIL_REPOSO}`}
+        >
+          {cuadro}
+        </button>
+        {flotante.visible && (
+          <div
+            role="dialog"
+            aria-label="Organización"
+            className={claseDePopover(flotante.entrada, true, 'arriba')}
+          >
+            {/* La cabecera que plegada no se ve: qué organización y qué plan. */}
+            <div className="flex items-center gap-2.5 border-b border-white/5 px-4 py-3">
+              {cuadro}
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="font-sans text-[10px] text-text-secondary">
+                  {etiquetaDePlan(activa?.tier)}
+                </span>
+                <span className="truncate font-sans text-[13px] font-semibold text-text-primary">
+                  {etiqueta}
+                </span>
+              </span>
+            </div>
+            {menu(true)}
+          </div>
+        )}
+        {modales}
+      </div>
+    );
   }
 
   return (
@@ -161,163 +361,10 @@ export function OrgSwitcher({
       <div
         className={`grid transition-all duration-200 ease-in-out ${abierto ? 'grid-rows-[1fr] opacity-100 mt-1.5' : 'grid-rows-[0fr] opacity-0'}`}
       >
-        <div className="overflow-hidden">
-          <div className="flex flex-col gap-0.5 rounded-xl border border-white/10 bg-[#202020] p-1.5 shadow-inner">
-            <div className="flex flex-col mb-1 pb-1 border-b border-white/5">
-              {/* Contratar y cambiar el plan es **solo del dueño** — el gateway
-                  responde 403 a cualquier otro (`checkout` → `organizacionPropia`).
-                  A quien no lo es no se le enseña el botón: llevaría a un pago
-                  que le van a rechazar. */}
-              {activa?.soyDueno && (
-                <button
-                  onClick={() => setActiveModal('upgrade')}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-text-secondary hover:text-white transition-colors text-left w-full"
-                >
-                  <svg
-                    className="w-4 h-4 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                    />
-                  </svg>
-                  Mejorar plan
-                </button>
-              )}
-
-              <button
-                onClick={() => setActiveModal('invite')}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-text-secondary hover:text-white transition-colors text-left w-full"
-              >
-                <svg
-                  className="w-4 h-4 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                  />
-                </svg>
-                Invitar a miembros
-              </button>
-
-              {/* Nombre, icono y color de la organización: sin modal, navega a la
-                  pestaña «Ajustes» de Equipo. El backend exige `canManageOrganization`;
-                  la pantalla enseña la identidad a todo el mundo y el formulario solo
-                  a quien puede. */}
-              {activaId && (
-                <button
-                  onClick={() => {
-                    setAbierto(false);
-                    router.push('/main/team?tab=ajustes');
-                  }}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-text-secondary hover:text-white transition-colors text-left w-full"
-                >
-                  <svg
-                    className="w-4 h-4 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                  Configuración
-                </button>
-              )}
-            </div>
-
-            <div className="px-3 py-1">
-              <span className="text-[10px] font-medium text-white uppercase tracking-wider">
-                {name}
-              </span>
-            </div>
-
-            <div className="flex flex-col max-h-[220px] overflow-y-auto scrollbar-none">
-              {lista.map((org) => (
-                <OpcionDeOrg
-                  key={org.id}
-                  activa={org.id === activaId}
-                  cara={
-                    <CaraDeOrg
-                      org={org}
-                      inicial={(org.name ?? primerNombre ?? 'P').charAt(0).toUpperCase()}
-                    />
-                  }
-                  etiqueta={org.name ?? `Organización de ${primerNombre || 'Praxis'}`}
-                  detalle={org.kind === 'PERSONAL' ? 'Tu espacio' : 'Equipo'}
-                  onClick={() => elegir(org.id)}
-                />
-              ))}
-            </div>
-
-            <div className="mt-1 pt-1 border-t border-white/5 px-2 py-2">
-              {caben ? (
-                <button
-                  onClick={() => setActiveModal('newSpace')}
-                  className="flex items-center gap-2.5 px-1 rounded-md hover:bg-white/5 text-[13px] text-text-secondary hover:text-white transition-colors text-left w-full"
-                >
-                  <svg
-                    className="w-4 h-4 text-white"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                  Nuevo espacio de trabajo
-                </button>
-              ) : (
-                <p className="font-sans text-[11px] text-white leading-snug px-1">
-                  Has creado {propias} de {MAX_ORGANIZACIONES_PROPIAS} espacios, que es el límite
-                  por persona.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
+        <div className="overflow-hidden">{menu(false)}</div>
       </div>
 
-      {activeModal === 'invite' && activaId && (
-        <InviteMemberModal
-          organizationId={activaId}
-          organizationName={etiqueta}
-          onClose={() => setActiveModal(null)}
-          zonePath={zonePath}
-        />
-      )}
-
-      {activeModal === 'newSpace' && (
-        <NewSpaceModal onClose={() => setActiveModal(null)} zonePath={zonePath} />
-      )}
-
-      {activeModal === 'upgrade' && activaId && (
-        <UpgradeModal onClose={() => setActiveModal(null)} zonePath={zonePath} />
-      )}
+      {modales}
     </div>
   );
 }

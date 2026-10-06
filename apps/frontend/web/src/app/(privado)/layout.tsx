@@ -3,7 +3,7 @@ import { PerfilEnBarra } from '@/components/organisms/PerfilEnBarra';
 import { AvisoAsientoCongelado } from '@/components/organisms/Billing/AvisoAsientoCongelado';
 import { AppShell, PresenceFooter, avatarHref, displayName } from '@praxis/commons';
 import { loadPrivateChrome } from '@praxis/commons/auth';
-import { getSidebarPlegada, getSidebarTab } from '@praxis/commons/theme';
+import { getSidebarAncho, getSidebarPlegada, getSidebarTab } from '@praxis/commons/theme';
 import type { Metadata } from 'next';
 
 /**
@@ -62,6 +62,8 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
      pinta mal y el cliente la corrige — que es el error de hidratación que se
      arregló aquí. Ver `commons/theme/sidebar.ts`. */
   const pestana = await getSidebarTab();
+  /* El ancho que eligió la persona arrastrando el borde, por lo mismo. */
+  const anchoDeBarra = await getSidebarAncho();
 
   return (
     <AppShell
@@ -76,6 +78,7 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
        */
       zonePath=""
       plegadaInicial={plegada}
+      anchoInicial={anchoDeBarra}
       pestanaInicial={pestana}
       /* El selector de organización de la barra: la lista y cuál se mira. Las
          dos las resuelve `loadPrivateChrome`, así que aquí no cuestan nada. */

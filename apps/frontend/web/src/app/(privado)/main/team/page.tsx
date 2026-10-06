@@ -37,7 +37,7 @@ export default async function TeamPage({
   if (!organizacion) {
     return (
       <AppHeader title="Equipo">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-16">
+        <div className="flex w-full flex-col gap-8 pb-16">
           <header className="flex items-end justify-between border-b border-white/[0.08] pb-6">
             <div className="flex flex-col gap-2">
               <h1 className="font-sans text-2xl font-semibold text-white">Equipo</h1>
@@ -54,7 +54,7 @@ export default async function TeamPage({
 
   return (
     <AppHeader title="Equipo">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-16">
+      <div className="flex w-full flex-col gap-8 pb-16">
         <header className="flex flex-col gap-2 border-b border-white/[0.08] pb-6">
           <h1 className="font-sans text-3xl font-semibold tracking-tight text-white">
             Gestión de Equipo

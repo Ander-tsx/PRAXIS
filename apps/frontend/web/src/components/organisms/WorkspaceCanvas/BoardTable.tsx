@@ -17,7 +17,7 @@ import {
   dueState,
   personLabel,
 } from '@praxis/commons';
-import { useMemo, useState } from 'react';
+import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useState } from 'react';
 import { TaskDialog } from '../TaskBoard/TaskDialog';
 import { useTaskDialog } from '../TaskBoard/useTaskDialog';
 
@@ -38,6 +38,82 @@ export interface BoardTableProps {
 }
 
 type Col = 'titulo' | 'columna' | 'vencimiento' | 'prioridad';
+
+/** Las seis columnas de la tabla, en orden. Las que ordenan llevan `orden`. */
+type ColumnaDeTabla =
+  | 'titulo'
+  | 'columna'
+  | 'encargados'
+  | 'etiquetas'
+  | 'vencimiento'
+  | 'prioridad';
+
+const COLUMNAS: { id: ColumnaDeTabla; titulo: string; orden?: Col }[] = [
+  { id: 'titulo', titulo: 'Tarea', orden: 'titulo' },
+  { id: 'columna', titulo: 'Columna', orden: 'columna' },
+  { id: 'encargados', titulo: 'Encargados' },
+  { id: 'etiquetas', titulo: 'Etiquetas' },
+  { id: 'vencimiento', titulo: 'Vence', orden: 'vencimiento' },
+  { id: 'prioridad', titulo: 'Prioridad', orden: 'prioridad' },
+];
+
+type Anchos = Record<ColumnaDeTabla, number>;
+
+const ANCHOS_POR_DEFECTO: Anchos = {
+  titulo: 380,
+  columna: 160,
+  encargados: 140,
+  etiquetas: 200,
+  vencimiento: 120,
+  prioridad: 120,
+};
+const ANCHO_MIN = 72;
+const ANCHO_MAX = 960;
+
+/**
+ * Los anchos que eligió cada persona, **por persona y en este navegador**.
+ *
+ * `localStorage` y no el servidor: es cómo prefiere mirar la tabla quien la
+ * mira, no un dato del tablero, y no hay ruta donde guardarlo. La clave lleva
+ * el id de usuario para que dos cuentas en el mismo navegador no se pisen.
+ * Se lee después de montar —el servidor no lo tiene—, así que la primera
+ * pintura sale con los anchos por defecto y se corrige al hidratar.
+ */
+function claveDeAnchos(userId: string) {
+  return `praxis:tabla:anchos:${userId}`;
+}
+
+function leerAnchos(userId: string): Anchos {
+  try {
+    const crudo = window.localStorage.getItem(claveDeAnchos(userId));
+    if (!crudo) return ANCHOS_POR_DEFECTO;
+    const guardado = JSON.parse(crudo) as Partial<Record<string, unknown>>;
+    const r = { ...ANCHOS_POR_DEFECTO };
+    for (const { id } of COLUMNAS) {
+      const v = guardado[id];
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        r[id] = Math.min(ANCHO_MAX, Math.max(ANCHO_MIN, Math.round(v)));
+      }
+    }
+    return r;
+  } catch {
+    return ANCHOS_POR_DEFECTO;
+  }
+}
+
+/** Mientras se arrastra un borde: el cursor de redimensionar en toda la página y sin seleccionar texto. */
+function cursorDeRedimension(activo: boolean) {
+  document.body.style.cursor = activo ? 'col-resize' : '';
+  document.body.style.userSelect = activo ? 'none' : '';
+}
+
+function guardarAnchos(userId: string, anchos: Anchos) {
+  try {
+    window.localStorage.setItem(claveDeAnchos(userId), JSON.stringify(anchos));
+  } catch {
+    /* Sin almacenamiento (ventana privada, cuota): se pierde al recargar y ya. */
+  }
+}
 const PRIORIDAD_ORDEN: Record<Priority, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
 const fechaCorta = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' });
@@ -90,6 +166,55 @@ export function BoardTable({
   const [orden, setOrden] = useState<{ col: Col; asc: boolean }>({ col: 'columna', asc: true });
   const dialog = useTaskDialog(tasks, openTaskId);
 
+  const [anchos, setAnchos] = useState<Anchos>(ANCHOS_POR_DEFECTO);
+  useEffect(() => {
+    setAnchos(leerAnchos(currentUserId));
+  }, [currentUserId]);
+  const anchoTotal = COLUMNAS.reduce((suma, c) => suma + anchos[c.id], 0);
+
+  /**
+   * Arrastrar el borde derecho de una cabecera. El ancho se calcula desde el
+   * del principio del gesto más lo que se ha movido el puntero, no sumando
+   * deltas, para que no derive. Se guarda al soltar, no en cada píxel.
+   */
+  function empezarRedimension(id: ColumnaDeTabla, evento: ReactPointerEvent<HTMLSpanElement>) {
+    if (evento.button !== 0) return;
+    evento.preventDefault();
+    evento.stopPropagation();
+    const asa = evento.currentTarget;
+    asa.setPointerCapture(evento.pointerId);
+    const x0 = evento.clientX;
+    const ancho0 = anchos[id];
+    let ultimo = anchos;
+    cursorDeRedimension(true);
+
+    const mover = (e: PointerEvent) => {
+      const ancho = Math.min(ANCHO_MAX, Math.max(ANCHO_MIN, Math.round(ancho0 + e.clientX - x0)));
+      setAnchos((actual) => {
+        ultimo = { ...actual, [id]: ancho };
+        return ultimo;
+      });
+    };
+    const soltar = () => {
+      asa.removeEventListener('pointermove', mover);
+      asa.removeEventListener('pointerup', soltar);
+      asa.removeEventListener('pointercancel', soltar);
+      cursorDeRedimension(false);
+      guardarAnchos(currentUserId, ultimo);
+    };
+    asa.addEventListener('pointermove', mover);
+    asa.addEventListener('pointerup', soltar);
+    asa.addEventListener('pointercancel', soltar);
+  }
+
+  function restaurarAncho(id: ColumnaDeTabla) {
+    setAnchos((actual) => {
+      const siguiente = { ...actual, [id]: ANCHOS_POR_DEFECTO[id] };
+      guardarAnchos(currentUserId, siguiente);
+      return siguiente;
+    });
+  }
+
   const filas = useMemo(() => {
     const arr = [...tasks];
     const dir = orden.asc ? 1 : -1;
@@ -140,44 +265,39 @@ export function BoardTable({
   }
 
   return (
-    <div className="h-fit max-h-full overflow-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20 w-full rounded-xl border border-white/10 bg-[#202020]">
-      <table className="w-full border-collapse text-left">
+    <div className="h-fit max-h-full overflow-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20 w-fit max-w-full rounded-xl border border-white/10 bg-[#202020]">
+      {/**
+       * ⚠️ **`table-layout: fixed` y anchos en `<colgroup>`.** Con el reparto
+       * automático, un título de doscientos caracteres estiraba su columna
+       * hasta sacar la tabla de la pantalla —el `truncate` no tiene nada que
+       * recortar si la celda crece con el texto—. Fijos, el ancho lo decide
+       * la persona y el texto se recorta con puntos suspensivos.
+       *
+       * La tabla mide exactamente la suma de sus columnas, y el contenedor la
+       * abraza (`w-fit`). Hubo una columna de relleno para llenar la pantalla
+       * —sin ella, `fixed` reparte el sobrante entre todas y el ancho elegido
+       * no se respeta—, pero se leía como una columna rota sin cabecera.
+       */}
+      <table className="table-fixed border-collapse text-left" style={{ width: anchoTotal }}>
+        <colgroup>
+          {COLUMNAS.map((c) => (
+            <col key={c.id} style={{ width: anchos[c.id] }} />
+          ))}
+        </colgroup>
         <thead className="sticky top-0 z-10 bg-[#202020]">
           <tr className="border-b border-white/10 font-sans text-[11px] font-semibold uppercase tracking-wider text-white">
-            <Th
-              col="titulo"
-              orden={orden}
-              onSort={alOrdenar}
-              className="min-w-[16rem] border border-white/5"
-            >
-              Tarea
-            </Th>
-            <Th
-              col="columna"
-              orden={orden}
-              onSort={alOrdenar}
-              className="w-40 border border-white/5"
-            >
-              Columna
-            </Th>
-            <th className="px-3 py-2.5 font-semibold border border-white/5">Encargados</th>
-            <th className="px-3 py-2.5 font-semibold border border-white/5">Etiquetas</th>
-            <Th
-              col="vencimiento"
-              orden={orden}
-              onSort={alOrdenar}
-              className="w-32 border border-white/5"
-            >
-              Vence
-            </Th>
-            <Th
-              col="prioridad"
-              orden={orden}
-              onSort={alOrdenar}
-              className="w-28 border border-white/5"
-            >
-              Prioridad
-            </Th>
+            {COLUMNAS.map((c) => (
+              <Th
+                key={c.id}
+                col={c.orden}
+                orden={orden}
+                onSort={alOrdenar}
+                onResizeStart={(e) => empezarRedimension(c.id, e)}
+                onResizeReset={() => restaurarAncho(c.id)}
+              >
+                {c.titulo}
+              </Th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -245,6 +365,9 @@ export function BoardTable({
   );
 }
 
+/** Toda celda recorta: con `table-fixed` el texto ya no puede ensanchar la columna. */
+const CELDA = 'overflow-hidden whitespace-nowrap border border-white/5 px-3 py-2.5';
+
 /**
  * Una fila de tarea. Separada de `BoardTable` para pintarse igual en las dos
  * secciones —pendientes y completadas— sin duplicar el JSX.
@@ -276,27 +399,29 @@ function FilaTarea({
       onClick={onOpen}
       className={`cursor-pointer border-b border-white/[0.06] transition-colors last:border-0 hover:bg-[#282828] ${atenuada ? 'opacity-60' : ''}`}
     >
-      <td className="px-3 py-2.5 border border-white/5">
+      <td className={CELDA}>
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onOpen();
           }}
+          title={t.title}
           className="block max-w-full truncate text-left font-sans text-[13px] font-medium text-white outline-none focus-visible:underline"
         >
           {t.title}
         </button>
       </td>
-      <td className="px-3 py-2.5 border border-white/5">
+      <td className={CELDA}>
         <span
-          className="inline-flex items-center rounded-md px-2 py-0.5 font-sans text-[11px] font-medium"
+          title={nombreDeColumna}
+          className="inline-block max-w-full truncate rounded-md px-2 py-0.5 align-middle font-sans text-[11px] font-medium"
           style={{ background: alpha(tonoColumna, 15), color: tonoColumna }}
         >
           {nombreDeColumna}
         </span>
       </td>
-      <td className="px-3 py-2.5 border border-white/5">
+      <td className={CELDA}>
         {t.assignees.length === 0 ? (
           <span className="font-sans text-[11px] text-white">—</span>
         ) : (
@@ -320,12 +445,15 @@ function FilaTarea({
           </span>
         )}
       </td>
-      <td className="px-3 py-2.5 border border-white/5">
-        <span className="flex flex-wrap gap-1">
+      <td className={CELDA}>
+        <span
+          className="flex min-w-0 gap-1 overflow-hidden"
+          title={t.labels.map(({ label }) => label.name).join(', ') || undefined}
+        >
           {t.labels.slice(0, 3).map(({ label }) => (
             <span
               key={label.id}
-              className="rounded px-1.5 py-0.5 font-sans text-[10px] font-medium"
+              className="min-w-0 shrink truncate rounded px-1.5 py-0.5 font-sans text-[10px] font-medium"
               style={{
                 background: alpha(colors[label.color], 18),
                 color: colors[label.color],
@@ -335,11 +463,13 @@ function FilaTarea({
             </span>
           ))}
           {t.labels.length > 3 && (
-            <span className="font-sans text-[10px] text-white">+{t.labels.length - 3}</span>
+            <span className="shrink-0 font-sans text-[10px] text-white">
+              +{t.labels.length - 3}
+            </span>
           )}
         </span>
       </td>
-      <td className="px-3 py-2.5 border border-white/5">
+      <td className={CELDA}>
         {t.dueDate ? (
           <span
             className={`font-sans text-[12px] ${
@@ -356,7 +486,7 @@ function FilaTarea({
           <span className="font-sans text-[11px] text-white">Sin fecha</span>
         )}
       </td>
-      <td className="px-3 py-2.5 border border-white/5">
+      <td className={CELDA}>
         <PrioridadChip priority={t.priority} />
       </td>
     </tr>
@@ -367,39 +497,56 @@ function Th({
   col,
   orden,
   onSort,
-  className = '',
+  onResizeStart,
+  onResizeReset,
   children,
 }: {
-  col: Col;
+  /** Sin `col`, la cabecera no ordena. */
+  col?: Col;
   orden: { col: Col; asc: boolean };
   onSort: (c: Col) => void;
-  className?: string;
+  onResizeStart: (e: ReactPointerEvent<HTMLSpanElement>) => void;
+  onResizeReset: () => void;
   children: React.ReactNode;
 }) {
-  const activo = orden.col === col;
+  const activo = col !== undefined && orden.col === col;
   return (
-    <th className={`px-3 py-2.5 ${className}`}>
-      <button
-        type="button"
-        onClick={() => onSort(col)}
-        className={`flex items-center gap-1 font-semibold uppercase transition-colors hover:text-white ${
-          activo ? 'text-white' : ''
-        }`}
-      >
-        {children}
-        {activo && (
-          <svg
-            className={`h-3 w-3 transition-transform ${orden.asc ? '' : 'rotate-180'}`}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.5}
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 15l6-6 6 6" />
-          </svg>
-        )}
-      </button>
+    <th className="relative overflow-hidden border border-white/5 px-3 py-2.5 font-semibold">
+      {col ? (
+        <button
+          type="button"
+          onClick={() => onSort(col)}
+          className={`flex max-w-full items-center gap-1 font-semibold uppercase transition-colors hover:text-white ${
+            activo ? 'text-white' : ''
+          }`}
+        >
+          <span className="truncate">{children}</span>
+          {activo && (
+            <svg
+              className={`h-3 w-3 shrink-0 transition-transform ${orden.asc ? '' : 'rotate-180'}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 15l6-6 6 6" />
+            </svg>
+          )}
+        </button>
+      ) : (
+        <span className="block truncate">{children}</span>
+      )}
+      {/* El asa: el borde derecho de la cabecera. Doble clic, ancho de siempre.
+          Oculta a lectores de pantalla: es un ajuste de ratón sobre cómo se ve
+          la tabla, y la tabla se lee entera con cualquier ancho. */}
+      <span
+        aria-hidden="true"
+        title="Arrastra para cambiar el ancho · doble clic para restaurarlo"
+        onPointerDown={onResizeStart}
+        onDoubleClick={onResizeReset}
+        className="absolute inset-y-0 right-0 w-1.5 cursor-col-resize transition-colors hover:bg-primary/50 active:bg-primary/70"
+      />
     </th>
   );
 }

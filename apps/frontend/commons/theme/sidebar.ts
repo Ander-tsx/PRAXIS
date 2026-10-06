@@ -92,3 +92,27 @@ export async function getSidebarTab(): Promise<SidebarTabGuardada> {
   /* Una cookie vieja con `inbox` (la bandeja ya no es pestaña) cae a `home`. */
   return valor === 'chat' || valor === 'settings' ? valor : 'home';
 }
+
+/**
+ * El ancho de la barra lateral en escritorio, **en una cookie y por el mismo
+ * motivo que el pliegue**: si el servidor no lo sabe, la barra sale a 320 px y
+ * salta al ancho guardado al hidratar, en cada carga.
+ *
+ * ⚠️ Los límites se repiten en `AppShell` (cliente), por lo de siempre: este
+ * módulo usa `next/headers`. Si cambian aquí, cambian allí.
+ */
+export const SIDEBAR_WIDTH_COOKIE = 'praxis_sidebar_width';
+export const SIDEBAR_ANCHO_POR_DEFECTO = 320;
+export const SIDEBAR_ANCHO_MIN = 220;
+export const SIDEBAR_ANCHO_MAX = 520;
+
+/**
+ * El ancho guardado, acotado. Un valor que no sea un número —o uno fuera de
+ * rango, de una versión con otros límites— cae al de siempre o al tope.
+ */
+export async function getSidebarAncho(): Promise<number> {
+  const store = await cookies();
+  const valor = Number(store.get(SIDEBAR_WIDTH_COOKIE)?.value);
+  if (!Number.isFinite(valor) || valor <= 0) return SIDEBAR_ANCHO_POR_DEFECTO;
+  return Math.min(SIDEBAR_ANCHO_MAX, Math.max(SIDEBAR_ANCHO_MIN, Math.round(valor)));
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { moveTaskDueDateAction } from '@/app/(privado)/projects/[id]/actions';
+import { createTaskAction, moveTaskDueDateAction } from '@/app/(privado)/projects/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/projects/action-state';
 import {
   Avatar,
@@ -17,7 +17,7 @@ import {
   personLabel,
   useAccion,
 } from '@praxis/commons';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { TaskDialog } from '../TaskBoard/TaskDialog';
 import { useTaskDialog } from '../TaskBoard/useTaskDialog';
 
@@ -31,6 +31,8 @@ export interface BoardCalendarProps {
   currentUserId: string;
   openTaskId?: string | null;
   canMoveTask: boolean;
+  /** El «+» de cada día: `canCreateTask`. */
+  canCreateTask: boolean;
   canComment: boolean;
   canManageLabels: boolean;
   canEditTask: boolean;
@@ -58,6 +60,37 @@ function claveDia(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** La inversa de `claveDia`, en horario local (no `new Date('YYYY-MM-DD')`, que es UTC). */
+function deClave(clave: string): Date {
+  const [y, m, d] = clave.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Sumar días con `setDate` y no con milisegundos: un día de cambio de horario
+ * mide 23 o 25 horas, y sumar `DIA_MS` dejaría la fecha a las 23:00 del día
+ * anterior.
+ */
+function sumarDias(d: Date, dias: number): Date {
+  const r = new Date(d);
+  r.setDate(r.getDate() + dias);
+  return r;
+}
+
+/** El lunes de la semana de `d`, a medianoche local. */
+function inicioDeSemana(d: Date): Date {
+  const r = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  r.setDate(r.getDate() - ((r.getDay() + 6) % 7));
+  return r;
+}
+
+/** Cuántas semanas se añaden de golpe al acercarse a un borde. */
+const SEMANAS_POR_TANDA = 8;
+/** A cuántos píxeles del borde se añade la siguiente tanda. */
+const MARGEN_DE_CARGA_PX = 600;
+
 function tonoDePrioridad(p: Priority): string {
   return p === 'URGENT'
     ? colors.error
@@ -69,8 +102,9 @@ function tonoDePrioridad(p: Priority): string {
 }
 
 /**
- * La vista de **calendario** del tablero: una cuadrícula de mes con las tareas
- * puestas en su fecha de vencimiento. Las tareas **sin fecha** viven en su
+ * La vista de **calendario** del tablero: semanas en filas de siete días, con
+ * scroll infinito, y las tareas puestas en su fecha de vencimiento. El «+» de
+ * cada día crea una tarea con esa fecha ya puesta. Las tareas **sin fecha** viven en su
  * propio panel al lado, para que no desaparezcan. Pulsar una abre el panel de
  * siempre.
  *
@@ -89,6 +123,7 @@ export function BoardCalendar({
   currentUserId,
   openTaskId,
   canMoveTask,
+  canCreateTask,
   canComment,
   canManageLabels,
   canEditTask,
@@ -203,9 +238,6 @@ export function BoardCalendar({
     moveAction(datos);
   }
 
-  const hoy = useMemo(() => new Date(), []);
-  const [cursor, setCursor] = useState(() => new Date(hoy.getFullYear(), hoy.getMonth(), 1));
-
   /**
    * Una tarea completada sin fecha de vencimiento no va a «sin fecha»: se
    * ubica el día en que se completó, para que no desaparezca del trabajo
@@ -236,67 +268,189 @@ export function BoardCalendar({
     return { conFecha: map, sinFecha: nada };
   }, [tasks, diaDeTarea]);
 
-  /** Las 6 semanas (42 celdas) que cubren el mes, empezando en lunes. */
-  const celdas = useMemo(() => {
-    const primero = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-    const desplazamiento = (primero.getDay() + 6) % 7; // 0 = lunes
-    const inicio = new Date(primero);
-    inicio.setDate(primero.getDate() - desplazamiento);
-    return Array.from({ length: 42 }, (_, i) => {
-      const d = new Date(inicio);
-      d.setDate(inicio.getDate() + i);
-      return d;
-    });
-  }, [cursor]);
-
+  const hoy = useMemo(() => new Date(), []);
   const claveHoy = claveDia(hoy);
+
+  /**
+   * ## Scroll infinito por semanas, como Notion
+   *
+   * Era una cuadrícula de **un** mes (6 × 7 celdas encajadas en la altura que
+   * quedara), con flechas para pasar de mes. Con cuatro tareas en un día, la
+   * celda las escondía tras su propio scroll, y ver lo que cruza de un mes al
+   * siguiente obligaba a ir y volver.
+   *
+   * Ahora es una lista de semanas que se desplaza en vertical sin fin: cada fila
+   * mide lo que necesitan sus tareas, y al acercarse a un borde se añaden
+   * `SEMANAS_POR_TANDA` más. La cabecera dice **el mes que se está mirando**, y
+   * cambia sola al desplazar; las flechas y «Hoy» llevan a un mes concreto.
+   *
+   * ⚠️ **Añadir semanas ARRIBA empuja todo hacia abajo.** Sin compensar, el
+   * contenido saltaría una tanda entera bajo el puntero. Se guarda el
+   * `scrollHeight` antes y se suma la diferencia a `scrollTop` después, en un
+   * `useLayoutEffect` para que el salto no llegue a pintarse.
+   */
+  const [rango, setRango] = useState(() => ({
+    desde: sumarDias(inicioDeSemana(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), -7 * 8),
+    semanas: 8 + 6 + SEMANAS_POR_TANDA,
+  }));
+  const semanas = useMemo(
+    () => Array.from({ length: rango.semanas }, (_, i) => sumarDias(rango.desde, i * 7)),
+    [rango],
+  );
+  const [mesVisible, setMesVisible] = useState(
+    () => new Date(hoy.getFullYear(), hoy.getMonth(), 1),
+  );
+
+  const cuerpo = useRef<HTMLDivElement>(null);
+  /** El `scrollHeight` de antes de añadir semanas arriba, para compensar. */
+  const alturaAntesDePrepender = useRef<number | null>(null);
+  /**
+   * A qué semana desplazarse cuando esté pintada.
+   *
+   * ⚠️ **Salto seco, no `behavior: 'smooth'`.** Un desplazamiento animado
+   * dispara `onScroll` durante el trayecto; si pasa cerca del borde de arriba,
+   * se añaden semanas y la compensación de `scrollTop` choca con la animación,
+   * que acaba en otro mes.
+   */
+  const [destino, setDestino] = useState<string | null>(() =>
+    claveDia(inicioDeSemana(new Date(hoy.getFullYear(), hoy.getMonth(), 1))),
+  );
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `rango` no se lee dentro, pero es lo que cambia la altura del cuerpo: este efecto tiene que correr justo después de cada tanda nueva de semanas
+  useLayoutEffect(() => {
+    const el = cuerpo.current;
+    if (!el) return;
+    if (destino) {
+      const fila = el.querySelector<HTMLElement>(`[data-semana="${destino}"]`);
+      if (fila) {
+        alturaAntesDePrepender.current = null;
+        el.scrollTop = fila.offsetTop;
+        setDestino(null);
+      }
+      return;
+    }
+    if (alturaAntesDePrepender.current !== null) {
+      el.scrollTop += el.scrollHeight - alturaAntesDePrepender.current;
+      alturaAntesDePrepender.current = null;
+    }
+  }, [destino, rango]);
+
+  const alDesplazar = useCallback(() => {
+    const el = cuerpo.current;
+    if (!el) return;
+
+    /* El mes que se mira: el del jueves de la fila que cruza el primer tercio
+       de la vista. El jueves decide a qué mes pertenece una semana partida (ISO
+       8601); el tercio, que la cabecera no diga el mes que ya se está yendo
+       por arriba cuando el siguiente llena la pantalla. */
+    const linea = el.scrollTop + el.clientHeight / 3;
+    const filas = el.querySelectorAll<HTMLElement>('[data-semana]');
+    for (const fila of filas) {
+      if (fila.offsetTop + fila.offsetHeight > linea) {
+        const jueves = sumarDias(deClave(fila.dataset.semana ?? ''), 3);
+        setMesVisible((actual) =>
+          actual.getFullYear() === jueves.getFullYear() && actual.getMonth() === jueves.getMonth()
+            ? actual
+            : new Date(jueves.getFullYear(), jueves.getMonth(), 1),
+        );
+        break;
+      }
+    }
+
+    if (alturaAntesDePrepender.current !== null || destino) return;
+    if (el.scrollTop < MARGEN_DE_CARGA_PX) {
+      alturaAntesDePrepender.current = el.scrollHeight;
+      setRango((r) => ({
+        desde: sumarDias(r.desde, -7 * SEMANAS_POR_TANDA),
+        semanas: r.semanas + SEMANAS_POR_TANDA,
+      }));
+    } else if (el.scrollHeight - el.scrollTop - el.clientHeight < MARGEN_DE_CARGA_PX) {
+      setRango((r) => ({ ...r, semanas: r.semanas + SEMANAS_POR_TANDA }));
+    }
+  }, [destino]);
+
+  /** Llevar la vista a un mes, ampliando el rango si aún no está pintado. */
+  function irAMes(mes: Date) {
+    const lunes = inicioDeSemana(new Date(mes.getFullYear(), mes.getMonth(), 1));
+    const clave = claveDia(lunes);
+    setRango((r) => {
+      const fin = sumarDias(r.desde, r.semanas * 7);
+      if (lunes < r.desde) {
+        const extra = Math.ceil((r.desde.getTime() - lunes.getTime()) / (7 * DIA_MS)) + 4;
+        return { desde: sumarDias(r.desde, -7 * extra), semanas: r.semanas + extra };
+      }
+      if (sumarDias(lunes, 7 * 6) > fin) {
+        const extra = Math.ceil((sumarDias(lunes, 7 * 6).getTime() - fin.getTime()) / (7 * DIA_MS));
+        return { ...r, semanas: r.semanas + extra + 4 };
+      }
+      return r;
+    });
+    setDestino(clave);
+    setMesVisible(new Date(mes.getFullYear(), mes.getMonth(), 1));
+  }
+
+  /**
+   * El alta desde un día: el «+» de la celda abre un campo y la tarea nace con
+   * esa fecha límite, en la **primera columna** del tablero —la misma que el
+   * «Añadir tarea» del Kanban usaría para empezar—. Al crearla se abre su
+   * panel, igual que allí, en cuanto la revalidación la trae.
+   */
+  const primeraColumna = useMemo(
+    () => [...board.columns].sort((a, b) => a.order - b.order)[0],
+    [board.columns],
+  );
+  const puedeCrear = canCreateTask && !!primeraColumna;
+  const [creandoEn, setCreandoEn] = useState<string | null>(null);
+  const [recienCreada, setRecienCreada] = useState<string | null>(null);
+  const abrirTarea = dialog.open;
+  useEffect(() => {
+    if (!recienCreada) return;
+    if (!tasks.some((t) => t.id === recienCreada)) return;
+    abrirTarea(recienCreada);
+    setRecienCreada(null);
+  }, [tasks, recienCreada, abrirTarea]);
+
+  const mesVisibleIdx = mesVisible.getFullYear() * 12 + mesVisible.getMonth();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
       {/* ── Calendario ── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#202020]">
-        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-3 py-2.5">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5">
           <div className="flex items-center gap-2">
-            <h4 className="font-sans text-lg font-semibold text-white">
-              {MESES[cursor.getMonth()]} {cursor.getFullYear()}
+            <h4
+              aria-live="polite"
+              className="min-w-[10rem] font-sans text-lg font-semibold text-white"
+            >
+              {MESES[mesVisible.getMonth()]} {mesVisible.getFullYear()}
             </h4>
-            <div className="ml-2 flex items-center gap-1">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => setCursor(new Date(hoy.getFullYear(), hoy.getMonth(), 1))}
-                className="rounded-md px-2.5 py-1 font-sans text-xs font-medium text-white transition-colors hover:bg-white/5 hover:text-white"
+                aria-label="Mes anterior"
+                onClick={() =>
+                  irAMes(new Date(mesVisible.getFullYear(), mesVisible.getMonth() - 1, 1))
+                }
+                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-white transition-colors hover:bg-white/5"
+              >
+                <Chevron dir="left" />
+              </button>
+              <button
+                type="button"
+                onClick={() => irAMes(new Date(hoy.getFullYear(), hoy.getMonth(), 1))}
+                className="cursor-pointer rounded-md px-2.5 py-1 font-sans text-xs font-medium text-white transition-colors hover:bg-white/5"
               >
                 Hoy
               </button>
               <button
                 type="button"
-                aria-label="Mes anterior"
-                onClick={() => setCursor((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1))}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-white transition-colors hover:bg-white/5 hover:text-white"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </button>
-              <button
-                type="button"
                 aria-label="Mes siguiente"
-                onClick={() => setCursor((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1))}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-white transition-colors hover:bg-white/5 hover:text-white"
+                onClick={() =>
+                  irAMes(new Date(mesVisible.getFullYear(), mesVisible.getMonth() + 1, 1))
+                }
+                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-white transition-colors hover:bg-white/5"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
+                <Chevron dir="right" />
               </button>
             </div>
           </div>
@@ -304,22 +458,13 @@ export function BoardCalendar({
             <button
               type="button"
               onClick={() => setMostrarSinFecha((v) => !v)}
-              className="flex items-center gap-2 rounded-md px-2.5 py-1.5 font-sans text-xs font-medium text-white transition-colors hover:bg-white/5"
+              aria-expanded={mostrarSinFecha}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 font-sans text-xs font-medium text-white transition-colors hover:bg-white/5"
             >
               <span>Sin fecha ({sinFecha.length})</span>
-              <svg
-                className={`w-4 h-4 transition-transform ${mostrarSinFecha ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
+              <span className={`transition-transform ${mostrarSinFecha ? 'rotate-180' : ''}`}>
+                <Chevron dir="right" />
+              </span>
             </button>
           )}
         </div>
@@ -328,59 +473,118 @@ export function BoardCalendar({
           {DIAS.map((d) => (
             <div
               key={d}
-              className="px-2 py-1.5 text-center font-sans text-[10px] font-semibold uppercase tracking-wider text-white/35"
+              className="px-2 py-1.5 text-right font-sans text-[11px] font-medium text-white/40"
             >
               {d}
             </div>
           ))}
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 overflow-y-auto">
-          {celdas.map((d) => {
-            const k = claveDia(d);
-            const delMes = d.getMonth() === cursor.getMonth();
-            const esHoy = k === claveHoy;
-            const delDia = conFecha.get(k) ?? [];
+        <div
+          ref={cuerpo}
+          onScroll={alDesplazar}
+          className="scrollbar-slim relative min-h-0 flex-1 overflow-y-auto"
+        >
+          {semanas.map((lunes) => {
+            const claveSemana = claveDia(lunes);
             return (
-              <div
-                key={k}
-                onDragOver={(e) => {
-                  if (!canMoveTask) return;
-                  e.preventDefault();
-                  if (diaSobrevolado !== k) setDiaSobrevolado(k);
-                }}
-                onDragLeave={() => setDiaSobrevolado((actual) => (actual === k ? null : actual))}
-                onDrop={(e) => {
-                  if (!canMoveTask) return;
-                  e.preventDefault();
-                  soltarEn(e.dataTransfer.getData('text/plain'), k);
-                }}
-                className={`flex min-h-[6.5rem] flex-col gap-1 border-b border-r border-white/[0.06] p-1.5 transition-colors ${
-                  delMes ? '' : 'bg-black/30'
-                } ${diaSobrevolado === k ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}`}
-              >
-                <span
-                  className={`self-start rounded px-1 font-sans text-[11px] font-medium ${
-                    esHoy
-                      ? 'bg-primary text-primary-foreground'
-                      : delMes
-                        ? 'text-white/55'
-                        : 'text-white/20'
-                  }`}
-                >
-                  {d.getDate()}
-                </span>
-                <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto scrollbar-none">
-                  {delDia.map((t) => (
-                    <TareaChip
-                      key={t.id}
-                      task={t}
-                      usersById={usersById}
-                      arrastrable={canMoveTask}
-                      onClick={() => dialog.open(t.id)}
-                    />
-                  ))}
-                </div>
+              <div key={claveSemana} data-semana={claveSemana} className="grid grid-cols-7">
+                {Array.from({ length: 7 }, (_, i) => {
+                  const d = sumarDias(lunes, i);
+                  const k = claveDia(d);
+                  const esHoy = k === claveHoy;
+                  const delMesVisible = d.getFullYear() * 12 + d.getMonth() === mesVisibleIdx;
+                  const delDia = conFecha.get(k) ?? [];
+                  const finDeSemana = i >= 5;
+                  return (
+                    <div
+                      key={k}
+                      onDragOver={(e) => {
+                        if (!canMoveTask) return;
+                        e.preventDefault();
+                        if (diaSobrevolado !== k) setDiaSobrevolado(k);
+                      }}
+                      onDragLeave={() =>
+                        setDiaSobrevolado((actual) => (actual === k ? null : actual))
+                      }
+                      onDrop={(e) => {
+                        if (!canMoveTask) return;
+                        e.preventDefault();
+                        soltarEn(e.dataTransfer.getData('text/plain'), k);
+                      }}
+                      className={`group/dia flex min-h-[8.5rem] min-w-0 flex-col gap-1 border-b border-r border-white/[0.06] p-1.5 transition-colors ${
+                        finDeSemana ? 'bg-black/[0.12]' : ''
+                      } ${diaSobrevolado === k ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}`}
+                    >
+                      <div className="flex h-6 shrink-0 items-center justify-between gap-1">
+                        {puedeCrear ? (
+                          <button
+                            type="button"
+                            onClick={() => setCreandoEn(k)}
+                            aria-label={`Nueva tarea el ${d.getDate()} de ${MESES[d.getMonth()].toLowerCase()}`}
+                            title="Nueva tarea en este día"
+                            className="flex h-5 w-5 cursor-pointer items-center justify-center rounded text-white/60 opacity-0 transition-opacity hover:bg-white/10 hover:text-white focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary group-hover/dia:opacity-100"
+                          >
+                            <svg
+                              className="h-3.5 w-3.5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                              aria-hidden="true"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M12 5v14m7-7H5"
+                              />
+                            </svg>
+                          </button>
+                        ) : (
+                          <span />
+                        )}
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 font-sans text-xs tabular-nums ${
+                            esHoy
+                              ? 'bg-primary font-semibold text-primary-foreground'
+                              : delMesVisible
+                                ? 'text-white/75'
+                                : 'text-white/30'
+                          }`}
+                        >
+                          {/* El día 1 lleva el mes: es la única pista de dónde
+                              empieza uno nuevo en una lista que no se corta. */}
+                          {d.getDate() === 1
+                            ? `${d.getDate()} ${MESES[d.getMonth()].slice(0, 3).toLowerCase()}`
+                            : d.getDate()}
+                        </span>
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-1">
+                        {delDia.map((t) => (
+                          <TareaChip
+                            key={t.id}
+                            task={t}
+                            usersById={usersById}
+                            arrastrable={canMoveTask}
+                            completada={estaCompletada(t)}
+                            onClick={() => dialog.open(t.id)}
+                          />
+                        ))}
+                        {creandoEn === k && primeraColumna && (
+                          <CrearEnDia
+                            projectId={projectId}
+                            boardId={board.id}
+                            columnId={primeraColumna.id}
+                            columnName={primeraColumna.name}
+                            dia={k}
+                            onClose={() => setCreandoEn((actual) => (actual === k ? null : actual))}
+                            onCreated={setRecienCreada}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -473,12 +677,15 @@ function TareaChip({
   grande = false,
   columna,
   arrastrable = false,
+  completada = false,
 }: {
   task: Task;
   usersById: Map<string, UserProfile>;
   onClick: () => void;
   grande?: boolean;
   columna?: string;
+  /** En una columna de cierre: se tacha y se apaga, como en el Kanban. */
+  completada?: boolean;
   /** Permiso de mover: sin él la tarea se puede abrir, pero no arrastrar. */
   arrastrable?: boolean;
 }) {
@@ -496,15 +703,15 @@ function TareaChip({
       }}
       onClick={onClick}
       title={task.title}
-      className={`flex w-full items-center gap-1.5 rounded px-1.5 text-left transition-opacity hover:opacity-80 ${
-        grande ? 'py-1.5' : 'py-0.5'
-      } ${arrastrable ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      className={`flex w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 text-left transition-opacity hover:opacity-80 ${
+        grande ? 'py-1.5' : 'py-1'
+      } ${arrastrable ? 'cursor-grab active:cursor-grabbing' : ''} ${completada ? 'opacity-55' : ''}`}
       style={{ background: alpha(tono, grande ? 12 : 16) }}
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: tono }} />
       <span className="min-w-0 flex-1">
         <span
-          className={`block truncate font-sans font-medium ${grande ? 'text-[12px] text-white' : 'text-[10px] text-white/90'}`}
+          className={`block truncate font-sans font-medium ${grande ? 'text-[12px] text-white' : 'text-xs text-white/90'} ${completada ? 'line-through' : ''}`}
         >
           {task.title}
         </span>
@@ -527,6 +734,89 @@ function TareaChip({
         </span>
       )}
     </button>
+  );
+}
+
+/**
+ * El alta en línea dentro de un día. Mismo gesto que el «Añadir tarea» del
+ * Kanban: Enter crea, Escape o salir con el campo vacío cierra. Envía con
+ * `onSubmit` y un `FormData` a mano en vez de `action={…}`: el reseteo
+ * automático de React 19 vaciaría el campo *antes* de saber si se guardó.
+ */
+function CrearEnDia({
+  projectId,
+  boardId,
+  columnId,
+  columnName,
+  dia,
+  onClose,
+  onCreated,
+}: {
+  projectId: string;
+  boardId: string;
+  columnId: string;
+  /** `status` tiene que igualar el nombre de la columna, no su id. */
+  columnName: string;
+  /** `YYYY-MM-DD`: lo que espera `createTaskAction` en `dueDate`. */
+  dia: string;
+  onClose: () => void;
+  onCreated: (taskId: string) => void;
+}) {
+  const [titulo, setTitulo] = useState('');
+  const [state, crear, pending] = useAccion(createTaskAction, TASK_INITIAL_STATE);
+  const campo = useRef<HTMLInputElement>(null);
+  const ultimo = useRef(state);
+
+  useEffect(() => {
+    campo.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (state === ultimo.current) return;
+    ultimo.current = state;
+    if (!state.done) return;
+    /* No hace falta vaciar el campo: `onClose` desmonta el formulario. */
+    onCreated(state.done);
+    onClose();
+  }, [state, onCreated, onClose]);
+
+  return (
+    <form
+      noValidate
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!titulo.trim() || pending) return;
+        const datos = new FormData();
+        datos.set('projectId', projectId);
+        datos.set('boardId', boardId);
+        datos.set('columnId', columnId);
+        datos.set('status', columnName);
+        datos.set('title', titulo.trim());
+        datos.set('dueDate', dia);
+        crear(datos);
+      }}
+      className="flex flex-col gap-1"
+    >
+      <input
+        ref={campo}
+        value={titulo}
+        onChange={(e) => setTitulo(e.target.value)}
+        onBlur={() => !titulo.trim() && !pending && onClose()}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') onClose();
+        }}
+        maxLength={255}
+        disabled={pending}
+        placeholder={pending ? 'Creando…' : 'Nueva tarea'}
+        aria-label="Título de la tarea nueva"
+        className="h-7 w-full min-w-0 rounded-md border border-white/10 bg-[#191919] px-2 font-sans text-xs text-white outline-none placeholder:text-white/40 focus:border-primary"
+      />
+      {state.error && (
+        <p role="alert" className="font-sans text-[10px]" style={{ color: colors.error }}>
+          {state.error}
+        </p>
+      )}
+    </form>
   );
 }
 

@@ -74,7 +74,7 @@ export default async function OrganizationsPage({ searchParams }: PageProps) {
 
   return (
     <AppHeader title="Administración">
-      <div data-tone="dark" className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
+      <div data-tone="dark" className="flex w-full flex-col gap-6 pb-16">
         <AdminHeader
           titulo="Organizaciones"
           descripcion="Quién ha contratado qué y cuántos asientos ocupa. Desde aquí se puede conceder un plan sin cobrar; suspender sigue siendo cosa del proyecto."

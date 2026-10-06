@@ -270,6 +270,7 @@ export function BoardStrip({
             currentUserId={currentUserId}
             openTaskId={openTaskId}
             canMoveTask={canMoveTask}
+            canCreateTask={canCreateTask}
             canComment={canComment}
             canManageLabels={canManageLabels}
             canEditTask={canEditTask}

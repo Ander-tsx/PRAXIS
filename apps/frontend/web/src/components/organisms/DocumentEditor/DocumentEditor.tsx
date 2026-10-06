@@ -448,7 +448,10 @@ function EditorVivo({
 
   return (
     <Contexto.Provider value={contexto}>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 px-1 pb-24">
+      {/* A ancho completo: con `max-w-3xl` centrado, en un monitor grande el
+          texto ocupaba un tercio y el resto eran márgenes. El padding lateral
+          deja sitio al asa de arrastre, que cuelga a la izquierda del bloque. */}
+      <div className="flex w-full flex-col gap-2 px-6 pb-24 sm:px-10 lg:px-14">
         <header className="flex flex-col gap-3 pb-2">
           <div className="flex min-h-7 flex-wrap items-center justify-end gap-3">
             <EstadoDeGuardado red={estadoRed} guardando={guardando} editable={editable} />
@@ -636,7 +639,7 @@ function LineasFantasma() {
 
 function Esqueleto({ titulo }: { titulo: string }) {
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-1 pt-10">
+    <div className="flex w-full flex-col gap-4 px-6 pt-10 sm:px-10 lg:px-14">
       <h1 className="font-sans text-4xl font-bold tracking-tight text-text-primary">
         {titulo || 'Sin título'}
       </h1>

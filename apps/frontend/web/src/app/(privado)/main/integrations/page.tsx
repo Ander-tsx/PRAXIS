@@ -44,7 +44,7 @@ export default async function IntegrationsPage() {
   if (!organizationId || !organizacion) {
     return (
       <AppHeader title="Integraciones">
-        <div className="mx-auto flex w-full max-w-4xl flex-col pb-16">
+        <div className="flex w-full flex-col pb-16">
           {cabecera}
           <p className="border-t border-border pt-6 font-sans text-sm text-text-secondary">
             No se pudo cargar la organización activa.
@@ -81,7 +81,7 @@ export default async function IntegrationsPage() {
 
   return (
     <AppHeader title="Integraciones">
-      <div className="mx-auto flex w-full max-w-4xl flex-col pb-16">
+      <div className="flex w-full flex-col pb-16">
         {cabecera}
 
         <IntegrationRow

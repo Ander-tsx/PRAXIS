@@ -5,6 +5,9 @@ import { useEffect, useState } from 'react';
 import { colors } from '../../tokens';
 import type { AppNavItem } from './navigation';
 import {
+  RAIL_ACTIVA,
+  RAIL_CELDA,
+  RAIL_REPOSO,
   SIDEBAR_FILA,
   SIDEBAR_FILA_ACTIVA,
   SIDEBAR_FILA_REPOSO,
@@ -26,6 +29,9 @@ import {
  * solo hijo y aun así salta. Queda por capturar el `owner stack` real antes de
  * la hidratación, que es lo único que dirá qué array es.
  */
+
+/** Plegada, el icono de cada entrada a la medida del rail (18 px). */
+const RAIL_ICONOS = '[&_svg]:h-[18px] [&_svg]:w-[18px]';
 
 /**
  * El enlace activo es el que **más** coincide con la ruta, no cualquiera que sea
@@ -164,10 +170,11 @@ export function NavList({
                 <span
                   key={claveItem}
                   aria-disabled="true"
-                  title={
-                    plegada ? `${item.label} — disponible próximamente` : 'Disponible próximamente'
-                  }
-                  className={`${SIDEBAR_FILA} ${forma} cursor-not-allowed font-medium text-text-secondary opacity-60`}
+                  title={plegada ? undefined : 'Disponible próximamente'}
+                  data-rail-tip={plegada ? `${item.label} — disponible próximamente` : undefined}
+                  className={`${
+                    plegada ? `${RAIL_CELDA} ${RAIL_ICONOS}` : `${SIDEBAR_FILA} ${forma}`
+                  } cursor-not-allowed font-medium text-text-secondary opacity-60`}
                 >
                   <span className={SIDEBAR_INICIO}>{item.icon}</span>
                   <span className={plegada ? 'sr-only' : 'flex-1'}>{item.label}</span>
@@ -184,10 +191,15 @@ export function NavList({
                 href={item.href}
                 onClick={onNavigate}
                 aria-current={active ? 'page' : undefined}
-                title={plegada ? item.label : undefined}
-                className={`relative ${SIDEBAR_FILA} ${forma} ${
-                  active ? SIDEBAR_FILA_ACTIVA : SIDEBAR_FILA_REPOSO
-                }`}
+                data-rail-tip={plegada ? item.label : undefined}
+                aria-label={plegada ? item.label : undefined}
+                className={
+                  plegada
+                    ? `${RAIL_CELDA} ${RAIL_ICONOS} ${active ? RAIL_ACTIVA : RAIL_REPOSO}`
+                    : `relative ${SIDEBAR_FILA} ${forma} ${
+                        active ? SIDEBAR_FILA_ACTIVA : SIDEBAR_FILA_REPOSO
+                      }`
+                }
               >
                 <span className={SIDEBAR_INICIO}>{item.icon}</span>
                 <span className={plegada ? 'sr-only' : 'flex-1'}>{item.label}</span>
@@ -202,7 +214,7 @@ export function NavList({
                        leer es justo lo que no se puede perder al plegar. */
                     <span
                       aria-label={`${item.badge} sin leer`}
-                      className="absolute right-2 top-2 h-2 w-2 rounded-full ring-2"
+                      className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full ring-2"
                       style={{
                         background: colors.primary,
                         ['--tw-ring-color' as string]: colors.surface,

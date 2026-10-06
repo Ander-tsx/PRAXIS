@@ -121,16 +121,17 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   const { userId } = await loadCurrentUser();
   const api = createServerApiClient();
 
-  /* `ajustes` no está en `TABS` a propósito: no es una pestaña de la barra, se
-     llega por el engranaje de la cabecera. */
-  const activeTab: TabId | 'ajustes' = tab === 'ajustes'
-    ? 'ajustes'
-    : TABS.some((t) => t.id === tab)
-    ? (tab as TabId)
-    : /* Los dos nombres que tuvo esta sección antes. Ver `TABS`. */
-      tab === 'automatizaciones' || tab === 'reglas'
-      ? 'automation'
-      : 'espacios';
+  /* `ajustes` no está en `TABS` a propósito: es pestaña de la barra, pero solo
+     para quien puede editar o borrar el proyecto, y `TABS` es la lista fija. */
+  const activeTab: TabId | 'ajustes' =
+    tab === 'ajustes'
+      ? 'ajustes'
+      : TABS.some((t) => t.id === tab)
+        ? (tab as TabId)
+        : /* Los dos nombres que tuvo esta sección antes. Ver `TABS`. */
+          tab === 'automatizaciones' || tab === 'reglas'
+          ? 'automation'
+          : 'espacios';
 
   /**
    * El proyecto, o la puerta de la invitación.
@@ -620,16 +621,24 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
         <div className="shrink-0 flex items-center justify-between border-b border-border">
           <TabNav
             ariaLabel="Secciones del proyecto"
-            tabs={TABS.map((t) => ({
-              ...t,
-              count: counts[t.id],
-              icon: <TabIcon nombre={t.icon} />,
-            }))}
+            tabs={[
+              ...TABS.map((t) => ({
+                ...t,
+                count: counts[t.id],
+                icon: <TabIcon nombre={t.icon} />,
+              })),
+              /* Ajustes era un engranaje suelto en la cabecera, lejos de las
+                 demás secciones y fácil de no ver. Ahora es una pestaña más, a
+                 la derecha de Automatizaciones, sin contador. */
+              ...(can.canEditProject || can.canDeleteProject
+                ? [{ id: 'ajustes', label: 'Ajustes', icon: <TabIcon nombre="settings" /> }]
+                : []),
+            ]}
             activeId={activeTab}
             renderLink={(t, isActive, content) => (
               <Link
                 key={t.id}
-                href={projectHref(project, { tab: t.id as TabId })}
+                href={projectHref(project, { tab: t.id as TabId | 'ajustes' })}
                 aria-current={isActive ? 'page' : undefined}
                 className={tabLinkClasses(isActive)}
                 replace

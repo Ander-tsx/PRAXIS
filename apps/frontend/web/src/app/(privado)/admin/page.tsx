@@ -112,7 +112,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
 
   return (
     <AppHeader title="Administración">
-      <div data-tone="dark" className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
+      <div data-tone="dark" className="flex w-full flex-col gap-6 pb-16">
         <AdminHeader
           titulo="Cuentas"
           descripcion="Quién puede entrar, con qué rol y con qué plan. Suspender es reversible; borrar no existe aquí."

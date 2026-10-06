@@ -37,6 +37,10 @@ export interface ProjectSettingsPanelProps {
   roleCount: number;
 }
 
+/* Una fila por sección: título y explicación a la izquierda, contenido a la
+   derecha. En móvil, apilado. */
+const SECCION = 'grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:gap-12';
+
 /**
  * Los ajustes del proyecto, **en la propia página** (`?tab=ajustes`).
  *
@@ -129,9 +133,12 @@ export function ProjectSettingsPanel({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-10 px-1 py-8">
+    /* A ancho completo, con el título de cada sección a la izquierda y sus
+       campos a la derecha en escritorio. Antes era una columna de `max-w-2xl`
+       centrada, y en un monitor grande dos tercios de la pestaña eran vacío. */
+    <div className="flex w-full flex-col gap-10 px-1 py-8">
       {canEdit ? (
-        <section aria-label="Identidad del proyecto" className="flex flex-col gap-6">
+        <section aria-label="Identidad del proyecto" className={SECCION}>
           <header className="flex flex-col gap-1">
             <h2 className="font-sans text-lg font-semibold text-white">Identidad</h2>
             <p className="font-sans text-sm text-text-secondary">
@@ -139,67 +146,69 @@ export function ProjectSettingsPanel({
             </p>
           </header>
 
-          <div className="flex items-center gap-4">
-            {imageUrl || glyphByKey(seleccion.iconKey) ? (
-              <Glyph
-                iconKey={seleccion.iconKey}
-                imageUrl={imageUrl}
-                color={seleccion.color}
-                size="md"
-                shape="square"
-              />
-            ) : (
-              <ProjectMonogram id={projectId} name={name || initialName} size="md" />
-            )}
-            <div className="min-w-0 flex-1">
-              <FloatingLabelInput
-                id="project-name"
-                label="Nombre"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={100}
-              />
+          <div className="flex min-w-0 flex-col gap-6">
+            <div className="flex items-center gap-4">
+              {imageUrl || glyphByKey(seleccion.iconKey) ? (
+                <Glyph
+                  iconKey={seleccion.iconKey}
+                  imageUrl={imageUrl}
+                  color={seleccion.color}
+                  size="md"
+                  shape="square"
+                />
+              ) : (
+                <ProjectMonogram id={projectId} name={name || initialName} size="md" />
+              )}
+              <div className="min-w-0 flex-1">
+                <FloatingLabelInput
+                  id="project-name"
+                  label="Nombre"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={100}
+                />
+              </div>
             </div>
-          </div>
 
-          <FloatingLabelTextarea
-            id="project-description"
-            label="Descripción"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            maxLength={500}
-          />
+            <FloatingLabelTextarea
+              id="project-description"
+              label="Descripción"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              maxLength={500}
+            />
 
-          <ImagePicker
-            tieneImagen={imageUrl !== null}
-            onUpload={subirImagen}
-            onRemove={quitarImagen}
-            disabled={saving}
-          />
+            <ImagePicker
+              tieneImagen={imageUrl !== null}
+              onUpload={subirImagen}
+              onRemove={quitarImagen}
+              disabled={saving}
+            />
 
-          <GlyphPicker value={seleccion} onChange={setSeleccion} disabled={saving} />
+            <GlyphPicker value={seleccion} onChange={setSeleccion} disabled={saving} />
 
-          {error && (
-            <p role="alert" className="font-sans text-sm text-error">
-              {error}
-            </p>
-          )}
-
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || name.trim().length < 2}
-              className="rounded-lg bg-white px-5 py-2 font-sans text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              {saving ? 'Guardando…' : 'Guardar cambios'}
-            </button>
-            {saved && (
-              <span role="status" className="font-sans text-sm text-success">
-                Guardado.
-              </span>
+            {error && (
+              <p role="alert" className="font-sans text-sm text-error">
+                {error}
+              </p>
             )}
+
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving || name.trim().length < 2}
+                className="rounded-lg bg-white px-5 py-2 font-sans text-sm font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {saving ? 'Guardando…' : 'Guardar cambios'}
+              </button>
+              {saved && (
+                <span role="status" className="font-sans text-sm text-success">
+                  Guardado.
+                </span>
+              )}
+            </div>
           </div>
         </section>
       ) : (
@@ -209,10 +218,7 @@ export function ProjectSettingsPanel({
       )}
 
       {canDelete && (
-        <section
-          aria-label="Zona de peligro"
-          className="flex flex-col gap-3 border-t border-border pt-8"
-        >
+        <section aria-label="Zona de peligro" className={`${SECCION} border-t border-border pt-8`}>
           <header className="flex flex-col gap-1">
             <h2 className="font-sans text-lg font-semibold text-white">Zona de peligro</h2>
             <p className="font-sans text-sm text-text-secondary">
@@ -220,16 +226,18 @@ export function ProjectSettingsPanel({
               dentro.
             </p>
           </header>
-          <DeleteProjectButton
-            projectId={projectId}
-            projectName={initialName}
-            workspaceCount={workspaceCount}
-            boardCount={boardCount}
-            columnCount={columnCount}
-            labelCount={labelCount}
-            memberCount={memberCount}
-            roleCount={roleCount}
-          />
+          <div className="flex items-start">
+            <DeleteProjectButton
+              projectId={projectId}
+              projectName={initialName}
+              workspaceCount={workspaceCount}
+              boardCount={boardCount}
+              columnCount={columnCount}
+              labelCount={labelCount}
+              memberCount={memberCount}
+              roleCount={roleCount}
+            />
+          </div>
         </section>
       )}
     </div>
