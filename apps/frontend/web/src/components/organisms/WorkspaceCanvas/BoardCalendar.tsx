@@ -420,7 +420,7 @@ export function BoardCalendar({
     <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
       {/* ── Calendario ── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#202020]">
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-white/10 px-3 py-2.5">
           <div className="flex items-center gap-2">
             <h4
               aria-live="polite"
@@ -652,7 +652,11 @@ export function BoardCalendar({
             soltarEn(e.dataTransfer.getData('text/plain'), null);
           }}
           className={`flex shrink-0 flex-col overflow-hidden rounded-xl bg-[#202020] border-white/10 transition-all duration-300 ease-in-out ${
-            mostrarSinFecha ? 'w-full lg:w-64 opacity-100 border' : 'w-0 opacity-0 border-0'
+            /* Cerrado, en móvil fuera del todo: con la página en columna, el
+               `w-0` lo dejaba con el alto de su lista y aplastaba la agenda. */
+            mostrarSinFecha
+              ? 'max-h-[45%] w-full opacity-100 border lg:max-h-none lg:w-64'
+              : 'w-0 opacity-0 border-0 max-lg:hidden'
           } ${diaSobrevolado === 'sin-fecha' ? 'bg-primary/10' : ''}`}
         >
           <div className="shrink-0 border-b border-white/10 px-3 py-2.5 flex items-center justify-between">
@@ -768,7 +772,7 @@ function AgendaSemana({
               <section aria-label={diaLargo.format(d)} className="border-b border-white/[0.06]">
                 <header className="sticky top-0 z-10 flex min-h-11 items-center gap-2 bg-[#202020]/95 px-4 backdrop-blur">
                   <span
-                    className={`font-sans text-[13px] font-semibold capitalize ${
+                    className={`inline-block font-sans text-[13px] font-semibold first-letter:uppercase ${
                       esHoy ? 'text-primary' : 'text-white/80'
                     }`}
                   >

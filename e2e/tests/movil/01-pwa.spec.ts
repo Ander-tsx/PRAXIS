@@ -6,14 +6,30 @@ import { crearCuentaYEntrar } from '../../fixtures/ui';
  * worker toma el mando y que sin red hace lo que dice D4 —y nada más—.
  */
 
-/** Espera a que el SW controle la página. El primero se activa tras recargar. */
+/**
+ * Espera a que el SW controle la página.
+ *
+ * El primero se activa tras instalarse; la página que lo registró solo queda
+ * controlada desde la siguiente navegación. Se espera al estado `activated` —no
+ * a que exista `active`, que también vale durante `activating`— antes de
+ * recargar: recargando en mitad de la activación, esa navegación puede salir
+ * sin controlar (una carrera del navegador, no de la app: la siguiente ya va
+ * controlada). Por eso, si aun así no toma el mando, se recarga una vez más.
+ */
 async function conServiceWorker(page: Page) {
   await page.waitForFunction(async () => {
     const registro = await navigator.serviceWorker.getRegistration();
-    return !!registro?.active;
+    return registro?.active?.state === 'activated';
   });
-  await page.reload();
-  await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+  for (let intento = 0; intento < 2; intento++) {
+    await page.reload();
+    const controlada = await page
+      .waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (controlada) return;
+  }
+  throw new Error('El service worker no tomó el mando de la página tras dos recargas');
 }
 
 test('el manifiesto trae identidad, iconos maskable y accesos directos', async ({ request }) => {
