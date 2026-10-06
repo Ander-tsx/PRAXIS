@@ -718,8 +718,9 @@ body.arrastrando-en-tablero {
 
   /* Algo más ancha que los 350 px de serie: los avisos llevan nombres de
      persona y de proyecto entre comillas, y a 350 px la frase se parte en tres
-     líneas. */
-  --sileo-width: 380px;
+     líneas. Pero nunca más que la pantalla: en un teléfono de 360 px, 380 de
+     tarjeta más el margen se salían por el lado. */
+  --sileo-width: min(380px, calc(100vw - 24px));
 }
 
 /* ── Avisos: desbordes de `sileo` ──────────────────────────────────────────
@@ -765,6 +766,19 @@ body.arrastrando-en-tablero {
 [data-sileo-viewport][data-position] [data-sileo-description] {
   box-sizing: border-box;
   overflow-wrap: anywhere;
+}
+
+/* 2b. Y no crece sin fin. Los nombres largos ya se recortan al montar la
+ * frase (`acortarNombres` en `LiveNotices`); esto es la red por si un texto
+ * llega largo por otro camino. Se recorta el **texto** (`LiveNotices` lo
+ * envuelve en `[data-aviso-texto]`), no la descripción entera: dentro va
+ * también el botón «Ver», que tiene que seguir a la vista. */
+[data-sileo-viewport][data-position] [data-sileo-description] > [data-aviso-texto] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
 }
 
 /* 3. La descripción y título blancos en modo oscuro con su sombra respectiva. */

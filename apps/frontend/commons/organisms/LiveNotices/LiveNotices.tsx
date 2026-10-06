@@ -182,7 +182,10 @@ export function LiveNotices() {
         /* La tabla guarda la clave y el icono se resuelve aquí: `styles.ts` es
            un módulo de datos y esto es JSX. */
         ...(presentacion.icono === 'rayo' ? { icon: <RayoDeAutomatizacion /> } : {}),
-        description: descripcion,
+        /* En un `<span>` con su atributo y no como texto suelto: es lo que deja
+           al CSS recortarlo a cuatro líneas sin recortar también el botón,
+           que va dentro del mismo bloque. Ver «2b» en `theme.css`. */
+        description: <span data-aviso-texto>{acortarNombres(descripcion)}</span>,
         duration: presentacion.duracion,
         autopilot: presentacion.autopilot,
         /* El tono de la píldora sale de la paleta de PRAXIS, no del blanco y
@@ -455,4 +458,22 @@ export function mismaVista(destino: string, actual: { pathname: string; search: 
     if (abiertos.get(clave) !== valor) return false;
   }
   return true;
+}
+
+/** Lo más largo que puede ir un nombre entre «» dentro de una tarjeta. */
+const NOMBRE_MAX = 60;
+
+/**
+ * Recorta los nombres largos de la frase de una tarjeta.
+ *
+ * Los avisos citan nombres entre «» —un proyecto, una tarea, una persona—, y
+ * un proyecto puede llamarse hasta 100 caracteres y una tarea 255. Entero, un
+ * título así convertía la tarjeta en un párrafo de siete líneas que tapaba
+ * media pantalla, en un teléfono más que nadie. En la tarjeta basta con
+ * reconocerlo; el nombre entero sigue en la bandeja, que es donde se lee.
+ */
+function acortarNombres(texto: string): string {
+  return texto.replace(/«([^»]+)»/g, (entero, nombre: string) =>
+    nombre.length > NOMBRE_MAX ? `«${nombre.slice(0, NOMBRE_MAX - 1).trimEnd()}…»` : entero,
+  );
 }
