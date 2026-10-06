@@ -239,3 +239,19 @@ local**. Ninguna se sube.
 | M5 | ✅ | (este) | `BarraDeFormatoMovil`: deshacer, rehacer, títulos, negrita, cursiva, tachado, listas, tareas, cita e imagen, pegada al teclado (`bottom: var(--teclado)`), solo con el editor enfocado; `pointerdown` con `preventDefault` para no cerrar el teclado. El editor ya iba a lo ancho desde la etapa anterior. ⚠️ Un falso rojo que costó tiempo: `getByRole('navigation', { name: 'Secciones' })` casa por subcadena con «Secciones **del proyecto**»; las pruebas móviles usan `exact: true` |
 | M6 | ✅ | (este) | Avisos y Tú ya eran hojas (M2). Equipo: cada miembro es un bloque en móvil (la tabla de tres columnas se desplazaba). Facturación: la primera columna de la comparativa se queda fija. Administración: aviso «desde un ordenador» en vez del panel. D12 revisada (ver arriba). ⚠️ La invitación a instalar no tiene entrada en «Tú»: tras descartarla, se instala desde el menú del navegador —pendiente de decidir si hace falta |
 | M7 | ✅ | (este) | ⚠️ **Cambió el diseño:** la lista blanca de GET del gateway no servía —casi todo se pide en el servidor (Server Components)—. Se guarda el **HTML de las pantallas privadas visitadas** en `praxis-datos-<huella>` (SHA-256 del correo, que la app le dice al SW con `presentarPersona`: el SW no lee la cookie httpOnly); hasta 60 por persona. Otra persona → se borran las demás; cerrar sesión (`LogoutButton` y `PerfilEnBarra`) → `olvidarDatosSinConexion`. RSC no se guarda (depende de cabeceras del árbol); sin red el router cae a navegación dura, que sí sale de la copia. `FranjaSinConexion` en todas partes. 🔴 `navigator.onLine` miente (wifi sin salida, y en Chromium emulado da `true` en la página servida por el SW): la franja hace una sonda `HEAD /sw.js`, lo único que el SW nunca contesta de caché. ⚠️ Riesgo aceptado: si la sesión caduca sin cerrar sesión, la copia sigue en el dispositivo hasta que entre otra persona o se cierre sesión |
+
+### Cierre — corrida completa (2026-10-06, rama `feature/movil`)
+
+- **Unitarias** (`pnpm test`): 608 de 608.
+- **Integración** (`pnpm test:int`): `tasks-service` 19/19. `automation-service` 1/8: las
+  7 caen al construir `new PrismaService(...)` con la firma de antes de M4 de
+  PLAN-MONOLITO (ahora pide `ConfigService`). Ajeno a esta etapa y ya roto en `main`.
+- **e2e entera** (api, ui, movil-android, movil-iphone, con las `@security`): 341
+  pasan, 11 fallan, 8 omitidas. **Las 11 son de `ui` de escritorio y de cuatro
+  especificaciones que ya fallan en `main`**: `03-sesion` (2), `04-invitaciones` (1),
+  `07-reglas` (7; intermitente, cae un subconjunto distinto cada vez) y `09-scrum` (1;
+  depende de la hora). Ninguna móvil ni de api.
+- **Capturas de escritorio (I1)**: 10 de 10 idénticas.
+- **Falta, a mano y en un teléfono real** (no se puede emular): el teclado de iOS
+  sobre el compositor y la barra de formato, el gesto de volver, la barra de estado
+  y la pantalla de arranque, e instalar en Android e iOS.
