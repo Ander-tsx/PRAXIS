@@ -66,6 +66,9 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    /* `id` fija la identidad de la app instalada: sin él es `start_url`, y
+       cambiar la URL de arranque la convertiría en otra app para el sistema. */
+    id: '/',
     name: 'Praxis — Gestión de proyectos',
     short_name: 'Praxis',
     description:
@@ -73,6 +76,10 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: '/',
     scope: '/',
     display: 'standalone',
+    display_override: ['standalone'],
+    lang: 'es-MX',
+    dir: 'ltr',
+    categories: ['productivity', 'business'],
     /* El mismo casi-negro de la landing (`--l-bg` en landing-theme.css): la
        pantalla de carga de la app instalada tiene que fundirse con lo primero
        que se ve al abrirla, no con el `#0d0f14` azulado de la paleta general
@@ -94,6 +101,43 @@ export default function manifest(): MetadataRoute.Manifest {
         src: '/icons/icon-1024.png',
         sizes: '1024x1024',
         type: 'image/png',
+      },
+      /**
+       * Los `maskable`: Android recorta el icono con la forma de su lanzador
+       * (círculo, gota, cuadrado redondeado). Sin ellos pinta el nuestro dentro
+       * de un círculo blanco, encogido. Estos van a sangre en blanco y la X
+       * ocupa el 66 %, dentro del círculo seguro del 80 % que define la
+       * especificación. Ver M1 de `docs/PLAN-MOVIL.md`.
+       */
+      {
+        src: '/icons/maskable-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/icons/maskable-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+    ],
+    /* Mantener pulsado el icono instalado: los tres sitios a los que se entra. */
+    shortcuts: [
+      {
+        name: 'Proyectos',
+        url: '/projects',
+        icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+      },
+      {
+        name: 'Chat',
+        url: '/chat',
+        icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+      },
+      {
+        name: 'PRAX',
+        url: '/assistant',
+        icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
       },
     ],
   };

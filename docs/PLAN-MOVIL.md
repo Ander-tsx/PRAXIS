@@ -80,9 +80,12 @@ un móvil compartido, quien entra después no puede ver nada del anterior.
 **D6 — Una versión nueva nunca se impone a media tarea.** El SW nuevo se
 instala y **espera**; la app enseña «Hay una versión nueva · Actualizar», y solo
 al pulsar se hace `skipWaiting` y se recarga. Recargar solos podría tirar un
-documento a medio escribir. El registro lleva la versión del build en la URL
-(`/sw.js?v=…`) y `Cache-Control: no-cache` en el propio `sw.js`, para que una
-versión vieja no se quede pegada.
+documento a medio escribir. La versión del build va **dentro** del script
+—`/sw.js` lo genera un route handler estático, con URL fija— y el propio
+`sw.js` lleva `Cache-Control: no-store`, para que una versión vieja no se
+quede pegada. ⚠️ No por la URL (`/sw.js?v=…`): así, una pestaña abierta desde
+antes del despliegue registraba su versión vieja como nueva, y «Actualizar»
+hacía bajar de versión (registro de M1).
 
 **D7 — Barra inferior de cinco pestañas: Inicio · Chat · PRAX · Avisos · Tú.**
 Decidida por el dueño. Sustituye a la hamburguesa flotante. Inicio es la lista
@@ -229,7 +232,7 @@ local**. Ninguna se sube.
 | Fase | Estado | Commit | Notas |
 |---|---|---|---|
 | M0 | ✅ | (este) | Diez capturas de escritorio de referencia (`e2e/tests/ui/00-escritorio-capturas.spec.ts`), estables en tres corridas; tapan correo, nombre derivado, monograma y fechas cortas. Proyectos `movil-android` y `movil-iphone` (`pnpm e2e:movil`); el de iPhone es Chromium con medida de iPhone, no Safari. `viewport-fit=cover` + `interactive-widget`, utilidades `pt-safe`…, `getEsMovilInicial()` y `useEsMovil()`. ⚠️ `/main/settings` redirige a `/projects`: no es una pantalla que capturar |
-| M1 | ⏳ | | |
+| M1 | ✅ | (este) | SW a mano en `src/service-worker/sw.js`, servido por `src/app/sw.js/route.ts` (estático, `VERSION` dentro). Registro y aviso «Actualizar» en `RegistroDelServiceWorker`, solo en producción. `/sin-conexion` precargada **sin `<script>`** (con ellos, el router hidrataría otra ruta sin red). Manifest con `id`, `maskable`, `shortcuts`; `appleWebApp` con barra translúcida y ocho pantallas de arranque. `InvitacionAInstalar` (Android con el aviso del sistema, iOS con instrucciones). Dos fallos que salieron probando: 🔴 `controllerchange` salta también en la **primera** instalación, y recargar ahí se comía el formulario de alta —solo se recarga si se pidió—; y versionar por la URL permitía bajar de versión (ver D6). ⚠️ Playwright no intercepta la descarga del script del SW: la prueba de actualización registra otra URL en el mismo ámbito |
 | M2 | ⏳ | | |
 | M3 | ⏳ | | |
 | M4 | ⏳ | | |

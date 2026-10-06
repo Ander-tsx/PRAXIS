@@ -256,5 +256,8 @@ export const config = {
    * **no casa la raíz**. Sin esta entrada la landing nunca renovaba la sesión,
    * que es justo el caso para el que nació este proxy.
    */
-  matcher: ['/', '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth/api/).*)'],
+  /* `sw.js` fuera: el navegador lo pide a menudo para ver si hay versión
+     nueva, y no tiene nada que ver con la sesión. Pasar por el guard le haría
+     renovarla en cada comprobación. */
+  matcher: ['/', '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth/api/|sw\\.js).*)'],
 };

@@ -1,6 +1,7 @@
 import { setPresenceAction } from '@/app/(privado)/presence-actions';
-import { PerfilEnBarra } from '@/components/organisms/PerfilEnBarra';
 import { AvisoAsientoCongelado } from '@/components/organisms/Billing/AvisoAsientoCongelado';
+import { InvitacionAInstalar } from '@/components/organisms/InvitacionAInstalar/InvitacionAInstalar';
+import { PerfilEnBarra } from '@/components/organisms/PerfilEnBarra';
 import { AppShell, PresenceFooter, avatarHref, displayName } from '@praxis/commons';
 import { loadPrivateChrome } from '@praxis/commons/auth';
 import {
@@ -128,6 +129,8 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
           `resolverOrganizacionActiva`. */}
       <AvisoAsientoCongelado organizationId={organizacionActivaId} />
       {children}
+      {/* Solo en móvil, una vez y descartable. Ver M1 de docs/PLAN-MOVIL.md. */}
+      <InvitacionAInstalar />
     </AppShell>
   );
 }

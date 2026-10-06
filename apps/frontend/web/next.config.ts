@@ -1,6 +1,35 @@
+import { execSync } from 'node:child_process';
 import type { NextConfig } from 'next';
 
+/**
+ * La versión de este build, para el service worker (D6 de `docs/PLAN-MOVIL.md`).
+ *
+ * `src/app/sw.js/route.ts` la escribe dentro del script del SW: un build nuevo
+ * son bytes nuevos, y el navegador instala otro SW que espera a que la persona
+ * pulse «Actualizar». Commit **y** hora del build: con solo el commit, dos
+ * builds del mismo commit —lo normal en local— darían el mismo script y el SW
+ * viejo se quedaría pegado.
+ * Sin git (la imagen de Docker no lo trae), el commit que da Railway o nada.
+ */
+function versionDelBuild(): string {
+  let commit = process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ?? '';
+  if (!commit) {
+    try {
+      commit = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+        .toString()
+        .trim();
+    } catch {
+      commit = 'sin-git';
+    }
+  }
+  return `${commit}-${Date.now().toString(36)}`;
+}
+
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_VERSION_APP: versionDelBuild(),
+  },
+
   /**
    * @praxis/commons se publica como TypeScript sin compilar y pnpm lo enlaza
    * dentro de node_modules, donde Next no transpila por defecto.
@@ -80,6 +109,24 @@ const nextConfig: NextConfig = {
    * Atajos: /login y /signup redirigen a /auth/login y /auth/signup.
    * Mejora de UX para que no haya que recordar el prefijo /auth.
    */
+  /**
+   * El service worker **nunca** se sirve de caché HTTP: si el navegador
+   * guardara `sw.js`, no vería las versiones nuevas y la app se quedaría
+   * congelada en la vieja (I4). Y su ámbito es la raíz entera.
+   */
+  async headers() {
+    return [
+      {
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+          { key: 'Content-Type', value: 'application/javascript; charset=utf-8' },
+        ],
+      },
+    ];
+  },
+
   async redirects() {
     return [
       { source: '/login', destination: '/auth/login', permanent: false },

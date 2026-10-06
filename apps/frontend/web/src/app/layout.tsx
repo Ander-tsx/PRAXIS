@@ -1,3 +1,4 @@
+import { RegistroDelServiceWorker } from '@/components/organisms/ServiceWorker/RegistroDelServiceWorker';
 import { getTheme } from '@praxis/commons/theme';
 import type { Metadata, Viewport } from 'next';
 import { Archivo, Fraunces, Inter, Lora } from 'next/font/google';
@@ -102,6 +103,34 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'es_MX',
   },
+  /**
+   * iOS instalada (M1 de `docs/PLAN-MOVIL.md`). Safari no lee el manifiesto
+   * para esto: sin `appleWebApp` abre con su propia barra, con el título de la
+   * página y una pantalla en blanco al arrancar.
+   *
+   * - `black-translucent`: la app se dibuja bajo la barra de estado (con
+   *   `viewport-fit=cover` y las utilidades `pt-safe`), como una nativa.
+   * - Las pantallas de arranque van por tamaño exacto de pantalla: iOS no
+   *   escala ninguna, y si no hay una para ese teléfono, enseña blanco.
+   */
+  appleWebApp: {
+    capable: true,
+    title: 'Praxis',
+    statusBarStyle: 'black-translucent',
+    startupImage: [
+      [1290, 2796, 430, 932, 3],
+      [1179, 2556, 393, 852, 3],
+      [1284, 2778, 428, 926, 3],
+      [1170, 2532, 390, 844, 3],
+      [1125, 2436, 375, 812, 3],
+      [1242, 2688, 414, 896, 3],
+      [828, 1792, 414, 896, 2],
+      [750, 1334, 375, 667, 2],
+    ].map(([w, h, cw, ch, dpr]) => ({
+      url: `/icons/arranque/${w}x${h}.png`,
+      media: `(device-width: ${cw}px) and (device-height: ${ch}px) and (-webkit-device-pixel-ratio: ${dpr}) and (orientation: portrait)`,
+    })),
+  },
   twitter: {
     card: 'summary_large_image',
     title: 'Praxis — Gestión de proyectos inteligente',
@@ -163,7 +192,12 @@ export default async function RootLayout({
         cambia cómo se reparte el alto de `AppShell`. La landing no lo echa de
         menos: `LandingTemplate` ya trae su propio `flex min-h-screen flex-col`.
       */}
-      <body className="min-h-full antialiased">{children}</body>
+      <body className="min-h-full antialiased">
+        {children}
+        {/* El service worker, en toda la app —la landing incluida—: sin él no
+            se instala bien ni abre sin red. Ver `docs/PLAN-MOVIL.md`, M1. */}
+        <RegistroDelServiceWorker />
+      </body>
     </html>
   );
 }
