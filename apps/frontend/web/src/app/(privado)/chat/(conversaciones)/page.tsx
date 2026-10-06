@@ -1,16 +1,12 @@
 import { ULTIMO_CHAT_COOKIE, conversacionRecordada } from '@/lib/ultimo-chat';
 import {
-  Avatar,
   type DirectConversation,
+  ListaDeChatsMovil,
   type ProjectChatSummary,
-  ProjectMonogram,
-  avatarHref,
-  personName,
-  resolveProfiles,
 } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
+import { getEsMovilInicial } from '@praxis/commons/theme';
 import { cookies } from 'next/headers';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 /**
@@ -22,9 +18,6 @@ import { redirect } from 'next/navigation';
  * un `/<peerId>` llevaría a la raíz de la aplicación — a la landing.
  */
 const CHAT_PATH = '/chat';
-
-/** El proxy autenticado, ya uno solo para toda la aplicación. */
-const GATEWAY_PATH = '/api/gateway';
 
 interface PageProps {
   searchParams: Promise<{ lista?: string }>;
@@ -65,45 +58,40 @@ interface PageProps {
  *
  * Y el índice enseña **las conversaciones**, pero solo en móvil: en escritorio
  * la barra lateral ya las lista, así que la pantalla vacía se reduce a un
- * aviso de que hay que elegir un chat. El buscador de contactos vivía aquí y
- * se quitó de los dos: en escritorio es redundante con el de la barra
- * lateral, y en móvil esta pantalla es «tus conversaciones», no «con quién
- * puedes hablar».
+ * aviso de que hay que elegir un chat.
+ *
+ * ## En móvil no se vuelve a la última (M8 de `docs/PLAN-MOVIL.md`)
+ *
+ * La pestaña Chat de la barra inferior pide `?lista=1`, y además el servidor
+ * no redirige cuando la pista del dispositivo dice teléfono
+ * (`getEsMovilInicial`): en una app de mensajes, la pestaña abre la lista. La
+ * pista solo **quita** una redirección, así que equivocarse con ella —una
+ * tableta, una ventana estrecha— deja ver el índice, nunca otra cosa.
+ *
+ * La lista de móvil la pinta el cliente (`ListaDeChatsMovil`) con el directorio
+ * del armazón, que está vivo: un mensaje que llega sube su fila y su insignia
+ * sin recargar. Antes se pintaba aquí, en el servidor, y se quedaba quieta.
  */
 export default async function ChatVacioPage({ searchParams }: PageProps) {
   const { lista } = await searchParams;
   const { get: getCookie } = await cookies();
 
-  const api = createServerApiClient();
-
   const recordada = conversacionRecordada(getCookie(ULTIMO_CHAT_COOKIE)?.value);
 
-  /* Las dos listas hacen falta igualmente: para pintar el índice, y para
-     comprobar que lo recordado sigue siendo accesible antes de redirigir a
-     ello. Pedirlas antes del `redirect()` no cuesta nada en el camino largo. */
-  const [directas, deProyecto] = await Promise.all([
-    api.get<DirectConversation[]>('/me/chats').catch(() => [] as DirectConversation[]),
-    api.get<ProjectChatSummary[]>('/me/chats/projects').catch(() => [] as ProjectChatSummary[]),
-  ]);
-
-  /* `?lista=1` es «quiero el índice», y lo pide la salida de móvil de una
-     conversación. Sin él se vuelve a lo último abierto, si sigue accesible. */
-  if (lista !== '1' && recordada) {
+  /* `?lista=1` es «quiero el índice», y lo pide la pestaña de móvil. Sin él se
+     vuelve a lo último abierto, si sigue accesible — salvo en un teléfono. */
+  if (lista !== '1' && recordada && !(await getEsMovilInicial())) {
+    const api = createServerApiClient();
+    const [directas, deProyecto] = await Promise.all([
+      api.get<DirectConversation[]>('/me/chats').catch(() => [] as DirectConversation[]),
+      api.get<ProjectChatSummary[]>('/me/chats/projects').catch(() => [] as ProjectChatSummary[]),
+    ]);
     const accesible = recordada.startsWith('proyecto/')
       ? deProyecto.some((chat) => chat.project.id === recordada.slice('proyecto/'.length))
       : directas.some((conversacion) => conversacion.peerId === recordada);
 
     if (accesible) redirect(`${CHAT_PATH}/${recordada}`);
   }
-
-  /* Solo los interlocutores de conversaciones ya abiertas: sin buscador aquí,
-     no hace falta el directorio de contactos. */
-  const directorio = await resolveProfiles(
-    api,
-    directas.map((conversacion) => conversacion.peerId),
-  );
-
-  const hayConversaciones = directas.length > 0 || deProyecto.some((chat) => chat.channelId);
 
   return (
     <>
@@ -116,111 +104,18 @@ export default async function ChatVacioPage({ searchParams }: PageProps) {
         </p>
       </div>
 
-      {/* Móvil: esta pantalla es la lista de conversaciones —no hay barra
-          lateral visible—, así que sí hace falta pintarlas. Sin buscador: eso
-          es «con quién puedes hablar», y aquí es «con quién ya hablas». */}
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 p-4 md:hidden">
-        <header className="flex flex-col gap-1">
-          <h2 className="font-sans font-semibold text-2xl text-text-primary">Tus mensajes</h2>
-          <p className="font-sans text-sm text-text-secondary">
-            {hayConversaciones
-              ? 'Sigue donde lo dejaste.'
-              : 'Todavía no tienes ninguna conversación.'}
-          </p>
-        </header>
-
-        {hayConversaciones && (
-          <section className="flex flex-col gap-1">
-            <h3 className="px-1 pb-1 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-              Conversaciones
-            </h3>
-
-            {deProyecto
-              /* Sin canal es un proyecto en el que nadie ha escrito nunca: sale en
-                 la barra lateral —desde donde se abre y se estrena— pero no en una
-                 lista que dice «tus conversaciones». */
-              .filter((chat) => chat.channelId)
-              .map((chat) => (
-                <Link
-                  key={chat.project.id}
-                  href={`${CHAT_PATH}/proyecto/${chat.project.id}`}
-                  className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-white/5"
-                >
-                  <ProjectMonogram
-                    id={chat.project.id}
-                    name={chat.project.name}
-                    iconKey={chat.project.iconKey}
-                    imageUrl={chat.project.imageUrl}
-                    color={chat.project.color}
-                  />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-sans text-sm font-medium text-text-primary">
-                      {chat.project.name}
-                    </span>
-                    <span className="truncate font-sans text-xs text-text-secondary">
-                      {resumen(chat.ultimo)}
-                    </span>
-                  </span>
-                  <Insignia cuantos={chat.unread} />
-                </Link>
-              ))}
-
-            {directas.map((conversacion) => (
-              <Link
-                key={conversacion.peerId}
-                href={`${CHAT_PATH}/${conversacion.peerId}`}
-                className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-white/5"
-              >
-                <Avatar
-                  label={personName(directorio, conversacion.peerId)}
-                  size="sm"
-                  src={avatarHref(
-                    directorio.perfiles.get(conversacion.peerId)?.avatarUrl,
-                    GATEWAY_PATH,
-                  )}
-                />
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate font-sans text-sm font-medium text-text-primary">
-                    {personName(directorio, conversacion.peerId)}
-                  </span>
-                  <span className="truncate font-sans text-xs text-text-secondary">
-                    {resumen(conversacion.ultimo)}
-                  </span>
-                </span>
-                <Insignia cuantos={conversacion.unread} />
-              </Link>
-            ))}
-          </section>
-        )}
+      {/* Móvil: esta pantalla es la lista de conversaciones. El armazón del
+          chat es `lleno` (no desplaza `<main>`), así que desplaza esta capa;
+          los márgenes negativos devuelven el relleno de `AppHeader` para que
+          el buscador caiga en el mismo sitio que en Inicio.
+          ⚠️ El relleno va en una capa **dentro** de la que desplaza, como en
+          `AppHeader`: puesto en la que desplaza, Chromium pega el buscador
+          16 px más abajo (cuenta el relleno al fijar lo `sticky`). */}
+      <div className="-m-4 flex min-h-0 flex-1 flex-col overflow-y-auto md:hidden">
+        <div className="p-4">
+          <ListaDeChatsMovil />
+        </div>
       </div>
     </>
-  );
-}
-
-/**
- * El resumen de una fila.
- *
- * ⚠️ `deletedAt` antes que `body`: al borrar, el servidor vacía el cuerpo, así
- * que sin esta rama la fila de una conversación cuyo último mensaje se borró se
- * queda en blanco y se lee como si estuviera vacía.
- */
-function resumen(ultimo: { body: string; deletedAt?: string | null } | null): string {
-  if (!ultimo) return 'Sin mensajes';
-  if (ultimo.deletedAt) return 'Mensaje eliminado';
-  /* El cuerpo puede traer marcado; en un resumen de una línea estorba. */
-  const plano = ultimo.body.replace(/<[^>]*>?/g, '').trim();
-  return plano.length > 60 ? `${plano.slice(0, 60)}…` : plano || 'Sin mensajes';
-}
-
-/** Sin nada pendiente no se pinta: una insignia con un cero no informa de nada. */
-function Insignia({ cuantos }: { cuantos: number }) {
-  if (cuantos <= 0) return null;
-  return (
-    <span
-      className="min-w-[18px] shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[10px] font-semibold text-primary-foreground"
-      aria-label={`${cuantos} sin leer`}
-    >
-      {cuantos > 99 ? '99+' : cuantos}
-    </span>
   );
 }

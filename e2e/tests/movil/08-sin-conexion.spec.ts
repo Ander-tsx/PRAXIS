@@ -65,13 +65,13 @@ test('cerrar sesión borra las copias, y otra cuenta no ve nada de la primera (I
   /* Cerrar sesión desde «Tú». */
   await page
     .getByRole('navigation', { name: 'Secciones', exact: true })
-    .getByRole('button', { name: 'Tú' })
+    .getByRole('link', { name: 'Tú' })
     .click();
-  await page
-    .getByRole('dialog', { name: 'Tú' })
-    .getByRole('button', { name: 'Cerrar sesión' })
-    .click();
-  await page.waitForURL((url) => !url.pathname.startsWith('/projects'));
+  await page.waitForURL(/\/main\/me$/);
+  await page.getByRole('button', { name: 'Cerrar sesión' }).filter({ visible: true }).click();
+  /* Cerrar sesión lleva a la portada: se espera a llegar, no solo a salir de
+     donde se estaba (desde «Tú» ya no se está en `/projects`). */
+  await page.waitForURL((url) => url.pathname === '/');
   expect(await cachesDePersona(page)).toEqual([]);
 
   /* Entra otra persona en el mismo navegador, y sin red pide la pantalla de

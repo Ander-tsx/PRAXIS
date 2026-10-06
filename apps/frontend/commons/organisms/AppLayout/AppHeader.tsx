@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useState } from 'react';
+import { useFijarTituloMovil } from './BarraSuperior';
 import { claseDeEntrada, consumirTransicion } from './transicionDePantalla';
 
 export interface AppHeaderProps {
@@ -17,6 +18,12 @@ export interface AppHeaderProps {
    * y quitarla sería un renombrado global a cambio de nada.
    */
   title: string;
+  /**
+   * El título de la barra de arriba en móvil, cuando la ruta no basta para
+   * saberlo: el nombre del proyecto en `/projects/<slug>`. Sin él, la barra
+   * pone el de la ruta (ver `pantallaMovil` en `BarraSuperior`).
+   */
+  tituloMovil?: string;
   /**
    * La pantalla ocupa el alto disponible y **no desplaza**.
    *
@@ -78,6 +85,7 @@ export interface AppHeaderProps {
  */
 export function AppHeader({
   title,
+  tituloMovil,
   lleno = false,
   anchoCompleto = false,
   children,
@@ -87,6 +95,7 @@ export function AppHeader({
   const [entrada] = useState(() =>
     typeof window === 'undefined' ? '' : claseDeEntrada(consumirTransicion()),
   );
+  useFijarTituloMovil(tituloMovil);
   /* ⚠️ **Sin ancho máximo.** Hubo uno (1400 px, 1584 con la barra plegada) y
      en un monitor grande —o al alejar el zoom— dejaba dos franjas vacías a los
      lados más anchas que la propia barra lateral. La columna ocupa lo que haya;
@@ -119,13 +128,11 @@ export function AppHeader({
         <div
           className={`mx-auto w-full ${entrada} ${
             anchoCompleto
-              ? 'max-w-full p-0 max-md:pt-safe'
-              : /* En móvil, la zona segura del notch y un respiro encima: con
-                   `viewport-fit=cover` la página empieza bajo la barra de estado.
-                   Fue `pt-16` mientras hubo un botón de menú flotando en esta
-                   esquina (lo sustituyó la barra inferior, M2 de
-                   `docs/PLAN-MOVIL.md`). Desde `md` es lo de siempre (I1). */
-                'max-w-full px-4 pb-4 pt-[calc(env(safe-area-inset-top,0px)+1rem)] md:p-6 lg:px-8'
+              ? 'max-w-full p-0'
+              : /* En móvil la zona segura del notch ya la reserva la barra de
+                   arriba (`BarraSuperior`, M8 de `docs/PLAN-MOVIL.md`): aquí
+                   solo el respiro. Desde `md` es lo de siempre (I1). */
+                'max-w-full p-4 md:p-6 lg:px-8'
           } ${lleno ? 'flex h-full min-h-0 flex-col' : ''}`}
         >
           {children}

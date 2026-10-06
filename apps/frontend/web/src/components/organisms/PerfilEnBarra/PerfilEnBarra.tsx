@@ -5,7 +5,7 @@ import {
   uploadAvatarAction,
   useGoogleAvatarAction,
 } from '@/app/(privado)/main/profile/actions';
-import { Avatar, olvidarDatosSinConexion } from '@praxis/commons';
+import { Avatar, olvidarDatosSinConexion, useEsMovil } from '@praxis/commons';
 import { Camera, ImageUp, Loader2, LogOut, Mail } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
@@ -25,6 +25,13 @@ export interface PerfilEnBarraProps {
 const CAMPO =
   'min-h-9 w-full rounded-lg bg-white/5 px-2.5 font-sans text-[13px] text-white ring-1 ring-inset ring-white/10 placeholder:text-text-secondary focus:outline-none focus:ring-white/35 disabled:opacity-60';
 
+/* En móvil, 16 px: con menos, Safari amplía la página al enfocar el campo. */
+const CAMPO_MOVIL =
+  'min-h-11 w-full rounded-xl bg-white/5 px-3.5 font-sans text-base text-white ring-1 ring-inset ring-white/10 placeholder:text-text-secondary focus:outline-none focus:ring-white/35 disabled:opacity-60';
+
+const BOTON_DE_FOTO =
+  'flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/5 px-2 font-sans font-medium text-text-primary transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50';
+
 const FILA =
   'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left font-sans text-[13px] font-medium transition-colors';
 
@@ -41,6 +48,14 @@ const FILA =
  *
  * Ya no hay portada, biografía, ubicación ni «Eliminar mi cuenta» aquí: borrar una
  * cuenta no es algo que deba estar a un clic de la barra de cada día.
+ *
+ * ## En móvil es la cabeza de la pantalla «Tú»
+ *
+ * Desde M8 de `docs/PLAN-MOVIL.md` «Tú» es una pantalla y no una hoja, y el
+ * dueño la quiere sin desplegables: el estado sale con sus opciones a la vista
+ * y los campos y botones crecen al tamaño del dedo. «Cerrar sesión» no va aquí
+ * sino al final de la pantalla, debajo de organización y ajustes, que es
+ * donde lo busca quien usa apps. En escritorio no cambia nada.
  */
 export function PerfilEnBarra({
   nombre,
@@ -52,6 +67,7 @@ export function PerfilEnBarra({
   initialLastName,
 }: PerfilEnBarraProps) {
   const router = useRouter();
+  const esMovil = useEsMovil();
   const archivoRef = useRef<HTMLInputElement>(null);
   const [nombrePila, setNombrePila] = useState(initialFirstName);
   const [apellidos, setApellidos] = useState(initialLastName);
@@ -130,7 +146,13 @@ export function PerfilEnBarra({
   }
 
   return (
-    <div className="flex max-h-[calc(100dvh-7rem)] flex-col gap-3 overflow-y-auto p-3 scrollbar-none">
+    <div
+      className={
+        esMovil
+          ? 'flex flex-col gap-4'
+          : 'flex max-h-[calc(100dvh-7rem)] flex-col gap-3 overflow-y-auto p-3 scrollbar-none'
+      }
+    >
       {/* ── Foto y quién eres ───────────────────────────────────── */}
       <div className="flex items-center gap-3">
         <div className="relative shrink-0">
@@ -142,11 +164,17 @@ export function PerfilEnBarra({
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <p className="truncate font-sans text-[14px] font-semibold leading-tight text-white">
+          <p
+            className={`truncate font-sans font-semibold leading-tight text-white ${
+              esMovil ? 'text-[18px]' : 'text-[14px]'
+            }`}
+          >
             {nombre.trim() || 'Sin nombre'}
           </p>
           <p
-            className="flex items-center gap-1.5 font-sans text-[12px] text-text-secondary"
+            className={`flex items-center gap-1.5 font-sans text-text-secondary ${
+              esMovil ? 'text-[13px]' : 'text-[12px]'
+            }`}
             title="El correo no se puede cambiar"
           >
             <Mail className="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -173,7 +201,7 @@ export function PerfilEnBarra({
           type="button"
           onClick={() => archivoRef.current?.click()}
           disabled={subiendoFoto}
-          className="flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/5 px-2 font-sans text-[12px] font-medium text-text-primary transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
+          className={`${BOTON_DE_FOTO} ${esMovil ? 'min-h-11 rounded-xl text-[14px]' : 'min-h-8 text-[12px]'}`}
         >
           <Camera className="h-3.5 w-3.5" aria-hidden="true" />
           Subir foto
@@ -183,7 +211,7 @@ export function PerfilEnBarra({
             type="button"
             onClick={() => void volverAGoogle()}
             disabled={subiendoFoto}
-            className="flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/5 px-2 font-sans text-[12px] font-medium text-text-primary transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50"
+            className={`${BOTON_DE_FOTO} ${esMovil ? 'min-h-11 rounded-xl text-[14px]' : 'min-h-8 text-[12px]'}`}
           >
             <ImageUp className="h-3.5 w-3.5" aria-hidden="true" />
             Usar la de Google
@@ -206,7 +234,7 @@ export function PerfilEnBarra({
           aria-label="Nombre"
           maxLength={60}
           disabled={guardando}
-          className={CAMPO}
+          className={esMovil ? CAMPO_MOVIL : CAMPO}
         />
         <input
           value={apellidos}
@@ -215,7 +243,7 @@ export function PerfilEnBarra({
           aria-label="Apellidos"
           maxLength={60}
           disabled={guardando}
-          className={CAMPO}
+          className={esMovil ? CAMPO_MOVIL : CAMPO}
         />
         {/* El botón solo existe cuando hay algo que guardar, y crece en vez de aparecer de golpe. */}
         <div
@@ -228,7 +256,9 @@ export function PerfilEnBarra({
               type="submit"
               disabled={!hayCambios || guardando}
               tabIndex={hayCambios ? 0 : -1}
-              className="mt-0.5 flex min-h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-white font-sans text-[12px] font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-60"
+              className={`mt-0.5 flex w-full items-center justify-center gap-1.5 bg-white font-sans font-semibold text-black transition-opacity hover:opacity-90 disabled:opacity-60 ${
+                esMovil ? 'min-h-11 rounded-xl text-[14px]' : 'min-h-8 rounded-lg text-[12px]'
+              }`}
             >
               {guardando && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
               Guardar cambios
@@ -244,12 +274,20 @@ export function PerfilEnBarra({
       )}
 
       {/* ── Tu estado ───────────────────────────────────────────── */}
-      <div className="border-t border-border pt-2">
-        <PresencePicker inicial={presencia} />
-      </div>
+      {esMovil ? (
+        <section aria-label="Tu estado" className="mt-2 flex flex-col gap-2">
+          <h3 className="px-4 font-sans text-[13px] font-medium text-text-secondary">Tu estado</h3>
+          <PresencePicker inicial={presencia} estatico />
+        </section>
+      ) : (
+        <div className="border-t border-border pt-2">
+          <PresencePicker inicial={presencia} />
+        </div>
+      )}
 
-      {/* ── La cuenta ───────────────────────────────────────────── */}
-      <div className="border-t border-border pt-2">
+      {/* ── La cuenta ─────────────────────────────────────────────
+          En móvil va al final de la pantalla «Tú»: ver la cabecera. */}
+      <div className={esMovil ? 'hidden' : 'border-t border-border pt-2'}>
         <button
           type="button"
           onClick={() => void cerrarSesion()}

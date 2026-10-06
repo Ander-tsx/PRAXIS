@@ -26,13 +26,14 @@ test('desde «Tú» se llega a los ajustes de la organización', async () => {
   await pagina.goto('/projects');
   await pagina
     .getByRole('navigation', { name: 'Secciones', exact: true })
-    .getByRole('button', { name: 'Tú' })
+    .getByRole('link', { name: 'Tú' })
     .click();
-  const hoja = pagina.getByRole('dialog', { name: 'Tú' });
-  await expect(hoja).toBeVisible();
-  await hoja.getByRole('link', { name: 'Equipo' }).click();
+  await expect(pagina).toHaveURL(/\/main\/me$/);
+  await pagina.getByRole('link', { name: 'Equipo' }).filter({ visible: true }).click();
   await expect(pagina).toHaveURL(/\/main\/team/);
-  await expect(hoja).toHaveCount(0);
+  /* Y la barra de arriba vuelve a «Tú». */
+  await pagina.getByRole('link', { name: 'Atrás' }).filter({ visible: true }).click();
+  await expect(pagina).toHaveURL(/\/main\/me$/);
 });
 
 test('Equipo no se sale de la pantalla', async () => {

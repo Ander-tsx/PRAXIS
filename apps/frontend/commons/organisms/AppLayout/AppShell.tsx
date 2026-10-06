@@ -30,7 +30,6 @@ import { avatarHref } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
 import { ProjectMonogram } from '../../atoms/ProjectMonogram';
 import { EsMovilProvider } from '../../hooks/useEsMovil';
-import { HojaInferior } from '../../molecules/HojaInferior/HojaInferior';
 import {
   ABRIR_BANDEJA_EVENT,
   type AvisoLegible,
@@ -44,6 +43,7 @@ import { useMessageCount } from '../../realtime/useMessageCount';
 import { avisarDeAvisosLeidos, useNoticeCount } from '../../realtime/useNoticeCount';
 import { alpha, colors } from '../../tokens';
 import { BarraInferior, type PestanaInferior } from './BarraInferior';
+import { BarraSuperior, TituloMovilProvider } from './BarraSuperior';
 import {
   FilaDeAccion,
   NuevoContenidoEnLinea,
@@ -253,7 +253,26 @@ const AppShellContext = createContext<{
   plegada: boolean;
   /** La organización activa ya resuelta, para lo que el armazón presta fuera. */
   organizacionActivaId: string | null;
+  /**
+   * Lo que pinta la pantalla «Tú» en móvil (`/main/me`): el perfil, las
+   * organizaciones y los ajustes. Ya lo tiene el armazón —lo usa la barra
+   * lateral de escritorio— y así esa pantalla no vuelve a pedirlo.
+   */
+  datosDeTu: {
+    user: AppShellUser;
+    perfilSlot: ReactNode;
+    organizaciones: OrgDelSelector[];
+    navItems: AppNavItem[];
+  };
 } | null>(null);
+
+/** Lo que pinta la pantalla «Tú» de móvil. Ver `datosDeTu` en el contexto. */
+export function useDatosDeTu() {
+  const contexto = useContext(AppShellContext);
+  return contexto
+    ? { ...contexto.datosDeTu, organizacionActivaId: contexto.organizacionActivaId }
+    : null;
+}
 
 /** El estado del armazón para lo que se pinta dentro (hoy, si la barra está plegada). */
 export function useAppShell() {
@@ -374,7 +393,9 @@ export function AppShell(props: AppShellProps) {
                 zonePath={props.zonePath}
                 organizacionActivaId={props.organizacionActivaId ?? null}
               >
-                <ArmazonInterno {...props} />
+                <TituloMovilProvider>
+                  <ArmazonInterno {...props} />
+                </TituloMovilProvider>
               </PraxProvider>
             </DockProvider>
           </DirectorioDeChatsProvider>
@@ -412,13 +433,7 @@ function ArmazonInterno({
   useEffect(() => {
     presentarPersona(user.email).catch(() => undefined);
   }, [user.email]);
-  /** Móvil: qué hoja de la barra inferior está abierta (Avisos o Tú). */
-  const [hojaMovil, setHojaMovil] = useState<'avisos' | 'tu' | null>(null);
-  /* Navegar desde una hoja (un aviso, un ajuste) la cierra: se va a otra
-     pantalla y la hoja no tiene nada más que hacer. */
-  useEffect(() => {
-    setHojaMovil(null);
-  }, [pathname]);
+  const router = useRouter();
   /**
    * 🔴 **Determinista: la ruta y una prop, nada del navegador.**
    *
@@ -469,16 +484,17 @@ function ArmazonInterno({
    * destino se quedó apuntando a una ruta que hoy redirige a la lista de
    * proyectos. Ver `destinoDeAviso`.
    *
-   * En móvil la bandeja es la hoja «Avisos» de la barra inferior.
+   * En móvil la bandeja es la pantalla «Avisos» (`/main/notifications`) de la
+   * barra inferior.
    */
   useEffect(() => {
     function abrir() {
-      if (window.matchMedia('(max-width: 767px)').matches) setHojaMovil('avisos');
+      if (window.matchMedia('(max-width: 767px)').matches) router.push('/main/notifications');
       else setBandejaAbierta(true);
     }
     window.addEventListener(ABRIR_BANDEJA_EVENT, abrir);
     return () => window.removeEventListener(ABRIR_BANDEJA_EVENT, abrir);
-  }, []);
+  }, [router]);
   /**
    * ⚠️ **El estado nace de la cookie que ya leyó el servidor**, no de un efecto.
    *
@@ -602,21 +618,21 @@ function ArmazonInterno({
    */
   const enCuenta = perfilAbierto;
 
-  /* Móvil: qué pestaña de abajo se marca. Una hoja abierta manda sobre la ruta. */
-  const pestanaInferior: PestanaInferior | null =
-    hojaMovil === 'avisos'
-      ? 'avisos'
-      : hojaMovil === 'tu'
-        ? 'tu'
-        : browserPath.startsWith('/chat')
-          ? 'chat'
-          : browserPath.startsWith('/assistant')
-            ? 'prax'
-            : browserPath.startsWith('/projects')
-              ? 'inicio'
-              : null;
-  /** Dentro de una conversación la barra no está: trae su «atrás» y su compositor. */
-  const enConversacion = /^\/chat\/.+/.test(browserPath);
+  /* Móvil: qué pestaña de abajo se marca. Lo que cuelga de «Tú» (equipo,
+     facturación…) la deja marcada: es de donde se viene. */
+  const pestanaInferior: PestanaInferior | null = browserPath.startsWith('/chat')
+    ? 'chat'
+    : browserPath.startsWith('/assistant')
+      ? 'prax'
+      : browserPath.startsWith('/projects')
+        ? 'inicio'
+        : browserPath.startsWith('/main/notifications')
+          ? 'avisos'
+          : browserPath.startsWith('/main') ||
+              browserPath.startsWith('/admin') ||
+              browserPath.startsWith('/ayuda')
+            ? 'tu'
+            : null;
   const activePathDeSecciones = activePath;
   /**
    * 🔴 **Con la consulta, para el árbol de proyectos.** `usePathname()` no la
@@ -646,7 +662,16 @@ function ArmazonInterno({
 
   return (
     <AppShellContext.Provider
-      value={{ plegada, organizacionActivaId: organizacionActivaId ?? null }}
+      value={{
+        plegada,
+        organizacionActivaId: organizacionActivaId ?? null,
+        datosDeTu: {
+          user,
+          perfilSlot,
+          organizaciones: organizaciones ?? [],
+          navItems: navItems.filter((i) => esDeConfiguracion(i.href)),
+        },
+      }}
     >
       {/**
        * ⚠️ **`h-dvh` y no `h-screen`.**
@@ -873,6 +898,8 @@ function ArmazonInterno({
             alto en `--barra-inferior`) o el teclado de iOS (`--teclado`, ver
             `GestosMoviles`), el mayor de los dos. */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden max-md:pb-[max(var(--barra-inferior,0px),var(--teclado,0px))]">
+          {/* Móvil: el título de la pantalla, en todas (M8 de docs/PLAN-MOVIL.md). */}
+          <BarraSuperior />
           {children}
         </div>
 
@@ -904,72 +931,22 @@ function ArmazonInterno({
         <LiveNotices />
 
         {/**
-         * ── Móvil: barra inferior y sus dos hojas ───────────────────
+         * ── Móvil: barra inferior y gestos ──────────────────────────
          *
          * Sustituyen a la hamburguesa flotante y al cajón a pantalla completa
-         * que había aquí (D7 y D10 de `docs/PLAN-MOVIL.md`). El cajón metía en
-         * una sola capa todo lo que la barra lateral tiene en escritorio, y se
-         * abría desde un botón que tapaba la esquina de cada pantalla. Ahora
-         * cada cosa está donde se busca en una app: las secciones abajo, y lo
-         * tuyo y los avisos en hojas que suben encima de donde estés.
+         * que había aquí (D7 de `docs/PLAN-MOVIL.md`). Avisos y Tú fueron hojas
+         * hasta M8; ahora son pantallas, como las otras tres pestañas.
          *
-         * Todo es `md:hidden` o vive en portales que lo son: en escritorio no
-         * se pinta nada de esto (I1).
+         * Todo es `md:hidden`: en escritorio no se pinta nada de esto (I1).
          */}
         <GestosMoviles />
         <FranjaSinConexion />
         <BarraInferior
           activa={pestanaInferior}
-          oculta={enConversacion}
           mensajesSinLeer={mensajesSinLeer}
           avisosSinLeer={avisosSinLeer}
           usuario={user}
-          onAvisos={() => setHojaMovil((h) => (h === 'avisos' ? null : 'avisos'))}
-          onTu={() => setHojaMovil((h) => (h === 'tu' ? null : 'tu'))}
         />
-        <HojaInferior
-          abierta={hojaMovil === 'avisos'}
-          onCerrar={() => setHojaMovil(null)}
-          titulo="Avisos"
-          altura="completa"
-        >
-          {/* Solo montada mientras está abierta: la lista pide datos y se
-              suscribe al flujo al montarse, y en escritorio no se abre nunca. */}
-          {hojaMovil === 'avisos' && <SidebarInboxList zonePath={zonePath} plegada={false} />}
-        </HojaInferior>
-        <HojaInferior
-          abierta={hojaMovil === 'tu'}
-          onCerrar={() => setHojaMovil(null)}
-          titulo="Tú"
-          sinTitulo
-          altura="completa"
-        >
-          {hojaMovil === 'tu' && (
-            <div className="flex flex-col gap-5 px-2 pb-6">
-              {perfilSlot}
-              <section
-                aria-label="Organización"
-                className="flex flex-col gap-1 border-t border-border pt-4"
-              >
-                <OrgSwitcher
-                  name={user.name}
-                  plegada={false}
-                  organizaciones={organizaciones}
-                  activaId={organizacionActivaId ?? null}
-                  zonePath={zonePath}
-                />
-              </section>
-              <section aria-label="Ajustes" className="border-t border-border px-2 pt-4">
-                <SidebarSettingsList
-                  navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
-                  activePath={activePathDeSecciones}
-                  plegada={false}
-                  onNavigate={() => setHojaMovil(null)}
-                />
-              </section>
-            </div>
-          )}
-        </HojaInferior>
       </div>
     </AppShellContext.Provider>
   );
@@ -1684,6 +1661,11 @@ function guardarDesplegados(desplegados: Set<string>): void {
  * (M3 de `docs/PLAN-MOVIL.md`). Es el mismo de la barra lateral —con su
  * buscador, sus menús ⋯ (que en móvil son hojas) y su «Nuevo proyecto»—,
  * porque en un teléfono no hay barra lateral que lo enseñe.
+ *
+ * Con dos diferencias desde M8, las dos pedidas por el dueño: **sin la
+ * cabecera «Proyectos»** —en una pantalla donde no hay otra cosa no separa
+ * nada— y **con los proyectos siempre abiertos**, sin flecha para plegarlos.
+ * Los espacios sí se siguen plegando.
  */
 export function ArbolDeProyectos() {
   const contexto = useContext(AppShellContext);
@@ -1696,6 +1678,7 @@ export function ArbolDeProyectos() {
       plegada={false}
       activePath={pathname + (consulta ? `?${consulta}` : '')}
       organizacionActivaId={contexto?.organizacionActivaId ?? null}
+      movil
     />
   );
 }
@@ -1705,6 +1688,7 @@ function SidebarProjectsTree({
   activePath,
   organizacionActivaId,
   onDesplegar,
+  movil = false,
 }: {
   zonePath: string;
   plegada: boolean;
@@ -1712,6 +1696,8 @@ function SidebarProjectsTree({
   organizacionActivaId: string | null;
   /** Plegada: el «+» despliega la barra para escribir el nombre del proyecto. */
   onDesplegar?: () => void;
+  /** La pantalla Inicio de móvil: ver `ArbolDeProyectos`. */
+  movil?: boolean;
 }) {
   const router = useRouter();
   const [projects, setProjects] = useState<SidebarProject[]>([]);
@@ -1850,7 +1836,9 @@ function SidebarProjectsTree({
    */
   useEffect(() => {
     const pendientes = projects
-      .filter((p) => (expanded.has(p.id) || buscando) && !espaciosPedidos.current.has(p.id))
+      .filter(
+        (p) => (movil || expanded.has(p.id) || buscando) && !espaciosPedidos.current.has(p.id),
+      )
       .map((p) => p.id);
     if (pendientes.length === 0) return;
 
@@ -1879,7 +1867,7 @@ function SidebarProjectsTree({
     return () => {
       vigente = false;
     };
-  }, [projects, expanded, zonePath, buscando]);
+  }, [projects, expanded, zonePath, buscando, movil]);
 
   /** Tras crear algo desde la barra: vuelve a pedir los espacios de ese proyecto. */
   const refrescarProyecto = useCallback(
@@ -1931,7 +1919,12 @@ function SidebarProjectsTree({
 
   if (loading) {
     return (
-      <SidebarSection etiqueta="Proyectos" plegada={plegada}>
+      <SidebarSection
+        etiqueta="Proyectos"
+        plegada={plegada}
+        sinCabecera={movil}
+        sinDivisoria={movil}
+      >
         {[1, 2, 3].map((i) => (
           <div
             key={i}
@@ -2005,9 +1998,12 @@ function SidebarProjectsTree({
         onCambiar={setBusqueda}
         placeholder="Buscar"
         etiqueta="Buscar proyectos, espacios, tableros y documentos"
+        movil={movil}
       />
       <SidebarSection
         etiqueta="Proyectos"
+        sinCabecera={movil}
+        sinDivisoria={movil}
         accion={
           <MenuFlotante
             etiquetaAria="Acciones de proyectos"
@@ -2034,7 +2030,7 @@ function SidebarProjectsTree({
         )}
         <nav aria-label="Proyectos" className="flex flex-col gap-0.5">
           {proyectosVisibles.map((project) => {
-            const isOpen = buscando || expanded.has(project.id);
+            const isOpen = movil || buscando || expanded.has(project.id);
             // Las URLs de proyecto usan el SLUG, no el id
             const projectHref = `/projects/${project.slug}`;
             const isActiveProject =
@@ -2053,17 +2049,19 @@ function SidebarProjectsTree({
                   gatewayPath={gatewayPath}
                   inicio={
                     <>
-                      <button
-                        type="button"
-                        onClick={() => toggleProject(project.id)}
-                        aria-expanded={isOpen}
-                        aria-label={
-                          isOpen ? `Colapsar ${project.name}` : `Expandir ${project.name}`
-                        }
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:text-white"
-                      >
-                        <ChevronIcon open={isOpen} />
-                      </button>
+                      {!movil && (
+                        <button
+                          type="button"
+                          onClick={() => toggleProject(project.id)}
+                          aria-expanded={isOpen}
+                          aria-label={
+                            isOpen ? `Colapsar ${project.name}` : `Expandir ${project.name}`
+                          }
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:text-white"
+                        >
+                          <ChevronIcon open={isOpen} />
+                        </button>
+                      )}
                       <span
                         className={`${SIDEBAR_INICIO} [&>*]:shrink-0 [&>*]:scale-[0.82]`}
                         aria-hidden="true"
@@ -2272,6 +2270,10 @@ function SidebarProjectsTree({
         {projects.length === 0 && !creandoProyecto && (
           <FilaDeAccion etiqueta="Crear primer proyecto" onClick={() => setCreandoProyecto(true)} />
         )}
+        {/* Móvil: sin cabecera no hay ⋯ con «Nuevo proyecto»; va al final de la lista. */}
+        {movil && projects.length > 0 && !creandoProyecto && !buscando && (
+          <FilaDeAccion etiqueta="Nuevo proyecto" onClick={() => setCreandoProyecto(true)} />
+        )}
         {buscando && projects.length > 0 && proyectosVisibles.length === 0 && (
           <p className="px-3 py-6 text-center font-sans text-[13px] text-text-secondary">
             Nada coincide con «{busqueda.trim()}».
@@ -2462,14 +2464,14 @@ function InsigniaDeFila({ cuantos }: { cuantos: number }) {
  * que sin esta rama la fila se queda en blanco y se lee como si la conversación
  * estuviera vacía.
  */
-function resumenDe(mensaje: { body: string; deletedAt?: string | null }): string {
+export function resumenDe(mensaje: { body: string; deletedAt?: string | null }): string {
   if (mensaje.deletedAt) return 'Mensaje eliminado';
   const plano = mensaje.body.replace(/<[^>]*>?/g, '').trim();
   return plano.length > 50 ? `${plano.slice(0, 50)}…` : plano;
 }
 
 /** Hoy la hora; antes, el día. En una columna de 320 px no cabe más. */
-function cuandoCorto(iso: string): string {
+export function cuandoCorto(iso: string): string {
   const fecha = new Date(iso);
   const ahora = new Date();
   const mismoDia =
@@ -2760,15 +2762,22 @@ function AlturaSuave({ children, className = '' }: { children: ReactNode; classN
  * restar aquí sería adivinar, y adivinar en un contador acaba en insignias que
  * no se apagan.
  */
-function SidebarInboxList({
+export function SidebarInboxList({
   zonePath,
   plegada,
   className = '',
+  movil = false,
 }: {
   zonePath: string;
   plegada: boolean;
   /** El tope de alto: en el popover de la campana es otro que en una pestaña. */
   className?: string;
+  /**
+   * La pantalla «Avisos» de móvil (`/main/notifications`, M8 de
+   * `docs/PLAN-MOVIL.md`): el selector pegado arriba, filas y letra para el
+   * dedo, y sin tope de alto —desplaza la pantalla, no la lista—.
+   */
+  movil?: boolean;
 }) {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [directorio, setDirectorio] = useState<Map<string, UserProfile>>(new Map());
@@ -2845,34 +2854,46 @@ function SidebarInboxList({
   return (
     <div className="flex flex-col">
       {!plegada && (
-        <div className="mx-3 mb-3 flex shrink-0 rounded-lg bg-white/5 p-0.5">
-          <button
-            type="button"
-            onClick={() => setMostrarTodos(false)}
-            className={`flex-1 rounded-md py-1.5 font-sans text-[11px] font-medium transition-colors ${
-              !mostrarTodos
-                ? 'bg-white/15 text-white shadow-sm'
-                : 'text-text-secondary hover:bg-white/5 hover:text-white'
+        <div
+          className={
+            movil
+              ? 'sticky top-0 z-10 -mx-4 -mt-4 mb-2 bg-[#191919]/95 px-4 pb-2 pt-3 backdrop-blur-md'
+              : 'contents'
+          }
+        >
+          <div
+            className={`flex shrink-0 rounded-lg bg-white/5 p-0.5 ${
+              movil ? '[&>button]:min-h-9 [&>button]:text-[13px]' : 'mx-3 mb-3'
             }`}
           >
-            Sin leer
-          </button>
-          <button
-            type="button"
-            onClick={() => setMostrarTodos(true)}
-            className={`flex-1 rounded-md py-1.5 font-sans text-[11px] font-medium transition-colors ${
-              mostrarTodos
-                ? 'bg-white/15 text-white shadow-sm'
-                : 'text-text-secondary hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            Todos
-          </button>
+            <button
+              type="button"
+              onClick={() => setMostrarTodos(false)}
+              className={`flex-1 rounded-md py-1.5 font-sans text-[11px] font-medium transition-colors ${
+                !mostrarTodos
+                  ? 'bg-white/15 text-white shadow-sm'
+                  : 'text-text-secondary hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              Sin leer
+            </button>
+            <button
+              type="button"
+              onClick={() => setMostrarTodos(true)}
+              className={`flex-1 rounded-md py-1.5 font-sans text-[11px] font-medium transition-colors ${
+                mostrarTodos
+                  ? 'bg-white/15 text-white shadow-sm'
+                  : 'text-text-secondary hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              Todos
+            </button>
+          </div>
         </div>
       )}
 
-      <AlturaSuave className={`scrollbar-none overflow-y-auto ${className}`}>
-        <div className="flex flex-col gap-1 px-1 pb-4">
+      <AlturaSuave className={movil ? '' : `scrollbar-none overflow-y-auto ${className}`}>
+        <div className={`flex flex-col gap-1 pb-4 ${movil ? '' : 'px-1'}`}>
           {loading ? (
             loader
           ) : items.length === 0 ? (
@@ -2899,8 +2920,8 @@ function SidebarInboxList({
                   href={destinoDeUnAviso(aviso) ?? '#'}
                   onClick={() => alPulsar(aviso)}
                   className={`relative flex items-start gap-3 rounded-xl p-3 transition-colors hover:bg-white/5 ${
-                    sinLeer ? 'bg-white/[0.04]' : ''
-                  }`}
+                    movil ? 'active:bg-white/10' : ''
+                  } ${sinLeer ? 'bg-white/[0.04]' : ''}`}
                 >
                   {!plegada && (
                     /**
@@ -2926,13 +2947,17 @@ function SidebarInboxList({
                       Los dos decían `text-white`: el ternario existía y devolvía
                       lo mismo en las dos ramas desde el rediseño monocromo. */}
                     <p
-                      className={`line-clamp-2 [overflow-wrap:anywhere] font-sans text-[12px] leading-snug ${
-                        sinLeer ? 'font-medium text-white' : 'text-text-secondary'
-                      }`}
+                      className={`line-clamp-2 [overflow-wrap:anywhere] font-sans leading-snug ${
+                        movil ? 'text-[14px]' : 'text-[12px]'
+                      } ${sinLeer ? 'font-medium text-white' : 'text-text-secondary'}`}
                     >
                       {textoDeAviso(aviso, actor)}
                     </p>
-                    <span className="mt-1 font-sans text-[10px] text-text-secondary">
+                    <span
+                      className={`mt-1 font-sans text-text-secondary ${
+                        movil ? 'text-[12px]' : 'text-[10px]'
+                      }`}
+                    >
                       {new Date(aviso.createdAt).toLocaleDateString()}
                     </span>
                   </div>

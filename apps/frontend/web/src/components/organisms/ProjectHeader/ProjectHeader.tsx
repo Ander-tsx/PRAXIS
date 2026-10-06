@@ -83,7 +83,10 @@ export function ProjectHeader({
 
   if (compacto) {
     return (
-      <header className="flex min-w-0 shrink-0 items-center gap-3">
+      /* En móvil no: el nombre y el «atrás» ya los pone la barra de arriba del
+         armazón (`BarraSuperior`, M8 de docs/PLAN-MOVIL.md), y repetirlos
+         gastaba una fila entera del tablero. */
+      <header className="flex min-w-0 shrink-0 items-center gap-3 max-md:hidden">
         <Link
           href="/projects"
           aria-label="Volver a todos los proyectos"

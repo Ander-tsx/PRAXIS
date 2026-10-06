@@ -87,10 +87,9 @@ export function ProyectosPageClient({
    */
   if (esMovil) {
     return (
-      <div className="flex flex-col gap-4">
-        <h1 className="px-1 font-sans text-[28px] font-bold tracking-tight text-white">Inicio</h1>
-        <ArbolDeProyectos />
-      </div>
+      /* El título «Inicio» lo pone la barra de arriba del armazón
+         (`BarraSuperior`, M8 de `docs/PLAN-MOVIL.md`). */
+      <ArbolDeProyectos />
     );
   }
 

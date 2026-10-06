@@ -121,9 +121,11 @@ export interface ChatPanelProps {
    * mensajería resuelve lo mismo igual —la lista y la conversación son dos
    * pantallas, no dos columnas— y es lo que se hace aquí a partir de `sm`.
    *
-   * ⚠️ Se posiciona **fijo respecto al viewport**, así que quien lo active tiene
-   * que dar una salida visible: sin ella, en móvil no habría forma de volver.
-   * Va en `salidaMovil`, y por eso los dos van juntos.
+   * ⚠️ **Ya no se posiciona fijo sobre el viewport** (M8 de
+   * `docs/PLAN-MOVIL.md`). Lo hacía con `z-40`, y tapaba la barra de arriba y
+   * la de abajo: dentro de una conversación no había forma de cambiar de
+   * pestaña. Ahora llena la columna de contenido, que en móvil ya queda entre
+   * las dos barras, y el «atrás» lo pone la de arriba (`BarraSuperior`).
    */
   pantallaCompletaEnMovil?: boolean;
   /**
@@ -1679,11 +1681,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       onDrop={handleDrop}
       className={`relative flex min-h-0 flex-1 flex-col w-full max-w-[100vw] overflow-x-hidden ${
         /* `max-md:` y no un `hidden md:flex` en el padre: así el mismo
-           componente sirve en las dos y no hay dos árboles que mantener.
-           `bg-background` es obligatorio — al salir del flujo, lo de debajo se
-           vería a través. */
+           componente sirve en las dos y no hay dos árboles que mantener. Los
+           márgenes negativos devuelven el relleno de `AppHeader`: la
+           conversación va de borde a borde, como en cualquier app de
+           mensajes. */
         pantallaCompletaEnMovil
-          ? 'max-md:fixed max-md:inset-0 max-md:z-40 max-md:bg-background max-md:px-3 max-md:pb-3 max-md:w-full'
+          ? 'max-md:-mx-4 max-md:-mb-4 max-md:w-auto max-md:px-3 max-md:pb-2'
           : ''
       }`}
     >

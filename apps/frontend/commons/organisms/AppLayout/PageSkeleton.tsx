@@ -65,9 +65,7 @@ export function PageSkeleton({
 
       <div
         className={`mx-auto w-full ${entrada} ${
-          anchoCompleto
-            ? 'max-w-full p-0 max-md:pt-safe'
-            : 'max-w-full px-4 pb-4 pt-[calc(env(safe-area-inset-top,0px)+1rem)] md:p-6 lg:px-8'
+          anchoCompleto ? 'max-w-full p-0' : 'max-w-full p-4 md:p-6 lg:px-8'
         } ${lleno ? 'flex h-full min-h-0 flex-col' : ''}`}
       >
         {children}

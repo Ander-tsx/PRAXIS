@@ -90,11 +90,16 @@ hacía bajar de versión (registro de M1).
 Decidida por el dueño. Sustituye a la hamburguesa flotante. Inicio es la lista
 de proyectos con su árbol; Chat, la lista de conversaciones; PRAX, el asistente;
 Avisos, la bandeja a pantalla completa; Tú, el perfil, la organización y los
-ajustes.
+ajustes. ⚠️ *Revisado en M8:* **las cinco son pantallas** (Avisos y Tú fueron
+hojas), la barra está **en todas las vistas** —también dentro de una
+conversación— y solo se esconde con el teclado abierto.
 
 **D8 — Cada pantalla trae su barra superior.** Título, «atrás» cuando hay de
 dónde volver, y como mucho dos acciones a la derecha. Es lo que hace que una
-pantalla se lea como una vista de app y no como una página.
+pantalla se lea como una vista de app y no como una página. ⚠️ *Revisado en
+M8:* es **una sola, en el armazón** (`BarraSuperior`), no una por pantalla: así
+no falta en ninguna, no parpadea al navegar y está también mientras carga. El
+título sale de la ruta (`pantallaMovil`) o de `tituloMovil` de `AppHeader`.
 
 **D9 — Las transiciones, solo en móvil.** Una navegación hacia dentro desliza
 desde la derecha y «atrás» la deshace. Si `experimental.viewTransition` puede
@@ -239,6 +244,8 @@ local**. Ninguna se sube.
 | M5 | ✅ | (este) | `BarraDeFormatoMovil`: deshacer, rehacer, títulos, negrita, cursiva, tachado, listas, tareas, cita e imagen, pegada al teclado (`bottom: var(--teclado)`), solo con el editor enfocado; `pointerdown` con `preventDefault` para no cerrar el teclado. El editor ya iba a lo ancho desde la etapa anterior. ⚠️ Un falso rojo que costó tiempo: `getByRole('navigation', { name: 'Secciones' })` casa por subcadena con «Secciones **del proyecto**»; las pruebas móviles usan `exact: true` |
 | M6 | ✅ | (este) | Avisos y Tú ya eran hojas (M2). Equipo: cada miembro es un bloque en móvil (la tabla de tres columnas se desplazaba). Facturación: la primera columna de la comparativa se queda fija. Administración: aviso «desde un ordenador» en vez del panel. D12 revisada (ver arriba). ⚠️ La invitación a instalar no tiene entrada en «Tú»: tras descartarla, se instala desde el menú del navegador —pendiente de decidir si hace falta |
 | M7 | ✅ | (este) | ⚠️ **Cambió el diseño:** la lista blanca de GET del gateway no servía —casi todo se pide en el servidor (Server Components)—. Se guarda el **HTML de las pantallas privadas visitadas** en `praxis-datos-<huella>` (SHA-256 del correo, que la app le dice al SW con `presentarPersona`: el SW no lee la cookie httpOnly); hasta 60 por persona. Otra persona → se borran las demás; cerrar sesión (`LogoutButton` y `PerfilEnBarra`) → `olvidarDatosSinConexion`. RSC no se guarda (depende de cabeceras del árbol); sin red el router cae a navegación dura, que sí sale de la copia. `FranjaSinConexion` en todas partes. 🔴 `navigator.onLine` miente (wifi sin salida, y en Chromium emulado da `true` en la página servida por el SW): la franja hace una sonda `HEAD /sw.js`, lo único que el SW nunca contesta de caché. ⚠️ Riesgo aceptado: si la sesión caduca sin cerrar sesión, la copia sigue en el dispositivo hasta que entre otra persona o se cierre sesión |
+
+| M8 | ✅ | (este) | **Ajustes del dueño tras probarlo** (2026-10-06). Barra de arriba única en el armazón, con título y «atrás» en todas las pantallas (D8 revisada); la cabecera compacta del proyecto se esconde en móvil y su nombre sube a la barra. Barra inferior en todas las vistas (D7 revisada): la conversación ya no es `fixed inset-0 z-40`, llena la columna entre las dos barras y su «Conversaciones» lo sustituye el «atrás» de arriba. Más viva: píldora que se desliza al activo, icono relleno con salto, insignias con rebote, pulsar la pestaña activa sube al principio, vibración corta en Android. **Avisos y Tú son pantallas** (`/main/notifications`, `/main/me`) sin desplegables: el estado con sus opciones a la vista, la organización con sus acciones y la lista para cambiar, los ajustes como filas con flecha y «Cerrar sesión» al final; los datos los presta el armazón (`useDatosDeTu`), no se vuelven a pedir. Inicio sin la cabecera «Proyectos» y con los proyectos siempre abiertos (los espacios sí se pliegan); «Nuevo proyecto» al final de la lista. **Chat abre la lista**: la pestaña pide `?lista=1` y el servidor no redirige a la última si la pista dice teléfono; la lista es `ListaDeChatsMovil`, viva, ordenada por el último mensaje y con píldoras Todos/Equipos/Privados. El buscador cae **en el mismo píxel** en Inicio y Chat (`BuscadorDeBarra movil`, pegado arriba, 16 px para que Safari no amplíe). 🔴 Un `sticky` dentro de un contenedor que desplaza **y tiene relleno** queda 16 px más abajo en Chromium: el relleno va en una capa interior. ⚠️ **El SW no evita el esqueleto al cambiar de pestaña**: con red va red-primero y una navegación del App Router es RSC, que no guarda. Lo evita la caché de cliente de Next, que para una página dinámica solo guarda un prefetch **completo**: las pestañas llevan `prefetch` (5 min, `staleTimes.static`; `revalidatePath` la invalida). Solo se precarga en móvil: en escritorio la barra es `display:none` y el enlace nunca entra en la vista. ⚠️ En `next dev` no hay prefetch: el esqueleto se sigue viendo y no es esto. Suite móvil 80/80 (con la del esqueleto y la del buscador), capturas de escritorio 10/10, unitarias verdes |
 
 ### Cierre — corrida completa (2026-10-06, rama `feature/movil`)
 

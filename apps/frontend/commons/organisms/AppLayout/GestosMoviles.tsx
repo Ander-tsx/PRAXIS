@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { CONSULTA_MOVIL } from '../../hooks/useEsMovil';
 import { useRefrescoAgrupado } from '../../hooks/useRefrescoAgrupado';
+import { RAICES_MOVILES } from './BarraSuperior';
 
 /** Desde cuántos píxeles del borde izquierdo empieza el gesto de volver. */
 const BORDE_PX = 24;
@@ -13,8 +14,9 @@ const UMBRAL_REFRESCO_PX = 72;
 /** El tirón se frena: el indicador recorre menos que el dedo. */
 const RESISTENCIA = 0.5;
 
-/** Las raíces de cada pestaña de abajo: de ahí no se vuelve deslizando. */
-const RAICES = new Set(['/projects', '/chat', '/assistant']);
+/** Las raíces de cada pestaña de abajo: de ahí no se vuelve deslizando.
+ * La lista es la de la barra de arriba, que decide si enseña «atrás». */
+const RAICES = RAICES_MOVILES;
 
 /**
  * Los dos gestos que una app instalada no trae sola (D11 de

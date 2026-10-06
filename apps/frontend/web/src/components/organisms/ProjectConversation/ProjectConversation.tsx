@@ -111,27 +111,8 @@ export function ProjectConversation({
     <ChatPanel
       ref={chatRef}
       pantallaCompletaEnMovil
-      salidaMovil={
-        <a
-          /* ⚠️ `?lista=1`: sin él, el índice redirige a la última conversación
-             —esta— y el enlace de volver no vuelve a ningún sitio. Ver la
-             cabecera de `(conversaciones)/page.tsx`. */
-          href="/chat?lista=1"
-          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary max-md:-ml-1 max-md:min-h-11 max-md:text-[15px] max-md:text-text-primary"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-          Conversaciones
-        </a>
-      }
+      /* Sin `salidaMovil`: el «atrás» a la lista lo pone la barra de arriba
+         del armazón (`BarraSuperior`, M8 de docs/PLAN-MOVIL.md). */
       page={page}
       directorio={directorio}
       currentUserId={currentUserId}

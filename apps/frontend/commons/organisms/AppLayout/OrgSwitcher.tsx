@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
-import { Glyph, glyphByKey } from '../../atoms/GlyphPicker';
 import { createApiClient } from '../../api/client';
+import { Glyph, glyphByKey } from '../../atoms/GlyphPicker';
 import { ImagePicker } from '../../molecules/ImagePicker';
 import type { OrgDelSelector } from './AppShell';
-import { claseDePopover, RAIL_CELDA, RAIL_REPOSO, usePopover } from './SidebarPrimitives';
+import { RAIL_CELDA, RAIL_REPOSO, claseDePopover, usePopover } from './SidebarPrimitives';
 
 /**
  * El `tier` que llega en `OrgDelSelector` es el plan **real** de esa
@@ -67,6 +67,7 @@ export function OrgSwitcher({
   activaId,
   zonePath,
   controlLateral,
+  estatico = false,
 }: {
   name: string;
   plegada: boolean;
@@ -75,6 +76,12 @@ export function OrgSwitcher({
   zonePath: string;
   /** El control ocupa solo la cabecera; la tarjeta conserva todo el ancho. */
   controlLateral?: React.ReactNode;
+  /**
+   * La pantalla «Tú» de móvil (M8 de `docs/PLAN-MOVIL.md`): todo a la vista,
+   * sin nada que desplegar. La organización activa arriba, sus acciones y la
+   * lista para cambiar debajo, como filas de una pantalla de ajustes.
+   */
+  estatico?: boolean;
 }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
@@ -284,6 +291,145 @@ export function OrgSwitcher({
       </div>
     </div>
   );
+
+  if (estatico) {
+    const fila =
+      'flex min-h-12 w-full items-center gap-3 px-4 text-left font-sans text-[15px] text-text-primary transition-colors active:bg-white/10';
+    const icono = 'h-5 w-5 shrink-0 text-text-secondary';
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col overflow-hidden rounded-2xl bg-white/[0.04]">
+          <div className="flex items-center gap-3 px-4 py-3">
+            {cuadro}
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate font-sans text-[15px] font-semibold text-text-primary">
+                {etiqueta}
+              </span>
+              <span className="font-sans text-[12px] text-text-secondary">
+                {etiquetaDePlan(activa?.tier)}
+              </span>
+            </span>
+          </div>
+          {activa?.soyDueno && (
+            <button
+              type="button"
+              onClick={() => setActiveModal('upgrade')}
+              className={`${fila} border-t border-white/[0.06]`}
+            >
+              <svg
+                className={icono}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                />
+              </svg>
+              Mejorar plan
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setActiveModal('invite')}
+            className={`${fila} border-t border-white/[0.06]`}
+          >
+            <svg
+              className={icono}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+              />
+            </svg>
+            Invitar a miembros
+          </button>
+        </div>
+
+        {lista.length > 1 || caben ? (
+          <section aria-label="Cambiar de organización" className="flex flex-col gap-2">
+            <h3 className="px-4 font-sans text-[13px] font-medium text-text-secondary">
+              Cambiar de organización
+            </h3>
+            <div className="flex flex-col overflow-hidden rounded-2xl bg-white/[0.04] [&>*+*]:border-t [&>*+*]:border-white/[0.06]">
+              {lista.map((org) => {
+                const puesta = org.id === activaId;
+                return (
+                  <button
+                    key={org.id}
+                    type="button"
+                    onClick={() => !puesta && elegir(org.id)}
+                    aria-current={puesta ? 'true' : undefined}
+                    className={`${fila} py-2`}
+                  >
+                    <CaraDeOrg
+                      org={org}
+                      inicial={(org.name ?? primerNombre ?? 'P').charAt(0).toUpperCase()}
+                    />
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate">
+                        {org.name ?? `Organización de ${primerNombre || 'Praxis'}`}
+                      </span>
+                      <span className="font-sans text-[12px] text-text-secondary">
+                        {org.kind === 'PERSONAL' ? 'Tu espacio' : 'Equipo'}
+                      </span>
+                    </span>
+                    {puesta && (
+                      <svg
+                        className="h-5 w-5 shrink-0 text-text-primary"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2.25}
+                        aria-hidden="true"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+              {caben ? (
+                <button type="button" onClick={() => setActiveModal('newSpace')} className={fila}>
+                  <svg
+                    className={icono}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Nueva organización
+                </button>
+              ) : (
+                <p className="px-4 py-3 font-sans text-[13px] leading-snug text-text-secondary">
+                  Has creado {propias} de {MAX_ORGANIZACIONES_PROPIAS} espacios, que es el límite
+                  por persona.
+                </p>
+              )}
+            </div>
+          </section>
+        ) : null}
+        {modales}
+      </div>
+    );
+  }
 
   if (plegada) {
     return (

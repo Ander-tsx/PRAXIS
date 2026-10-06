@@ -2,9 +2,9 @@ import { type Page, expect, test } from '@playwright/test';
 import { crearCuentaYEntrar } from '../../fixtures/ui';
 
 /**
- * Chat y PRAX en móvil (M4 de `docs/PLAN-MOVIL.md`): la conversación a
- * pantalla completa, sin barra de pestañas, con su «atrás» del tamaño de un
- * dedo y las acciones de un mensaje por pulsación larga.
+ * Chat y PRAX en móvil (M4 y M8 de `docs/PLAN-MOVIL.md`): la conversación
+ * entre las dos barras, con el «atrás» de la de arriba del tamaño de un dedo y
+ * las acciones de un mensaje por pulsación larga.
  */
 
 test.describe.configure({ mode: 'serial' });
@@ -26,10 +26,10 @@ test.afterAll(async () => {
   await pagina?.context().close();
 });
 
-test('una conversación ocupa la pantalla y su «atrás» se acierta con el dedo', async () => {
+test('una conversación deja ver las barras y su «atrás» se acierta con el dedo', async () => {
   await pagina.goto(`/chat/proyecto/${projectId}`);
-  await expect(pagina.getByRole('navigation', { name: 'Secciones', exact: true })).toBeHidden();
-  const atras = pagina.getByRole('link', { name: 'Conversaciones' }).filter({ visible: true });
+  await expect(pagina.getByRole('navigation', { name: 'Secciones', exact: true })).toBeVisible();
+  const atras = pagina.getByRole('link', { name: 'Atrás' }).filter({ visible: true });
   await expect(atras).toBeVisible();
   const caja = await atras.boundingBox();
   expect(caja?.height ?? 0).toBeGreaterThanOrEqual(44);
@@ -75,8 +75,9 @@ test('se escribe, se envía, y la pulsación larga abre las acciones', async () 
 
 test('el «atrás» de la conversación lleva a la lista, con la barra de vuelta', async () => {
   await pagina.goto(`/chat/proyecto/${projectId}`);
-  await pagina.getByRole('link', { name: 'Conversaciones' }).filter({ visible: true }).click();
+  await pagina.getByRole('link', { name: 'Atrás' }).filter({ visible: true }).click();
   await expect(pagina).toHaveURL(/\/chat\?lista=1/);
+  await expect(pagina.getByRole('searchbox', { name: 'Buscar conversaciones' })).toBeVisible();
   await expect(pagina.getByRole('navigation', { name: 'Secciones', exact: true })).toBeVisible();
 });
 

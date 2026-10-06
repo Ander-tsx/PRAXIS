@@ -161,18 +161,32 @@ export function BuscadorDeBarra({
   onCambiar,
   placeholder,
   etiqueta,
+  movil = false,
+  children,
 }: {
   valor: string;
   onCambiar: (valor: string) => void;
   placeholder: string;
   /** Nombre accesible: qué se busca. */
   etiqueta: string;
+  /**
+   * La forma de las pantallas de móvil (Inicio y Chat, M8 de
+   * `docs/PLAN-MOVIL.md`): pegado arriba mientras se desplaza, más alto para el
+   * dedo y con letra de 16 px —con menos, Safari amplía la página al enfocar—.
+   * ⚠️ Cuenta con el relleno de `AppHeader` (`p-4`) y lo devuelve con márgenes
+   * negativos: así cae **en el mismo sitio** en las dos pantallas.
+   */
+  movil?: boolean;
+  /** Lo que va pegado debajo del campo, en la misma franja (móvil). */
+  children?: ReactNode;
 }) {
   const campo = useRef<HTMLInputElement>(null);
-  return (
+  const caja = (
     <div className="group/buscador relative shrink-0">
       <Search
-        className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-secondary transition-colors group-focus-within/buscador:text-text-primary"
+        className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-text-secondary transition-colors group-focus-within/buscador:text-text-primary ${
+          movil ? 'left-3 h-4 w-4' : 'left-2.5 h-3.5 w-3.5'
+        }`}
         aria-hidden="true"
       />
       <input
@@ -191,7 +205,9 @@ export function BuscadorDeBarra({
         aria-label={etiqueta}
         autoComplete="off"
         spellCheck={false}
-        className="h-8 w-full rounded-lg bg-white/[0.04] pl-8 pr-8 font-sans text-[13px] text-text-primary outline-none ring-1 ring-inset ring-white/[0.08] transition-[box-shadow,background-color] placeholder:text-text-secondary hover:ring-white/15 focus:bg-white/[0.06] focus:ring-white/30"
+        className={`w-full bg-white/[0.04] font-sans text-text-primary outline-none ring-1 ring-inset ring-white/[0.08] transition-[box-shadow,background-color] placeholder:text-text-secondary hover:ring-white/15 focus:bg-white/[0.06] focus:ring-white/30 ${
+          movil ? 'h-10 rounded-xl pl-10 pr-10 text-base' : 'h-8 rounded-lg pl-8 pr-8 text-[13px]'
+        }`}
       />
       {valor && (
         <button
@@ -202,11 +218,20 @@ export function BuscadorDeBarra({
           }}
           aria-label="Borrar la búsqueda"
           title="Borrar (Esc)"
-          className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-white/10 hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40"
+          className={`absolute top-1/2 flex -translate-y-1/2 items-center justify-center text-text-secondary transition-colors hover:bg-white/10 hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40 ${
+            movil ? 'right-1 h-8 w-8 rounded-lg' : 'right-1.5 h-5 w-5 rounded-md'
+          }`}
         >
-          <X className="h-3 w-3" strokeWidth={2.25} aria-hidden="true" />
+          <X className={movil ? 'h-4 w-4' : 'h-3 w-3'} strokeWidth={2.25} aria-hidden="true" />
         </button>
       )}
+    </div>
+  );
+  if (!movil) return caja;
+  return (
+    <div className="sticky top-0 z-10 -mx-4 -mt-4 flex flex-col gap-2 bg-[#191919]/95 px-4 pb-2 pt-3 backdrop-blur-md">
+      {caja}
+      {children}
     </div>
   );
 }
@@ -280,6 +305,7 @@ export function SidebarSection({
   compactada,
   onAlternar,
   sinCabecera = false,
+  sinDivisoria = false,
   accion,
 }: {
   etiqueta: string;
@@ -288,6 +314,8 @@ export function SidebarSection({
   compactada?: boolean;
   onAlternar?: () => void;
   sinCabecera?: boolean;
+  /** Sin la raya de arriba que la separa de la sección anterior. */
+  sinDivisoria?: boolean;
   /** Un control a la derecha de la etiqueta (un menú ⋯). Ver `MenuFlotante`. */
   accion?: ReactNode;
 }) {
@@ -299,7 +327,7 @@ export function SidebarSection({
     <section
       aria-label={etiqueta}
       className={
-        plegada
+        plegada || sinDivisoria
           ? 'flex flex-col gap-1'
           : 'flex flex-col gap-1 [&:not(:first-child)]:border-t [&:not(:first-child)]:border-border [&:not(:first-child)]:pt-3'
       }

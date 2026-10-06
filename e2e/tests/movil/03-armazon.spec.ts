@@ -2,8 +2,8 @@ import { type Page, expect, test } from '@playwright/test';
 import { crearCuentaYEntrar } from '../../fixtures/ui';
 
 /**
- * El armazón de app en móvil (M2 de `docs/PLAN-MOVIL.md`): la barra de abajo,
- * las hojas de Avisos y Tú, y los gestos.
+ * El armazón de app en móvil (M2 y M8 de `docs/PLAN-MOVIL.md`): la barra de
+ * abajo, la de arriba, las pantallas de Avisos y Tú, y los gestos.
  */
 
 test.describe.configure({ mode: 'serial' });
@@ -13,6 +13,8 @@ let slug: string;
 let projectId: string;
 
 const barra = () => pagina.getByRole('navigation', { name: 'Secciones', exact: true });
+/** El título de la barra de arriba (la única cabecera del documento, `banner`). */
+const titulo = () => pagina.getByRole('banner').getByRole('heading', { level: 1 });
 
 test.beforeAll(async ({ browser }, info) => {
   const contexto = await browser.newContext(info.project.use);
@@ -58,11 +60,9 @@ async function deslizar(page: Page, desde: [number, number], hasta: [number, num
 test('abajo hay cinco pestañas y ninguna hamburguesa', async () => {
   await pagina.goto('/projects');
   await expect(barra()).toBeVisible();
-  for (const nombre of ['Inicio', 'Chat', 'PRAX']) {
+  for (const nombre of ['Inicio', 'Chat', 'PRAX', /^Avisos/, 'Tú']) {
     await expect(barra().getByRole('link', { name: nombre })).toBeVisible();
   }
-  await expect(barra().getByRole('button', { name: /^Avisos/ })).toBeVisible();
-  await expect(barra().getByRole('button', { name: 'Tú' })).toBeVisible();
   await expect(pagina.getByRole('button', { name: 'Abrir menú' })).toHaveCount(0);
   await expect(barra().getByRole('link', { name: 'Inicio' })).toHaveAttribute(
     'aria-current',
@@ -73,63 +73,107 @@ test('abajo hay cinco pestañas y ninguna hamburguesa', async () => {
 test('las pestañas llevan a su sección', async () => {
   await pagina.goto('/projects');
   await barra().getByRole('link', { name: 'Chat' }).click();
-  await expect(pagina).toHaveURL(/\/chat$/);
+  /* La lista, no la última conversación (M8). */
+  await expect(pagina).toHaveURL(/\/chat\?lista=1$/);
   await expect(barra().getByRole('link', { name: 'Chat' })).toHaveAttribute('aria-current', 'page');
   await barra().getByRole('link', { name: 'PRAX' }).click();
   await expect(pagina).toHaveURL(/\/assistant/);
 });
 
-test('«Tú» y «Avisos» abren su hoja, y Escape la cierra', async () => {
+test('«Tú» y «Avisos» son pantallas, no hojas', async () => {
   await pagina.goto('/projects');
-  await barra().getByRole('button', { name: 'Tú' }).click();
-  const tu = pagina.getByRole('dialog', { name: 'Tú' });
-  await expect(tu).toBeVisible();
-  await expect(tu.getByText('Cerrar sesión')).toBeVisible();
-  await pagina.keyboard.press('Escape');
-  await expect(tu).toHaveCount(0);
+  await barra().getByRole('link', { name: 'Tú' }).click();
+  await expect(pagina).toHaveURL(/\/main\/me$/);
+  await expect(titulo()).toHaveText('Tú');
+  await expect(pagina.getByRole('dialog')).toHaveCount(0);
+  await expect(pagina.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible();
+  /* Sin desplegables: las opciones de estado ya están a la vista. */
+  await expect(pagina.getByRole('button', { name: /^Ocupado/ })).toBeVisible();
+  await expect(barra().getByRole('link', { name: 'Tú' })).toHaveAttribute('aria-current', 'page');
 
   await barra()
-    .getByRole('button', { name: /^Avisos/ })
+    .getByRole('link', { name: /^Avisos/ })
     .click();
-  const avisos = pagina.getByRole('dialog', { name: 'Avisos' });
-  await expect(avisos).toBeVisible();
-  await pagina.keyboard.press('Escape');
-  await expect(avisos).toHaveCount(0);
+  await expect(pagina).toHaveURL(/\/main\/notifications$/);
+  await expect(titulo()).toHaveText('Avisos');
+  await expect(pagina.getByRole('button', { name: 'Sin leer' })).toBeVisible();
 });
 
-test('la hoja se cierra arrastrándola hacia abajo', async () => {
+test('arriba siempre está el título de la pantalla', async () => {
+  for (const [ruta, esperado] of [
+    ['/projects', 'Inicio'],
+    ['/chat?lista=1', 'Chat'],
+    ['/assistant', 'PRAX'],
+    ['/main/team', 'Equipo'],
+    [`/projects/${slug}`, 'Armazón móvil'],
+    [`/chat/proyecto/${projectId}`, 'Chat'],
+  ] as const) {
+    await pagina.goto(ruta);
+    await expect(titulo()).toHaveText(esperado);
+    await expect(barra()).toBeVisible();
+  }
+});
+
+test('cambiar de pestaña no pasa por el esqueleto (prefetch completo)', async () => {
   await pagina.goto('/projects');
-  await barra().getByRole('button', { name: 'Tú' }).click();
-  const hoja = pagina.getByRole('dialog', { name: 'Tú' });
-  await expect(hoja).toBeVisible();
-  /* Que termine de entrar: a media animación la caja aún está desplazada y
-     el «asa» quedaría fuera del dedo. */
-  await pagina.waitForTimeout(400);
-  const caja = await hoja.boundingBox();
-  if (!caja) throw new Error('La hoja no tiene caja');
-  /* El asa está arriba del todo, centrada. */
-  const x = caja.x + caja.width / 2;
-  const y = caja.y + 10;
-  await pagina.mouse.move(x, y);
-  await pagina.mouse.down();
-  await pagina.mouse.move(x, y + 80, { steps: 4 });
-  await pagina.mouse.move(x, y + 220, { steps: 4 });
-  await pagina.mouse.up();
-  await expect(hoja).toHaveCount(0);
+  /* Que terminen las precargas de las cinco pestañas. */
+  await pagina.waitForLoadState('networkidle');
+  await pagina.evaluate(() => {
+    const w = window as unknown as { esqueletos: number };
+    w.esqueletos = 0;
+    new MutationObserver(() => {
+      if (document.querySelector('[aria-busy="true"]')) w.esqueletos++;
+    }).observe(document.body, { subtree: true, childList: true, attributes: true });
+  });
+  for (const [nombre, ruta] of [
+    [/^Avisos/, /\/main\/notifications$/],
+    ['Tú', /\/main\/me$/],
+    ['Chat', /\/chat\?lista=1$/],
+    ['Inicio', /\/projects$/],
+  ] as const) {
+    await barra().getByRole('link', { name: nombre }).click();
+    await expect(pagina).toHaveURL(ruta);
+  }
+  expect(
+    await pagina.evaluate(() => (window as unknown as { esqueletos: number }).esqueletos),
+  ).toBe(0);
+});
+
+test('Inicio: sin cabecera «Proyectos» y los proyectos no se pliegan', async () => {
+  await pagina.goto('/projects');
+  await expect(pagina.getByRole('link', { name: 'Armazón móvil' }).first()).toBeVisible();
+  await expect(pagina.getByRole('button', { name: 'Proyectos', exact: true })).toHaveCount(0);
+  await expect(
+    pagina.getByRole('button', { name: /^(Colapsar|Expandir) Armazón móvil/ }),
+  ).toHaveCount(0);
+});
+
+test('el buscador cae en el mismo sitio en Inicio y en Chat', async () => {
+  await pagina.goto('/projects');
+  const enInicio = await pagina.getByRole('searchbox').filter({ visible: true }).boundingBox();
+  await pagina.goto('/chat?lista=1');
+  const enChat = await pagina.getByRole('searchbox').filter({ visible: true }).boundingBox();
+  expect(enInicio).not.toBeNull();
+  expect(Math.round(enChat?.y ?? -1)).toBe(Math.round(enInicio?.y ?? -2));
+  expect(Math.round(enChat?.height ?? -1)).toBe(Math.round(enInicio?.height ?? -2));
 });
 
 test('mientras se escribe, la barra se esconde', async () => {
   await pagina.goto('/projects');
   await expect(barra()).toBeVisible();
-  await pagina.getByPlaceholder(/Buscar/).filter({ visible: true }).first().focus();
+  await pagina
+    .getByPlaceholder(/Buscar/)
+    .filter({ visible: true })
+    .first()
+    .focus();
   await expect(barra()).toBeHidden();
   await pagina.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await expect(barra()).toBeVisible();
 });
 
-test('dentro de una conversación no hay barra', async () => {
+test('dentro de una conversación la barra sigue ahí', async () => {
   await pagina.goto(`/chat/proyecto/${projectId}`);
-  await expect(barra()).toBeHidden();
+  await expect(barra()).toBeVisible();
 });
 
 test('deslizar desde el borde izquierdo vuelve atrás', async () => {

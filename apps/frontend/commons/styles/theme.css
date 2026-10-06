@@ -1000,3 +1000,51 @@ body.arrastrando-en-tablero {
     transform: none;
   }
 }
+
+/* ── Móvil: las dos barras de la app (registro de M8 en docs/PLAN-MOVIL.md) ──
+   El icono de la pestaña que se activa da un pequeño salto, la insignia entra
+   con un rebote cuando cambia su número y el título de arriba se funde al
+   cambiar de pantalla. Las clases solo las ponen componentes `md:hidden`, y
+   con menos movimiento pedido no anima nada. */
+@media (prefers-reduced-motion: no-preference) {
+  .pestana-salta {
+    animation: pestana-salta 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .insignia-entra {
+    animation: insignia-entra 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .titulo-entra {
+    animation: titulo-entra 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+@keyframes pestana-salta {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18) translateY(-2px);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes insignia-entra {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes titulo-entra {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

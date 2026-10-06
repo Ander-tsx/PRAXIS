@@ -582,7 +582,9 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
        gastaba la única línea que dice dónde estás en decir dos veces lo mismo,
        y con un nombre largo además se truncaba. La cabecera nombra la sección,
        igual que el enlace de la barra lateral por el que se llega. */
-    <AppHeader title="Proyectos" lleno={esTablero}>
+    /* `tituloMovil`: en móvil la cabecera compacta no se pinta y el nombre lo
+       lleva la barra de arriba (M8 de docs/PLAN-MOVIL.md). */
+    <AppHeader title="Proyectos" tituloMovil={project.name} lleno={esTablero}>
       {/* El mismo `gap` en todas las pestañas: era `gap-3` en Espacios y `gap-6`
           en las demás, y la cabecera saltaba de sitio al cambiar de sección. */}
       <div className={esTablero ? 'flex min-h-0 flex-1 flex-col gap-4' : 'flex flex-col gap-4'}>

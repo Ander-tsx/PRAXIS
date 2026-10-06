@@ -127,28 +127,8 @@ export function DirectConversation({
       /* En móvil la conversación se lleva la pantalla entera, como cualquier
          app de mensajería: con la lista encima quedaban cuatro líneas útiles. */
       pantallaCompletaEnMovil
-      salidaMovil={
-        <a
-          /* ⚠️ `?lista=1` y no `/chat` a secas: el índice redirige a la última
-             conversación abierta, así que sin el parámetro este enlace devuelve
-             **a la conversación que se acaba de dejar** — pulsar «Conversaciones»
-             no hacía nada. Ver la cabecera de `(conversaciones)/page.tsx`. */
-          href="/chat?lista=1"
-          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary max-md:-ml-1 max-md:min-h-11 max-md:text-[15px] max-md:text-text-primary"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-          Conversaciones
-        </a>
-      }
+      /* Sin `salidaMovil`: el «atrás» a la lista lo pone la barra de arriba
+         del armazón (`BarraSuperior`, M8 de docs/PLAN-MOVIL.md). */
       page={page}
       directorio={directorio}
       currentUserId={currentUserId}

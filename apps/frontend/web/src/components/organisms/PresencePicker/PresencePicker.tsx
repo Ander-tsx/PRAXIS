@@ -7,6 +7,11 @@ import { useState } from 'react';
 export interface PresencePickerProps {
   /** La presencia guardada. Lo que no se reconozca cae a «Disponible». */
   inicial: string;
+  /**
+   * Las opciones siempre a la vista, sin fila que desplegar: la pantalla «Tú»
+   * de móvil (M8 de `docs/PLAN-MOVIL.md`).
+   */
+  estatico?: boolean;
 }
 
 /**
@@ -31,7 +36,7 @@ export interface PresencePickerProps {
  * `setPresenceAction` revalida el layout, así que el mismo clic actualiza la
  * esfera de la barra lateral y el retrato de la portada.
  */
-export function PresencePicker({ inicial }: PresencePickerProps) {
+export function PresencePicker({ inicial, estatico = false }: PresencePickerProps) {
   const [presencia, setPresencia] = useState(inicial);
   const [guardando, setGuardando] = useState(false);
   const [abierto, setAbierto] = useState(false);
@@ -48,6 +53,61 @@ export function PresencePicker({ inicial }: PresencePickerProps) {
   }
 
   const actual = presenceOf(presencia);
+
+  if (estatico) {
+    return (
+      <fieldset
+        className="flex flex-col overflow-hidden rounded-2xl bg-white/[0.04] [&>button+button]:border-t [&>button+button]:border-white/[0.06]"
+        disabled={guardando}
+        aria-busy={guardando}
+      >
+        <legend className="sr-only">Tu estado</legend>
+        {PRESENCES.filter((clave) => clave !== 'AWAY').map((clave) => {
+          const descripcion = presenceOf(clave);
+          const puesta = clave === presencia;
+          return (
+            <button
+              key={clave}
+              type="button"
+              onClick={() => void elegir(clave)}
+              aria-pressed={puesta}
+              className="flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left transition-colors active:bg-white/10 disabled:opacity-60"
+            >
+              <span
+                aria-hidden="true"
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ background: descripcion.color }}
+              />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span
+                  className={`font-sans text-[15px] ${puesta ? 'font-semibold text-white' : 'text-text-primary'}`}
+                >
+                  {descripcion.etiqueta}
+                </span>
+                {descripcion.ayuda && (
+                  <span className="font-sans text-[12px] leading-snug text-text-secondary">
+                    {descripcion.ayuda}
+                  </span>
+                )}
+              </span>
+              {puesta && (
+                <svg
+                  className="h-5 w-5 shrink-0 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.25}
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          );
+        })}
+      </fieldset>
+    );
+  }
 
   return (
     /* Plegado: **una sola fila** con tu estado de ahora. Se abre para cambiarlo y
