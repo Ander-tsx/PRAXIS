@@ -105,13 +105,16 @@ test('sin red, el gateway no se sirve de ninguna caché (I2, I3)', async ({ page
   const guardadas = await page.evaluate(async () => {
     const urls: string[] = [];
     for (const nombre of await caches.keys()) {
+      /* Las copias por persona de M7 se comprueban en `08-sin-conexion`. */
+      if (nombre.startsWith('praxis-datos-') || nombre === 'praxis-sesion') continue;
       const cache = await caches.open(nombre);
       for (const peticion of await cache.keys()) urls.push(new URL(peticion.url).pathname);
     }
     return urls;
   });
   expect(guardadas.filter((u) => u.startsWith('/api/'))).toEqual([]);
-  /* Ni HTML de la aplicación: solo la pantalla «Sin conexión». */
+  /* Fuera de las cachés por persona, ni HTML de la aplicación: solo la
+     pantalla «Sin conexión». */
   const publico =
     /^\/(_next\/static\/|icons\/|fonts\/|media\/|manifest\.webmanifest$|(apple-)?icon[^/]*\.png$|sin-conexion$)/;
   expect(guardadas.filter((u) => !publico.test(u))).toEqual([]);

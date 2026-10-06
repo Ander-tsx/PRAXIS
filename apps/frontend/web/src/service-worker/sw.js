@@ -14,10 +14,9 @@
  * | Navegaciones (HTML)                      | Red; sin red, la pantalla «Sin conexión»   |
  * | Todo lo demás                            | **No se toca**: va directo a la red        |
  *
- * 🔴 **Nunca se guarda HTML de la aplicación ni respuestas del gateway** en
- * esta fase. Llevan los datos de la sesión, y en un móvil compartido quien
- * entrase después los vería (I2). La lectura sin conexión es M7, con una caché
- * por usuario que se borra al cerrar sesión (D5).
+ * 🔴 **El HTML privado solo se guarda por persona** (M7, ver «Lectura sin
+ * conexión» más abajo), y nunca respuestas del gateway: llevan los datos de la
+ * sesión, y en un móvil compartido quien entrase después los vería (I2).
  *
  * 🔴 **Ni escrituras, ni sesión, ni flujos en vivo, ni Stripe** (I3): todo lo
  * que no sea un GET del mismo origen, `/api/*`, `/auth/api/*`, los
@@ -62,6 +61,58 @@ const PREFIJO_DATOS = 'praxis-datos-';
 
 const SIN_CONEXION = '/sin-conexion';
 
+/**
+ * ## Lectura sin conexión (M7, D5)
+ *
+ * Las pantallas privadas ya visitadas se guardan **por persona**, en
+ * `praxis-datos-<huella>`, donde la huella es un SHA-256 del correo que manda
+ * la propia app al montarse (este SW no puede leer la cookie de sesión: es
+ * httpOnly). Sin red, se sirve la última copia de **esa** persona y de nadie
+ * más:
+ *
+ * - si entra otra cuenta, se borran las copias de cualquier otra (I2);
+ * - al cerrar sesión, la app pide `olvidar-datos` y se borran todas;
+ * - sin persona conocida, no se sirve ninguna copia.
+ *
+ * Solo navegaciones (HTML). Las peticiones RSC del router no se guardan: su
+ * respuesta depende de cabeceras del árbol de rutas y una copia por URL podría
+ * pintar un árbol que no encaja. Sin red, el router cae a una navegación dura,
+ * y esa sí sale de aquí.
+ */
+const SESION = 'praxis-sesion';
+const CLAVE_DE_PERSONA = '/__praxis/persona';
+/** Lo privado que vale la pena leer sin red. `/admin` no: no está en móvil. */
+const PREFIJOS_LEGIBLES = ['/projects', '/chat', '/assistant', '/main', '/ayuda'];
+/** Cuántas pantallas se guardan por persona; las más viejas salen primero. */
+const MAXIMO_DE_PANTALLAS = 60;
+
+async function personaActual() {
+  const respuesta = await (await caches.open(SESION)).match(CLAVE_DE_PERSONA);
+  return respuesta ? respuesta.text() : null;
+}
+
+async function fijarPersona(huella) {
+  if (!/^[a-f0-9]{16,128}$/.test(huella)) return;
+  const sesion = await caches.open(SESION);
+  await sesion.put(CLAVE_DE_PERSONA, new Response(huella));
+  for (const nombre of await caches.keys()) {
+    if (nombre.startsWith(PREFIJO_DATOS) && nombre !== PREFIJO_DATOS + huella) {
+      await caches.delete(nombre);
+    }
+  }
+}
+
+async function olvidarDatos() {
+  for (const nombre of await caches.keys()) {
+    if (nombre.startsWith(PREFIJO_DATOS)) await caches.delete(nombre);
+  }
+  await caches.delete(SESION);
+}
+
+function esLegible(url) {
+  return PREFIJOS_LEGIBLES.some((p) => url.pathname === p || url.pathname.startsWith(`${p}/`));
+}
+
 self.addEventListener('install', (evento) => {
   evento.waitUntil(precargar());
 });
@@ -105,7 +156,7 @@ self.addEventListener('activate', (evento) => {
     (async () => {
       /* Fuera las cachés de versiones anteriores. Las de datos no son de una
          versión: son de una persona, y las borra cerrar sesión. */
-      const vigentes = new Set([ESTATICOS, RECURSOS, PAGINAS]);
+      const vigentes = new Set([ESTATICOS, RECURSOS, PAGINAS, SESION]);
       for (const nombre of await caches.keys()) {
         if (nombre.startsWith(PREFIJO_DATOS)) continue;
         if (!vigentes.has(nombre)) await caches.delete(nombre);
@@ -120,13 +171,9 @@ self.addEventListener('message', (evento) => {
   if (tipo === 'activar') {
     self.skipWaiting();
   } else if (tipo === 'olvidar-datos') {
-    evento.waitUntil(
-      (async () => {
-        for (const nombre of await caches.keys()) {
-          if (nombre.startsWith(PREFIJO_DATOS)) await caches.delete(nombre);
-        }
-      })(),
-    );
+    evento.waitUntil(olvidarDatos());
+  } else if (tipo === 'persona' && typeof evento.data.huella === 'string') {
+    evento.waitUntil(fijarPersona(evento.data.huella));
   }
 });
 
@@ -162,7 +209,7 @@ self.addEventListener('fetch', (evento) => {
   } else if (esRecursoPublico(url)) {
     evento.respondWith(revalidarEnSegundoPlano(peticion, evento));
   } else if (peticion.mode === 'navigate') {
-    evento.respondWith(redPrimero(peticion));
+    evento.respondWith(redPrimero(peticion, evento));
   }
   /* El resto no se toca: sin `respondWith`, el navegador lo pide como siempre. */
 });
@@ -193,19 +240,50 @@ async function revalidarEnSegundoPlano(peticion, evento) {
 }
 
 /**
- * Las navegaciones van a la red. Su HTML **no se guarda** (lleva la sesión);
- * sin red se enseña «Sin conexión», en la URL que se pidió para que recargar
- * la vuelva a intentar.
+ * Las navegaciones van a la red. Las privadas que salen bien se guardan para la
+ * persona de ahora (M7); sin red se sirve su copia, y si no hay, «Sin
+ * conexión», en la URL que se pidió para que recargar la vuelva a intentar.
  */
-async function redPrimero(peticion) {
+async function redPrimero(peticion, evento) {
+  const url = new URL(peticion.url);
+  const legible = esLegible(url);
   try {
-    return await fetch(peticion);
+    const respuesta = await fetch(peticion);
+    if (
+      legible &&
+      respuesta.ok &&
+      !respuesta.redirected &&
+      (respuesta.headers.get('content-type') || '').includes('text/html')
+    ) {
+      const persona = await personaActual();
+      if (persona) {
+        evento.waitUntil(guardarPantalla(persona, url.href, respuesta.clone()));
+      }
+    }
+    return respuesta;
   } catch {
+    if (legible) {
+      const persona = await personaActual();
+      if (persona) {
+        const guardada = await (await caches.open(PREFIJO_DATOS + persona)).match(url.href);
+        if (guardada) return guardada;
+      }
+    }
     const sinConexion = await caches.match(SIN_CONEXION);
     return (
       sinConexion ||
       new Response('Sin conexión', { status: 503, headers: { 'Content-Type': 'text/plain' } })
     );
+  }
+}
+
+async function guardarPantalla(persona, clave, respuesta) {
+  const cache = await caches.open(PREFIJO_DATOS + persona);
+  await cache.put(clave, respuesta);
+  const claves = await cache.keys();
+  /* `keys()` sale en orden de inserción: las primeras son las más viejas. */
+  for (const vieja of claves.slice(0, Math.max(0, claves.length - MAXIMO_DE_PANTALLAS))) {
+    await cache.delete(vieja);
   }
 }
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '../../atoms';
+import { olvidarDatosSinConexion } from '../../pwa/sinConexion';
 import { useSidebarPlegada } from '../AppLayout/AppShell';
 
 /**
@@ -46,6 +47,9 @@ export function LogoutButton({ compacto }: LogoutButtonProps = {}) {
 
   async function handleLogout() {
     setPending(true);
+    /* Las pantallas guardadas para leer sin conexión son de esta persona:
+       se van con ella (D5 de docs/PLAN-MOVIL.md). */
+    await olvidarDatosSinConexion().catch(() => undefined);
     try {
       await fetch('/auth/api/logout', { method: 'POST' });
     } catch {

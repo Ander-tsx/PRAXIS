@@ -37,6 +37,7 @@ import {
   describirAviso,
   destinoDeAviso,
 } from '../../notifications/avisos';
+import { presentarPersona } from '../../pwa/sinConexion';
 import { LivePresences, LiveSource, useLiveEvent, useReconnection } from '../../realtime';
 import { usePresence } from '../../realtime/presence';
 import { useMessageCount } from '../../realtime/useMessageCount';
@@ -53,6 +54,7 @@ import {
 import { DirectorioDeChatsProvider, useDirectorioDeChats } from './DirectorioDeChats';
 import { DockColumn, DockProvider } from './DockPanel';
 import { FilaDeArbol } from './FilaDeArbol';
+import { FranjaSinConexion } from './FranjaSinConexion';
 import { GestosMoviles } from './GestosMoviles';
 import { NavList } from './NavList';
 import { OrgSwitcher } from './OrgSwitcher';
@@ -405,6 +407,11 @@ function ArmazonInterno({
   useEffect(() => {
     instalarDetectorDeNavegacion();
   }, []);
+  /* Sin conexión: el SW guarda las pantallas por persona y no sabe quién es
+     (la cookie es httpOnly); se lo dice esto. Ver `commons/pwa`. */
+  useEffect(() => {
+    presentarPersona(user.email).catch(() => undefined);
+  }, [user.email]);
   /** Móvil: qué hoja de la barra inferior está abierta (Avisos o Tú). */
   const [hojaMovil, setHojaMovil] = useState<'avisos' | 'tu' | null>(null);
   /* Navegar desde una hoja (un aviso, un ajuste) la cierra: se va a otra
@@ -910,6 +917,7 @@ function ArmazonInterno({
          * se pinta nada de esto (I1).
          */}
         <GestosMoviles />
+        <FranjaSinConexion />
         <BarraInferior
           activa={pestanaInferior}
           oculta={enConversacion}
