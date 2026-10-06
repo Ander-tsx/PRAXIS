@@ -134,7 +134,9 @@ test('lista de proyectos', async () => {
 
 test('tablero en Kanban', async () => {
   await pagina.goto(`/projects/${slug}`);
-  await expect(pagina.getByText('Migrar la base de clientes').filter({ visible: true })).toBeVisible();
+  await expect(
+    pagina.getByText('Migrar la base de clientes').filter({ visible: true }),
+  ).toBeVisible();
   await capturar(pagina, 'escritorio-kanban');
 });
 
@@ -180,6 +182,8 @@ test('integraciones', async () => {
 test('barra plegada', async () => {
   await pagina.context().addCookies([{ name: 'praxis_sidebar', value: '1', url: pagina.url() }]);
   await pagina.goto(`/projects/${slug}`);
-  await expect(pagina.getByText('Migrar la base de clientes').filter({ visible: true })).toBeVisible();
+  await expect(
+    pagina.getByText('Migrar la base de clientes').filter({ visible: true }),
+  ).toBeVisible();
   await capturar(pagina, 'escritorio-barra-plegada');
 });

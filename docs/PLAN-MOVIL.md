@@ -228,7 +228,7 @@ local**. Ninguna se sube.
 
 | Fase | Estado | Commit | Notas |
 |---|---|---|---|
-| M0 | ⏳ | | |
+| M0 | ✅ | (este) | Diez capturas de escritorio de referencia (`e2e/tests/ui/00-escritorio-capturas.spec.ts`), estables en tres corridas; tapan correo, nombre derivado, monograma y fechas cortas. Proyectos `movil-android` y `movil-iphone` (`pnpm e2e:movil`); el de iPhone es Chromium con medida de iPhone, no Safari. `viewport-fit=cover` + `interactive-widget`, utilidades `pt-safe`…, `getEsMovilInicial()` y `useEsMovil()`. ⚠️ `/main/settings` redirige a `/projects`: no es una pantalla que capturar |
 | M1 | ⏳ | | |
 | M2 | ⏳ | | |
 | M3 | ⏳ | | |

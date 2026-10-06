@@ -120,6 +120,13 @@ export const metadata: Metadata = {
  */
 export const viewport: Viewport = {
   themeColor: '#080807',
+  /* Móvil (docs/PLAN-MOVIL.md, M0). `cover`: la app se dibuja también bajo el
+     notch, y las utilidades `pt-safe`/`pb-safe` devuelven ese hueco donde haga
+     falta. `resizes-content`: al abrir el teclado se encoge la ventana en vez de
+     taparla, que es lo que deja un compositor pegado encima del teclado. Las dos
+     son inertes en escritorio. */
+  viewportFit: 'cover',
+  interactiveWidget: 'resizes-content',
 };
 
 /**

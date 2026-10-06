@@ -17,6 +17,7 @@ import {
   useState,
 } from 'react';
 import { createApiClient } from '../../api/client';
+import { EsMovilProvider } from '../../hooks/useEsMovil';
 import type {
   AppNotification,
   DirectConversation,
@@ -153,6 +154,12 @@ export interface AppShellProps {
    * persona arrastrando el borde derecho.
    */
   anchoInicial?: number;
+  /**
+   * Si la primera pintura va para un móvil, **adivinado en el servidor** con
+   * `getEsMovilInicial()`. Lo leen los componentes con `useEsMovil()`, que lo
+   * corrigen con el ancho real. Ver `docs/PLAN-MOVIL.md`, D2.
+   */
+  movilInicial?: boolean;
   /**
    * Con qué pestaña sale la barra —Inicio, Chat o Bandeja—, **resuelto en el
    * servidor**, exactamente por lo mismo que `plegadaInicial`.
@@ -338,33 +345,35 @@ const UN_ANO = 60 * 60 * 24 * 365;
  */
 export function AppShell(props: AppShellProps) {
   return (
-    <LiveSource gatewayPath={`${props.zonePath}/api/gateway`}>
-      {/* Por encima de todo lo que pinte un avatar: el punto de estado de
+    <EsMovilProvider inicial={props.movilInicial ?? false}>
+      <LiveSource gatewayPath={`${props.zonePath}/api/gateway`}>
+        {/* Por encima de todo lo que pinte un avatar: el punto de estado de
           cualquier persona se corrige solo desde aquí. */}
-      <LivePresences>
-        {/* El directorio de conversaciones, **una sola vez para las dos barras**.
+        <LivePresences>
+          {/* El directorio de conversaciones, **una sola vez para las dos barras**.
             Dentro de `LiveSource` porque se suscribe al flujo; por encima del
             armazón porque lo leen el `<aside>` de escritorio y el cajón móvil, y
             en un teléfono los dos están montados a la vez. Ver
             `DirectorioDeChatsProvider`. */}
-        <DirectorioDeChatsProvider gatewayPath={`${props.zonePath}/api/gateway`}>
-          {/* El cajón lateral, por encima del armazón: la columna la pinta él y
+          <DirectorioDeChatsProvider gatewayPath={`${props.zonePath}/api/gateway`}>
+            {/* El cajón lateral, por encima del armazón: la columna la pinta él y
               el contenido lo proyecta la página, así que el proveedor tiene que
               envolver a los dos. Ver `DockPanel`. */}
-          <DockProvider>
-            {/* PRAX global: el lanzador de la cabecera y el minichat (flotante o
+            <DockProvider>
+              {/* PRAX global: el lanzador de la cabecera y el minichat (flotante o
               acoplado). Dentro de `DockProvider` porque el modo acoplado usa su
               columna. Ver `PraxWindow`. */}
-            <PraxProvider
-              zonePath={props.zonePath}
-              organizacionActivaId={props.organizacionActivaId ?? null}
-            >
-              <ArmazonInterno {...props} />
-            </PraxProvider>
-          </DockProvider>
-        </DirectorioDeChatsProvider>
-      </LivePresences>
-    </LiveSource>
+              <PraxProvider
+                zonePath={props.zonePath}
+                organizacionActivaId={props.organizacionActivaId ?? null}
+              >
+                <ArmazonInterno {...props} />
+              </PraxProvider>
+            </DockProvider>
+          </DirectorioDeChatsProvider>
+        </LivePresences>
+      </LiveSource>
+    </EsMovilProvider>
   );
 }
 

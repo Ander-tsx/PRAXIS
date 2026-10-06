@@ -173,5 +173,35 @@ export default defineConfig({
         ignoreHTTPSErrors: true,
       },
     },
+    /**
+     * **Móvil** (`docs/PLAN-MOVIL.md`): las mismas pantallas en un teléfono.
+     *
+     * Dos tamaños, los dos sobre Chromium: el de un Android de gama media y el
+     * de un iPhone. ⚠️ El segundo **no es Safari**: es Chromium con la medida,
+     * el `User-Agent` y el tacto de un iPhone. Lo propio de WebKit —el gesto de
+     * volver, la barra de estado de una app instalada— no se puede automatizar
+     * aquí y se prueba a mano en un teléfono, que es parte del cierre del plan.
+     */
+    {
+      name: 'movil-android',
+      testDir: './tests/movil',
+      use: {
+        ...devices['Pixel 7'],
+        channel: 'chromium',
+        baseURL: SHELL_URL,
+        ignoreHTTPSErrors: true,
+      },
+    },
+    {
+      name: 'movil-iphone',
+      testDir: './tests/movil',
+      use: {
+        ...devices['iPhone 14'],
+        browserName: 'chromium',
+        channel: 'chromium',
+        baseURL: SHELL_URL,
+        ignoreHTTPSErrors: true,
+      },
+    },
   ],
 });

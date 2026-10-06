@@ -7,6 +7,7 @@
     "test": "playwright test",
     "test:api": "playwright test --project=api",
     "test:ui": "playwright test --project=ui",
+    "test:movil": "playwright test --project=movil-android --project=movil-iphone",
     "test:regresion": "playwright test --grep-invert @security",
     "test:seguridad": "playwright test --grep @security",
     "report": "playwright show-report",

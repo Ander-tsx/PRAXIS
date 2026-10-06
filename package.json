@@ -27,6 +27,7 @@
     "e2e": "pnpm --filter @praxis/e2e run test",
     "e2e:api": "pnpm --filter @praxis/e2e run test:api",
     "e2e:ui": "pnpm --filter @praxis/e2e run test:ui",
+    "e2e:movil": "pnpm --filter @praxis/e2e run test:movil",
     "e2e:regresion": "pnpm --filter @praxis/e2e run test:regresion",
     "e2e:seguridad": "pnpm --filter @praxis/e2e run test:seguridad",
     "e2e:report": "pnpm --filter @praxis/e2e run report",

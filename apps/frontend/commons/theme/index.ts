@@ -16,3 +16,6 @@ export * from './sidebar';
 /* La organización activa, por lo mismo que las dos de arriba: si no la sabe el
    servidor al pintar, la lista de proyectos sale entera y se recorta después. */
 export * from './organizacion';
+/* Si la primera pintura va para un móvil, por lo mismo: el armazón móvil tiene
+   que salir bien desde el primer byte. Ver `docs/PLAN-MOVIL.md`, D2. */
+export * from './dispositivo';

@@ -3,7 +3,12 @@ import { PerfilEnBarra } from '@/components/organisms/PerfilEnBarra';
 import { AvisoAsientoCongelado } from '@/components/organisms/Billing/AvisoAsientoCongelado';
 import { AppShell, PresenceFooter, avatarHref, displayName } from '@praxis/commons';
 import { loadPrivateChrome } from '@praxis/commons/auth';
-import { getSidebarAncho, getSidebarPlegada, getSidebarTab } from '@praxis/commons/theme';
+import {
+  getEsMovilInicial,
+  getSidebarAncho,
+  getSidebarPlegada,
+  getSidebarTab,
+} from '@praxis/commons/theme';
 import type { Metadata } from 'next';
 
 /**
@@ -64,6 +69,8 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
   const pestana = await getSidebarTab();
   /* El ancho que eligió la persona arrastrando el borde, por lo mismo. */
   const anchoDeBarra = await getSidebarAncho();
+  /* Si la primera pintura va para un móvil: ver `getEsMovilInicial`. */
+  const movilInicial = await getEsMovilInicial();
 
   return (
     <AppShell
@@ -79,6 +86,7 @@ export default async function PrivadoLayout({ children }: { children: React.Reac
       zonePath=""
       plegadaInicial={plegada}
       anchoInicial={anchoDeBarra}
+      movilInicial={movilInicial}
       pestanaInicial={pestana}
       /* El selector de organización de la barra: la lista y cuál se mira. Las
          dos las resuelve `loadPrivateChrome`, así que aquí no cuestan nada. */

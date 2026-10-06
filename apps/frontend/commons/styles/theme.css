@@ -933,3 +933,21 @@ body.arrastrando-en-tablero {
     animation: none;
   }
 }
+
+/* ── Móvil: zonas seguras (docs/PLAN-MOVIL.md, M0) ───────────────────────
+   Con `viewport-fit=cover` la página se dibuja también bajo el notch y la
+   barra de inicio del teléfono; estas utilidades devuelven ese hueco a lo que
+   tiene que quedar fuera. `env()` vale 0 en escritorio y en cualquier pantalla
+   sin muescas, así que usarlas no cambia nada fuera de un teléfono. */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+@utility pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
