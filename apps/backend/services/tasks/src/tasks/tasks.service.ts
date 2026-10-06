@@ -95,6 +95,14 @@ const TASK_INCLUDE = {
       createdAt: true,
     },
   },
+  /**
+   * Los documentos vinculados: **solo el id**, para la marca de la tarjeta.
+   *
+   * El título vive en projects-service y aquí no se conoce; la pantalla lo
+   * cruza con los documentos del proyecto, que ya tiene. Sin esto, saber si una
+   * tarea lleva documentos costaba una petición por tarjeta.
+   */
+  documents: { orderBy: { createdAt: 'asc' }, select: { documentId: true } },
 } satisfies Prisma.TaskInclude;
 
 @Injectable()
@@ -802,13 +810,13 @@ export class TasksService {
     requesterId: string;
   }) {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
-    await this.loadTaskInProject(dto.taskId, dto.projectId);
+    const task = await this.loadTaskInProject(dto.taskId, dto.projectId);
     await this.prisma.taskDocument.upsert({
       where: { taskId_documentId: { taskId: dto.taskId, documentId: dto.documentId } },
       create: { taskId: dto.taskId, documentId: dto.documentId, linkedBy: dto.requesterId },
       update: {},
     });
-    await this.redis.del(`task:${dto.taskId}`);
+    await this.olvidarDocumentosEnCache(dto.taskId, task.boardId);
     return this.taskDocuments(dto.taskId, dto.projectId);
   }
 
@@ -819,11 +827,26 @@ export class TasksService {
     requesterId: string;
   }) {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
-    await this.loadTaskInProject(dto.taskId, dto.projectId);
+    const task = await this.loadTaskInProject(dto.taskId, dto.projectId);
     await this.prisma.taskDocument.deleteMany({
       where: { taskId: dto.taskId, documentId: dto.documentId },
     });
+    await this.olvidarDocumentosEnCache(dto.taskId, task.boardId);
     return this.taskDocuments(dto.taskId, dto.projectId);
+  }
+
+  /**
+   * ⚠️ **Desde que `TASK_INCLUDE` lleva `documents`, vincular cambia también el
+   * listado del tablero**, no solo la tarea suelta. Antes bastaba con borrar
+   * `task:<id>` —y desvincular ni eso—; ahora, sin el prefijo del tablero, la
+   * marca de la tarjeta seguiría diciendo lo de antes durante el minuto de
+   * caché (trampa 26 de CLAUDE.md).
+   */
+  private async olvidarDocumentosEnCache(taskId: string, boardId: string) {
+    await Promise.all([
+      this.redis.del(`task:${taskId}`),
+      this.redis.delByPrefix(`tasks:board:${boardId}`),
+    ]);
   }
 
   /**
