@@ -262,12 +262,17 @@ export function SlideOver({
            encima» un instante, a medio deslizar. */
         style={{ zIndex: posicion === -1 ? 39 : 40 + posicion }}
         className={[
-          'fixed inset-y-0 right-0 m-0 h-full w-full max-h-screen overflow-y-auto p-5 text-left transition-none sm:transition-transform sm:duration-300 sm:left-auto sm:border-l cursor-default',
+          /* Móvil (por debajo de `sm`): ocupa la pantalla, sube desde abajo como
+             una hoja y deja libres el notch y la barra de inicio (M3 de
+             `docs/PLAN-MOVIL.md`). Antes aparecía de golpe, sin transición, y
+             con la barra inferior encima tapándole el final. Desde `sm`, todo
+             es lo de siempre (I1). */
+          'fixed inset-y-0 right-0 m-0 h-full w-full max-h-screen overflow-y-auto p-5 text-left max-sm:pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] max-sm:pt-[calc(env(safe-area-inset-top,0px)+1rem)] max-sm:transition-transform max-sm:duration-300 max-sm:ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none sm:transition-transform sm:duration-300 sm:left-auto sm:border-l cursor-default',
           dark
             ? 'bg-[#202020] text-white sm:border-white/[0.08]'
             : 'bg-surface text-text-primary sm:border-border',
           sizeClasses[size],
-          visible ? 'translate-x-0' : 'translate-x-full',
+          visible ? 'translate-x-0 translate-y-0' : 'max-sm:translate-y-full sm:translate-x-full',
         ].join(' ')}
       >
         <div className="flex h-full min-w-0 flex-col">

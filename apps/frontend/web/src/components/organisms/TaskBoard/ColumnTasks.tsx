@@ -334,7 +334,7 @@ function NewTaskInline({
            falta bajar hasta el fondo de la lista para saber que está ahí.
            `focus-visible` lo enseña igual sin ratón, que si no quedaba
            inalcanzable por teclado con la columna vacía de foco. */
-        className="flex shrink-0 w-full cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 font-sans text-xs text-white/45 opacity-0 transition-opacity hover:bg-white/5 hover:text-white focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100"
+        className="flex shrink-0 w-full cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 font-sans text-xs text-white/45 opacity-0 transition-opacity hover:bg-white/5 hover:text-white focus-visible:opacity-100 focus-visible:outline-none group-hover:opacity-100 max-md:min-h-11 max-md:opacity-100"
       >
         <svg
           className="h-3.5 w-3.5"

@@ -11,7 +11,7 @@ test('el aviso cabe en la pantalla y recorta el nombre', async ({ page }) => {
   await expect(texto).not.toContainText(NOMBRE_LARGO);
   const caja = await tarjeta.boundingBox();
   const ancho = page.viewportSize()?.width ?? 0;
-  expect(caja, 'la tarjeta tiene caja').not.toBeNull();
-  expect(caja!.x).toBeGreaterThanOrEqual(0);
-  expect(caja!.x + caja!.width).toBeLessThanOrEqual(ancho);
+  if (!caja) throw new Error('La tarjeta del aviso no tiene caja');
+  expect(caja.x).toBeGreaterThanOrEqual(0);
+  expect(caja.x + caja.width).toBeLessThanOrEqual(ancho);
 });

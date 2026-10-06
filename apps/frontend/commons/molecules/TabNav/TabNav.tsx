@@ -72,7 +72,7 @@ export function TabNav({
      * falta y en táctil se arrastra igual.
      */
     <nav
-      className="scrollbar-none flex gap-1 overflow-x-auto overflow-y-hidden border-b border-white/[0.08]"
+      className="scrollbar-none flex min-w-0 gap-1 overflow-x-auto overflow-y-hidden border-b border-white/[0.08]"
       aria-label={ariaLabel}
     >
       {tabs.map((tab) => {

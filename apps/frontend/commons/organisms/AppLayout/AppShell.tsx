@@ -6,8 +6,8 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type PointerEvent as ReactPointerEvent,
   createContext,
   useCallback,
   useContext,
@@ -17,7 +17,6 @@ import {
   useState,
 } from 'react';
 import { createApiClient } from '../../api/client';
-import { EsMovilProvider } from '../../hooks/useEsMovil';
 import type {
   AppNotification,
   DirectConversation,
@@ -30,6 +29,8 @@ import type { Paginated } from '../../api/envelope';
 import { avatarHref } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
 import { ProjectMonogram } from '../../atoms/ProjectMonogram';
+import { EsMovilProvider } from '../../hooks/useEsMovil';
+import { HojaInferior } from '../../molecules/HojaInferior/HojaInferior';
 import {
   ABRIR_BANDEJA_EVENT,
   type AvisoLegible,
@@ -41,38 +42,41 @@ import { usePresence } from '../../realtime/presence';
 import { useMessageCount } from '../../realtime/useMessageCount';
 import { avisarDeAvisosLeidos, useNoticeCount } from '../../realtime/useNoticeCount';
 import { alpha, colors } from '../../tokens';
+import { BarraInferior, type PestanaInferior } from './BarraInferior';
 import {
   FilaDeAccion,
-  type TipoDeEspacio,
   NuevoContenidoEnLinea,
   NuevoEspacioEnLinea,
   NuevoProyectoEnLinea,
+  type TipoDeEspacio,
 } from './CrearEnLinea';
 import { DirectorioDeChatsProvider, useDirectorioDeChats } from './DirectorioDeChats';
+import { DockColumn, DockProvider } from './DockPanel';
 import { FilaDeArbol } from './FilaDeArbol';
+import { GestosMoviles } from './GestosMoviles';
+import { NavList } from './NavList';
+import { OrgSwitcher } from './OrgSwitcher';
+import { PraxProvider } from './PraxWindow';
 import {
   BuscadorDeBarra,
+  Desplegable,
+  MenuFlotante,
   RAIL_ACTIVA,
   RAIL_CELDA,
   RAIL_DIVISORIA,
   RAIL_ICONO,
   RAIL_REPOSO,
   RailTooltip,
-  claseDePopover,
-  Desplegable,
-  MenuFlotante,
-  normalizarBusqueda,
   SIDEBAR_FILA,
   SIDEBAR_ICONO,
   SIDEBAR_INICIO,
   SidebarSection,
+  claseDePopover,
+  normalizarBusqueda,
   usePopover,
 } from './SidebarPrimitives';
-import { DockColumn, DockProvider } from './DockPanel';
-import { NavList } from './NavList';
-import { OrgSwitcher } from './OrgSwitcher';
-import { PraxProvider } from './PraxWindow';
 import type { AppNavItem } from './navigation';
+import { instalarDetectorDeNavegacion } from './transicionDePantalla';
 
 /**
  * Las tarjetas emergentes, **fuera de la carga inicial** (E6.5).
@@ -244,11 +248,12 @@ export interface OrgDelSelector {
  * pieza de estado que cruza esa frontera.
  */
 const AppShellContext = createContext<{
-  openMenu: () => void;
   plegada: boolean;
+  /** La organización activa ya resuelta, para lo que el armazón presta fuera. */
+  organizacionActivaId: string | null;
 } | null>(null);
 
-/** Lo usa `AppHeader` para su botón de menú en móvil. */
+/** El estado del armazón para lo que se pinta dentro (hoy, si la barra está plegada). */
 export function useAppShell() {
   const context = useContext(AppShellContext);
   if (!context) {
@@ -396,11 +401,16 @@ function ArmazonInterno({
   const searchParams = useSearchParams();
   const browserPath = zonePath + (pathname === '/' ? '' : pathname);
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  /* Navegar desde el árbol de proyectos del cajón móvil no pasa por `onNavigate`:
-     se cierra cuando cambia la ruta. */
+  /* Móvil: hacia dónde va cada navegación, para la entrada de la pantalla. */
   useEffect(() => {
-    setMobileMenuOpen(false);
+    instalarDetectorDeNavegacion();
+  }, []);
+  /** Móvil: qué hoja de la barra inferior está abierta (Avisos o Tú). */
+  const [hojaMovil, setHojaMovil] = useState<'avisos' | 'tu' | null>(null);
+  /* Navegar desde una hoja (un aviso, un ajuste) la cierra: se va a otra
+     pantalla y la hoja no tiene nada más que hacer. */
+  useEffect(() => {
+    setHojaMovil(null);
   }, [pathname]);
   /**
    * 🔴 **Determinista: la ruta y una prop, nada del navegador.**
@@ -445,38 +455,6 @@ function ArmazonInterno({
   }, [activeTab]);
 
   /**
-   * Si el contenido del cajón móvil está montado.
-   *
-   * ## 🔴 Por qué no basta con `mobileMenuOpen`
-   *
-   * El cajón se **monta siempre** para poder animar su salida con `transform`
-   * (ver su bloque). Pero dentro van `SidebarChatList` y `SidebarInboxList`, que
-   * no son marcado: son **suscripciones que piden datos al montarse**. Dejarlos
-   * montados sin más significaría que en un escritorio —donde el cajón está
-   * `md:hidden` y nunca se abre— esas listas se montan igual, duplicando cada
-   * petición del directorio de chats y cada suscripción al flujo.
-   *
-   * `display:none` no salva de eso: esconde, no desmonta.
-   *
-   * Así que el contenedor vive siempre y el **contenido** solo mientras hace
-   * falta: desde que se abre hasta que termina de salir. El retardo es el de la
-   * transición; sin él, al cerrar se vería un panel vacío deslizándose.
-   */
-  const [cajonMontado, setCajonMontado] = useState(false);
-
-  useEffect(() => {
-    if (mobileMenuOpen) {
-      setCajonMontado(true);
-      return;
-    }
-    /* Espejo de `duration-200` de la transición. Si allí cambia, aquí también:
-       de más deja las listas pidiendo datos de balde, y de menos vacía el panel
-       antes de que termine de irse. */
-    const t = window.setTimeout(() => setCajonMontado(false), 200);
-    return () => window.clearTimeout(t);
-  }, [mobileMenuOpen]);
-
-  /**
    * Abrir la bandeja desde fuera del armazón.
    *
    * ⚠️ **La bandeja ya no tiene URL.** Cuando era una pantalla, la tarjeta de un
@@ -484,13 +462,12 @@ function ArmazonInterno({
    * destino se quedó apuntando a una ruta que hoy redirige a la lista de
    * proyectos. Ver `destinoDeAviso`.
    *
-   * En móvil hay que abrir además el cajón: es donde viven las pestañas cuando
-   * no hay barra lateral.
+   * En móvil la bandeja es la hoja «Avisos» de la barra inferior.
    */
   useEffect(() => {
     function abrir() {
-      setBandejaAbierta(true);
-      if (window.matchMedia('(max-width: 767px)').matches) setMobileMenuOpen(true);
+      if (window.matchMedia('(max-width: 767px)').matches) setHojaMovil('avisos');
+      else setBandejaAbierta(true);
     }
     window.addEventListener(ABRIR_BANDEJA_EVENT, abrir);
     return () => window.removeEventListener(ABRIR_BANDEJA_EVENT, abrir);
@@ -617,6 +594,22 @@ function ArmazonInterno({
    * sin nada activo y marcando la ficha de usuario, que es de donde se viene.
    */
   const enCuenta = perfilAbierto;
+
+  /* Móvil: qué pestaña de abajo se marca. Una hoja abierta manda sobre la ruta. */
+  const pestanaInferior: PestanaInferior | null =
+    hojaMovil === 'avisos'
+      ? 'avisos'
+      : hojaMovil === 'tu'
+        ? 'tu'
+        : browserPath.startsWith('/chat')
+          ? 'chat'
+          : browserPath.startsWith('/assistant')
+            ? 'prax'
+            : browserPath.startsWith('/projects')
+              ? 'inicio'
+              : null;
+  /** Dentro de una conversación la barra no está: trae su «atrás» y su compositor. */
+  const enConversacion = /^\/chat\/.+/.test(browserPath);
   const activePathDeSecciones = activePath;
   /**
    * 🔴 **Con la consulta, para el árbol de proyectos.** `usePathname()` no la
@@ -645,7 +638,9 @@ function ArmazonInterno({
   const avisosSinLeer = useNoticeCount(avisosIniciales, `${zonePath}/api/gateway`);
 
   return (
-    <AppShellContext.Provider value={{ openMenu: () => setMobileMenuOpen(true), plegada }}>
+    <AppShellContext.Provider
+      value={{ plegada, organizacionActivaId: organizacionActivaId ?? null }}
+    >
       {/**
        * ⚠️ **`h-dvh` y no `h-screen`.**
        *
@@ -867,7 +862,11 @@ function ArmazonInterno({
         </aside>
 
         {/* ── Contenido ────────────────────────────────────────── */}
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
+        {/* En móvil reserva abajo el alto de la barra inferior, que la propia
+            barra publica en `--barra-inferior` (0 cuando se esconde). */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden max-md:pb-[var(--barra-inferior,0px)]">
+          {children}
+        </div>
 
         {/**
          * El cajón lateral, **hermano del contenido y no encima de él**.
@@ -897,182 +896,71 @@ function ArmazonInterno({
         <LiveNotices />
 
         {/**
-         * ── Cajón lateral (móvil) ──────────────────────────────
+         * ── Móvil: barra inferior y sus dos hojas ───────────────────
          *
-         * ## Ocupa la pantalla entera, y entra animado
+         * Sustituyen a la hamburguesa flotante y al cajón a pantalla completa
+         * que había aquí (D7 y D10 de `docs/PLAN-MOVIL.md`). El cajón metía en
+         * una sola capa todo lo que la barra lateral tiene en escritorio, y se
+         * abría desde un botón que tapaba la esquina de cada pantalla. Ahora
+         * cada cosa está donde se busca en una app: las secciones abajo, y lo
+         * tuyo y los avisos en hojas que suben encima de donde estés.
          *
-         * Era una columna de `w-64` sobre un velo, que aparecía y desaparecía de
-         * golpe: `{mobileMenuOpen && …}` monta y desmonta, así que no hay estado
-         * de salida al que animar. En un teléfono, 256 px para un menú que
-         * ahora lleva **el árbol de proyectos, el directorio de chats y la
-         * bandeja** era la mitad de lo que hace falta para leer una fila.
-         *
-         * ⚠️ **Se monta siempre y se traslada con `transform`**, no se
-         * condiciona. Es lo que permite animar la salida —el nodo sigue ahí
-         * mientras se va— y además lo que hace que la transición corra en el
-         * compositor: animar `left` o `width` obliga a recalcular la
-         * maquetación en cada fotograma y en un teléfono se ve.
-         *
-         * `inert` cuando está cerrado: fuera del flujo del foco y del lector de
-         * pantalla. Sin él, un menú «invisible» a la derecha del viewport sigue
-         * siendo tabulable, que es el fallo clásico de este patrón.
-         *
-         * `motion-reduce:transition-none` porque un panel de pantalla completa
-         * deslizándose es justo lo que molesta a quien pide menos movimiento; el
-         * cambio instantáneo ahí es correcto, no un defecto.
+         * Todo es `md:hidden` o vive en portales que lo son: en escritorio no
+         * se pinta nada de esto (I1).
          */}
-        <div
-          className={`fixed inset-0 z-50 md:hidden ${mobileMenuOpen ? '' : 'pointer-events-none'}`}
-          inert={!mobileMenuOpen}
+        <GestosMoviles />
+        <BarraInferior
+          activa={pestanaInferior}
+          oculta={enConversacion}
+          mensajesSinLeer={mensajesSinLeer}
+          avisosSinLeer={avisosSinLeer}
+          usuario={user}
+          onAvisos={() => setHojaMovil((h) => (h === 'avisos' ? null : 'avisos'))}
+          onTu={() => setHojaMovil((h) => (h === 'tu' ? null : 'tu'))}
+        />
+        <HojaInferior
+          abierta={hojaMovil === 'avisos'}
+          onCerrar={() => setHojaMovil(null)}
+          titulo="Avisos"
+          altura="completa"
         >
-          <button
-            type="button"
-            aria-label="Cerrar menú"
-            onClick={() => setMobileMenuOpen(false)}
-            className={`fixed inset-0 backdrop-blur-sm transition-opacity duration-200 motion-reduce:transition-none ${
-              mobileMenuOpen ? 'opacity-100' : 'opacity-0'
-            }`}
-            style={{ background: alpha(colors.overlay, 80) }}
-            tabIndex={mobileMenuOpen ? 0 : -1}
-          />
-
-          <div
-            className={`fixed inset-0 z-10 flex w-full flex-col justify-between bg-[#202020] p-4 transition-transform duration-200 ease-out motion-reduce:transition-none ${
-              mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-            }`}
-          >
-            {/* Solo mientras hace falta: ver `cajonMontado`. Sin esto, las listas
-                de dentro se montarían y pedirían datos también en escritorio. */}
-            {cajonMontado && (
-              <>
-                <div className="flex flex-col gap-4 flex-1 min-h-0 mb-6">
-                  <div className="flex shrink-0 items-start gap-1">
-                    <div className="min-w-0 flex-1">
-                      <OrgSwitcher
-                        name={user.name}
-                        plegada={false}
-                        organizaciones={organizaciones}
-                        activaId={organizacionActivaId ?? null}
-                        zonePath={zonePath}
-                        controlLateral={
-                          <button
-                            type="button"
-                            onClick={() => setMobileMenuOpen(false)}
-                            aria-label="Cerrar menú"
-                            className="mt-3 shrink-0 rounded-md p-1 text-white transition-colors hover:text-text-primary"
-                          >
-                            <svg
-                              className="h-6 w-6"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={1.75}
-                              aria-hidden="true"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
-                          </button>
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  {/**
-                   * 🔴 **Las tres pestañas, también aquí.**
-                   *
-                   * Este cajón tenía solo `NavList`, y las pestañas —con el
-                   * directorio de chats y la bandeja dentro— viven en el `<aside
-                   * hidden … md:flex>`, o sea **solo en escritorio**. Sumado a que
-                   * `ac4caf1` borró la entrada `/chat` de la lista canónica, el
-                   * resultado era que desde un teléfono no había **un solo enlace
-                   * hacia una conversación** en toda la aplicación: ni en el menú,
-                   * ni en el cajón, ni en ninguna pantalla.
-                   *
-                   * Comparte estado (`activeTab`) con la barra de escritorio a
-                   * propósito: es la misma preferencia de la misma persona, y ya
-                   * se guarda en `localStorage`.
-                   */}
-                  <SidebarTabs
-                    activa={activeTab}
-                    onCambiar={(t) => {
-                      setActiveTab(t);
-                      setPerfilAbierto(false);
-                    }}
-                    mensajesSinLeer={mensajesSinLeer}
-                  />
-
-                  <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto">
-                    {/* Aquí sí se monta y se desmonta, al revés que en el escritorio:
-                    el cajón entero solo existe mientras está abierto, así que
-                    las suscripciones de estas listas ya viven en la barra de
-                    escritorio cuando la hay, y en un teléfono no hay ninguna
-                    barra que mantener viva por detrás. */}
-                    {activeTab === 'home' && (
-                      <div className="flex flex-col gap-3">
-                        {/* 🔴 El árbol de proyectos **también en móvil**: este cajón solo tenía el
-                          enlace «Proyectos» de la lista, y al dejar Inicio con solo el
-                          asistente se quedó sin ninguna puerta a los proyectos. */}
-                        <SidebarProjectsTree
-                          zonePath={zonePath}
-                          plegada={false}
-                          activePath={activePathConConsulta}
-                          organizacionActivaId={organizacionActivaId ?? null}
-                        />
-                        <div className="border-t border-border pt-3">
-                          <NavList
-                            navItems={navItems.filter((i) => i.href === '/assistant')}
-                            sinEtiquetas
-                            activePath={activePathDeSecciones}
-                            onNavigate={() => setMobileMenuOpen(false)}
-                          />
-                        </div>
-                      </div>
-                    )}
-                    {activeTab === 'settings' && (
-                      <SidebarSettingsList
-                        navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
-                        activePath={activePathDeSecciones}
-                        plegada={false}
-                        onNavigate={() => setMobileMenuOpen(false)}
-                      />
-                    )}
-                    {activeTab === 'chat' && (
-                      <SidebarChatList zonePath={zonePath} plegada={false} />
-                    )}
-                  </div>
-                </div>
-
-                <div className="relative border-t border-border pt-4">
-                  <div className="flex items-stretch gap-1">
-                    <PerfilFlotante
-                      abierto={perfilAbierto}
-                      onCambiar={setPerfilAbierto}
-                      contenido={perfilSlot}
-                      className="min-w-0 flex-1"
-                    >
-                      <UserCard
-                        user={user}
-                        activa={enCuenta}
-                        estadoSlot={estadoSlot}
-                        onAbrir={() => setPerfilAbierto((v) => !v)}
-                      />
-                    </PerfilFlotante>
-                    <BandejaBoton
-                      abierta={bandejaAbierta}
-                      onCambiar={setBandejaAbierta}
-                      sinLeer={avisosSinLeer}
-                      zonePath={zonePath}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+          {/* Solo montada mientras está abierta: la lista pide datos y se
+              suscribe al flujo al montarse, y en escritorio no se abre nunca. */}
+          {hojaMovil === 'avisos' && <SidebarInboxList zonePath={zonePath} plegada={false} />}
+        </HojaInferior>
+        <HojaInferior
+          abierta={hojaMovil === 'tu'}
+          onCerrar={() => setHojaMovil(null)}
+          titulo="Tú"
+          sinTitulo
+          altura="completa"
+        >
+          {hojaMovil === 'tu' && (
+            <div className="flex flex-col gap-5 px-2 pb-6">
+              {perfilSlot}
+              <section
+                aria-label="Organización"
+                className="flex flex-col gap-1 border-t border-border pt-4"
+              >
+                <OrgSwitcher
+                  name={user.name}
+                  plegada={false}
+                  organizaciones={organizaciones}
+                  activaId={organizacionActivaId ?? null}
+                  zonePath={zonePath}
+                />
+              </section>
+              <section aria-label="Ajustes" className="border-t border-border px-2 pt-4">
+                <SidebarSettingsList
+                  navItems={navItems.filter((i) => esDeConfiguracion(i.href))}
+                  activePath={activePathDeSecciones}
+                  plegada={false}
+                  onNavigate={() => setHojaMovil(null)}
+                />
+              </section>
+            </div>
+          )}
+        </HojaInferior>
       </div>
     </AppShellContext.Provider>
   );
@@ -1782,6 +1670,26 @@ function guardarDesplegados(desplegados: Set<string>): void {
   }
 }
 
+/**
+ * El árbol de proyectos fuera de la barra: la pantalla **Inicio en móvil**
+ * (M3 de `docs/PLAN-MOVIL.md`). Es el mismo de la barra lateral —con su
+ * buscador, sus menús ⋯ (que en móvil son hojas) y su «Nuevo proyecto»—,
+ * porque en un teléfono no hay barra lateral que lo enseñe.
+ */
+export function ArbolDeProyectos() {
+  const contexto = useContext(AppShellContext);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const consulta = searchParams.toString();
+  return (
+    <SidebarProjectsTree
+      zonePath=""
+      plegada={false}
+      activePath={pathname + (consulta ? `?${consulta}` : '')}
+      organizacionActivaId={contexto?.organizacionActivaId ?? null}
+    />
+  );
+}
 function SidebarProjectsTree({
   zonePath,
   plegada,
@@ -3009,7 +2917,7 @@ function SidebarInboxList({
                       Los dos decían `text-white`: el ternario existía y devolvía
                       lo mismo en las dos ramas desde el rediseño monocromo. */}
                     <p
-                      className={`line-clamp-2 font-sans text-[12px] leading-snug ${
+                      className={`line-clamp-2 [overflow-wrap:anywhere] font-sans text-[12px] leading-snug ${
                         sinLeer ? 'font-medium text-white' : 'text-text-secondary'
                       }`}
                     >

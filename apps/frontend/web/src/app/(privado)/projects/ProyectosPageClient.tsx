@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ArbolDeProyectos,
   Avatar,
   Pagination,
   type Project,
@@ -8,6 +9,7 @@ import {
   type UserProfile,
   avatarHref,
   projectHref,
+  useEsMovil,
 } from '@praxis/commons';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -45,6 +47,7 @@ export function ProyectosPageClient({
   const router = useRouter();
   const [query, setQuery] = useState(search);
   const [, startTransition] = useTransition();
+  const esMovil = useEsMovil();
 
   /* La ruta base es `/projects`. Al fusionar las zonas (F6) desapareció el
      `basePath` que Next anteponía, así que un `/` o `/?…` a pelo ya no vuelve a
@@ -75,6 +78,21 @@ export function ProyectosPageClient({
 
   const hayProyectos = projects.length > 0;
   const buscando = search.length > 0;
+
+  /**
+   * En un teléfono, «Inicio» es el árbol: proyectos, espacios, tableros y
+   * documentos, con su buscador (M3 de `docs/PLAN-MOVIL.md`). La tabla de abajo
+   * —equipo, espacios, fecha— son columnas que en 390 px no caben, y sin barra
+   * lateral el árbol era lo único que no tenía dónde vivir.
+   */
+  if (esMovil) {
+    return (
+      <div className="flex flex-col gap-4">
+        <h1 className="px-1 font-sans text-[28px] font-bold tracking-tight text-white">Inicio</h1>
+        <ArbolDeProyectos />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">

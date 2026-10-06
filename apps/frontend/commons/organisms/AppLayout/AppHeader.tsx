@@ -1,7 +1,7 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { useAppShell } from './AppShell';
+import { type ReactNode, useState } from 'react';
+import { claseDeEntrada, consumirTransicion } from './transicionDePantalla';
 
 export interface AppHeaderProps {
   anchoCompleto?: boolean;
@@ -82,7 +82,11 @@ export function AppHeader({
   anchoCompleto = false,
   children,
 }: AppHeaderProps) {
-  const { openMenu } = useAppShell();
+  /* Móvil: entra deslizando según hacia dónde se navegó (D9). Se lee una vez,
+     al montar; en la carga inicial no hay dirección y no anima. */
+  const [entrada] = useState(() =>
+    typeof window === 'undefined' ? '' : claseDeEntrada(consumirTransicion()),
+  );
   /* ⚠️ **Sin ancho máximo.** Hubo uno (1400 px, 1584 con la barra plegada) y
      en un monitor grande —o al alejar el zoom— dejaba dos franjas vacías a los
      lados más anchas que la propia barra lateral. La columna ocupa lo que haya;
@@ -90,31 +94,6 @@ export function AppHeader({
 
   return (
     <>
-      {/**
-       * El menú, flotando y **solo en móvil**.
-       *
-       * `fixed` y no `absolute`: tiene que quedarse quieto mientras `<main>` se
-       * desplaza. Con fondo y borde propios porque ahora flota sobre contenido
-       * cualquiera —una tabla, un tablero— y un icono suelto ahí no se ve.
-       */}
-      <button
-        type="button"
-        onClick={openMenu}
-        aria-label="Abrir menú"
-        className="fixed left-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#202020] text-text-primary shadow-lg transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
-      >
-        <svg
-          className="h-5 w-5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={1.75}
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
-
       {/**
        * ⚠️ **El scroll suave va aquí y no en `html`.**
        *
@@ -138,14 +117,15 @@ export function AppHeader({
         }`}
       >
         <div
-          className={`mx-auto w-full ${
+          className={`mx-auto w-full ${entrada} ${
             anchoCompleto
-              ? 'p-0 max-w-full'
-              : /* ⚠️ `pt-16` en móvil y `sm:pt-6` a partir de ahí: el botón del
-                   menú flota sobre esta esquina, y sin ese hueco taparía la
-                   primera línea de cualquier pantalla. En escritorio no existe,
-                   así que no se paga. */
-                'max-w-full px-4 pb-4 pt-16 sm:p-6 lg:px-8'
+              ? 'max-w-full p-0 max-md:pt-safe'
+              : /* En móvil, la zona segura del notch y un respiro encima: con
+                   `viewport-fit=cover` la página empieza bajo la barra de estado.
+                   Fue `pt-16` mientras hubo un botón de menú flotando en esta
+                   esquina (lo sustituyó la barra inferior, M2 de
+                   `docs/PLAN-MOVIL.md`). Desde `md` es lo de siempre (I1). */
+                'max-w-full px-4 pb-4 pt-[calc(env(safe-area-inset-top,0px)+1rem)] md:p-6 lg:px-8'
           } ${lleno ? 'flex h-full min-h-0 flex-col' : ''}`}
         >
           {children}

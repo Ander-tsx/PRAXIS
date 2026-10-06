@@ -16,6 +16,7 @@ import {
   dueState,
   personLabel,
   useAccion,
+  useEsMovil,
 } from '@praxis/commons';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { TaskDialog } from '../TaskBoard/TaskDialog';
@@ -411,6 +412,9 @@ export function BoardCalendar({
   }, [tasks, recienCreada, abrirTarea]);
 
   const mesVisibleIdx = mesVisible.getFullYear() * 12 + mesVisible.getMonth();
+  /* Móvil: agenda en vez de cuadrícula (M3 de `docs/PLAN-MOVIL.md`). Por
+     `useEsMovil` y no por CSS: pintar las dos duplicaría cada tarea en el DOM. */
+  const esMovil = useEsMovil();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
@@ -469,125 +473,165 @@ export function BoardCalendar({
           )}
         </div>
 
-        <div className="grid shrink-0 grid-cols-7 border-b border-white/10">
-          {DIAS.map((d) => (
-            <div
-              key={d}
-              className="px-2 py-1.5 text-right font-sans text-[11px] font-medium text-white/40"
-            >
-              {d}
-            </div>
-          ))}
-        </div>
+        {!esMovil && (
+          <div className="grid shrink-0 grid-cols-7 border-b border-white/10">
+            {DIAS.map((d) => (
+              <div
+                key={d}
+                className="px-2 py-1.5 text-right font-sans text-[11px] font-medium text-white/40"
+              >
+                {d}
+              </div>
+            ))}
+          </div>
+        )}
 
         <div
           ref={cuerpo}
           onScroll={alDesplazar}
           className="scrollbar-slim relative min-h-0 flex-1 overflow-y-auto"
         >
-          {semanas.map((lunes) => {
-            const claveSemana = claveDia(lunes);
-            return (
-              <div key={claveSemana} data-semana={claveSemana} className="grid grid-cols-7">
-                {Array.from({ length: 7 }, (_, i) => {
-                  const d = sumarDias(lunes, i);
-                  const k = claveDia(d);
-                  const esHoy = k === claveHoy;
-                  const delMesVisible = d.getFullYear() * 12 + d.getMonth() === mesVisibleIdx;
-                  const delDia = conFecha.get(k) ?? [];
-                  const finDeSemana = i >= 5;
-                  return (
-                    <div
-                      key={k}
-                      onDragOver={(e) => {
-                        if (!canMoveTask) return;
-                        e.preventDefault();
-                        if (diaSobrevolado !== k) setDiaSobrevolado(k);
-                      }}
-                      onDragLeave={() =>
-                        setDiaSobrevolado((actual) => (actual === k ? null : actual))
-                      }
-                      onDrop={(e) => {
-                        if (!canMoveTask) return;
-                        e.preventDefault();
-                        soltarEn(e.dataTransfer.getData('text/plain'), k);
-                      }}
-                      className={`group/dia flex min-h-[8.5rem] min-w-0 flex-col gap-1 border-b border-r border-white/[0.06] p-1.5 transition-colors ${
-                        finDeSemana ? 'bg-black/[0.12]' : ''
-                      } ${diaSobrevolado === k ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}`}
-                    >
-                      <div className="flex h-6 shrink-0 items-center justify-between gap-1">
-                        {puedeCrear ? (
-                          <button
-                            type="button"
-                            onClick={() => setCreandoEn(k)}
-                            aria-label={`Nueva tarea el ${d.getDate()} de ${MESES[d.getMonth()].toLowerCase()}`}
-                            title="Nueva tarea en este día"
-                            className="flex h-5 w-5 cursor-pointer items-center justify-center rounded text-white/60 opacity-0 transition-opacity hover:bg-white/10 hover:text-white focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary group-hover/dia:opacity-100"
-                          >
-                            <svg
-                              className="h-3.5 w-3.5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                              aria-hidden="true"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M12 5v14m7-7H5"
-                              />
-                            </svg>
-                          </button>
-                        ) : (
-                          <span />
-                        )}
-                        <span
-                          className={`rounded-full px-1.5 py-0.5 font-sans text-xs tabular-nums ${
-                            esHoy
-                              ? 'bg-primary font-semibold text-primary-foreground'
-                              : delMesVisible
-                                ? 'text-white/75'
-                                : 'text-white/30'
-                          }`}
+          {esMovil
+            ? semanas.map((lunes) => (
+                <AgendaSemana
+                  key={claveDia(lunes)}
+                  lunes={lunes}
+                  conFecha={conFecha}
+                  claveHoy={claveHoy}
+                  puedeCrear={puedeCrear}
+                  creandoEn={creandoEn}
+                  onCrearEn={setCreandoEn}
+                  formulario={(k) =>
+                    primeraColumna && (
+                      <CrearEnDia
+                        projectId={projectId}
+                        boardId={board.id}
+                        columnId={primeraColumna.id}
+                        columnName={primeraColumna.name}
+                        dia={k}
+                        onClose={() => setCreandoEn((actual) => (actual === k ? null : actual))}
+                        onCreated={setRecienCreada}
+                      />
+                    )
+                  }
+                  pintarTarea={(t) => (
+                    <TareaChip
+                      key={t.id}
+                      task={t}
+                      usersById={usersById}
+                      grande
+                      completada={estaCompletada(t)}
+                      columna={nombreDeColumna.get(t.columnId)}
+                      onClick={() => dialog.open(t.id)}
+                    />
+                  )}
+                />
+              ))
+            : semanas.map((lunes) => {
+                const claveSemana = claveDia(lunes);
+                return (
+                  <div key={claveSemana} data-semana={claveSemana} className="grid grid-cols-7">
+                    {Array.from({ length: 7 }, (_, i) => {
+                      const d = sumarDias(lunes, i);
+                      const k = claveDia(d);
+                      const esHoy = k === claveHoy;
+                      const delMesVisible = d.getFullYear() * 12 + d.getMonth() === mesVisibleIdx;
+                      const delDia = conFecha.get(k) ?? [];
+                      const finDeSemana = i >= 5;
+                      return (
+                        <div
+                          key={k}
+                          onDragOver={(e) => {
+                            if (!canMoveTask) return;
+                            e.preventDefault();
+                            if (diaSobrevolado !== k) setDiaSobrevolado(k);
+                          }}
+                          onDragLeave={() =>
+                            setDiaSobrevolado((actual) => (actual === k ? null : actual))
+                          }
+                          onDrop={(e) => {
+                            if (!canMoveTask) return;
+                            e.preventDefault();
+                            soltarEn(e.dataTransfer.getData('text/plain'), k);
+                          }}
+                          className={`group/dia flex min-h-[8.5rem] min-w-0 flex-col gap-1 border-b border-r border-white/[0.06] p-1.5 transition-colors ${
+                            finDeSemana ? 'bg-black/[0.12]' : ''
+                          } ${diaSobrevolado === k ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}`}
                         >
-                          {/* El día 1 lleva el mes: es la única pista de dónde
+                          <div className="flex h-6 shrink-0 items-center justify-between gap-1">
+                            {puedeCrear ? (
+                              <button
+                                type="button"
+                                onClick={() => setCreandoEn(k)}
+                                aria-label={`Nueva tarea el ${d.getDate()} de ${MESES[d.getMonth()].toLowerCase()}`}
+                                title="Nueva tarea en este día"
+                                className="flex h-5 w-5 cursor-pointer items-center justify-center rounded text-white/60 opacity-0 transition-opacity hover:bg-white/10 hover:text-white focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary group-hover/dia:opacity-100"
+                              >
+                                <svg
+                                  className="h-3.5 w-3.5"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                  aria-hidden="true"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M12 5v14m7-7H5"
+                                  />
+                                </svg>
+                              </button>
+                            ) : (
+                              <span />
+                            )}
+                            <span
+                              className={`rounded-full px-1.5 py-0.5 font-sans text-xs tabular-nums ${
+                                esHoy
+                                  ? 'bg-primary font-semibold text-primary-foreground'
+                                  : delMesVisible
+                                    ? 'text-white/75'
+                                    : 'text-white/30'
+                              }`}
+                            >
+                              {/* El día 1 lleva el mes: es la única pista de dónde
                               empieza uno nuevo en una lista que no se corta. */}
-                          {d.getDate() === 1
-                            ? `${d.getDate()} ${MESES[d.getMonth()].slice(0, 3).toLowerCase()}`
-                            : d.getDate()}
-                        </span>
-                      </div>
-                      <div className="flex min-w-0 flex-col gap-1">
-                        {delDia.map((t) => (
-                          <TareaChip
-                            key={t.id}
-                            task={t}
-                            usersById={usersById}
-                            arrastrable={canMoveTask}
-                            completada={estaCompletada(t)}
-                            onClick={() => dialog.open(t.id)}
-                          />
-                        ))}
-                        {creandoEn === k && primeraColumna && (
-                          <CrearEnDia
-                            projectId={projectId}
-                            boardId={board.id}
-                            columnId={primeraColumna.id}
-                            columnName={primeraColumna.name}
-                            dia={k}
-                            onClose={() => setCreandoEn((actual) => (actual === k ? null : actual))}
-                            onCreated={setRecienCreada}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+                              {d.getDate() === 1
+                                ? `${d.getDate()} ${MESES[d.getMonth()].slice(0, 3).toLowerCase()}`
+                                : d.getDate()}
+                            </span>
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-1">
+                            {delDia.map((t) => (
+                              <TareaChip
+                                key={t.id}
+                                task={t}
+                                usersById={usersById}
+                                arrastrable={canMoveTask}
+                                completada={estaCompletada(t)}
+                                onClick={() => dialog.open(t.id)}
+                              />
+                            ))}
+                            {creandoEn === k && primeraColumna && (
+                              <CrearEnDia
+                                projectId={projectId}
+                                boardId={board.id}
+                                columnId={primeraColumna.id}
+                                columnName={primeraColumna.name}
+                                dia={k}
+                                onClose={() =>
+                                  setCreandoEn((actual) => (actual === k ? null : actual))
+                                }
+                                onCreated={setRecienCreada}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
         </div>
       </div>
 
@@ -666,6 +710,109 @@ export function BoardCalendar({
           canDelete={canDeleteTask}
         />
       )}
+    </div>
+  );
+}
+
+const diaLargo = new Intl.DateTimeFormat('es-MX', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+});
+
+/**
+ * Una semana del calendario **en móvil**, como agenda: solo los días que tienen
+ * algo —y hoy, siempre—, con su cabecera fija mientras se desplaza y un «+»
+ * para crear con la fecha puesta. Siete columnas en 390 px dejaban celdas de
+ * 50 px con títulos de cinco letras; una lista se lee.
+ *
+ * Conserva `data-semana`: el scroll infinito y el mes de la cabecera salen de
+ * esas filas, igual que en la cuadrícula.
+ */
+function AgendaSemana({
+  lunes,
+  conFecha,
+  claveHoy,
+  puedeCrear,
+  creandoEn,
+  onCrearEn,
+  formulario,
+  pintarTarea,
+}: {
+  lunes: Date;
+  conFecha: Map<string, Task[]>;
+  claveHoy: string;
+  puedeCrear: boolean;
+  creandoEn: string | null;
+  onCrearEn: (dia: string) => void;
+  formulario: (dia: string) => React.ReactNode;
+  pintarTarea: (t: Task) => React.ReactNode;
+}) {
+  const dias = Array.from({ length: 7 }, (_, i) => sumarDias(lunes, i));
+  return (
+    <div data-semana={claveDia(lunes)}>
+      {dias.map((d) => {
+        const k = claveDia(d);
+        const delDia = conFecha.get(k) ?? [];
+        const esHoy = k === claveHoy;
+        const empiezaMes = d.getDate() === 1;
+        if (!esHoy && !empiezaMes && delDia.length === 0 && creandoEn !== k) return null;
+        return (
+          <div key={k}>
+            {empiezaMes && (
+              <h5 className="px-4 pb-1 pt-5 font-sans text-base font-semibold text-white">
+                {MESES[d.getMonth()]} {d.getFullYear()}
+              </h5>
+            )}
+            {(esHoy || delDia.length > 0 || creandoEn === k) && (
+              <section aria-label={diaLargo.format(d)} className="border-b border-white/[0.06]">
+                <header className="sticky top-0 z-10 flex min-h-11 items-center gap-2 bg-[#202020]/95 px-4 backdrop-blur">
+                  <span
+                    className={`font-sans text-[13px] font-semibold capitalize ${
+                      esHoy ? 'text-primary' : 'text-white/80'
+                    }`}
+                  >
+                    {diaLargo.format(d)}
+                  </span>
+                  {esHoy && (
+                    <span className="rounded-full bg-primary px-2 py-0.5 font-sans text-[10px] font-semibold text-primary-foreground">
+                      Hoy
+                    </span>
+                  )}
+                  {puedeCrear && (
+                    <button
+                      type="button"
+                      onClick={() => onCrearEn(k)}
+                      aria-label={`Nueva tarea el ${d.getDate()} de ${MESES[d.getMonth()].toLowerCase()}`}
+                      className="ml-auto flex h-11 w-11 items-center justify-center rounded-lg text-white/70 active:bg-white/10"
+                    >
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
+                      </svg>
+                    </button>
+                  )}
+                </header>
+                <div className="flex flex-col gap-1.5 px-3 pb-3">
+                  {delDia.map(pintarTarea)}
+                  {creandoEn === k && formulario(k)}
+                  {esHoy && delDia.length === 0 && creandoEn !== k && (
+                    <p className="px-1 py-1 font-sans text-xs text-text-secondary">
+                      Nada para hoy.
+                    </p>
+                  )}
+                </div>
+              </section>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

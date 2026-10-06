@@ -5,6 +5,7 @@ import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'rea
 import { createPortal } from 'react-dom';
 import { createApiClient } from '../../api/client';
 import type { EffectivePermissions, ProjectPermission } from '../../api/domain';
+import { HojaInferior } from '../../molecules/HojaInferior/HojaInferior';
 
 /**
  * Las piezas que comparten las tres pestañas de la barra lateral —Inicio, Chat
@@ -22,7 +23,7 @@ import type { EffectivePermissions, ProjectPermission } from '../../api/domain';
 
 /** La fila de la barra: mismo alto, radio, hueco y tipografía en las tres pestañas. */
 export const SIDEBAR_FILA =
-  'flex min-h-9 items-center gap-2.5 rounded-lg px-2.5 font-sans text-[13px] transition-colors duration-150';
+  'flex min-h-9 items-center gap-2.5 rounded-lg px-2.5 font-sans text-[13px] transition-colors duration-150 max-md:min-h-11 max-md:text-[15px]';
 
 /** Fila abierta: activo por tono, no por caja (kyloo-design §13). */
 export const SIDEBAR_FILA_ACTIVA = 'bg-white/10 font-semibold text-white';
@@ -377,9 +378,17 @@ export function MenuFlotante({
   const [dentro, setDentro] = useState(false);
   const [posicion, setPosicion] = useState({ top: 0, left: 0 });
   const [permisos, setPermisos] = useState<EffectivePermissions | null | undefined>(undefined);
+  /**
+   * En móvil el menú es una hoja de acciones (D10 de `docs/PLAN-MOVIL.md`): un
+   * flotante de 208 px pegado a un botón de 24 no se acierta con el dedo. Se
+   * decide al abrir, que es cuando importa.
+   */
+  const [comoHoja, setComoHoja] = useState(false);
 
   useEffect(() => {
-    if (!abierto) return;
+    /* La hoja se cierra sola (fondo, Escape, arrastre); y su propio scroll no
+       es «la página se movió». */
+    if (!abierto || comoHoja) return;
     function fuera(evento: MouseEvent) {
       const destino = evento.target as Node;
       if (menuRef.current?.contains(destino) || botonRef.current?.contains(destino)) return;
@@ -403,13 +412,14 @@ export function MenuFlotante({
       window.clearTimeout(t);
       setDentro(false);
     };
-  }, [abierto]);
+  }, [abierto, comoHoja]);
 
   function alternar() {
     if (abierto) {
       setAbierto(false);
       return;
     }
+    setComoHoja(window.matchMedia('(max-width: 767px)').matches);
     const caja = botonRef.current?.getBoundingClientRect();
     if (caja) {
       setPosicion({
@@ -442,14 +452,60 @@ export function MenuFlotante({
         aria-label={etiquetaAria}
         aria-haspopup="menu"
         aria-expanded={abierto}
-        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-white/10 hover:text-white focus-visible:opacity-100 ${
+        /* En móvil no hay `hover` que lo enseñe: siempre a la vista, y del
+           tamaño de un dedo (I5). */
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-secondary transition hover:bg-white/10 hover:text-white focus-visible:opacity-100 max-md:h-9 max-md:w-9 max-md:opacity-100 ${
           abierto || activa ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         }`}
       >
         <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
       </button>
 
+      {comoHoja && (
+        <HojaInferior abierta={abierto} onCerrar={() => setAbierto(false)} titulo={etiquetaAria}>
+          <div className="flex flex-col px-2 pb-3">
+            {permisos === undefined ? (
+              <p className="px-3 py-4 font-sans text-sm text-text-secondary">Comprobando…</p>
+            ) : visibles.length === 0 ? (
+              <p className="px-3 py-4 font-sans text-sm text-text-secondary">
+                No tienes permiso para cambiar esto.
+              </p>
+            ) : (
+              visibles.map((item, i) => {
+                const nuevoGrupo = item.grupo && item.grupo !== visibles[i - 1]?.grupo;
+                const nuevaZona = item.peligro && !visibles[i - 1]?.peligro && i > 0;
+                return (
+                  <div key={item.clave}>
+                    {(nuevaZona || (nuevoGrupo && i > 0)) && (
+                      <div className="mx-3 my-1 border-t border-white/10" aria-hidden="true" />
+                    )}
+                    {nuevoGrupo && (
+                      <p className={`px-3 pb-1 pt-2 ${SIDEBAR_ETIQUETA}`}>{item.grupo}</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAbierto(false);
+                        item.onElegir();
+                      }}
+                      className={`flex min-h-[52px] w-full items-center gap-3 rounded-xl px-3 text-left font-sans text-[15px] active:bg-white/10 ${
+                        item.peligro ? 'text-error' : 'text-text-primary'
+                      }`}
+                    >
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center [&>svg]:h-5 [&>svg]:w-5">
+                        {item.icono}
+                      </span>
+                      {item.etiqueta}
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </HojaInferior>
+      )}
       {abierto &&
+        !comoHoja &&
         createPortal(
           <div
             ref={menuRef}

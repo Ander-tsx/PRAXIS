@@ -965,3 +965,38 @@ body.arrastrando-en-tablero {
 @utility pr-safe {
   padding-right: env(safe-area-inset-right, 0px);
 }
+
+/* ── Móvil: la pantalla que entra (D9 de docs/PLAN-MOVIL.md) ──────────────
+   Adelante entra desde la derecha; atrás, desde la izquierda. Corto y con
+   poco recorrido: es para que se lea como una pila, no para lucirse. Solo en
+   móvil y solo si no se pidió menos movimiento: en escritorio la clase está
+   puesta y no hace nada (I1). El `to` deja `transform: none` para que, al
+   terminar, nada de dentro tenga un bloque contenedor nuevo para lo `fixed`. */
+@media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
+  .pantalla-entra-adelante {
+    animation: pantalla-entra-adelante 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .pantalla-entra-atras {
+    animation: pantalla-entra-atras 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+@keyframes pantalla-entra-adelante {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pantalla-entra-atras {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

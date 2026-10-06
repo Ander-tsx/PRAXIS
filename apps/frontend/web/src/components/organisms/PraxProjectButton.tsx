@@ -46,10 +46,12 @@ export function PraxProjectButton({ foco }: { foco: FocoDePrax | null }) {
       }}
       aria-pressed={prax.abierto}
       title={foco ? `PRAX sobre ${foco.name}` : 'PRAX'}
-      className="flex items-center gap-2 rounded-lg border border-white/[0.12] bg-white/[0.04] px-3.5 py-1.5 font-sans text-sm font-medium text-white transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+      /* En un teléfono, solo el icono (y el texto para quien no ve): la fila
+         de pestañas del proyecto no tiene sitio para dos botones con texto. */
+      className="flex items-center gap-2 rounded-lg border border-white/[0.12] bg-white/[0.04] px-3.5 py-1.5 font-sans text-sm font-medium text-white transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white max-sm:h-9 max-sm:px-2.5"
     >
       <PraxSidebarIcon className="h-4 w-4" />
-      PRAX
+      <span className="max-sm:sr-only">PRAX</span>
     </button>
   );
 }

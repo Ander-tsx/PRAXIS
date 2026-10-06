@@ -16,6 +16,7 @@ import {
   colors,
   dueState,
   personLabel,
+  useEsMovil,
 } from '@praxis/commons';
 import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useState } from 'react';
 import { TaskDialog } from '../TaskBoard/TaskDialog';
@@ -164,6 +165,7 @@ export function BoardTable({
   );
 
   const [orden, setOrden] = useState<{ col: Col; asc: boolean }>({ col: 'columna', asc: true });
+  const esMovil = useEsMovil();
   const dialog = useTaskDialog(tasks, openTaskId);
 
   const [anchos, setAnchos] = useState<Anchos>(ANCHOS_POR_DEFECTO);
@@ -264,6 +266,83 @@ export function BoardTable({
     );
   }
 
+  const panel = dialog.renderedTask && (
+    <TaskDialog
+      open={dialog.isOpen}
+      onClose={dialog.close}
+      projectId={projectId}
+      boardId={board.id}
+      task={dialog.renderedTask}
+      columnId={dialog.renderedTask.columnId}
+      columnName={nombreDeColumna.get(dialog.renderedTask.columnId) ?? ''}
+      members={members}
+      labels={labels}
+      usersById={usersById}
+      currentUserId={currentUserId}
+      canToggleChecklist={canMoveTask}
+      canComment={canComment}
+      canManageLabels={canManageLabels}
+      canEdit={canEditTask}
+      canDelete={canDeleteTask}
+    />
+  );
+
+  /**
+   * Móvil: una lista de tarjetas en vez de la tabla (M3 de
+   * `docs/PLAN-MOVIL.md`). Seis columnas en 390 px se reducían a la primera
+   * con el resto fuera de pantalla; aquí cada tarea enseña lo mismo apilado.
+   * El orden se elige con un desplegable, que es lo que sustituye a pulsar
+   * las cabeceras.
+   */
+  if (esMovil) {
+    return (
+      <div className="flex min-h-0 flex-col gap-2 overflow-y-auto pb-2">
+        <label className="flex shrink-0 items-center gap-2 self-end font-sans text-xs text-text-secondary">
+          Ordenar por
+          <select
+            value={orden.col}
+            onChange={(e) => setOrden({ col: e.target.value as Col, asc: true })}
+            className="min-h-9 rounded-lg border border-white/10 bg-[#191919] px-2 font-sans text-sm text-text-primary"
+          >
+            <option value="columna">Columna</option>
+            <option value="titulo">Tarea</option>
+            <option value="vencimiento">Vence</option>
+            <option value="prioridad">Prioridad</option>
+          </select>
+        </label>
+        {pendientes.map((t, i) => (
+          <TarjetaDeTarea
+            key={t.id}
+            task={t}
+            columna={columnasById.get(t.columnId)}
+            indiceDeColumna={ordenDeColumna.get(t.columnId) ?? i}
+            nombreDeColumna={nombreDeColumna.get(t.columnId) ?? '—'}
+            usersById={usersById}
+            onOpen={() => dialog.open(t.id)}
+          />
+        ))}
+        {completadas.length > 0 && (
+          <p className="px-1 pt-3 font-sans text-[10px] font-semibold uppercase tracking-wider text-white/40">
+            Completadas ({completadas.length})
+          </p>
+        )}
+        {completadas.map((t, i) => (
+          <TarjetaDeTarea
+            key={t.id}
+            task={t}
+            columna={columnasById.get(t.columnId)}
+            indiceDeColumna={ordenDeColumna.get(t.columnId) ?? i}
+            nombreDeColumna={nombreDeColumna.get(t.columnId) ?? '—'}
+            usersById={usersById}
+            onOpen={() => dialog.open(t.id)}
+            atenuada
+          />
+        ))}
+        {panel}
+      </div>
+    );
+  }
+
   return (
     <div className="h-fit max-h-full overflow-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20 w-fit max-w-full rounded-xl border border-white/10 bg-[#202020]">
       {/**
@@ -341,26 +420,7 @@ export function BoardTable({
         )}
       </table>
 
-      {dialog.renderedTask && (
-        <TaskDialog
-          open={dialog.isOpen}
-          onClose={dialog.close}
-          projectId={projectId}
-          boardId={board.id}
-          task={dialog.renderedTask}
-          columnId={dialog.renderedTask.columnId}
-          columnName={nombreDeColumna.get(dialog.renderedTask.columnId) ?? ''}
-          members={members}
-          labels={labels}
-          usersById={usersById}
-          currentUserId={currentUserId}
-          canToggleChecklist={canMoveTask}
-          canComment={canComment}
-          canManageLabels={canManageLabels}
-          canEdit={canEditTask}
-          canDelete={canDeleteTask}
-        />
-      )}
+      {panel}
     </div>
   );
 }
@@ -548,6 +608,78 @@ function Th({
         className="absolute inset-y-0 right-0 w-1.5 cursor-col-resize transition-colors hover:bg-primary/50 active:bg-primary/70"
       />
     </th>
+  );
+}
+
+/** Una tarea de la tabla, como tarjeta: lo que en escritorio son sus columnas. */
+function TarjetaDeTarea({
+  task: t,
+  columna,
+  indiceDeColumna,
+  nombreDeColumna,
+  usersById,
+  onOpen,
+  atenuada = false,
+}: {
+  task: Task;
+  columna: Column | undefined;
+  indiceDeColumna: number;
+  nombreDeColumna: string;
+  usersById: Map<string, UserProfile>;
+  onOpen: () => void;
+  atenuada?: boolean;
+}) {
+  const due = dueState(t.dueDate);
+  const tonoColumna = columna ? tintOf(columna.color, indiceDeColumna) : colors.textSecondary;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`flex w-full flex-col gap-2 rounded-xl border border-white/[0.06] bg-[#202020] p-3 text-left active:bg-[#282828] ${
+        atenuada ? 'opacity-60' : ''
+      }`}
+    >
+      <span className="line-clamp-2 [overflow-wrap:anywhere] font-sans text-[15px] font-medium text-white">
+        {t.title}
+      </span>
+      <span className="flex flex-wrap items-center gap-1.5">
+        <span
+          className="max-w-[10rem] truncate rounded-md px-2 py-0.5 font-sans text-[11px] font-medium"
+          style={{ background: alpha(tonoColumna, 15), color: tonoColumna }}
+        >
+          {nombreDeColumna}
+        </span>
+        <PrioridadChip priority={t.priority} />
+        {t.dueDate && (
+          <span
+            className={`font-sans text-[12px] ${
+              due === 'overdue'
+                ? 'font-semibold text-error'
+                : due === 'soon'
+                  ? 'text-warning'
+                  : 'text-white/70'
+            }`}
+          >
+            {fechaCorta.format(new Date(t.dueDate))}
+          </span>
+        )}
+        {t.assignees.length > 0 && (
+          <span className="ml-auto flex -space-x-1.5">
+            {t.assignees.slice(0, 3).map((a) => {
+              const u = usersById.get(a.userId);
+              return (
+                <Avatar
+                  key={a.id}
+                  size="sm"
+                  label={u ? personLabel(u) : '?'}
+                  src={avatarHref(u?.avatarUrl, '/api/gateway')}
+                />
+              );
+            })}
+          </span>
+        )}
+      </span>
+    </button>
   );
 }
 

@@ -14,3 +14,4 @@ export * from './DataTable';
 export * from './SelectorDeFecha';
 export * from './QuotaNotice';
 export * from './ImagePicker';
+export * from './HojaInferior/HojaInferior';

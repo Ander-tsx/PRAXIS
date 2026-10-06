@@ -1,6 +1,7 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
+import { claseDeEntrada, consumirTransicion } from './transicionDePantalla';
 
 export interface PageSkeletonProps {
   /** Lo mismo que en `AppHeader`: el nombre de la pantalla, para quien no la ve. */
@@ -47,6 +48,11 @@ export function PageSkeleton({
   anchoCompleto = false,
   children,
 }: PageSkeletonProps) {
+  /* La misma entrada que `AppHeader`: si el esqueleto llega primero, se la
+     lleva él y la pantalla de verdad ya no vuelve a deslizarse. */
+  const [entrada] = useState(() =>
+    typeof window === 'undefined' ? '' : claseDeEntrada(consumirTransicion()),
+  );
   return (
     /* `aria-busy` y un texto solo para lectores: sin esto, quien navega con uno
        oye un montón de cajas sin nombre y no sabe si la pantalla llegó o falló. */
@@ -58,8 +64,10 @@ export function PageSkeleton({
       <span className="sr-only">Cargando {title}</span>
 
       <div
-        className={`mx-auto w-full ${
-          anchoCompleto ? 'max-w-full p-0' : 'max-w-full px-4 pb-4 pt-16 sm:p-6 lg:px-8'
+        className={`mx-auto w-full ${entrada} ${
+          anchoCompleto
+            ? 'max-w-full p-0 max-md:pt-safe'
+            : 'max-w-full px-4 pb-4 pt-[calc(env(safe-area-inset-top,0px)+1rem)] md:p-6 lg:px-8'
         } ${lleno ? 'flex h-full min-h-0 flex-col' : ''}`}
       >
         {children}

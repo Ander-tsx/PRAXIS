@@ -1,8 +1,6 @@
 'use client';
 
-import { colors } from '@praxis/commons';
-import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { HojaDeAcciones } from '@praxis/commons';
 
 export interface TaskMobileMoveSheetProps {
   isOpen: boolean;
@@ -12,6 +10,16 @@ export interface TaskMobileMoveSheetProps {
   onMoveToColumn: (columnId: string) => void;
 }
 
+/**
+ * «Mover a…» con el dedo: lo que abre una pulsación larga sobre una tarjeta
+ * del Kanban, porque en un teléfono las tarjetas no se arrastran (D12 de
+ * `docs/PLAN-MOVIL.md`).
+ *
+ * Era una hoja hecha a mano, con su propia animación en un `<style>` y sin
+ * arrastrar para cerrar ni fondo inerte. Ahora es la `HojaDeAcciones` de
+ * siempre. `tambienEnTableta`: la pulsación larga también llega desde una
+ * tableta, que por ancho ya es escritorio.
+ */
 export function TaskMobileMoveSheet({
   isOpen,
   onClose,
@@ -19,73 +27,18 @@ export function TaskMobileMoveSheet({
   currentColumnId,
   onMoveToColumn,
 }: TaskMobileMoveSheetProps) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!isOpen || !mounted) return null;
-
-  return createPortal(
-    <>
-      <div
-        className="fixed inset-0 z-[100] transition-opacity"
-        style={{ background: 'rgba(0, 0, 0, 0.4)' }}
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div
-        className="fixed inset-x-0 bottom-0 z-[100] flex flex-col gap-2 rounded-t-2xl border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl transition-transform ease-out"
-        style={{
-          background: colors.surfaceElevated,
-          borderColor: colors.border,
-          maxHeight: '80vh',
-          animation: 'slideUp 0.25s ease-out forwards',
-        }}
-      >
-        <span
-          aria-hidden="true"
-          className="mx-auto mb-2 h-1 w-10 shrink-0 rounded-full"
-          style={{ background: colors.border }}
-        />
-        <h3 className="shrink-0 px-2 text-center font-sans text-sm font-semibold text-text-primary">
-          Mover a...
-        </h3>
-
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-          {columns.map((col) => {
-            const isCurrent = col.id === currentColumnId;
-            return (
-              <button
-                key={col.id}
-                type="button"
-                disabled={isCurrent}
-                onClick={() => {
-                  onMoveToColumn(col.id);
-                  onClose();
-                }}
-                className={[
-                  'flex w-full items-center justify-between rounded-xl px-4 py-3 font-sans text-sm transition-colors text-left',
-                  isCurrent
-                    ? 'opacity-50 cursor-default text-text-primary'
-                    : 'cursor-pointer hover:bg-surface active:bg-surface text-text-primary',
-                ].join(' ')}
-              >
-                <span className="truncate">{col.name}</span>
-                {isCurrent && <span className="shrink-0 text-xs text-white">(Actual)</span>}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <style>{`
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
-        }
-      `}</style>
-    </>,
-    document.body,
+  return (
+    <HojaDeAcciones
+      abierta={isOpen}
+      onCerrar={onClose}
+      titulo="Mover a…"
+      tambienEnTableta
+      acciones={columns.map((col) => ({
+        clave: col.id,
+        etiqueta: col.id === currentColumnId ? `${col.name} (actual)` : col.name,
+        deshabilitada: col.id === currentColumnId,
+        onElegir: () => onMoveToColumn(col.id),
+      }))}
+    />
   );
 }

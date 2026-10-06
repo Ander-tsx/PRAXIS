@@ -9,6 +9,7 @@ import {
 } from '@/lib/projects/action-state';
 import {
   type Board,
+  CONSULTA_MOVIL,
   type Column,
   type ColumnColor,
   DONE_COLUMN_COLOR,
@@ -289,6 +290,8 @@ export function BoardColumns({
 
   const { movimientos, registrar, confirmar, revertir } = useMovimientosOptimistas(todas);
   const reposicion = useReposicionAnimada();
+  /** La pista de columnas, para las píldoras de móvil. */
+  const pistaMovil = useRef<HTMLDivElement | null>(null);
 
   const tasksByColumn = repartirPorColumna(todas, movimientos);
 
@@ -610,7 +613,11 @@ export function BoardColumns({
         /* `group`: lo que activa el botón de «Añadir tarea» al fondo de la
            columna (`ColumnTasks`), que ahora solo se enseña al pasar por
            aquí, no siempre. */
-        className="group flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-[#202020]"
+        data-columna-movil={column.id}
+        /* Móvil: una columna por pantalla, con imán al deslizar y un borde de
+           la siguiente asomando —para que se vea que hay más— (M3 de
+           `docs/PLAN-MOVIL.md`). Desde `md`, los 288 px de siempre. */
+        className="group flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-[#202020] max-md:w-[calc(100vw-3rem)] max-md:snap-center"
         style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
       >
         {/**
@@ -625,6 +632,9 @@ export function BoardColumns({
         <header
           onPointerDown={(evento) => {
             if (!canEditColumn || conMenuAbierto) return;
+            /* En un teléfono las columnas no se reordenan arrastrando (D12): el
+               dedo sobre la cabecera es para deslizar entre columnas. */
+            if (evento.pointerType !== 'mouse' && window.matchMedia(CONSULTA_MOVIL).matches) return;
             /* Solo el fondo de la cabecera: sobre un botón, el gesto es del botón. */
             if ((evento.target as HTMLElement).closest('button')) return;
             empezar(evento, { tipo: 'columna', id: column.id });
@@ -657,7 +667,8 @@ export function BoardColumns({
                 a un lector de pantalla, así que no puede ser la única
                 forma de mover una columna. */}
             {canEditColumn && columns.length > 1 && (
-              <>
+              <span className="flex items-center gap-1 max-md:hidden">
+                {/* En móvil no se reordenan columnas (D12 de docs/PLAN-MOVIL.md). */}
                 <NudgeButton
                   direction={-1}
                   disabled={index === 0}
@@ -670,7 +681,7 @@ export function BoardColumns({
                   columnName={column.name}
                   onClick={() => nudge(column.id, 1)}
                 />
-              </>
+              </span>
             )}
             {/* Con límite WIP, «3/5»; pasado, en tono de aviso. Es blando (D13
                 de docs/PLAN-SCRUM-KANBAN.md): se dice, no se impide. */}
@@ -781,10 +792,22 @@ export function BoardColumns({
        * quince dejaba un escalón de medio metro y el tablero se leía como una
        * gráfica de barras.
        */}
+      <PildorasDeColumnas
+        pista={pistaMovil}
+        columnas={columnasVisibles.map((column, index) => ({
+          id: column.id,
+          nombre: column.name,
+          tono: tintOf(column.color, index),
+          cuantas: (tasksByColumn.get(column.id) ?? []).length,
+        }))}
+      />
       <div
-        ref={registrarPista}
+        ref={(el) => {
+          registrarPista(el);
+          pistaMovil.current = el;
+        }}
         onScroll={reposicion.invalidar}
-        className="scrollbar-slim -mx-1 flex min-h-0 flex-1 items-stretch gap-4 overflow-x-auto px-1 pb-1"
+        className="scrollbar-slim -mx-1 flex min-h-0 flex-1 items-stretch gap-4 overflow-x-auto px-1 pb-1 max-md:snap-x max-md:snap-mandatory max-md:gap-3"
       >
         {columnasVisibles.flatMap((column, index) =>
           index === huecoDeColumna
@@ -1171,5 +1194,88 @@ function NudgeButton({
         />
       </svg>
     </button>
+  );
+}
+
+/**
+ * Las columnas como píldoras, arriba del tablero, **solo en móvil** (M3 de
+ * `docs/PLAN-MOVIL.md`).
+ *
+ * Con una columna por pantalla no se ve cuántas hay ni en cuál estás: esta
+ * fila lo dice —nombre y número de tareas— y marca la que se está mirando
+ * según se desliza. Tocar una lleva a ella.
+ */
+function PildorasDeColumnas({
+  pista,
+  columnas,
+}: {
+  pista: React.RefObject<HTMLDivElement | null>;
+  columnas: { id: string; nombre: string; tono: string; cuantas: number }[];
+}) {
+  const [actual, setActual] = useState(0);
+  const fila = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = pista.current;
+    if (!el) return;
+    const alDesplazar = () => {
+      const hijos = [...el.querySelectorAll<HTMLElement>('[data-columna-movil]')];
+      const centro = el.scrollLeft + el.clientWidth / 2;
+      let mejor = 0;
+      let distancia = Number.POSITIVE_INFINITY;
+      hijos.forEach((hijo, i) => {
+        const d = Math.abs(hijo.offsetLeft + hijo.offsetWidth / 2 - centro);
+        if (d < distancia) {
+          distancia = d;
+          mejor = i;
+        }
+      });
+      setActual(mejor);
+    };
+    el.addEventListener('scroll', alDesplazar, { passive: true });
+    return () => el.removeEventListener('scroll', alDesplazar);
+  }, [pista]);
+
+  /* La píldora marcada, siempre a la vista en su propia fila. */
+  useEffect(() => {
+    const boton = fila.current?.children[actual] as HTMLElement | undefined;
+    boton?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  }, [actual]);
+
+  if (columnas.length < 2) return null;
+
+  return (
+    <div
+      ref={fila}
+      role="tablist"
+      aria-label="Columnas"
+      className="scrollbar-none -mx-1 mb-2 flex shrink-0 gap-1.5 overflow-x-auto px-1 md:hidden"
+    >
+      {columnas.map((c, i) => (
+        <button
+          key={c.id}
+          type="button"
+          role="tab"
+          aria-selected={i === actual}
+          onClick={() => {
+            const destino = pista.current?.querySelector<HTMLElement>(
+              `[data-columna-movil="${c.id}"]`,
+            );
+            destino?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+          }}
+          className={`flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 font-sans text-[13px] font-medium transition-colors ${
+            i === actual ? 'bg-white/10 text-white' : 'text-text-secondary'
+          }`}
+        >
+          <span
+            aria-hidden="true"
+            className="h-2 w-2 rounded-full"
+            style={{ background: c.tono }}
+          />
+          {c.nombre}
+          <span className="tabular-nums text-text-secondary">{c.cuantas}</span>
+        </button>
+      ))}
+    </div>
   );
 }
