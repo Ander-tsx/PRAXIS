@@ -4,6 +4,12 @@ import { ApiError, createApiClient, useRefrescoAgrupado } from '@praxis/commons'
 import { FileText, Link2, Plus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  SECTION_BODY_CLASS,
+  SECTION_CLASS,
+  SECTION_COUNT_CLASS,
+  SECTION_TITLE_CLASS,
+} from './section-panel';
 
 interface DocumentoVinculado {
   id: string;
@@ -143,15 +149,11 @@ export function TaskDocuments({
   }
 
   return (
-    <section className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5">
-      <header className="flex items-center justify-between gap-3">
-        <h4 className="font-sans text-sm font-medium text-text-primary">
+    <section className={SECTION_CLASS}>
+      <header className="flex min-h-6 items-center justify-between gap-3 px-1">
+        <h4 className={SECTION_TITLE_CLASS}>
           Documentos{' '}
-          {!!vinculados?.length && (
-            <span className="font-normal tabular-nums text-text-secondary">
-              {vinculados.length}
-            </span>
-          )}
+          {!!vinculados?.length && <span className={SECTION_COUNT_CLASS}>{vinculados.length}</span>}
         </h4>
         {canEdit && modo === 'nada' && (
           <span className="flex items-center gap-1">
@@ -181,125 +183,130 @@ export function TaskDocuments({
         )}
       </header>
 
-      {vinculados && vinculados.length > 0 && (
-        <ul className="flex flex-col">
-          {vinculados.map((d) => (
-            <li
-              key={d.id}
-              className="group flex items-center gap-2 rounded-lg px-1 py-1.5 hover:bg-white/[0.04]"
-            >
-              <FileText className="h-4 w-4 shrink-0 text-text-secondary" />
-              <a
-                href={hrefDe(d)}
-                className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary hover:underline"
+      <div className={SECTION_BODY_CLASS}>
+        {vinculados && vinculados.length > 0 && (
+          <ul className="flex flex-col">
+            {vinculados.map((d) => (
+              <li
+                key={d.id}
+                className="group flex items-center gap-2 rounded-lg px-1 py-1.5 hover:bg-white/[0.04]"
               >
-                {d.title || 'Sin título'}
-              </a>
-              {canEdit && (
-                <button
-                  type="button"
-                  aria-label={`Quitar «${d.title}» de la tarea`}
-                  title="Quitar de la tarea (el documento no se borra)"
-                  onClick={() => void desvincular(d.id)}
-                  className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-text-secondary opacity-0 transition-opacity hover:text-error group-hover:opacity-100"
+                <FileText className="h-4 w-4 shrink-0 text-text-secondary" />
+                <a
+                  href={hrefDe(d)}
+                  className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary hover:underline"
                 >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {vinculados?.length === 0 && modo === 'nada' && (
-        <p className="font-sans text-xs text-text-secondary">
-          {canEdit
-            ? 'Especificaciones, actas, notas: escríbelas como documento y vincúlalas aquí.'
-            : 'Sin documentos.'}
-        </p>
-      )}
-
-      {modo === 'vincular' && (
-        <div className="flex flex-col gap-2 rounded-xl border border-border p-2">
-          <input
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar un documento del proyecto"
-            aria-label="Buscar un documento del proyecto"
-            className="h-8 rounded-lg bg-background px-2.5 font-sans text-sm text-text-primary outline-none placeholder:text-text-secondary"
-          />
-          <ul className="flex max-h-48 flex-col overflow-y-auto">
-            {espacios === null && (
-              <li className="px-2 py-1.5 font-sans text-xs text-text-secondary">Cargando…</li>
-            )}
-            {espacios !== null && candidatos.length === 0 && (
-              <li className="px-2 py-1.5 font-sans text-xs text-text-secondary">
-                No hay documentos que vincular.
-              </li>
-            )}
-            {candidatos.map((d) => (
-              <li key={d.id}>
-                <button
-                  type="button"
-                  disabled={ocupado}
-                  onClick={() => void vincular(d.id)}
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-white/[0.06]"
-                >
-                  <FileText className="h-4 w-4 shrink-0 text-text-secondary" />
-                  <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary">
-                    {d.title || 'Sin título'}
-                  </span>
-                  <span className="shrink-0 font-sans text-[11px] text-text-secondary">
-                    {d.espacio}
-                  </span>
-                </button>
+                  {d.title || 'Sin título'}
+                </a>
+                {canEdit && (
+                  <button
+                    type="button"
+                    aria-label={`Quitar «${d.title}» de la tarea`}
+                    title="Quitar de la tarea (el documento no se borra)"
+                    onClick={() => void desvincular(d.id)}
+                    className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-text-secondary opacity-0 transition-opacity hover:text-error group-hover:opacity-100"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </li>
             ))}
           </ul>
-          <button
-            type="button"
-            onClick={() => setModo('nada')}
-            className="self-end cursor-pointer px-2 font-sans text-xs text-text-secondary hover:text-text-primary"
-          >
-            Cancelar
-          </button>
-        </div>
-      )}
+        )}
 
-      {modo === 'crear' && (
-        <form onSubmit={crear} className="flex flex-col gap-2 rounded-xl border border-border p-3">
-          <input
-            name="titulo"
-            placeholder="Título del documento"
-            aria-label="Título del documento"
-            maxLength={200}
-            className="h-9 rounded-lg bg-background px-2.5 font-sans text-sm text-text-primary outline-none placeholder:text-text-secondary"
-          />
-          <EspacioParaCrear espacios={espacios} />
-          <div className="flex justify-end gap-2">
+        {vinculados?.length === 0 && modo === 'nada' && (
+          <p className="font-sans text-xs text-text-secondary">
+            {canEdit
+              ? 'Especificaciones, actas, notas: escríbelas como documento y vincúlalas aquí.'
+              : 'Sin documentos.'}
+          </p>
+        )}
+
+        {modo === 'vincular' && (
+          <div className="flex flex-col gap-2 rounded-xl border border-border p-2">
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar un documento del proyecto"
+              aria-label="Buscar un documento del proyecto"
+              className="h-8 rounded-lg bg-white/[0.04] px-2.5 font-sans text-sm text-text-primary outline-none placeholder:text-text-secondary"
+            />
+            <ul className="flex max-h-48 flex-col overflow-y-auto">
+              {espacios === null && (
+                <li className="px-2 py-1.5 font-sans text-xs text-text-secondary">Cargando…</li>
+              )}
+              {espacios !== null && candidatos.length === 0 && (
+                <li className="px-2 py-1.5 font-sans text-xs text-text-secondary">
+                  No hay documentos que vincular.
+                </li>
+              )}
+              {candidatos.map((d) => (
+                <li key={d.id}>
+                  <button
+                    type="button"
+                    disabled={ocupado}
+                    onClick={() => void vincular(d.id)}
+                    className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-white/[0.06]"
+                  >
+                    <FileText className="h-4 w-4 shrink-0 text-text-secondary" />
+                    <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary">
+                      {d.title || 'Sin título'}
+                    </span>
+                    <span className="shrink-0 font-sans text-[11px] text-text-secondary">
+                      {d.espacio}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
             <button
               type="button"
               onClick={() => setModo('nada')}
-              className="cursor-pointer px-2 font-sans text-xs text-text-secondary hover:text-text-primary"
+              className="self-end cursor-pointer px-2 font-sans text-xs text-text-secondary hover:text-text-primary"
             >
               Cancelar
             </button>
-            <button
-              type="submit"
-              disabled={ocupado}
-              className="cursor-pointer rounded-lg bg-primary px-3 py-1.5 font-sans text-xs font-semibold text-primary-foreground disabled:opacity-50"
-            >
-              {ocupado ? 'Creando…' : 'Crear y abrir'}
-            </button>
           </div>
-        </form>
-      )}
+        )}
 
-      {error && (
-        <p role="alert" className="font-sans text-xs text-error">
-          {error}
-        </p>
-      )}
+        {modo === 'crear' && (
+          <form
+            onSubmit={crear}
+            className="flex flex-col gap-2 rounded-xl border border-border p-3"
+          >
+            <input
+              name="titulo"
+              placeholder="Título del documento"
+              aria-label="Título del documento"
+              maxLength={200}
+              className="h-9 rounded-lg bg-white/[0.04] px-2.5 font-sans text-sm text-text-primary outline-none placeholder:text-text-secondary"
+            />
+            <EspacioParaCrear espacios={espacios} />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setModo('nada')}
+                className="cursor-pointer px-2 font-sans text-xs text-text-secondary hover:text-text-primary"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={ocupado}
+                className="cursor-pointer rounded-lg bg-primary px-3 py-1.5 font-sans text-xs font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {ocupado ? 'Creando…' : 'Crear y abrir'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {error && (
+          <p role="alert" className="font-sans text-xs text-error">
+            {error}
+          </p>
+        )}
+      </div>
     </section>
   );
 }
@@ -320,7 +327,7 @@ function EspacioParaCrear({ espacios }: { espacios: EspacioDeDocumentos[] | null
           value={elegido}
           onChange={(e) => setElegido(e.target.value)}
           aria-label="Espacio"
-          className="h-9 rounded-lg bg-background px-2 font-sans text-sm text-text-primary outline-none [color-scheme:dark]"
+          className="h-9 rounded-lg bg-white/[0.04] px-2 font-sans text-sm text-text-primary outline-none [color-scheme:dark]"
         >
           {espacios.map((e) => (
             <option key={e.id} value={e.id}>
@@ -336,7 +343,7 @@ function EspacioParaCrear({ espacios }: { espacios: EspacioDeDocumentos[] | null
           placeholder="Documentación"
           aria-label="Nombre del espacio nuevo"
           maxLength={100}
-          className="h-9 rounded-lg bg-background px-2.5 font-sans text-sm text-text-primary outline-none placeholder:text-text-secondary"
+          className="h-9 rounded-lg bg-white/[0.04] px-2.5 font-sans text-sm text-text-primary outline-none placeholder:text-text-secondary"
         />
       )}
     </>

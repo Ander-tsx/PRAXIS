@@ -11,9 +11,14 @@ import {
   checklistProgress,
   colors,
   dueState,
+  fieldInputOf,
+  fieldValueOf,
+  isEmptyFieldInput,
   personLabel,
 } from '@praxis/commons';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { FieldValueView } from './custom-fields/FieldValueView';
+import { useProjectFields } from './custom-fields/ProjectFieldsContext';
 import { useTitulosDeDocumentos } from './documentos-de-tarea';
 import { AttachmentGlyph, LinkGlyph, NotesGlyph } from './task-marks';
 
@@ -354,6 +359,8 @@ export function TaskCard({
         </div>
       )}
 
+      <CardFields task={task} />
+
       <div className="flex flex-wrap items-center gap-1.5">
         {/**
          * Entregada: la píldora verde sustituye a la de vencimiento, no se suma.
@@ -492,6 +499,35 @@ export function TaskCard({
  * Pone tu usuario primero para que lo encuentres rápido.
  * Ahora también los ordena alfabéticamente por ID para que no salten de posición en cada render.
  */
+/**
+ * Los campos personalizados marcados «mostrar en la tarjeta», con su nombre
+ * delante: un «Ana» suelto no dice si es quien revisa o quien lo pidió.
+ *
+ * Solo los que tienen valor. Un «Reviewer: —» en cada tarjeta de la columna
+ * ocuparía sitio para decir que no hay nada.
+ */
+function CardFields({ task }: { task: Task }) {
+  const { fields, usersById } = useProjectFields();
+  const rows = fields
+    .filter((field) => field.showOnCard)
+    .map((field) => ({ field, input: fieldInputOf(field, fieldValueOf(task, field.id)) }))
+    .filter(({ input }) => !isEmptyFieldInput(input));
+  if (rows.length === 0) return null;
+
+  return (
+    <dl className="flex flex-col gap-1 font-sans text-[11px]">
+      {rows.map(({ field, input }) => (
+        <div key={field.id} className="flex min-w-0 items-center gap-1.5">
+          <dt className="max-w-[45%] shrink-0 truncate text-text-secondary">{field.name}</dt>
+          <dd className="flex min-w-0 items-center text-text-primary">
+            <FieldValueView field={field} input={input} usersById={usersById} dense />
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function mineFirst<T extends { userId: string }>(assignees: T[], currentUserId: string): T[] {
   const sorted = [...assignees].sort((a, b) => a.userId.localeCompare(b.userId));
   const index = sorted.findIndex((assignee) => assignee.userId === currentUserId);

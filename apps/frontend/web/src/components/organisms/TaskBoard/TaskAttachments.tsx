@@ -21,7 +21,13 @@ import {
 } from '@praxis/commons';
 import { useEffect, useRef, useState } from 'react';
 import { PdfViewer } from './PdfViewer';
-import { SECTION_PANEL } from './section-panel';
+import {
+  SECTION_BODY_CLASS,
+  SECTION_CLASS,
+  SECTION_COUNT_CLASS,
+  SECTION_PANEL,
+  SECTION_TITLE_CLASS,
+} from './section-panel';
 
 export interface TaskAttachmentsProps {
   projectId: string;
@@ -82,74 +88,76 @@ export function TaskAttachments({
   const total = attachments.reduce((sum, file) => sum + file.size, 0);
 
   return (
-    <section className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5">
-      <h4 className="font-sans text-sm font-medium text-white">
+    <section className={SECTION_CLASS}>
+      <h4 className={`${SECTION_TITLE_CLASS} px-1`}>
         Archivos{' '}
         {attachments.length > 0 && (
-          <span className="font-normal text-white">
+          <span className={SECTION_COUNT_CLASS}>
             {attachments.length} · {formatBytes(total)}
           </span>
         )}
       </h4>
 
-      {attachments.length === 0 && (
-        <p className="font-sans text-xs text-white">
-          {canUpload
-            ? `Solo PDF, hasta ${formatBytes(ATTACHMENT_MAX_BYTES)} cada uno.`
-            : 'Esta tarea no tiene archivos.'}
-        </p>
-      )}
+      <div className={SECTION_BODY_CLASS}>
+        {attachments.length === 0 && (
+          <p className="font-sans text-xs text-text-secondary">
+            {canUpload
+              ? `Solo PDF, hasta ${formatBytes(ATTACHMENT_MAX_BYTES)} cada uno.`
+              : 'Esta tarea no tiene archivos.'}
+          </p>
+        )}
 
-      {attachments.length > 0 && (
-        <ul className="flex flex-col gap-2">
-          {attachments.map((file) => (
-            <AttachmentRow
-              key={file.id}
-              file={file}
-              uploader={usersById.get(file.uploadedBy)}
-              projectId={projectId}
-              taskId={taskId}
-              canDelete={file.uploadedBy === currentUserId || canModerate}
-            />
-          ))}
-        </ul>
-      )}
+        {attachments.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {attachments.map((file) => (
+              <AttachmentRow
+                key={file.id}
+                file={file}
+                uploader={usersById.get(file.uploadedBy)}
+                projectId={projectId}
+                taskId={taskId}
+                canDelete={file.uploadedBy === currentUserId || canModerate}
+              />
+            ))}
+          </ul>
+        )}
 
-      {canUpload && (
-        <form ref={formRef} action={formAction} className="flex items-center gap-2" noValidate>
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="taskId" value={taskId} />
-          <input
-            type="file"
-            name="file"
-            /* Filtra el diálogo del sistema. No sustituye a la validación: el
+        {canUpload && (
+          <form ref={formRef} action={formAction} className="flex items-center gap-2" noValidate>
+            <input type="hidden" name="projectId" value={projectId} />
+            <input type="hidden" name="taskId" value={taskId} />
+            <input
+              type="file"
+              name="file"
+              /* Filtra el diálogo del sistema. No sustituye a la validación: el
                `accept` se puede saltar eligiendo «todos los archivos». */
-            accept={ATTACHMENT_ALLOWED_MIME.join(',')}
-            aria-label="Archivo que adjuntar"
-            onChange={(evento) => {
-              const elegido = evento.target.files?.[0];
-              setRechazo(elegido ? validateAttachment(elegido.type, elegido.size) : null);
-            }}
-            className="flex-1 cursor-pointer font-sans text-xs text-white file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:font-sans file:text-xs file:font-semibold file:text-white"
-          />
-          <button
-            type="submit"
-            disabled={uploading || rechazo !== null}
-            className="shrink-0 cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ background: alpha(colors.primary, 20) }}
-          >
-            {uploading ? 'Subiendo…' : 'Adjuntar'}
-          </button>
-        </form>
-      )}
+              accept={ATTACHMENT_ALLOWED_MIME.join(',')}
+              aria-label="Archivo que adjuntar"
+              onChange={(evento) => {
+                const elegido = evento.target.files?.[0];
+                setRechazo(elegido ? validateAttachment(elegido.type, elegido.size) : null);
+              }}
+              className="flex-1 cursor-pointer font-sans text-xs text-white file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:font-sans file:text-xs file:font-semibold file:text-white"
+            />
+            <button
+              type="submit"
+              disabled={uploading || rechazo !== null}
+              className="shrink-0 cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ background: alpha(colors.primary, 20) }}
+            >
+              {uploading ? 'Subiendo…' : 'Adjuntar'}
+            </button>
+          </form>
+        )}
 
-      {/* El del navegador manda sobre el del servidor: si el archivo ni siquiera
+        {/* El del navegador manda sobre el del servidor: si el archivo ni siquiera
           se puede enviar, lo que diga el intento anterior ya no viene al caso. */}
-      {(rechazo ?? state.error) && (
-        <p role="alert" className="font-sans text-xs" style={{ color: colors.error }}>
-          {rechazo ?? state.error}
-        </p>
-      )}
+        {(rechazo ?? state.error) && (
+          <p role="alert" className="font-sans text-xs" style={{ color: colors.error }}>
+            {rechazo ?? state.error}
+          </p>
+        )}
+      </div>
     </section>
   );
 }

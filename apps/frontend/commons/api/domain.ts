@@ -850,7 +850,151 @@ export interface Task {
    * vías (eventos en vivo, el asistente) pueden no traerlo.
    */
   documents?: { documentId: string }[];
+  /**
+   * Los valores de los campos personalizados que tienen algo; sin entrada es
+   * vacío. Opcional por lo mismo que `documents`: las tareas que llegan por
+   * eventos en vivo o del asistente pueden no traerlo.
+   */
+  fieldValues?: TaskFieldValue[];
   subtasks: Task[];
+}
+
+/* ─── Campos personalizados (docs/PLAN-CAMPOS-PERSONALIZADOS.md) ─────────── */
+
+/** Espejo de `CUSTOM_FIELD_TYPES` en `@praxis/contracts`. */
+export const CUSTOM_FIELD_TYPES = [
+  'TEXT',
+  'NUMBER',
+  'DATE',
+  'SELECT',
+  'MULTI_SELECT',
+  'PERSON',
+  'CHECKBOX',
+  'URL',
+] as const;
+export type CustomFieldType = (typeof CUSTOM_FIELD_TYPES)[number];
+
+export const CUSTOM_FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
+  TEXT: 'Texto',
+  NUMBER: 'Número',
+  DATE: 'Fecha',
+  SELECT: 'Selección',
+  MULTI_SELECT: 'Selección múltiple',
+  PERSON: 'Persona',
+  CHECKBOX: 'Casilla',
+  URL: 'Enlace',
+};
+
+/** Los dos tipos que llevan lista de opciones. */
+export function fieldTakesOptions(type: CustomFieldType): boolean {
+  return type === 'SELECT' || type === 'MULTI_SELECT';
+}
+
+export interface CustomFieldOption {
+  id: string;
+  name: string;
+  color: LabelColor;
+}
+
+/** Un campo que el proyecto añade a sus tareas: «Reviewer», «Cliente»… */
+export interface CustomField {
+  id: string;
+  projectId: string;
+  name: string;
+  /** No cambia una vez creado: para otro tipo se crea otro campo. */
+  type: CustomFieldType;
+  /** Solo en `SELECT` y `MULTI_SELECT`; los valores guardan el `id`. */
+  options: CustomFieldOption[];
+  /** Se pinta también en la tarjeta del tablero. */
+  showOnCard: boolean;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * El valor de un campo en una tarea. Cada tipo usa **una** columna:
+ * `text` (texto, enlace, id de la opción elegida), `number`, `date`, `bool`, o
+ * `ids` (opciones de una selección múltiple, o personas).
+ */
+export interface TaskFieldValue {
+  fieldId: string;
+  text: string | null;
+  number: number | null;
+  date: string | null;
+  bool: boolean | null;
+  ids: string[];
+}
+
+/**
+ * Lo que se manda para escribir un valor —`PUT /tasks/:id/fields/:fieldId`—,
+ * con la forma que espera cada tipo. `null` vacía el campo.
+ */
+export type FieldInput = string | number | boolean | string[] | null;
+
+/** El valor de un campo en una tarea, o `undefined` si está vacío. */
+export function fieldValueOf(task: Task, fieldId: string): TaskFieldValue | undefined {
+  return task.fieldValues?.find((value) => value.fieldId === fieldId);
+}
+
+/** Pasa un valor guardado a la forma de entrada de su tipo. */
+export function fieldInputOf(field: CustomField, value: TaskFieldValue | undefined): FieldInput {
+  if (!value) return field.type === 'MULTI_SELECT' || field.type === 'PERSON' ? [] : null;
+  switch (field.type) {
+    case 'TEXT':
+    case 'URL':
+    case 'SELECT':
+      return value.text;
+    case 'NUMBER':
+      return value.number;
+    case 'DATE':
+      return value.date ? value.date.slice(0, 10) : null;
+    case 'CHECKBOX':
+      return value.bool;
+    case 'MULTI_SELECT':
+    case 'PERSON':
+      return value.ids;
+  }
+}
+
+/** ¿Vacío? Lo que decide si una tarjeta pinta el campo o no. */
+export function isEmptyFieldInput(input: FieldInput): boolean {
+  return input === null || input === '' || (Array.isArray(input) && input.length === 0);
+}
+
+/**
+ * Una clave para ordenar la tabla por un campo: números como número, todo lo
+ * demás como texto. Los vacíos van siempre al final (`null`).
+ */
+export function fieldSortKey(
+  field: CustomField,
+  value: TaskFieldValue | undefined,
+  personName: (userId: string) => string,
+): string | number | null {
+  if (!value) return null;
+  switch (field.type) {
+    case 'NUMBER':
+      return value.number;
+    case 'CHECKBOX':
+      return value.bool ? 1 : 0;
+    case 'DATE':
+      return value.date;
+    case 'SELECT': {
+      /* Por la posición de la opción, no por su nombre: quien define «Baja,
+         Media, Alta» espera ese orden, no el alfabético. */
+      const index = field.options.findIndex((o) => o.id === value.text);
+      return index < 0 ? null : index;
+    }
+    case 'MULTI_SELECT':
+      return value.ids
+        .map((id) => field.options.find((o) => o.id === id)?.name ?? '')
+        .join(', ')
+        .toLocaleLowerCase('es');
+    case 'PERSON':
+      return value.ids.map(personName).join(', ').toLocaleLowerCase('es');
+    default:
+      return value.text?.toLocaleLowerCase('es') ?? null;
+  }
 }
 
 /** Cuántos ítems del checklist están hechos. `total` 0 significa que no hay. */

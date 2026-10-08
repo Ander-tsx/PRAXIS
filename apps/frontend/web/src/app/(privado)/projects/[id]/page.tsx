@@ -15,6 +15,7 @@ import {
   type AutomationExecutionPage,
   type AutomationRule,
   type ChatMessagePage,
+  type CustomField,
   type EffectivePermissions,
   type Label,
   type MyInvitation,
@@ -460,7 +461,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     return { sprints, tareas, backlog, metricas };
   }
 
-  const [boardTasks, scrumDeTableros, documentos, historiales] = await Promise.all([
+  const [boardTasks, scrumDeTableros, documentos, historiales, customFields] = await Promise.all([
     Promise.all(
       visibleBoards
         .filter((board) => !board.scrumEnabled)
@@ -496,6 +497,12 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             .catch(() => [board.id, [] as Sprint[]] as const),
         ),
     ),
+    /* Los campos personalizados del proyecto (`docs/PLAN-CAMPOS-PERSONALIZADOS.md`):
+       nombre, tipo y opciones, una vez por proyecto. Las tareas solo traen sus
+       valores. Si falla, el tablero se pinta igual, sin esos campos. */
+    api
+      .get<CustomField[]>(`/projects/${project.id}/fields`)
+      .catch(() => [] as CustomField[]),
   ]);
   const historialByBoard = new Map(historiales.filter(([, sprints]) => sprints.length > 0));
   /* Para el resto de la página, el tablero Scrum «tiene» las tareas de su
@@ -716,6 +723,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             tasksByBoard={tasksByBoard}
             members={assignableMembers}
             labels={labels}
+            customFields={customFields}
             usersById={usersById}
             currentUserId={userId}
             canCreateTask={can.canCreateTask}

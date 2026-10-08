@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type CustomField,
   type Label,
   type ProjectDocument,
   type Sprint,
@@ -13,6 +14,10 @@ import {
 } from '@praxis/commons';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ProjectFieldsProvider,
+  type ProjectFieldsValue,
+} from '../TaskBoard/custom-fields/ProjectFieldsContext';
 import { TitulosDeDocumentosProvider } from '../TaskBoard/documentos-de-tarea';
 import { BoardStrip } from './BoardStrip';
 import { BoardTabs } from './BoardTabs';
@@ -81,6 +86,8 @@ export interface WorkspaceCanvasProps {
   tasksByBoard: Map<string, Task[]>;
   members: UserProfile[];
   labels: Label[];
+  /** Campos personalizados del proyecto (`docs/PLAN-CAMPOS-PERSONALIZADOS.md`). */
+  customFields: CustomField[];
   usersById: Map<string, UserProfile>;
   currentUserId: string;
   canCreateTask: boolean;
@@ -160,6 +167,7 @@ export function WorkspaceCanvas({
   tasksByBoard,
   members,
   labels,
+  customFields,
   usersById,
   currentUserId,
   canCreateTask,
@@ -185,6 +193,19 @@ export function WorkspaceCanvas({
     () =>
       new Map(workspaces.flatMap((w) => w.documents ?? []).map((d) => [d.id, d.title] as const)),
     [workspaces],
+  );
+
+  /* Los campos personalizados, para el panel, la tabla y la tarjeta. Ver
+     `custom-fields/ProjectFieldsContext.tsx`. */
+  const camposDelProyecto = useMemo<ProjectFieldsValue>(
+    () => ({
+      projectId,
+      fields: customFields,
+      canEdit: canEditTask,
+      members,
+      usersById,
+    }),
+    [projectId, customFields, canEditTask, members, usersById],
   );
 
   /**
@@ -517,38 +538,40 @@ export function WorkspaceCanvas({
 
   return (
     <TitulosDeDocumentosProvider value={titulosDeDocumentos}>
-      <BoardStrip
-        /* Remonta al cambiar de tablero: `BoardColumns` guarda el orden de las
+      <ProjectFieldsProvider value={camposDelProyecto}>
+        <BoardStrip
+          /* Remonta al cambiar de tablero: `BoardColumns` guarda el orden de las
          columnas en estado local, y sin esto el tablero nuevo aparecería con el
          orden del anterior hasta el primer efecto. */
-        key={boardActivo.id}
-        board={boardActivo}
-        vista={vista}
-        titulo={barraDelTablero}
-        filtroMisTareas={controlesDeVista}
-        projectId={projectId}
-        canEditBoard={canEditBoard}
-        canDeleteBoard={canDeleteBoard}
-        canCreateColumn={canCreateColumn}
-        canEditColumn={canEditColumn}
-        canDeleteColumn={canDeleteColumn}
-        tasks={tasksByBoard.get(boardActivo.id) ?? SIN_TAREAS}
-        members={members}
-        labels={labels}
-        usersById={usersById}
-        currentUserId={currentUserId}
-        canCreateTask={canCreateTask}
-        canMoveTask={canMoveTask}
-        openTaskId={openTaskId}
-        canComment={canComment}
-        canManageLabels={canManageLabels}
-        canEditTask={canEditTask}
-        canDeleteTask={canDeleteTask}
-        scrum={boardActivo.scrumEnabled ? scrumByBoard.get(boardActivo.id) : undefined}
-        historial={historialByBoard.get(boardActivo.id)}
-        canManageSprint={canManageSprint}
-        onCambiarVista={cambiarVista}
-      />
+          key={boardActivo.id}
+          board={boardActivo}
+          vista={vista}
+          titulo={barraDelTablero}
+          filtroMisTareas={controlesDeVista}
+          projectId={projectId}
+          canEditBoard={canEditBoard}
+          canDeleteBoard={canDeleteBoard}
+          canCreateColumn={canCreateColumn}
+          canEditColumn={canEditColumn}
+          canDeleteColumn={canDeleteColumn}
+          tasks={tasksByBoard.get(boardActivo.id) ?? SIN_TAREAS}
+          members={members}
+          labels={labels}
+          usersById={usersById}
+          currentUserId={currentUserId}
+          canCreateTask={canCreateTask}
+          canMoveTask={canMoveTask}
+          openTaskId={openTaskId}
+          canComment={canComment}
+          canManageLabels={canManageLabels}
+          canEditTask={canEditTask}
+          canDeleteTask={canDeleteTask}
+          scrum={boardActivo.scrumEnabled ? scrumByBoard.get(boardActivo.id) : undefined}
+          historial={historialByBoard.get(boardActivo.id)}
+          canManageSprint={canManageSprint}
+          onCambiarVista={cambiarVista}
+        />
+      </ProjectFieldsProvider>
     </TitulosDeDocumentosProvider>
   );
 }

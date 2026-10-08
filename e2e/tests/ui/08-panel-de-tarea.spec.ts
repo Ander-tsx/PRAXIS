@@ -99,7 +99,13 @@ test.describe('Panel de detalle de una tarea', () => {
      * sobrevive a cualquier rediseño del cuadro. El `toBeChecked` de después
      * sigue siendo lo que confirma que el clic hizo su efecto.
      */
-    const casillaAnterior = page.getByRole('checkbox', { name: etiqueta });
+    /* Los encargados van plegados en su fila desde el rediseño del panel
+       (`docs/PLAN-CAMPOS-PERSONALIZADOS.md`): primero se abre la lista. La
+       casilla se busca con `includeHidden` porque **sigue en el formulario** con
+       la lista plegada —es lo que lee el guardado al cerrar—, y la comprobación
+       de después la mira justo así. */
+    await page.getByRole('button', { name: 'Encargados: cambiar' }).click();
+    const casillaAnterior = page.getByRole('checkbox', { name: etiqueta, includeHidden: true });
     await page.locator('label').filter({ has: casillaAnterior }).click();
     await expect(casillaAnterior).toBeChecked();
 
@@ -143,7 +149,8 @@ test.describe('Panel de detalle de una tarea', () => {
      */
     await page.getByRole('button', { name: `Ver y editar la tarea ${siguiente.title}` }).click();
 
-    const casillaSiguiente = page.getByRole('checkbox', { name: etiqueta });
+    await page.getByRole('button', { name: 'Encargados: cambiar' }).click();
+    const casillaSiguiente = page.getByRole('checkbox', { name: etiqueta, includeHidden: true });
     await expect(casillaSiguiente).not.toBeChecked();
     /* Por la etiqueta, igual que arriba: es aquí donde el `check({ force })`
        moría por la posición del `sr-only`. */

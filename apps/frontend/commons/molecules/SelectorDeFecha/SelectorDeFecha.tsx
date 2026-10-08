@@ -39,6 +39,19 @@ export interface SelectorDeFechaProps {
    * 18rem se salía de la pantalla.
    */
   align?: 'left' | 'right';
+  /**
+   * Esconde la etiqueta a la vista, sin quitársela al lector de pantalla.
+   *
+   * Para cuando el nombre ya está escrito al lado —una fila de propiedades del
+   * panel de tarea, con el nombre a la izquierda— y repetirlo encima del campo
+   * sería decirlo dos veces.
+   */
+  hideLabel?: boolean;
+  /**
+   * Sin caja hasta pasar por encima. Para el bloque de propiedades del panel
+   * de tarea, donde una caja por fila pesaba lo mismo que el bloque entero.
+   */
+  ghost?: boolean;
 }
 
 const DIAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -128,6 +141,8 @@ export function SelectorDeFecha({
   placeholder = 'Sin fecha límite',
   onValueChange,
   align = 'left',
+  hideLabel = false,
+  ghost = false,
 }: SelectorDeFechaProps) {
   const [valor, setValor] = useState(defaultValue);
   const [abierto, setAbierto] = useState(false);
@@ -191,7 +206,10 @@ export function SelectorDeFecha({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span id={etiquetaId} className="font-sans text-sm font-medium text-text-primary">
+      <span
+        id={etiquetaId}
+        className={hideLabel ? 'sr-only' : 'font-sans text-sm font-medium text-text-primary'}
+      >
         {label}
       </span>
 
@@ -209,8 +227,12 @@ export function SelectorDeFecha({
           aria-labelledby={etiquetaId}
           className={[
             'flex h-10 w-full items-center gap-2 rounded-lg border px-3 font-sans text-sm',
-            'border-border bg-surface-elevated text-left outline-none transition-all duration-150',
-            'hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-primary/20',
+            ghost
+              ? 'border-transparent bg-transparent text-left outline-none transition-all duration-150 hover:bg-white/[0.04]'
+              : 'border-border bg-surface-elevated text-left outline-none transition-all duration-150',
+            ghost
+              ? 'focus:border-primary'
+              : 'hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-primary/20',
             'disabled:cursor-not-allowed disabled:opacity-50',
             abierto ? 'border-primary ring-2 ring-primary/20' : '',
             disabled ? '' : 'cursor-pointer',

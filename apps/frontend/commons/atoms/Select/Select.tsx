@@ -166,6 +166,13 @@ export function Select({
     switch (evento.key) {
       case 'Escape':
         evento.preventDefault();
+        /* Cierra la lista y **nada más**. Un panel lateral (`SlideOver`)
+           también escucha Escape en `document`, y React delega sus eventos en
+           ese mismo nodo: `stopPropagation()` no frena a un oyente del mismo
+           nodo, `stopImmediatePropagation()` sí. Sin esto, cerrar la lista de
+           prioridad cerraba la tarea entera. */
+        evento.stopPropagation();
+        evento.nativeEvent.stopImmediatePropagation();
         setAbierto(false);
         botonRef.current?.focus();
         return;

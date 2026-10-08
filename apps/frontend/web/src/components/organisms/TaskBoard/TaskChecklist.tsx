@@ -16,6 +16,12 @@ import {
   useAccion,
 } from '@praxis/commons';
 import { useEffect, useRef } from 'react';
+import {
+  SECTION_BODY_CLASS,
+  SECTION_CLASS,
+  SECTION_COUNT_CLASS,
+  SECTION_TITLE_CLASS,
+} from './section-panel';
 
 export interface TaskChecklistProps {
   projectId: string;
@@ -60,12 +66,12 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
   }, [addState]);
 
   return (
-    <section className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5">
-      <header className="flex items-center justify-between gap-3">
-        <h4 className="font-sans text-sm font-medium text-white">
-          Checklist{' '}
+    <section className={SECTION_CLASS}>
+      <header className="flex min-h-6 items-center justify-between gap-3 px-1">
+        <h4 className={SECTION_TITLE_CLASS}>
+          Checklist
           {total > 0 && (
-            <span className="font-normal tabular-nums text-white">
+            <span className={SECTION_COUNT_CLASS}>
               {done}/{total}
             </span>
           )}
@@ -82,67 +88,69 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
         )}
       </header>
 
-      {total === 0 && (
-        <p className="font-sans text-xs text-white">
-          {canEdit
-            ? 'Divide la tarea en pasos concretos para ver el avance de un vistazo.'
-            : 'Esta tarea no tiene checklist.'}
-        </p>
-      )}
+      <div className={SECTION_BODY_CLASS}>
+        {total === 0 && (
+          <p className="font-sans text-xs text-text-secondary">
+            {canEdit
+              ? 'Divide la tarea en pasos concretos para ver el avance de un vistazo.'
+              : 'Esta tarea no tiene checklist.'}
+          </p>
+        )}
 
-      {task.checklists.length > 0 && (
-        <ul className="flex flex-col gap-1">
-          {task.checklists.map((item) => (
-            <ChecklistRow
-              key={item.id}
-              projectId={projectId}
-              taskId={task.id}
-              itemId={item.id}
-              text={item.text}
-              completed={item.completed}
-              canEdit={canEdit}
-              canToggle={canToggle}
+        {task.checklists.length > 0 && (
+          <ul className="flex flex-col gap-1">
+            {task.checklists.map((item) => (
+              <ChecklistRow
+                key={item.id}
+                projectId={projectId}
+                taskId={task.id}
+                itemId={item.id}
+                text={item.text}
+                completed={item.completed}
+                canEdit={canEdit}
+                canToggle={canToggle}
+              />
+            ))}
+          </ul>
+        )}
+
+        {canEdit && (
+          <form ref={addFormRef} action={addAction} className="relative mt-2" noValidate>
+            <input type="hidden" name="projectId" value={projectId} />
+            <input type="hidden" name="taskId" value={task.id} />
+            <input type="hidden" name="order" value={total} />
+
+            <input
+              name="text"
+              placeholder="Añadir un paso…"
+              maxLength={500}
+              aria-label="Nuevo ítem del checklist"
+              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 pr-11 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary hover:border-white/[0.14] focus:border-primary focus:bg-white/[0.06]"
             />
-          ))}
-        </ul>
-      )}
-
-      {canEdit && (
-        <form ref={addFormRef} action={addAction} className="relative mt-2" noValidate>
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="taskId" value={task.id} />
-          <input type="hidden" name="order" value={total} />
-
-          <input
-            name="text"
-            placeholder="Añadir un paso…"
-            maxLength={500}
-            aria-label="Nuevo ítem del checklist"
-            className="w-full rounded-xl border border-white/10 bg-[#191919] px-4 py-2.5 pr-12 font-sans text-sm text-white outline-none transition-colors placeholder:text-white focus:border-primary focus:ring-1 focus:ring-primary"
-          />
-          <button
-            type="submit"
-            disabled={adding}
-            className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-text-inverse transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <svg
-              className="h-3.5 w-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2.5}
+            <button
+              type="submit"
+              disabled={adding}
+              className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-primary text-text-inverse transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
-            </svg>
-          </button>
-        </form>
-      )}
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+              </svg>
+            </button>
+          </form>
+        )}
 
-      {addState.error && (
-        <p role="alert" className="font-sans text-xs" style={{ color: colors.error }}>
-          {addState.error}
-        </p>
-      )}
+        {addState.error && (
+          <p role="alert" className="font-sans text-xs" style={{ color: colors.error }}>
+            {addState.error}
+          </p>
+        )}
+      </div>
     </section>
   );
 }

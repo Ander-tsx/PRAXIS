@@ -15,7 +15,13 @@ import {
   useAccion,
 } from '@praxis/commons';
 import { useEffect, useRef, useState } from 'react';
-import { SECTION_PANEL } from './section-panel';
+import {
+  SECTION_BODY_CLASS,
+  SECTION_CLASS,
+  SECTION_COUNT_CLASS,
+  SECTION_PANEL,
+  SECTION_TITLE_CLASS,
+} from './section-panel';
 import { NotesGlyph } from './task-marks';
 
 /**
@@ -90,73 +96,73 @@ export function TaskNotes({
   }, [state]);
 
   return (
-    <section className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5">
-      <h4 className="flex items-center gap-2 font-sans text-sm font-medium text-white">
-        <NotesGlyph className="h-4 w-4 text-primary" />
+    <section className={SECTION_CLASS}>
+      <h4 className={`${SECTION_TITLE_CLASS} px-1`}>
+        <NotesGlyph className="h-3.5 w-3.5" />
         Notas{' '}
-        {comments.length > 0 && (
-          <span className="font-normal tabular-nums text-white">{comments.length}</span>
-        )}
+        {comments.length > 0 && <span className={SECTION_COUNT_CLASS}>{comments.length}</span>}
       </h4>
 
-      {comments.length === 0 && (
-        <p className="font-sans text-xs text-white">
-          {canComment
-            ? 'Sin notas todavía. Deja aquí por qué la tarea se movió, se aplazó o está esperando.'
-            : 'Esta tarea no tiene notas.'}
-        </p>
-      )}
+      <div className={SECTION_BODY_CLASS}>
+        {comments.length === 0 && (
+          <p className="font-sans text-xs text-text-secondary">
+            {canComment
+              ? 'Sin notas todavía. Deja aquí por qué la tarea se movió, se aplazó o está esperando.'
+              : 'Esta tarea no tiene notas.'}
+          </p>
+        )}
 
-      {comments.length > 0 && (
-        <ul className="flex flex-col gap-3">
-          {comments.map((comment) => (
-            <NoteRow
-              key={comment.id}
-              comment={comment}
-              author={usersById.get(comment.authorId)}
-              projectId={projectId}
-              taskId={taskId}
-              canEdit={comment.authorId === currentUserId}
-              canDelete={comment.authorId === currentUserId || canModerate}
+        {comments.length > 0 && (
+          <ul className="flex flex-col gap-3">
+            {comments.map((comment) => (
+              <NoteRow
+                key={comment.id}
+                comment={comment}
+                author={usersById.get(comment.authorId)}
+                projectId={projectId}
+                taskId={taskId}
+                canEdit={comment.authorId === currentUserId}
+                canDelete={comment.authorId === currentUserId || canModerate}
+              />
+            ))}
+          </ul>
+        )}
+
+        {canComment ? (
+          <form ref={formRef} action={formAction} className="flex flex-col gap-2" noValidate>
+            <input type="hidden" name="projectId" value={projectId} />
+            <input type="hidden" name="taskId" value={taskId} />
+            <textarea
+              name="body"
+              rows={2}
+              maxLength={4000}
+              placeholder="Escribe una nota…"
+              aria-label="Nueva nota"
+              className="w-full resize-y rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 font-sans text-sm text-text-primary placeholder:text-text-secondary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
-          ))}
-        </ul>
-      )}
+            <span className="flex justify-end">
+              <button
+                type="submit"
+                disabled={pending}
+                className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: alpha(colors.primary, 20) }}
+              >
+                {pending ? 'Guardando…' : 'Añadir nota'}
+              </button>
+            </span>
+          </form>
+        ) : (
+          <p className="font-sans text-xs text-text-secondary">
+            Puedes leer las notas, pero no tienes permiso para escribir.
+          </p>
+        )}
 
-      {canComment ? (
-        <form ref={formRef} action={formAction} className="flex flex-col gap-2" noValidate>
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="taskId" value={taskId} />
-          <textarea
-            name="body"
-            rows={2}
-            maxLength={4000}
-            placeholder="Escribe una nota…"
-            aria-label="Nueva nota"
-            className="w-full resize-y rounded-lg border border-white/10 bg-[#191919] px-3 py-2 font-sans text-xs text-white placeholder:text-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-          />
-          <span className="flex justify-end">
-            <button
-              type="submit"
-              disabled={pending}
-              className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ background: alpha(colors.primary, 20) }}
-            >
-              {pending ? 'Guardando…' : 'Añadir nota'}
-            </button>
-          </span>
-        </form>
-      ) : (
-        <p className="font-sans text-xs text-white">
-          Puedes leer las notas, pero no tienes permiso para escribir.
-        </p>
-      )}
-
-      {state.error && (
-        <p role="alert" className="font-sans text-xs" style={{ color: colors.error }}>
-          {state.error}
-        </p>
-      )}
+        {state.error && (
+          <p role="alert" className="font-sans text-xs" style={{ color: colors.error }}>
+            {state.error}
+          </p>
+        )}
+      </div>
     </section>
   );
 }
@@ -241,7 +247,7 @@ function NoteRow({
             maxLength={4000}
             defaultValue={comment.body}
             aria-label="Editar nota"
-            className="w-full resize-y rounded-lg border border-white/10 bg-[#191919] px-3 py-2 font-sans text-xs text-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full resize-y rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 font-sans text-sm text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
           <span className="flex gap-2">
             <button

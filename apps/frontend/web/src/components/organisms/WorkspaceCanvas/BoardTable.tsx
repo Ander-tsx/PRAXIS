@@ -1,10 +1,12 @@
 'use client';
 
+import { reorderCustomFieldsAction } from '@/app/(privado)/projects/[id]/field-actions';
 import {
   Avatar,
   type Board,
   type Column,
   type ColumnColor,
+  type CustomField,
   DONE_COLUMN_COLOR,
   type Label as LabelType,
   PRIORITY_LABELS,
@@ -15,11 +17,23 @@ import {
   avatarHref,
   colors,
   dueState,
+  fieldSortKey,
+  fieldValueOf,
   personLabel,
   useEsMovil,
 } from '@praxis/commons';
-import { type PointerEvent as ReactPointerEvent, useEffect, useMemo, useState } from 'react';
+import {
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { TaskDialog } from '../TaskBoard/TaskDialog';
+import { AnchoredPanel, FieldEditor, useFieldValue } from '../TaskBoard/custom-fields/FieldEditor';
+import { FieldSettings } from '../TaskBoard/custom-fields/FieldSettings';
+import { FieldValueView } from '../TaskBoard/custom-fields/FieldValueView';
+import { useProjectFields } from '../TaskBoard/custom-fields/ProjectFieldsContext';
 import { useTaskDialog } from '../TaskBoard/useTaskDialog';
 
 export interface BoardTableProps {
@@ -38,7 +52,11 @@ export interface BoardTableProps {
   canDeleteTask: boolean;
 }
 
-type Col = 'titulo' | 'columna' | 'vencimiento' | 'prioridad';
+/**
+ * Por qué se puede ordenar. Un campo personalizado ordena como
+ * `` `campo:${id}` ``: su columna existe solo si el proyecto lo tiene.
+ */
+type Col = 'titulo' | 'columna' | 'vencimiento' | 'prioridad' | `campo:${string}`;
 
 /** Las seis columnas de la tabla, en orden. Las que ordenan llevan `orden`. */
 type ColumnaDeTabla =
@@ -58,9 +76,18 @@ const COLUMNAS: { id: ColumnaDeTabla; titulo: string; orden?: Col }[] = [
   { id: 'prioridad', titulo: 'Prioridad', orden: 'prioridad' },
 ];
 
-type Anchos = Record<ColumnaDeTabla, number>;
+/**
+ * El ancho de cada columna, por clave: las seis fijas por su nombre y los
+ * campos personalizados como `` `campo:${id}` ``.
+ */
+type Anchos = Record<string, number>;
 
-const ANCHOS_POR_DEFECTO: Anchos = {
+/** Lo que mide de entrada la columna de un campo personalizado. */
+const ANCHO_CAMPO = 160;
+/** La columna del «+» que añade un campo. */
+const ANCHO_AÑADIR = 48;
+
+const ANCHOS_POR_DEFECTO: Record<ColumnaDeTabla, number> = {
   titulo: 380,
   columna: 160,
   encargados: 140,
@@ -89,9 +116,10 @@ function leerAnchos(userId: string): Anchos {
     const crudo = window.localStorage.getItem(claveDeAnchos(userId));
     if (!crudo) return ANCHOS_POR_DEFECTO;
     const guardado = JSON.parse(crudo) as Partial<Record<string, unknown>>;
-    const r = { ...ANCHOS_POR_DEFECTO };
-    for (const { id } of COLUMNAS) {
-      const v = guardado[id];
+    const r: Anchos = { ...ANCHOS_POR_DEFECTO };
+    /* Todas las claves guardadas, no solo las fijas: también las de los campos
+       personalizados. Una de un campo que ya no existe no estorba. */
+    for (const [id, v] of Object.entries(guardado)) {
       if (typeof v === 'number' && Number.isFinite(v)) {
         r[id] = Math.min(ANCHO_MAX, Math.max(ANCHO_MIN, Math.round(v)));
       }
@@ -168,25 +196,32 @@ export function BoardTable({
   const esMovil = useEsMovil();
   const dialog = useTaskDialog(tasks, openTaskId);
 
+  const { fields, canEdit: puedeGestionarCampos, usersById: personas } = useProjectFields();
+
   const [anchos, setAnchos] = useState<Anchos>(ANCHOS_POR_DEFECTO);
   useEffect(() => {
     setAnchos(leerAnchos(currentUserId));
   }, [currentUserId]);
-  const anchoTotal = COLUMNAS.reduce((suma, c) => suma + anchos[c.id], 0);
+  const anchoDe = (id: string) => anchos[id] ?? ANCHO_CAMPO;
+  const anchoTotal =
+    COLUMNAS.reduce((suma, c) => suma + anchoDe(c.id), 0) +
+    fields.reduce((suma, f) => suma + anchoDe(`campo:${f.id}`), 0) +
+    (puedeGestionarCampos ? ANCHO_AÑADIR : 0);
+  const totalDeColumnas = COLUMNAS.length + fields.length + (puedeGestionarCampos ? 1 : 0);
 
   /**
    * Arrastrar el borde derecho de una cabecera. El ancho se calcula desde el
    * del principio del gesto más lo que se ha movido el puntero, no sumando
    * deltas, para que no derive. Se guarda al soltar, no en cada píxel.
    */
-  function empezarRedimension(id: ColumnaDeTabla, evento: ReactPointerEvent<HTMLSpanElement>) {
+  function empezarRedimension(id: string, evento: ReactPointerEvent<HTMLSpanElement>) {
     if (evento.button !== 0) return;
     evento.preventDefault();
     evento.stopPropagation();
     const asa = evento.currentTarget;
     asa.setPointerCapture(evento.pointerId);
     const x0 = evento.clientX;
-    const ancho0 = anchos[id];
+    const ancho0 = anchoDe(id);
     let ultimo = anchos;
     cursorDeRedimension(true);
 
@@ -209,9 +244,12 @@ export function BoardTable({
     asa.addEventListener('pointercancel', soltar);
   }
 
-  function restaurarAncho(id: ColumnaDeTabla) {
+  function restaurarAncho(id: string) {
     setAnchos((actual) => {
-      const siguiente = { ...actual, [id]: ANCHOS_POR_DEFECTO[id] };
+      const siguiente = {
+        ...actual,
+        [id]: ANCHOS_POR_DEFECTO[id as ColumnaDeTabla] ?? ANCHO_CAMPO,
+      };
       guardarAnchos(currentUserId, siguiente);
       return siguiente;
     });
@@ -220,6 +258,33 @@ export function BoardTable({
   const filas = useMemo(() => {
     const arr = [...tasks];
     const dir = orden.asc ? 1 : -1;
+
+    /* Por un campo personalizado: los vacíos siempre al final, en los dos
+       sentidos —ordenar por «Reviewer» es querer ver primero a quién se le
+       asignó, no las filas sin nadie—. */
+    if (orden.col.startsWith('campo:')) {
+      const campo = fields.find((f) => `campo:${f.id}` === orden.col);
+      if (campo) {
+        const nombre = (id: string) => {
+          const u = personas.get(id);
+          return u ? personLabel(u) : '';
+        };
+        const clave = new Map(
+          arr.map((t) => [t.id, fieldSortKey(campo, fieldValueOf(t, campo.id), nombre)]),
+        );
+        arr.sort((a, b) => {
+          const av = clave.get(a.id) ?? null;
+          const bv = clave.get(b.id) ?? null;
+          if (av === null && bv === null) return 0;
+          if (av === null) return 1;
+          if (bv === null) return -1;
+          if (typeof av === 'number' && typeof bv === 'number') return dir * (av - bv);
+          return dir * String(av).localeCompare(String(bv), 'es');
+        });
+      }
+      return arr;
+    }
+
     arr.sort((a, b) => {
       switch (orden.col) {
         case 'titulo':
@@ -235,10 +300,12 @@ export function BoardTable({
         }
         case 'prioridad':
           return dir * (PRIORIDAD_ORDEN[a.priority] - PRIORIDAD_ORDEN[b.priority]);
+        default:
+          return 0;
       }
     });
     return arr;
-  }, [tasks, orden, ordenDeColumna]);
+  }, [tasks, orden, ordenDeColumna, fields, personas]);
 
   /**
    * Completadas aparte, igual que en Calendario: mezcladas con lo pendiente,
@@ -360,8 +427,12 @@ export function BoardTable({
       <table className="table-fixed border-collapse text-left" style={{ width: anchoTotal }}>
         <colgroup>
           {COLUMNAS.map((c) => (
-            <col key={c.id} style={{ width: anchos[c.id] }} />
+            <col key={c.id} style={{ width: anchoDe(c.id) }} />
           ))}
+          {fields.map((f) => (
+            <col key={f.id} style={{ width: anchoDe(`campo:${f.id}`) }} />
+          ))}
+          {puedeGestionarCampos && <col style={{ width: ANCHO_AÑADIR }} />}
         </colgroup>
         <thead className="sticky top-0 z-10 bg-[#202020]">
           <tr className="border-b border-white/10 font-sans text-[11px] font-semibold uppercase tracking-wider text-white">
@@ -377,6 +448,33 @@ export function BoardTable({
                 {c.titulo}
               </Th>
             ))}
+            {fields.map((f, i) => (
+              <Th
+                key={f.id}
+                col={`campo:${f.id}`}
+                orden={orden}
+                onSort={alOrdenar}
+                onResizeStart={(e) => empezarRedimension(`campo:${f.id}`, e)}
+                onResizeReset={() => restaurarAncho(`campo:${f.id}`)}
+                menu={
+                  puedeGestionarCampos && (
+                    <MenuDeCampo
+                      field={f}
+                      antes={fields[i - 1]?.id}
+                      despues={fields[i + 1]?.id}
+                      orden={fields.map((x) => x.id)}
+                    />
+                  )
+                }
+              >
+                {f.name}
+              </Th>
+            ))}
+            {puedeGestionarCampos && (
+              <th className="border border-white/5 px-1 py-1.5">
+                <AñadirCampo />
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -398,7 +496,10 @@ export function BoardTable({
         {completadas.length > 0 && (
           <tbody>
             <tr aria-hidden="true">
-              <td colSpan={6} className="border border-white/5 bg-black/20 px-3 py-1.5">
+              <td
+                colSpan={totalDeColumnas}
+                className="border border-white/5 bg-black/20 px-3 py-1.5"
+              >
                 <span className="font-sans text-[10px] font-semibold uppercase tracking-wider text-white/40">
                   Completadas ({completadas.length})
                 </span>
@@ -453,6 +554,7 @@ function FilaTarea({
   const t = task;
   const due = dueState(t.dueDate);
   const tonoColumna = columna ? tintOf(columna.color, indiceDeColumna) : colors.textSecondary;
+  const { fields, canEdit } = useProjectFields();
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: el equivalente de teclado es el <button> del título, cuyo click burbujea hasta aquí; el click en la fila es solo comodidad de ratón
     <tr
@@ -549,7 +651,189 @@ function FilaTarea({
       <td className={CELDA}>
         <PrioridadChip priority={t.priority} />
       </td>
+      {fields.map((f) => (
+        <CeldaDeCampo key={f.id} task={t} field={f} />
+      ))}
+      {canEdit && <td className={CELDA} />}
     </tr>
+  );
+}
+
+/**
+ * Una celda de campo personalizado. Con permiso, pulsarla edita el valor ahí
+ * mismo —sin abrir la tarea— en un flotante; sin él, la fila se comporta como
+ * siempre y abre el panel.
+ *
+ * La casilla no abre nada: se marca y desmarca al pulsar.
+ */
+function CeldaDeCampo({ task, field }: { task: Task; field: CustomField }) {
+  const { canEdit, usersById } = useProjectFields();
+  const { input, save, saving, error } = useFieldValue(task, field);
+  const [ancla, setAncla] = useState<HTMLElement | null>(null);
+  const cerrar = useCallback(() => setAncla(null), []);
+
+  const valor = <FieldValueView field={field} input={input} usersById={usersById} />;
+
+  if (!canEdit) {
+    return (
+      <td className={`${CELDA} font-sans text-[12px] text-text-primary`}>
+        <span className="flex min-w-0 items-center">{valor}</span>
+      </td>
+    );
+  }
+
+  return (
+    <td
+      className={`${CELDA} p-0 font-sans text-[12px] text-text-primary`}
+      /* Que el clic edite la celda y no abra la tarea de la fila. El teclado
+         entra por el botón de dentro, que ya no burbujea hasta la fila. */
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        aria-label={`${field.name} de «${task.title}»: cambiar`}
+        title={error ?? undefined}
+        onClick={(e) => {
+          if (field.type === 'CHECKBOX') return void save(input !== true);
+          setAncla(ancla ? null : e.currentTarget);
+        }}
+        className={`flex h-full min-h-10 w-full min-w-0 cursor-pointer items-center px-3 py-2 text-left transition-colors hover:bg-white/[0.04] ${
+          saving ? 'opacity-60' : ''
+        } ${error ? 'outline outline-1 -outline-offset-1 outline-error' : ''}`}
+      >
+        {valor}
+      </button>
+      {ancla && (
+        <AnchoredPanel anchor={ancla} onClose={cerrar}>
+          <div className="flex flex-col gap-2">
+            <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+              {field.name}
+            </span>
+            <FieldEditor
+              field={field}
+              input={input}
+              variant="panel"
+              autoFocus
+              onCommit={(value) => {
+                void save(value);
+                /* Elegir una sola cosa termina la edición; en las listas
+                   múltiples se siguen marcando hasta salir. */
+                if (field.type !== 'MULTI_SELECT' && field.type !== 'PERSON') cerrar();
+              }}
+            />
+          </div>
+        </AnchoredPanel>
+      )}
+    </td>
+  );
+}
+
+/**
+ * El «+» al final de la cabecera: crea un campo, que aparece como columna nueva
+ * a la derecha. Es el equivalente de «añadir una columna» de una hoja de
+ * cálculo, y el campo nace para todo el proyecto, no solo para esta tabla.
+ */
+function AñadirCampo() {
+  const [ancla, setAncla] = useState<HTMLElement | null>(null);
+  const cerrar = useCallback(() => setAncla(null), []);
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Añadir un campo"
+        title="Añadir un campo"
+        onClick={(e) => setAncla(ancla ? null : e.currentTarget)}
+        className="flex h-7 w-full cursor-pointer items-center justify-center rounded-md text-base text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary"
+      >
+        +
+      </button>
+      {ancla && (
+        <AnchoredPanel anchor={ancla} onClose={cerrar} width={320}>
+          <FieldSettings onDone={cerrar} />
+        </AnchoredPanel>
+      )}
+    </>
+  );
+}
+
+/**
+ * El menú de la cabecera de un campo: configurarlo y moverlo de sitio. Moverlo
+ * mueve el campo **para todo el proyecto** —también en el panel de la tarea—,
+ * no solo en la tabla de quien lo mueve.
+ */
+function MenuDeCampo({
+  field,
+  antes,
+  despues,
+  orden,
+}: {
+  field: CustomField;
+  antes?: string;
+  despues?: string;
+  orden: string[];
+}) {
+  const { projectId } = useProjectFields();
+  const [ancla, setAncla] = useState<HTMLElement | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const cerrar = useCallback(() => setAncla(null), []);
+
+  async function mover(con: string) {
+    const ids = [...orden];
+    const a = ids.indexOf(field.id);
+    const b = ids.indexOf(con);
+    [ids[a], ids[b]] = [ids[b], ids[a]];
+    const resultado = await reorderCustomFieldsAction({ projectId, orderedIds: ids });
+    if (resultado.error) setError(resultado.error);
+    else cerrar();
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={`Opciones del campo ${field.name}`}
+        title="Opciones del campo"
+        onClick={(e) => {
+          e.stopPropagation();
+          setError(null);
+          setAncla(ancla ? null : e.currentTarget);
+        }}
+        className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded text-text-secondary opacity-0 transition-opacity hover:bg-white/10 hover:text-text-primary focus-visible:opacity-100 group-hover/th:opacity-100"
+      >
+        ⋯
+      </button>
+      {ancla && (
+        <AnchoredPanel anchor={ancla} onClose={cerrar} width={320}>
+          <div className="flex flex-col gap-3 normal-case tracking-normal">
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                disabled={!antes}
+                onClick={() => antes && void mover(antes)}
+                className="flex-1 cursor-pointer rounded-md border border-border px-2 py-1 font-sans text-xs font-normal text-text-secondary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ← Mover a la izquierda
+              </button>
+              <button
+                type="button"
+                disabled={!despues}
+                onClick={() => despues && void mover(despues)}
+                className="flex-1 cursor-pointer rounded-md border border-border px-2 py-1 font-sans text-xs font-normal text-text-secondary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Mover a la derecha →
+              </button>
+            </div>
+            {error && (
+              <p role="alert" className="font-sans text-xs font-normal text-error">
+                {error}
+              </p>
+            )}
+            <FieldSettings field={field} onDone={cerrar} />
+          </div>
+        </AnchoredPanel>
+      )}
+    </>
   );
 }
 
@@ -559,6 +843,7 @@ function Th({
   onSort,
   onResizeStart,
   onResizeReset,
+  menu,
   children,
 }: {
   /** Sin `col`, la cabecera no ordena. */
@@ -567,36 +852,41 @@ function Th({
   onSort: (c: Col) => void;
   onResizeStart: (e: ReactPointerEvent<HTMLSpanElement>) => void;
   onResizeReset: () => void;
+  /** El «⋯» de un campo personalizado, a la derecha del nombre. */
+  menu?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const activo = col !== undefined && orden.col === col;
   return (
-    <th className="relative overflow-hidden border border-white/5 px-3 py-2.5 font-semibold">
-      {col ? (
-        <button
-          type="button"
-          onClick={() => onSort(col)}
-          className={`flex max-w-full items-center gap-1 font-semibold uppercase transition-colors hover:text-white ${
-            activo ? 'text-white' : ''
-          }`}
-        >
-          <span className="truncate">{children}</span>
-          {activo && (
-            <svg
-              className={`h-3 w-3 shrink-0 transition-transform ${orden.asc ? '' : 'rotate-180'}`}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2.5}
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 15l6-6 6 6" />
-            </svg>
-          )}
-        </button>
-      ) : (
-        <span className="block truncate">{children}</span>
-      )}
+    <th className="group/th relative overflow-hidden border border-white/5 px-3 py-2.5 font-semibold">
+      <span className="flex min-w-0 items-center gap-1">
+        {col ? (
+          <button
+            type="button"
+            onClick={() => onSort(col)}
+            className={`flex max-w-full items-center gap-1 font-semibold uppercase transition-colors hover:text-white ${
+              activo ? 'text-white' : ''
+            }`}
+          >
+            <span className="truncate">{children}</span>
+            {activo && (
+              <svg
+                className={`h-3 w-3 shrink-0 transition-transform ${orden.asc ? '' : 'rotate-180'}`}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 15l6-6 6 6" />
+              </svg>
+            )}
+          </button>
+        ) : (
+          <span className="block truncate">{children}</span>
+        )}
+        {menu && <span className="ml-auto flex shrink-0">{menu}</span>}
+      </span>
       {/* El asa: el borde derecho de la cabecera. Doble clic, ancho de siempre.
           Oculta a lectores de pantalla: es un ajuste de ratón sobre cómo se ve
           la tabla, y la tabla se lee entera con cualquier ancho. */}
