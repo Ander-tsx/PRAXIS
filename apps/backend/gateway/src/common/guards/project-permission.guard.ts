@@ -45,6 +45,8 @@ const TASK_CONTROLLERS = new Set([
   /* Sin esta línea el guard no sabe sacar el proyecto de `:taskId` y responde
      403 «Contexto de proyecto no encontrado» a todo (E9 de PLAN-DOCUMENTOS). */
   'TaskDocumentsController',
+  /* El valor de un campo personalizado: `PUT /tasks/:taskId/fields/:fieldId`. */
+  'TaskFieldValuesController',
 ]);
 
 /**

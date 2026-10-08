@@ -25,6 +25,7 @@ model Task {
   checklists   Checklist[]
   assignees    TaskAssignee[]
   labels       TaskLabel[]
+  fieldValues  TaskFieldValue[]
   comments     TaskComment[]
   attachments  TaskAttachment[]
   documents    TaskDocument[]
@@ -317,6 +318,86 @@ model TaskLabel {
   @@index([labelId])
   @@schema("tasks")
   @@map("task_labels")
+}
+
+/// Los ocho tipos de campo personalizado (`docs/PLAN-CAMPOS-PERSONALIZADOS.md`).
+///
+/// ⚠️ Un campo **no cambia de tipo** una vez creado: el valor guardado se
+/// interpreta según el tipo, y pasar de `NUMBER` a `DATE` dejaría filas que no
+/// significan nada. Para otro tipo se crea otro campo.
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+  MULTI_SELECT
+  PERSON
+  CHECKBOX
+  URL
+
+  @@schema("tasks")
+}
+
+/// Un campo que un proyecto añade a sus tareas —«Reviewer», «Cliente»,
+/// «Versión»—.
+///
+/// Es del **proyecto**, igual que `Label`: vale para todos sus tableros. Sin
+/// clave foránea hacia `Project`, que vive en otro servicio; al borrar el
+/// proyecto lo limpia `task_purge`.
+model CustomField {
+  id         String           @id @default(uuid())
+  projectId  String
+  name       String
+  type       CustomFieldType
+  /// Solo para `SELECT` y `MULTI_SELECT`: `[{ id, name, color }]`, con `color`
+  /// del mismo vocabulario que las etiquetas. Para el resto, `[]`.
+  ///
+  /// Los valores guardan el **id** de la opción, no su nombre: así renombrar
+  /// una opción no obliga a reescribir ninguna tarea.
+  options    Json             @default("[]")
+  /// Si se pinta en la tarjeta del tablero, además de en el panel y la tabla.
+  showOnCard Boolean          @default(false)
+  order      Int              @default(0)
+  values     TaskFieldValue[]
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  /// Dos campos con el mismo nombre en un proyecto serían dos columnas iguales.
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@schema("tasks")
+  @@map("custom_fields")
+}
+
+/// El valor de un campo en una tarea. Una fila por pareja; sin fila = vacío.
+///
+/// Columnas con tipo en vez de un `Json`: así se puede ordenar y filtrar en
+/// SQL. Cada tipo usa **una sola**:
+///
+/// | Tipo | Columna |
+/// |---|---|
+/// | `TEXT`, `URL` | `text` |
+/// | `SELECT` | `text` (id de la opción) |
+/// | `NUMBER` | `number` |
+/// | `DATE` | `date` |
+/// | `CHECKBOX` | `bool` |
+/// | `MULTI_SELECT`, `PERSON` | `ids` (ids de opción o de usuario) |
+model TaskFieldValue {
+  taskId    String
+  task      Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fieldId   String
+  field     CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  text      String?
+  number    Float?
+  date      DateTime?
+  bool      Boolean?
+  ids       String[]    @default([])
+  updatedAt DateTime    @updatedAt
+
+  @@id([taskId, fieldId])
+  @@index([fieldId])
+  @@schema("tasks")
+  @@map("task_field_values")
 }
 
 enum Priority {

@@ -64,6 +64,15 @@ const TASK_INCLUDE = {
      tiene de dónde sacarlos si solo llega la relación. */
   labels: { include: { label: true } },
   /**
+   * Los valores de los campos personalizados, solo los que tienen algo: sin
+   * fila es vacío. La definición del campo **no** viaja aquí —nombre, tipo y
+   * opciones se piden una vez por proyecto (`/projects/:id/fields`)—; repetirla
+   * en cada tarea del tablero sería pagarla cincuenta veces.
+   */
+  fieldValues: {
+    select: { fieldId: true, text: true, number: true, date: true, bool: true, ids: true },
+  },
+  /**
    * Los comentarios viajan **con la tarea**, también en el listado del tablero.
    *
    * Es la decisión menos elegante de este include y se toma a sabiendas: la
@@ -1393,6 +1402,11 @@ export class TasksService {
     if (dto.projectId) {
       await this.prisma.label.deleteMany({ where: { projectId: dto.projectId } });
       await this.redis.del(`labels:project:${dto.projectId}`);
+
+      /* Los campos personalizados, por lo mismo que las etiquetas: son del
+         proyecto. Sus valores caen en cascada con el campo y con la tarea. */
+      await this.prisma.customField.deleteMany({ where: { projectId: dto.projectId } });
+      await this.redis.del(`fields:project:${dto.projectId}`);
 
       /**
        * Y el historial de eventos del proyecto.

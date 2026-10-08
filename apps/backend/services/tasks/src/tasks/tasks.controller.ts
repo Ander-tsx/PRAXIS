@@ -6,15 +6,18 @@ import {
   CreateAttachmentDto,
   CreateChecklistDto,
   CreateCommentDto,
+  CreateCustomFieldDto,
   CreateLabelDto,
   CreateTaskDto,
   DeleteAttachmentDto,
   DeleteChecklistDto,
   DeleteCommentDto,
+  DeleteCustomFieldDto,
   DeleteLabelDto,
   DeleteTaskDto,
   FindAttachmentsDto,
   FindCommentsDto,
+  FindCustomFieldsDto,
   FindLabelsDto,
   FindMyTasksDto,
   FindOneTaskDto,
@@ -25,14 +28,17 @@ import {
   PurgeTasksDto,
   type ReportFilters,
   RestatusTasksDto,
+  SetTaskFieldValueDto,
   ToggleChecklistDto,
   UpdateCommentDto,
+  UpdateCustomFieldDto,
   UpdateLabelDto,
   UpdateTaskDto,
 } from '@praxis/contracts';
 
 import { AttachmentsService } from './attachments.service';
 import { CommentsService } from './comments.service';
+import { CustomFieldsService } from './custom-fields.service';
 import { LabelsService } from './labels.service';
 import { type DimensionCruce, StatsService } from './stats.service';
 import { TasksService } from './tasks.service';
@@ -42,6 +48,7 @@ export class TasksController {
   constructor(
     private readonly tasksService: TasksService,
     private readonly labelsService: LabelsService,
+    private readonly customFieldsService: CustomFieldsService,
     private readonly commentsService: CommentsService,
     private readonly attachmentsService: AttachmentsService,
     private readonly statsService: StatsService,
@@ -196,6 +203,33 @@ export class TasksController {
   @MessagePattern({ cmd: 'label_delete' })
   deleteLabel(@Payload() dto: DeleteLabelDto) {
     return this.labelsService.deleteLabel(dto);
+  }
+
+  // ─── Campos personalizados ────────────────────────────────────────────────
+
+  @MessagePattern({ cmd: 'field_find_all' })
+  findFields(@Payload() dto: FindCustomFieldsDto) {
+    return this.customFieldsService.findFields(dto);
+  }
+
+  @MessagePattern({ cmd: 'field_create' })
+  createField(@Payload() dto: CreateCustomFieldDto) {
+    return this.customFieldsService.createField(dto);
+  }
+
+  @MessagePattern({ cmd: 'field_update' })
+  updateField(@Payload() dto: UpdateCustomFieldDto) {
+    return this.customFieldsService.updateField(dto);
+  }
+
+  @MessagePattern({ cmd: 'field_delete' })
+  deleteField(@Payload() dto: DeleteCustomFieldDto) {
+    return this.customFieldsService.deleteField(dto);
+  }
+
+  @MessagePattern({ cmd: 'field_set_value' })
+  setFieldValue(@Payload() dto: SetTaskFieldValueDto) {
+    return this.customFieldsService.setValue(dto);
   }
 
   // ─── Comentarios ──────────────────────────────────────────────────────────

@@ -687,6 +687,28 @@ vocabulario del proyecto entero.
 
 ---
 
+## Campos personalizados 🔒
+
+Del **proyecto**, como las etiquetas (`docs/PLAN-CAMPOS-PERSONALIZADOS.md`).
+
+| Método | Ruta | Cuerpo | Permiso |
+|---|---|---|---|
+| GET | `/projects/:projectId/fields` | — | `canViewProject` |
+| POST | `/projects/:projectId/fields` | `{ name, type, options?, showOnCard? }` → 201 | `canEditTask` |
+| PATCH | `/projects/:projectId/fields/:id` | `{ name?, options?, showOnCard?, order? }` — **sin `type`** | `canEditTask` |
+| DELETE | `/projects/:projectId/fields/:id` | — → `{ success, removedFrom }` | `canEditTask` |
+| PUT | `/tasks/:taskId/fields/:fieldId` | `{ value }` — `null` vacía | `canEditTask` |
+
+- `type`: `TEXT`, `NUMBER`, `DATE`, `SELECT`, `MULTI_SELECT`, `PERSON`, `CHECKBOX`, `URL`.
+- `options` (solo selecciones): `[{ id?, name, color }]`, `color` del vocabulario
+  de etiquetas. Es la lista **entera**: una opción sin `id` es nueva y una que
+  falta se quita también de las tareas.
+- `value` según el tipo: texto, número, `yyyy-mm-dd`, booleano, id de opción, o
+  lista de ids (opciones o personas del proyecto). Un tipo equivocado da 400 con
+  el motivo en español. Nombre repetido en el proyecto: 409.
+- La tarea sale con `fieldValues: [{ fieldId, text, number, date, bool, ids }]`,
+  solo los que tienen algo.
+
 ## Comentarios 🔒
 
 | Método | Ruta | Body | Permiso |
