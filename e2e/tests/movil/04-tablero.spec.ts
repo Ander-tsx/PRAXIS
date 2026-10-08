@@ -126,28 +126,27 @@ test('una pulsación larga sobre una tarjeta abre «Mover a…»', async () => {
   ).toBeVisible({ timeout: 10_000 });
 });
 
-test('el calendario es una agenda con «Hoy» y su «+»', async () => {
-  await pagina.goto(`/projects/${slug}?vista=calendario`);
-  const hoy = pagina.getByText('Hoy', { exact: true }).filter({ visible: true }).last();
-  await expect(hoy).toBeVisible();
-  await pagina
-    .getByRole('button', { name: /^Nueva tarea el / })
-    .filter({ visible: true })
-    .first()
-    .click();
-  const campo = pagina.getByLabel('Título de la tarea nueva');
-  await campo.fill('Desde la agenda');
-  await campo.press('Enter');
-  await expect(pagina.getByText('Desde la agenda').filter({ visible: true }).first()).toBeVisible({
-    timeout: 15_000,
-  });
-});
-
-test('la tabla es una lista de tarjetas con su orden', async () => {
-  await pagina.goto(`/projects/${slug}?vista=tabla`);
-  await expect(pagina.getByRole('table')).toHaveCount(0);
-  await expect(pagina.getByLabel('Ordenar por')).toBeVisible();
-  await expect(pagina.getByRole('button', { name: /Migrar clientes/ })).toBeVisible();
+/**
+ * 🔴 **En el teléfono solo hay Kanban** (decisión del dueño, 2026-10-08,
+ * `docs/PLAN-CAMPOS-PERSONALIZADOS.md`). Tabla y Calendario se quitaron en vez
+ * de encogerse: ni selector de vista, ni se llega por `?vista=` con un enlace
+ * copiado del escritorio. Sustituye a las pruebas de M3 que fijaban la agenda
+ * y la lista de la tabla en móvil.
+ */
+test('en el teléfono no hay Tabla ni Calendario, ni por la URL', async () => {
+  for (const vista of ['tabla', 'calendario']) {
+    await pagina.goto(`/projects/${slug}?vista=${vista}`);
+    await expect(
+      pagina
+        .getByRole('button', { name: /Migrar clientes/ })
+        .filter({ visible: true })
+        .first(),
+    ).toBeVisible();
+    await expect(pagina.getByRole('table')).toHaveCount(0);
+    await expect(pagina.getByLabel('Ordenar por')).toHaveCount(0);
+    await expect(pagina.getByRole('tablist', { name: 'Vista del tablero' })).toHaveCount(0);
+    await expect(pagina.getByRole('button', { name: /^Nueva tarea el / })).toHaveCount(0);
+  }
 });
 
 test('las pestañas del proyecto se desplazan y llegan hasta Ajustes', async () => {

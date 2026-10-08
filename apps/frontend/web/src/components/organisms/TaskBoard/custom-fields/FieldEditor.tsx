@@ -2,12 +2,15 @@
 
 import { setTaskFieldValueAction } from '@/app/(privado)/projects/[id]/field-actions';
 import {
+  Avatar,
   type CustomField,
   type FieldInput,
+  Select,
   SelectorDeFecha,
   type Task,
   type UserProfile,
   alpha,
+  avatarHref,
   colors,
   fieldInputOf,
   fieldValueOf,
@@ -15,8 +18,10 @@ import {
 } from '@praxis/commons';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { FIELD_BOX, FIELD_OVERRIDE } from '../section-panel';
 import { FieldValueView, OptionPill } from './FieldValueView';
 import { useProjectFields } from './ProjectFieldsContext';
+import { TokenPicker } from './TokenPicker';
 import { swallowEscape } from './swallow-escape';
 
 /**
@@ -83,6 +88,7 @@ export function FieldEditor({
   disabled = false,
   variant = 'inline',
   autoFocus = false,
+  id,
 }: {
   field: CustomField;
   input: FieldInput;
@@ -90,6 +96,8 @@ export function FieldEditor({
   disabled?: boolean;
   variant?: 'inline' | 'panel';
   autoFocus?: boolean;
+  /** Para que el nombre de la fila (`<label for>`) nombre al control. */
+  id?: string;
 }) {
   const { members, usersById } = useProjectFields();
 
@@ -104,6 +112,8 @@ export function FieldEditor({
           onCommit={onCommit}
           disabled={disabled}
           autoFocus={autoFocus}
+          id={id}
+          boxed={variant === 'inline'}
         />
       );
 
@@ -119,6 +129,8 @@ export function FieldEditor({
           defaultValue={typeof input === 'string' ? input : ''}
           placeholder="Sin fecha"
           disabled={disabled}
+          className={variant === 'inline' ? FIELD_OVERRIDE : ''}
+          corto
           align="right"
           onValueChange={(value) => onCommit(value || null)}
         />
@@ -128,6 +140,23 @@ export function FieldEditor({
       return <CheckboxEditor field={field} input={input} onCommit={onCommit} disabled={disabled} />;
 
     case 'SELECT':
+      /* En el panel, el mismo desplegable que Prioridad: una sola opción se
+         elige igual en toda la tarea. En el flotante de la tabla, la lista. */
+      if (variant === 'inline') {
+        return (
+          <Select
+            id={id}
+            className={FIELD_OVERRIDE}
+            value={typeof input === 'string' ? input : ''}
+            disabled={disabled}
+            onValueChange={(value) => onCommit(value || null)}
+            options={[
+              { value: '', label: 'Sin valor' },
+              ...field.options.map((o) => ({ value: o.id, label: o.name, color: colors[o.color] })),
+            ]}
+          />
+        );
+      }
       return (
         <OptionsEditor
           field={field}
@@ -147,6 +176,31 @@ export function FieldEditor({
       );
 
     case 'MULTI_SELECT':
+      if (variant === 'inline') {
+        return (
+          <TokenPicker
+            label={field.name}
+            items={field.options.map((o) => ({
+              id: o.id,
+              label: o.name,
+              tone: colors[o.color],
+              leading: (
+                <span
+                  aria-hidden="true"
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ background: colors[o.color] }}
+                />
+              ),
+            }))}
+            selected={Array.isArray(input) ? input : []}
+            onChange={(ids) => onCommit(ids)}
+            disabled={disabled}
+            placeholder="Añadir opción…"
+            emptyText="Sin valor"
+            noItemsText="Este campo no tiene opciones todavía."
+          />
+        );
+      }
       return (
         <OptionsEditor
           field={field}
@@ -166,6 +220,30 @@ export function FieldEditor({
       );
 
     case 'PERSON':
+      if (variant === 'inline') {
+        return (
+          <TokenPicker
+            label={field.name}
+            items={members.map((m) => ({
+              id: m.id,
+              label: personLabel(m),
+              leading: (
+                <Avatar
+                  size="sm"
+                  label={personLabel(m)}
+                  src={avatarHref(m.avatarUrl, '/api/gateway')}
+                />
+              ),
+            }))}
+            selected={Array.isArray(input) ? input : []}
+            onChange={(ids) => onCommit(ids)}
+            disabled={disabled}
+            placeholder="Añadir persona…"
+            emptyText="Nadie"
+            noItemsText="Este proyecto todavía no tiene a nadie a quien elegir."
+          />
+        );
+      }
       return (
         <OptionsEditor
           field={field}
@@ -194,12 +272,17 @@ function TextLikeEditor({
   onCommit,
   disabled,
   autoFocus,
+  id,
+  boxed,
 }: {
   field: CustomField;
   input: FieldInput;
   onCommit: (value: FieldInput) => void;
   disabled: boolean;
   autoFocus: boolean;
+  id?: string;
+  /** Con la caja de campo del panel (`FIELD_BOX`); sin ella en la tabla. */
+  boxed: boolean;
 }) {
   const initial = input === null ? '' : String(input);
   const [draft, setDraft] = useState(initial);
@@ -232,14 +315,17 @@ function TextLikeEditor({
       <input
         type={field.type === 'URL' ? 'url' : 'text'}
         inputMode={field.type === 'NUMBER' ? 'decimal' : undefined}
-        aria-label={field.name}
+        id={id}
+        aria-label={id ? undefined : field.name}
         aria-invalid={problem ? true : undefined}
         value={draft}
         disabled={disabled}
         // biome-ignore lint/a11y/noAutofocus: solo en el flotante de una celda, que se abrió para escribir aquí
         autoFocus={autoFocus}
         maxLength={field.type === 'URL' ? 2048 : 2000}
-        placeholder={field.type === 'URL' ? 'https://…' : 'Vacío'}
+        placeholder={
+          field.type === 'URL' ? 'https://…' : field.type === 'NUMBER' ? '0' : 'Escribe…'
+        }
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => {
@@ -258,11 +344,15 @@ function TextLikeEditor({
           }
         }}
         className={[
-          'h-9 w-full min-w-0 rounded-lg border bg-transparent px-2.5 font-sans text-sm text-text-primary outline-none transition-colors',
-          'placeholder:text-text-disabled hover:border-border focus:border-primary focus:bg-surface',
-          problem ? 'border-error' : 'border-transparent',
+          'h-10 w-full min-w-0 px-3 font-sans text-sm text-text-primary outline-none',
+          'placeholder:text-text-secondary disabled:cursor-default disabled:px-0',
+          /* En el panel, la caja de campo: si tiene caja, se toca. Sin permiso
+             (`disabled`), el valor sin caja. En la tabla, el flotante ya es la caja. */
+          boxed && !disabled
+            ? FIELD_BOX
+            : 'rounded-xl border border-white/[0.11] bg-white/[0.05] disabled:border-transparent disabled:bg-transparent',
+          problem ? 'border-error!' : '',
           field.type === 'NUMBER' ? 'tabular-nums' : '',
-          'disabled:cursor-not-allowed disabled:opacity-60',
         ].join(' ')}
       />
       {problem && (
@@ -294,7 +384,7 @@ function CheckboxEditor({
       aria-label={field.name}
       disabled={disabled}
       onClick={() => onCommit(!on)}
-      className="flex h-9 w-fit cursor-pointer items-center gap-2 rounded-lg px-2.5 font-sans text-sm text-text-primary transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
+      className={`flex min-h-10 w-full cursor-pointer items-center gap-2.5 px-3 text-left font-sans text-sm text-text-primary disabled:cursor-default disabled:px-0 ${disabled ? '' : FIELD_BOX}`}
     >
       <span
         aria-hidden="true"

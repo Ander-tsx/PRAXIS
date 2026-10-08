@@ -339,7 +339,7 @@ function NewLinkForm({
   }
 
   const campo =
-    'h-9 w-full min-w-0 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary hover:border-white/[0.14] focus:border-primary focus:bg-white/[0.06]';
+    'h-9 w-full min-w-0 rounded-xl border border-white/[0.11] bg-white/[0.05] px-3 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary hover:border-white/[0.2] focus:border-primary/70 focus:bg-white/[0.07]';
 
   return (
     <div

@@ -47,11 +47,13 @@ export interface SelectorDeFechaProps {
    * sería decirlo dos veces.
    */
   hideLabel?: boolean;
+  /** Clases para el botón, detrás de las propias: la caja del panel de tarea. */
+  className?: string;
   /**
-   * Sin caja hasta pasar por encima. Para el bloque de propiedades del panel
-   * de tarea, donde una caja por fila pesaba lo mismo que el bloque entero.
+   * «12 oct 2026» en vez de «12 de octubre de 2026»: para una columna estrecha,
+   * donde la forma larga se partía en dos líneas.
    */
-  ghost?: boolean;
+  corto?: boolean;
 }
 
 const DIAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -142,7 +144,8 @@ export function SelectorDeFecha({
   onValueChange,
   align = 'left',
   hideLabel = false,
-  ghost = false,
+  className = '',
+  corto = false,
 }: SelectorDeFechaProps) {
   const [valor, setValor] = useState(defaultValue);
   const [abierto, setAbierto] = useState(false);
@@ -227,23 +230,22 @@ export function SelectorDeFecha({
           aria-labelledby={etiquetaId}
           className={[
             'flex h-10 w-full items-center gap-2 rounded-lg border px-3 font-sans text-sm',
-            ghost
-              ? 'border-transparent bg-transparent text-left outline-none transition-all duration-150 hover:bg-white/[0.04]'
-              : 'border-border bg-surface-elevated text-left outline-none transition-all duration-150',
-            ghost
-              ? 'focus:border-primary'
-              : 'hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-primary/20',
+            'border-border bg-surface-elevated text-left outline-none transition-all duration-150',
+            'hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-primary/20',
             'disabled:cursor-not-allowed disabled:opacity-50',
             abierto ? 'border-primary ring-2 ring-primary/20' : '',
             disabled ? '' : 'cursor-pointer',
+            className,
           ]
             .filter(Boolean)
             .join(' ')}
         >
           <CalendarioIcono />
-          <span className={seleccionada ? 'text-text-primary' : 'text-white'}>
+          <span className={seleccionada ? 'text-text-primary' : 'text-text-secondary'}>
             {seleccionada
-              ? `${seleccionada.getDate()} de ${MESES[seleccionada.getMonth()]} de ${seleccionada.getFullYear()}`
+              ? corto
+                ? `${seleccionada.getDate()} ${MESES[seleccionada.getMonth()].slice(0, 3)} ${seleccionada.getFullYear()}`
+                : `${seleccionada.getDate()} de ${MESES[seleccionada.getMonth()]} de ${seleccionada.getFullYear()}`
               : placeholder}
           </span>
 

@@ -54,3 +54,24 @@ export const TASK_PANEL_TOKENS = {
   '--color-surface': '#262626',
   '--color-surface-elevated': '#2c2c2b',
 } as CSSProperties;
+
+/**
+ * **La caja de todo lo que se edita** en el panel de tarea: desplegables,
+ * fechas, textos, el selector de personas y etiquetas.
+ *
+ * Borde y fondo visibles a propósito. La versión anterior quitaba la caja
+ * («fantasma») para que las filas pesaran menos, y el resultado fue que no se
+ * distinguía lo editable de lo que no —en el teléfono sobre todo, donde no hay
+ * hover que lo descubra—. Ahora la regla es simple: **si tiene caja, se
+ * toca**; sin permiso de edición, el valor se pinta sin caja.
+ */
+export const FIELD_BOX =
+  'rounded-xl border border-white/[0.11] bg-white/[0.05] transition-colors hover:border-white/[0.2] hover:bg-white/[0.07] focus-within:border-primary/70 focus-within:bg-white/[0.07]';
+
+/**
+ * Lo mismo para los átomos que ya traen su caja (`Select`, `SelectorDeFecha`):
+ * con `!` porque entre dos utilidades del mismo tipo decide el orden del CSS,
+ * no el de las clases.
+ */
+export const FIELD_OVERRIDE =
+  'rounded-xl! border-white/[0.11]! bg-white/[0.05]! shadow-none! hover:border-white/[0.2]! hover:bg-white/[0.07]! hover:shadow-none!';

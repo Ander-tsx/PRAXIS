@@ -138,7 +138,7 @@ export function TaskNotes({
               maxLength={4000}
               placeholder="Escribe una nota…"
               aria-label="Nueva nota"
-              className="w-full resize-y rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 font-sans text-sm text-text-primary placeholder:text-text-secondary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="w-full resize-y rounded-xl border border-white/[0.11] bg-white/[0.05] px-3 py-2 font-sans text-sm text-text-primary hover:border-white/[0.2] placeholder:text-text-secondary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
             <span className="flex justify-end">
               <button
@@ -247,7 +247,7 @@ function NoteRow({
             maxLength={4000}
             defaultValue={comment.body}
             aria-label="Editar nota"
-            className="w-full resize-y rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 font-sans text-sm text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full resize-y rounded-xl border border-white/[0.11] bg-white/[0.05] px-3 py-2 font-sans text-sm text-text-primary hover:border-white/[0.2] focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
           <span className="flex gap-2">
             <button

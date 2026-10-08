@@ -125,7 +125,7 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
               placeholder="Añadir un paso…"
               maxLength={500}
               aria-label="Nuevo ítem del checklist"
-              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 pr-11 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary hover:border-white/[0.14] focus:border-primary focus:bg-white/[0.06]"
+              className="w-full rounded-xl border border-white/[0.11] bg-white/[0.05] px-3 py-2 pr-11 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary hover:border-white/[0.2] focus:border-primary/70 focus:bg-white/[0.07]"
             />
             <button
               type="submit"

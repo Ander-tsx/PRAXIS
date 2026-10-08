@@ -80,34 +80,20 @@ test.describe('Panel de detalle de una tarea', () => {
     const etiqueta = companero.email.split('@')[0];
 
     /**
-     * ⚠️ **Se pulsa la etiqueta, no la casilla, y no es un capricho de estilo.**
+     * Encargados es un selector de fichas desde 2026-10-08
+     * (`custom-fields/TokenPicker.tsx`): se escribe o se pulsa en la caja, se
+     * elige en la lista y la persona queda como ficha con su «Quitar a …».
      *
-     * El interruptor de encargado es un `<input type="checkbox">` de verdad
-     * escondido dentro de su `<label>`: va `sr-only` —un píxel, recortado y
-     * fuera de flujo— y lo que se ve, y lo que recibe el clic de una persona,
-     * es el cuadro dibujado al lado.
-     *
-     * Esto hacía `check({ force: true })`. `force` se salta las comprobaciones
-     * de accionabilidad, pero **no** el cálculo del punto del clic: Playwright
-     * sigue necesitando que la caja del elemento caiga dentro del viewport, y
-     * la de un `sr-only` no se mueve al desplazar el panel. Funcionaba en la
-     * primera casilla y fallaba en la segunda —ya con el panel de otra tarea
-     * abierto y desplazado— con «Element is outside of the viewport», que no
-     * menciona por ningún sitio que el problema sea el `sr-only`.
-     *
-     * Pulsar la `<label>` que lo envuelve es además lo que hace una persona, y
-     * sobrevive a cualquier rediseño del cuadro. El `toBeChecked` de después
-     * sigue siendo lo que confirma que el clic hizo su efecto.
+     * Lo que viaja en el formulario son `<input type="hidden">`, uno por
+     * ficha; por eso lo que se comprueba es la ficha, no una casilla.
      */
-    /* Los encargados van plegados en su fila desde el rediseño del panel
-       (`docs/PLAN-CAMPOS-PERSONALIZADOS.md`): primero se abre la lista. La
-       casilla se busca con `includeHidden` porque **sigue en el formulario** con
-       la lista plegada —es lo que lee el guardado al cerrar—, y la comprobación
-       de después la mira justo así. */
-    await page.getByRole('button', { name: 'Encargados: cambiar' }).click();
-    const casillaAnterior = page.getByRole('checkbox', { name: etiqueta, includeHidden: true });
-    await page.locator('label').filter({ has: casillaAnterior }).click();
-    await expect(casillaAnterior).toBeChecked();
+    await page.getByRole('combobox', { name: 'Añadir a Encargados' }).click();
+    await page.getByRole('option', { name: etiqueta }).click();
+    const fichaAnterior = page.getByRole('button', {
+      name: `Quitar a ${etiqueta}`,
+      includeHidden: true,
+    });
+    await expect(fichaAnterior).toHaveCount(1);
 
     await page.getByRole('button', { name: 'Cerrar panel' }).click();
 
@@ -135,9 +121,9 @@ test.describe('Panel de detalle de una tarea', () => {
      */
     await page.waitForTimeout(2_000);
     await expect(
-      casillaAnterior,
-      'Cerrar el panel no puede desmarcar lo que se acaba de guardar',
-    ).toBeChecked();
+      fichaAnterior,
+      'Cerrar el panel no puede quitar lo que se acaba de guardar',
+    ).toHaveCount(1);
 
     /**
      * ⚠️ **La segunda tarea se abre pulsando su tarjeta, no con otra URL.**
@@ -149,12 +135,11 @@ test.describe('Panel de detalle de una tarea', () => {
      */
     await page.getByRole('button', { name: `Ver y editar la tarea ${siguiente.title}` }).click();
 
-    await page.getByRole('button', { name: 'Encargados: cambiar' }).click();
-    const casillaSiguiente = page.getByRole('checkbox', { name: etiqueta, includeHidden: true });
-    await expect(casillaSiguiente).not.toBeChecked();
-    /* Por la etiqueta, igual que arriba: es aquí donde el `check({ force })`
-       moría por la posición del `sr-only`. */
-    await page.locator('label').filter({ has: casillaSiguiente }).click();
+    /* La segunda tarea nace sin esa persona: si la ficha saliera aquí, es que
+       el panel arrastró el estado de la anterior. */
+    await expect(page.getByRole('button', { name: `Quitar a ${etiqueta}` })).toHaveCount(0);
+    await page.getByRole('combobox', { name: 'Añadir a Encargados' }).click();
+    await page.getByRole('option', { name: etiqueta }).click();
     await page.getByRole('button', { name: 'Cerrar panel' }).click();
 
     await expect

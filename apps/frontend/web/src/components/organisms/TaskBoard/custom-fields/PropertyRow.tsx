@@ -5,10 +5,13 @@ import { SECTION_CLASS, SECTION_TITLE_CLASS } from '../section-panel';
  *
  * La jerarquía del panel la ponen estos bloques, no rayas entre filas: un
  * encabezado pequeño en versalitas dice qué hay dentro, y un fondo apenas más
- * claro agrupa las filas que van juntas. Con una raya entre cada fila, todas
- * pesaban lo mismo y el panel se leía como una lista sin orden.
+ * claro agrupa lo que va junto.
  *
- * `action` va a la derecha del encabezado: el «+ Añadir» de los campos.
+ * Dentro, una **rejilla de dos columnas** desde `sm`: los campos cortos
+ * (prioridad, fecha, un número) van de dos en dos y los largos (encargados,
+ * etiquetas, un texto) ocupan la fila entera (`wide`). En el teléfono, una.
+ *
+ * `action` va a la derecha del encabezado: el «+ Añadir campo».
  */
 export function PropertyGroup({
   title,
@@ -25,7 +28,7 @@ export function PropertyGroup({
         <h3 className={SECTION_TITLE_CLASS}>{title}</h3>
         {action}
       </header>
-      <div className="flex flex-col rounded-xl bg-white/[0.025] p-1 ring-1 ring-inset ring-white/[0.06]">
+      <div className="grid grid-cols-1 gap-x-3 gap-y-4 rounded-xl bg-white/[0.025] p-4 ring-1 ring-white/[0.06] ring-inset sm:grid-cols-2">
         {children}
       </div>
     </section>
@@ -33,25 +36,34 @@ export function PropertyGroup({
 }
 
 /**
- * Una fila de propiedad: icono y nombre a la izquierda, el valor a la derecha.
+ * Una propiedad: el nombre **encima** y el campo debajo, a todo el ancho.
+ *
+ * Fue nombre a la izquierda y valor a la derecha, y el dueño del producto lo
+ * vio desequilibrado —todo el peso cargado a un lado, los desplegables
+ * apretados en la mitad— (2026-10-08). Encima, el nombre se lee igual y el
+ * campo aprovecha la anchura.
  *
  * Con `htmlFor`, el nombre es un `<label>` de verdad y da nombre accesible al
- * control. Sin él —un control que ya se nombra solo, o un grupo— es texto.
+ * control. Sin él —un control que ya se nombra solo— es texto.
  *
- * `action` aparece al pasar por encima, junto al nombre: el engranaje para
- * configurar un campo personalizado.
+ * `action` va a la derecha del nombre: el engranaje de un campo personalizado,
+ * o «Gestionar» en las etiquetas. Siempre visible: en el teléfono no hay hover
+ * que la descubra.
  */
 export function PropertyRow({
   label,
   icon,
   htmlFor,
   action,
+  wide = false,
   children,
 }: {
   label: React.ReactNode;
   icon?: React.ReactNode;
   htmlFor?: string;
   action?: React.ReactNode;
+  /** Ocupa las dos columnas: listas de fichas, textos. */
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   const name = (
@@ -59,15 +71,10 @@ export function PropertyRow({
       {label}
     </span>
   );
-  /**
-   * ⚠️ **En el teléfono, apilada**: el nombre arriba y el valor debajo, a todo
-   * el ancho. A 390 px, dos columnas dejaban al valor en ~230 px: la fecha se
-   * partía en dos líneas, «Reviewer» se cortaba y la lista de personas no cabía.
-   */
   return (
-    <div className="group/row grid grid-cols-[8.5rem_minmax(0,1fr)] items-start gap-2 rounded-lg px-2 py-0.5 transition-colors hover:bg-white/[0.03] max-sm:grid-cols-1 max-sm:gap-0 max-sm:py-1.5">
-      <span className="flex min-h-9 min-w-0 items-center gap-2 font-sans text-[13px] text-text-secondary max-sm:min-h-6 max-sm:text-xs">
-        {icon && <span className="text-text-secondary/80">{icon}</span>}
+    <div className={`flex min-w-0 flex-col gap-1.5 ${wide ? 'sm:col-span-2' : ''}`}>
+      <span className="flex min-h-5 min-w-0 items-center gap-1.5 font-sans text-xs font-medium text-text-secondary">
+        {icon && <span className="text-text-secondary/80 [&>svg]:h-3.5 [&>svg]:w-3.5">{icon}</span>}
         {htmlFor ? (
           <label htmlFor={htmlFor} className="min-w-0 truncate">
             {name}
@@ -75,11 +82,7 @@ export function PropertyRow({
         ) : (
           name
         )}
-        {action && (
-          <span className="ml-auto shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100 max-sm:opacity-100">
-            {action}
-          </span>
-        )}
+        {action && <span className="ml-auto flex shrink-0 items-center">{action}</span>}
       </span>
       <div className="min-w-0">{children}</div>
     </div>

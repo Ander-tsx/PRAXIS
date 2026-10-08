@@ -11,6 +11,7 @@ import {
   alpha,
   colors,
   projectHref,
+  useEsMovil,
 } from '@praxis/commons';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -291,6 +292,15 @@ export function WorkspaceCanvas({
   const [vista, setVista] = useState<VistaTablero>(() =>
     esVista(vistaInicial) ? vistaInicial : 'kanban',
   );
+  /**
+   * ⚠️ **En el teléfono solo hay Kanban.** Tabla y Calendario no se piensan para
+   * 390 px —una tabla de doce columnas o una rejilla de mes— y el dueño del
+   * producto decidió quitarlas en vez de encogerlas (2026-10-08). Aunque se
+   * llegue con `?vista=tabla` desde un enlace copiado en el escritorio, aquí se
+   * pinta Kanban; la URL no se toca, para que ese enlace siga valiendo allí.
+   */
+  const esMovil = useEsMovil();
+  const vistaVisible: VistaTablero = esMovil ? 'kanban' : vista;
   function cambiarVista(v: VistaTablero) {
     setVista(v);
     const url = new URL(window.location.href);
@@ -431,7 +441,7 @@ export function WorkspaceCanvas({
      tablero, y comparten sitio encima del lienzo. */
   const controlesDeVista = (
     <>
-      <VistaSelector value={vista} onChange={cambiarVista} />
+      {!esMovil && <VistaSelector value={vista} onChange={cambiarVista} />}
       {filtroMisTareas}
     </>
   );
@@ -545,7 +555,7 @@ export function WorkspaceCanvas({
          orden del anterior hasta el primer efecto. */
           key={boardActivo.id}
           board={boardActivo}
-          vista={vista}
+          vista={vistaVisible}
           titulo={barraDelTablero}
           filtroMisTareas={controlesDeVista}
           projectId={projectId}

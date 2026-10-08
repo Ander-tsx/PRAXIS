@@ -17,6 +17,8 @@ import {
   fieldTakesOptions,
 } from '@praxis/commons';
 import { useId, useState } from 'react';
+import { FIELD_BOX, FIELD_OVERRIDE } from '../section-panel';
+import { CheckToggle } from './CheckToggle';
 import { useProjectFields } from './ProjectFieldsContext';
 import { swallowEscape } from './swallow-escape';
 
@@ -129,7 +131,7 @@ export function FieldSettings({
               void save();
             }
           }}
-          className="h-9 rounded-lg border border-border bg-surface px-2.5 text-sm text-text-primary outline-none placeholder:text-text-disabled focus:border-primary"
+          className={`h-10 px-3 text-sm text-text-primary outline-none placeholder:text-text-secondary ${FIELD_BOX}`}
         />
       </label>
 
@@ -149,6 +151,7 @@ export function FieldSettings({
           </label>
           <Select
             id={tipoId}
+            className={FIELD_OVERRIDE}
             value={type}
             onValueChange={(value) => setType(value as CustomFieldType)}
             options={CUSTOM_FIELD_TYPES.map((t) => ({
@@ -181,7 +184,7 @@ export function FieldSettings({
                     all.map((o) => (o.key === option.key ? { ...o, name: event.target.value } : o)),
                   )
                 }
-                className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-sm text-text-primary outline-none placeholder:text-text-disabled focus:border-primary"
+                className={`h-9 min-w-0 flex-1 px-2.5 text-sm text-text-primary outline-none placeholder:text-text-secondary ${FIELD_BOX}`}
               />
               <button
                 type="button"
@@ -217,15 +220,12 @@ export function FieldSettings({
         </fieldset>
       )}
 
-      <label className="flex cursor-pointer items-center gap-2 text-sm text-text-primary">
-        <input
-          type="checkbox"
-          checked={showOnCard}
-          onChange={(event) => setShowOnCard(event.target.checked)}
-          className="h-4 w-4 accent-[var(--color-primary)]"
-        />
-        Mostrar en la tarjeta del tablero
-      </label>
+      <CheckToggle
+        checked={showOnCard}
+        onChange={setShowOnCard}
+        label="Mostrar en la tarjeta del tablero"
+        hint="Se ve sin abrir la tarea, solo si tiene valor."
+      />
 
       {error && (
         <p role="alert" className="rounded-lg bg-error/10 p-2 text-xs text-error">

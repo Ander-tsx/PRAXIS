@@ -1,7 +1,7 @@
 'use client';
 
 import type { CustomField, Task } from '@praxis/commons';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { FieldEditor, useFieldValue } from './FieldEditor';
 import { FieldSettings } from './FieldSettings';
 import { useProjectFields } from './ProjectFieldsContext';
@@ -46,7 +46,7 @@ export function CustomFieldRows({ task, readOnly }: { task: Task; readOnly: bool
         <button
           type="button"
           onClick={() => setEditing('new')}
-          className="flex cursor-pointer flex-col items-start gap-0.5 rounded-lg px-3 py-3 text-left font-sans transition-colors hover:bg-white/[0.03]"
+          className="flex cursor-pointer flex-col items-start gap-0.5 rounded-lg border border-dashed border-white/[0.14] px-3 py-3 text-left font-sans transition-colors hover:border-white/[0.24] hover:bg-white/[0.03] sm:col-span-2"
         >
           <span className="text-sm text-text-primary">
             Añade lo que este proyecto necesite anotar
@@ -94,10 +94,19 @@ function CustomFieldRow({
   onEdit?: () => void;
 }) {
   const { input, save, saving, error } = useFieldValue(task, field);
+  /* El nombre de la fila nombra al control (`<label for>`) en los que son un
+     solo campo; las listas de fichas se nombran solas. */
+  const id = useId();
+  const labelled = ['TEXT', 'NUMBER', 'URL', 'SELECT'].includes(field.type);
   return (
     <PropertyRow
       label={field.name}
       icon={<FieldTypeIcon type={field.type} />}
+      htmlFor={labelled ? id : undefined}
+      /* Todos a lo ancho. A media anchura, un campo suelto —«Entorno» entre dos
+         que ocupan la fila— dejaba un hueco a la derecha y el bloque se veía
+         desequilibrado (el dueño del producto, 2026-10-08). */
+      wide
       action={
         onEdit && (
           <button
@@ -113,12 +122,18 @@ function CustomFieldRow({
       }
     >
       <div className="flex min-w-0 flex-col gap-0.5">
-        <FieldEditor field={field} input={input} onCommit={save} disabled={readOnly} />
+        <FieldEditor
+          field={field}
+          input={input}
+          onCommit={save}
+          disabled={readOnly}
+          id={labelled ? id : undefined}
+        />
         {(saving || error) && (
           <span
             role={error ? 'alert' : undefined}
             aria-live="polite"
-            className={`px-2.5 font-sans text-[11px] ${error ? 'text-error' : 'text-text-secondary'}`}
+            className={`font-sans text-[11px] ${error ? 'text-error' : 'text-text-secondary'}`}
           >
             {error ?? 'Guardando…'}
           </span>
@@ -130,7 +145,7 @@ function CustomFieldRow({
 
 function SettingsBox({ children }: { children: React.ReactNode }) {
   return (
-    <div className="m-1 origin-top animate-desplegar-menu rounded-lg border border-border bg-surface p-3">
+    <div className="origin-top animate-desplegar-menu rounded-lg border border-white/[0.12] bg-surface p-4 sm:col-span-2">
       {children}
     </div>
   );

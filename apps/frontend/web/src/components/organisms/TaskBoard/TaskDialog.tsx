@@ -27,6 +27,7 @@ import { TaskDocuments } from './TaskDocuments';
 import { TaskNotes } from './TaskNotes';
 import { CustomFieldRows } from './custom-fields/CustomFieldRows';
 import { PropertyGroup, PropertyRow } from './custom-fields/PropertyRow';
+import { type TokenItem, TokenPicker } from './custom-fields/TokenPicker';
 import {
   CalendarIcon,
   EstimateIcon,
@@ -35,7 +36,7 @@ import {
   TagIcon,
 } from './custom-fields/property-icons';
 import { swallowEscape } from './custom-fields/swallow-escape';
-import { SECTION_PANEL, SECTION_TITLE_CLASS, TASK_PANEL_TOKENS } from './section-panel';
+import { FIELD_BOX, FIELD_OVERRIDE, TASK_PANEL_TOKENS } from './section-panel';
 
 export interface TaskDialogProps {
   open: boolean;
@@ -99,15 +100,6 @@ export interface TaskDialogProps {
  * encargados— y `taskId` viaja dentro, así que dos tareas distintas nunca dan
  * la misma firma aunque tengan los mismos valores.
  */
-/**
- * Un desplegable sin caja hasta que se le pasa por encima: dentro del bloque de
- * propiedades, una caja por fila volvía a pesar lo mismo que el bloque entero.
- * Con `!` porque el átomo ya trae su borde y su fondo, y entre dos utilidades
- * del mismo tipo decide el orden del CSS, no el de las clases.
- */
-const GHOST_FIELD =
-  'border-transparent! bg-transparent! shadow-none! hover:bg-white/[0.04]! hover:shadow-none!';
-
 function formSignature(form: HTMLFormElement): string {
   return Array.from(new FormData(form).entries())
     .map(([name, value]) => `${name}=${String(value)}`)
@@ -391,15 +383,16 @@ export function TaskDialog({
             defaultValue={task.description ?? ''}
             rows={2}
             disabled={readOnly}
-            className="-mx-2 min-h-[2.75rem] resize-none rounded-lg bg-transparent px-2 py-1.5 font-sans text-sm leading-relaxed text-text-primary outline-none transition-colors [field-sizing:content] placeholder:text-text-disabled hover:bg-white/[0.03] focus:bg-white/[0.04] focus:ring-1 focus:ring-white/10 disabled:hover:bg-transparent"
+            /* El mismo estilo que el título: los dos son el contenido de la tarea,
+               no una propiedad, y se editan en el sitio, sin caja. */
+            className="-mx-2 min-h-[2.75rem] resize-none rounded-lg bg-transparent px-2 py-1.5 font-sans text-sm leading-relaxed text-text-primary outline-none transition-colors [field-sizing:content] placeholder:text-text-secondary hover:bg-white/[0.03] focus:bg-white/[0.04] focus:ring-1 focus:ring-white/10 disabled:hover:bg-transparent"
           />
 
           {/**
-           * **Propiedades en filas**, con el nombre a la izquierda y el valor a la
-           * derecha (kyloo-design §4: filas, no cajas). Antes era una pila de
-           * campos grandes con su etiqueta encima, y con encargados y etiquetas
-           * desplegados enteros el panel medía tres pantallas en un equipo de
-           * quince personas.
+           * **Propiedades con el nombre encima** y el campo a todo su ancho, en
+           * una rejilla de dos columnas (`PropertyGroup`): lo corto de dos en
+           * dos, lo largo —encargados, etiquetas, estimación con sus atajos— en
+           * fila entera.
            *
            * Los nombres de campo (`priority`, `dueDate`, `estimatePoints`,
            * `assigneeIds`, `labelIds`) **no cambian**: el guardado al cerrar sigue
@@ -409,7 +402,7 @@ export function TaskDialog({
             <PropertyRow label="Prioridad" icon={<PriorityIcon />} htmlFor="task-priority">
               <Select
                 id="task-priority"
-                className={GHOST_FIELD}
+                className={FIELD_OVERRIDE}
                 name="priority"
                 defaultValue={task.priority}
                 disabled={readOnly}
@@ -432,11 +425,12 @@ export function TaskDialog({
                 name="dueDate"
                 label="Fecha límite (opcional)"
                 hideLabel
-                ghost
+                corto
+                className={FIELD_OVERRIDE}
                 defaultValue={toDateInput(task.dueDate)}
                 disabled={readOnly}
-                /* El panel es estrecho: el calendario desplegable se pega al
-                 borde derecho y crece hacia dentro. */
+                /* En la columna derecha de la rejilla: el calendario se pega
+                 al borde derecho y crece hacia dentro. */
                 align="right"
               />
             </PropertyRow>
@@ -444,9 +438,9 @@ export function TaskDialog({
             {/* Puntos sin escala impuesta (D4 de `docs/PLAN-SCRUM-KANBAN.md`):
               vacío es «sin estimar», que no es lo mismo que 0. */}
             <PropertyRow
-              /* «(puntos)» solo para el lector de pantalla: a la vista lo dice el
-               propio campo. Por `<label for>` y no `aria-label`: con Scrum hay
-               dos paneles montados, y un `aria-label` nombraría a los dos. */
+              /* «(puntos)» solo para el lector de pantalla. Por `<label for>` y no
+               `aria-label`: con Scrum hay dos paneles montados, y un
+               `aria-label` nombraría a los dos. */
               label={
                 <>
                   Estimación<span className="sr-only"> (puntos)</span>
@@ -454,8 +448,13 @@ export function TaskDialog({
               }
               icon={<EstimateIcon />}
               htmlFor="task-estimate"
+              wide
             >
-              <div className="flex flex-wrap items-center gap-1">
+              {/* Un solo control: el número y sus atajos dentro de la misma
+                  caja, no dos cosas sueltas una al lado de la otra. */}
+              <div
+                className={`flex min-h-10 items-center gap-2 pr-1.5 ${readOnly ? '' : FIELD_BOX}`}
+              >
                 <input
                   id="task-estimate"
                   name="estimatePoints"
@@ -464,17 +463,17 @@ export function TaskDialog({
                   min={0}
                   max={999}
                   step={1}
-                  placeholder="—"
+                  placeholder="Sin estimar"
                   defaultValue={task.estimatePoints ?? ''}
                   disabled={readOnly}
-                  className="h-9 w-[5.5rem] rounded-lg border border-transparent bg-transparent px-2.5 font-sans text-sm tabular-nums text-text-primary outline-none transition-colors placeholder:text-text-disabled hover:border-border focus:border-primary focus:bg-surface disabled:opacity-60"
+                  className="h-10 w-full min-w-0 flex-1 bg-transparent px-3 font-sans text-sm tabular-nums text-text-primary outline-none placeholder:text-text-secondary disabled:px-0"
                 />
                 {/* Atajos de la escala más usada, sin imponerla (S22): escribir
                   cualquier otro número sigue valiendo. Escriben en el campo no
                   controlado, así que el guardado al cerrar los ve como un
                   cambio más. */}
                 {!readOnly && (
-                  <span className="flex gap-1" aria-label="Estimaciones rápidas">
+                  <span className="flex shrink-0 gap-1" aria-label="Estimaciones rápidas">
                     {[1, 2, 3, 5, 8, 13].map((n) => (
                       <button
                         key={n}
@@ -486,7 +485,7 @@ export function TaskDialog({
                           if (!campo) return;
                           campo.value = String(n);
                         }}
-                        className="h-6 min-w-6 cursor-pointer rounded-md border border-white/10 px-1 font-sans text-[11px] tabular-nums text-text-secondary transition-colors hover:border-primary hover:text-primary"
+                        className="h-7 min-w-7 cursor-pointer rounded-full bg-white/[0.06] px-2 font-sans text-xs tabular-nums text-text-secondary transition-colors hover:bg-primary/20 hover:text-text-primary"
                       >
                         {n}
                       </button>
@@ -696,18 +695,16 @@ function SaveStatus({
  * foco lo pinte el cuadro con `peer-focus-visible`.
  */
 /**
- * Encargados: quién la lleva, y la lista de miembros al pulsar.
+ * Encargados: quién la lleva y a quién se puede añadir, **en un solo control**
+ * (`TokenPicker`).
  *
- * ⚠️ **Las casillas están siempre en el DOM**, también con la lista cerrada
- * (`hidden`, que no es `disabled`): el guardado al cerrar lee el `FormData`
- * entero, y una casilla que no estuviera montada mandaría la lista de
- * encargados vacía —es decir, los borraría—. Es la misma avería de
- * `734855a` por otro camino.
+ * ⚠️ **Lo que viaja en el formulario son `<input type="hidden">`**, uno por
+ * persona elegida, con el mismo `name` que tenían las casillas. El guardado al
+ * cerrar lee el `FormData` entero, y lo que no esté ahí se da por quitado: es
+ * la avería de `734855a` si alguna vez se dejan de pintar.
  *
- * El resumen de arriba lleva su propio estado, alimentado por el `onChange`
- * de cada casilla: las casillas siguen sin controlar, como el resto del
- * formulario, y el formulario se remonta por `key` al cambiar de tarea, así que
- * ese estado nace de nuevo con cada una.
+ * El estado nace de la tarea con cada una: el formulario se remonta por `key`
+ * al cambiar de tarea.
  */
 function AssigneesProperty({
   members,
@@ -721,90 +718,61 @@ function AssigneesProperty({
   readOnly: boolean;
 }) {
   const [chosen, setChosen] = useState<string[]>(initial);
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const q = query.trim().toLocaleLowerCase('es');
+
+  /* Las personas que ya no están en el proyecto siguen saliendo mientras estén
+     asignadas: quitarlas es decisión de quien edita, no de la lista. */
+  const items: TokenItem[] = [
+    ...members,
+    ...chosen
+      .filter((id) => !members.some((m) => m.id === id))
+      .flatMap((id) => {
+        const user = usersById.get(id);
+        return user ? [user] : [];
+      }),
+  ].map((user) => ({
+    id: user.id,
+    label: personLabel(user),
+    leading: (
+      <Avatar
+        size="sm"
+        label={personLabel(user)}
+        src={avatarHref(user.avatarUrl, '/api/gateway')}
+      />
+    ),
+  }));
 
   return (
-    <PropertyRow label="Encargados" icon={<PeopleIcon />}>
-      <PickerShell
-        open={open}
-        setOpen={setOpen}
+    <PropertyRow label="Encargados" icon={<PeopleIcon />} wide>
+      {chosen.map((id) => (
+        <input key={id} type="hidden" name="assigneeIds" value={id} />
+      ))}
+      <TokenPicker
+        label="Encargados"
+        items={items}
+        selected={chosen}
+        onChange={setChosen}
         disabled={readOnly}
-        toggleLabel="Encargados: cambiar"
-        summary={
-          chosen.length === 0 ? (
-            <span className="text-text-disabled">Sin asignar</span>
-          ) : (
-            <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-              {chosen.map((id) => {
-                const user = usersById.get(id);
-                const label = user ? personLabel(user) : 'Alguien que ya no está';
-                return (
-                  <span key={id} className="flex min-w-0 max-w-full items-center gap-1.5">
-                    <Avatar
-                      size="sm"
-                      label={label}
-                      src={avatarHref(user?.avatarUrl, '/api/gateway')}
-                    />
-                    <span className="truncate">{label}</span>
-                  </span>
-                );
-              })}
-            </span>
-          )
-        }
-      >
-        <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-1">
-          <legend className="sr-only">Encargados</legend>
-          {members.length > 6 && (
-            <input
-              type="search"
-              aria-label="Buscar a quién asignar"
-              placeholder="Buscar…"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="mb-1 h-8 w-full rounded-md border border-border bg-surface px-2 font-sans text-sm text-text-primary outline-none placeholder:text-text-disabled focus:border-primary"
-            />
-          )}
-          {members.length === 0 ? (
-            <p className="px-2 py-1 font-sans text-xs text-text-secondary">
-              Este proyecto todavía no tiene a nadie a quien asignar.
-            </p>
-          ) : (
-            members.map((member) => (
-              <AssigneeToggle
-                key={member.id}
-                member={member}
-                defaultChecked={initial.includes(member.id)}
-                /* Filtrar oculta, no desmonta: ver la nota de la función. */
-                hidden={q !== '' && !personLabel(member).toLocaleLowerCase('es').includes(q)}
-                onChange={(checked) =>
-                  setChosen((all) =>
-                    checked ? [...all, member.id] : all.filter((id) => id !== member.id),
-                  )
-                }
-              />
-            ))
-          )}
-          <p className="px-2 pt-1 font-sans text-[11px] text-text-secondary">
+        placeholder="Añadir persona…"
+        emptyText="Sin asignar"
+        noItemsText="Este proyecto todavía no tiene a nadie a quien asignar."
+        footer={
+          <span className="font-sans text-[11px] text-text-secondary">
             Solo se puede asignar a quien esté en el proyecto.
-          </p>
-        </fieldset>
-      </PickerShell>
+          </span>
+        }
+      />
     </PropertyRow>
   );
 }
 
 /**
- * Etiquetas: las puestas, y las del proyecto al pulsar, con su gestor.
+ * Etiquetas: las puestas y las del proyecto, en el mismo control que los
+ * encargados. Gestionar el vocabulario —crear, renombrar, borrar— va aparte,
+ * con «Gestionar» junto al nombre: es otro permiso (`canManageLabels`) y otra
+ * tarea que elegir cuáles lleva esta.
  *
- * ⚠️ Mismo cuidado que los encargados: las casillas no se desmontan nunca.
- *
- * ⚠️ **El `fieldset` cubre solo las casillas, no el gestor.** Va con
- * `disabled={readOnly}`, y un `fieldset` deshabilitado apaga todo lo que tenga
- * dentro, botones incluidos: alguien con `canManageLabels` pero sin
- * `canEditTask` se encontraría el gestor apagado sin motivo.
+ * ⚠️ Mismo cuidado que los encargados: lo que viaja son `hidden`, uno por
+ * etiqueta puesta.
  */
 function LabelsProperty({
   projectId,
@@ -820,239 +788,65 @@ function LabelsProperty({
   canManageLabels: boolean;
 }) {
   const [chosen, setChosen] = useState<string[]>(initial);
-  const [open, setOpen] = useState(false);
-  const shown = labels.filter((l) => chosen.includes(l.id));
+  const [gestionando, setGestionando] = useState(false);
+
+  const items: TokenItem[] = labels.map((label) => ({
+    id: label.id,
+    label: label.name,
+    tone: colors[label.color],
+    leading: (
+      <span
+        aria-hidden="true"
+        className="h-2.5 w-2.5 shrink-0 rounded-full"
+        style={{ background: colors[label.color] }}
+      />
+    ),
+  }));
 
   return (
-    <PropertyRow label="Etiquetas" icon={<TagIcon />}>
-      <PickerShell
-        open={open}
-        setOpen={setOpen}
-        /* Con el gestor dentro, la lista se abre aunque no se pueda etiquetar. */
-        disabled={readOnly && !canManageLabels}
-        toggleLabel="Etiquetas: cambiar"
-        summary={
-          shown.length === 0 ? (
-            <span className="text-text-disabled">Sin etiquetas</span>
-          ) : (
-            <span className="flex flex-wrap gap-1">
-              {shown.map((label) => (
-                <span
-                  key={label.id}
-                  className="rounded px-1.5 py-0.5 font-sans text-[11px] font-medium"
-                  style={{ background: alpha(colors[label.color], 18), color: colors[label.color] }}
-                >
-                  {label.name}
-                </span>
-              ))}
-            </span>
-          )
+    <PropertyRow
+      label="Etiquetas"
+      icon={<TagIcon />}
+      wide
+      action={
+        canManageLabels && (
+          <button
+            type="button"
+            aria-expanded={gestionando}
+            onClick={() => setGestionando((v) => !v)}
+            className="cursor-pointer rounded px-1.5 py-0.5 font-sans text-[11px] font-medium text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary"
+          >
+            {gestionando ? 'Cerrar' : 'Gestionar'}
+          </button>
+        )
+      }
+    >
+      {chosen.map((id) => (
+        <input key={id} type="hidden" name="labelIds" value={id} />
+      ))}
+      <TokenPicker
+        label="Etiquetas"
+        items={items}
+        selected={chosen}
+        onChange={setChosen}
+        disabled={readOnly}
+        placeholder="Añadir etiqueta…"
+        emptyText="Sin etiquetas"
+        noItemsText={
+          canManageLabels
+            ? 'Este proyecto no tiene etiquetas: créalas con «Gestionar».'
+            : 'Este proyecto no tiene etiquetas todavía.'
         }
-      >
-        <div className="flex flex-col gap-2">
-          <fieldset className="flex min-w-0 flex-col gap-2" disabled={readOnly}>
-            <legend className="sr-only">Etiquetas</legend>
-            {labels.length === 0 ? (
-              <p className="px-1 font-sans text-xs text-text-secondary">
-                Este proyecto no tiene etiquetas todavía.
-                {canManageLabels ? ' Crea la primera aquí abajo.' : ''}
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2 rounded-xl p-2" style={SECTION_PANEL}>
-                {labels.map((label) => (
-                  <LabelToggle
-                    key={label.id}
-                    label={label}
-                    defaultChecked={initial.includes(label.id)}
-                    onChange={(checked) =>
-                      setChosen((all) =>
-                        checked ? [...all, label.id] : all.filter((id) => id !== label.id),
-                      )
-                    }
-                  />
-                ))}
-              </div>
-            )}
-          </fieldset>
-          {canManageLabels && <GestorDeEtiquetas projectId={projectId} labels={labels} />}
+      />
+      {canManageLabels && gestionando && (
+        <div className="mt-2 origin-top animate-desplegar-menu">
+          <GestorDeEtiquetas projectId={projectId} labels={labels} />
         </div>
-      </PickerShell>
+      )}
     </PropertyRow>
   );
 }
 
-/**
- * El botón con el resumen y la lista desplegada debajo, **dentro del panel**
- * —no en un portal, que el panel tomaría por un clic fuera y se cerraría—.
- *
- * La lista cerrada se esconde con `hidden` y no se desmonta: lleva casillas del
- * formulario (ver `AssigneesProperty`).
- */
-function PickerShell({
-  open,
-  setOpen,
-  disabled,
-  toggleLabel,
-  summary,
-  children,
-}: {
-  open: boolean;
-  setOpen: (open: boolean) => void;
-  disabled: boolean;
-  toggleLabel: string;
-  summary: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const panelId = useId();
-  return (
-    <div
-      className="flex min-w-0 flex-col"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && open) {
-          swallowEscape(event);
-          setOpen(false);
-        }
-      }}
-    >
-      <button
-        type="button"
-        disabled={disabled}
-        aria-expanded={open}
-        aria-controls={panelId}
-        aria-label={toggleLabel}
-        onClick={() => setOpen(!open)}
-        className="flex min-h-9 w-full min-w-0 cursor-pointer items-center rounded-lg px-2.5 py-1.5 text-left font-sans text-sm text-text-primary transition-colors hover:bg-white/5 disabled:cursor-default disabled:hover:bg-transparent"
-      >
-        {summary}
-      </button>
-      {/* Entra con `animate-desplegar-menu` al quitarse `hidden`: una animación
-          CSS arranca cada vez que el elemento vuelve a pintarse.
-          ⚠️ No `animate-desplegar-panel`: ese deja el contenido con
-          `overflow: hidden` y recortaría el desplegable de color del gestor de
-          etiquetas, que vive aquí dentro. */}
-      <div
-        id={panelId}
-        hidden={!open}
-        className="mt-1 origin-top animate-desplegar-menu rounded-lg border border-white/[0.08] bg-surface-elevated p-2 shadow-lg shadow-black/20"
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function AssigneeToggle({
-  member,
-  defaultChecked,
-  hidden = false,
-  onChange,
-}: {
-  member: UserProfile;
-  defaultChecked: boolean;
-  hidden?: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label
-      hidden={hidden}
-      className="group flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/5 has-[:disabled]:cursor-not-allowed"
-    >
-      <input
-        type="checkbox"
-        name="assigneeIds"
-        value={member.id}
-        defaultChecked={defaultChecked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="peer sr-only"
-      />
-
-      {/* La marca se enciende con `[&>svg]`: los variantes `peer-*` solo miran
-          hermanos, y el icono es hijo de este span, no hermano del input. */}
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-white/20 transition-colors peer-checked:border-primary peer-checked:bg-primary/25 peer-checked:[&>svg]:opacity-100 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-disabled:opacity-50">
-        <svg
-          className="h-3.5 w-3.5 text-primary opacity-0 transition-opacity"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={3}
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      </span>
-
-      <span className="min-w-0 flex-1 truncate font-sans text-sm text-white peer-disabled:text-white">
-        {personLabel(member)}
-      </span>
-    </label>
-  );
-}
-
-/**
- * Una etiqueta marcable, con su color.
- *
- * Es un checkbox de verdad —oculto— y no un botón con estado: así el formulario
- * recoge `labelIds` solo, sin JavaScript que sincronice nada, igual que los
- * encargados.
- *
- * ⚠️ **Marcada y sin marcar tienen que distinguirse de lejos**, y no lo hacían.
- * Llevaba el checkbox nativo del navegador a 12 px dentro de una píldora de
- * color, y el único `has-[:checked]` que había subía la opacidad al 100 % sobre
- * una base que ya estaba al 100 %: no cambiaba nada. Con seis etiquetas encima
- * había que acercarse a mirar cuál estaba puesta.
- *
- * Ahora la píldora entera responde —apagada al 55 %, encendida del todo— y
- * lleva el mismo cuadrito dibujado que los encargados, en el color de la
- * etiqueta. Dos señales para el mismo estado, que es lo que hace que se lea sin
- * fijarse.
- */
-function LabelToggle({
-  label,
-  defaultChecked,
-  onChange,
-}: {
-  label: LabelType;
-  defaultChecked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  const tone = colors[label.color];
-
-  return (
-    <label
-      className="flex cursor-pointer items-center gap-2 rounded-full px-3 py-1.5 font-sans text-sm opacity-55 transition-opacity hover:opacity-80 has-[:checked]:opacity-100 has-[:disabled]:cursor-not-allowed"
-      style={{ background: alpha(tone, 15), color: tone }}
-    >
-      <input
-        type="checkbox"
-        name="labelIds"
-        value={label.id}
-        defaultChecked={defaultChecked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="peer sr-only"
-      />
-
-      {/* `currentColor` en vez del token: hereda el color de la etiqueta que ya
-          pinta la píldora, así el cuadro y la marca salen del mismo tono sin
-          repetirlo. */}
-      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 border-current transition-colors peer-checked:[&>svg]:opacity-100 peer-focus-visible:ring-2 peer-focus-visible:ring-current peer-disabled:opacity-50">
-        <svg
-          className="h-3 w-3 opacity-0 transition-opacity"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={3.5}
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      </span>
-
-      {label.name}
-    </label>
-  );
-}
-
-/** `2026-08-01T23:59:59.000Z` → `2026-08-01`, que es lo que quiere el input. */
 function toDateInput(iso: string | null): string {
   if (!iso) return '';
   const date = new Date(iso);

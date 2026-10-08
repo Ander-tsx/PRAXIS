@@ -173,3 +173,28 @@ animados».
 9. ⚠️ **Adjuntos y etiquetas invalidaban el tablero con un `del` exacto**
    (trampa 26 de CLAUDE.md): la marca de un PDF recién subido podía tardar un
    minuto en salir en la tarjeta. Ahora `delByPrefix`, también en los enlaces.
+
+## Tercera vuelta del panel (2026-10-08)
+
+Lo que pidió el dueño tras probarlo en el teléfono y en el escritorio:
+
+- **En el teléfono solo hay Kanban.** Ni selector de vista ni `?vista=tabla`
+  o `calendario` (se pinta Kanban y la URL no se toca). Sustituye a lo que M3
+  de PLAN-MOVIL había hecho con esas vistas; la e2e `movil/04-tablero` lo fija.
+- **Si tiene caja, se toca.** Todo lo editable lleva la misma caja
+  (`FIELD_BOX`, `FIELD_OVERRIDE` en `section-panel.ts`); sin permiso, el valor
+  va sin caja. **La excepción son el título y la descripción**: son el
+  contenido de la tarea, no una propiedad, y se editan en el sitio, sin caja.
+  La versión «fantasma» quitaba la caja a todo y no se distinguía lo
+  editable, sobre todo en el teléfono, donde no hay hover.
+- **El nombre encima y el campo a todo el ancho.** Nombre a la izquierda y
+  valor a la derecha cargaba el peso a un lado. Solo Prioridad y Fecha límite
+  van emparejadas; los campos del proyecto, siempre a lo ancho (uno suelto a
+  media anchura dejaba un hueco).
+- **Encargados, etiquetas, personas y selección múltiple: un solo control**
+  (`TokenPicker`): fichas redondas dentro de la caja y la lista de lo que falta
+  al escribir o pulsar. Antes eran resumen + lista de casillas, y se leía
+  duplicado. Lo que viaja en el formulario son `hidden`, uno por ficha.
+- La fecha en forma corta («12 oct 2026»), la casilla «Mostrar en la tarjeta»
+  con el aspecto del sistema (`CheckToggle`) y los desplegables se cierran al
+  pulsar fuera.
