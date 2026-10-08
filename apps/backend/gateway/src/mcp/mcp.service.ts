@@ -243,6 +243,8 @@ export class McpService {
         );
       case 'list_my_tasks':
         return this.misTareas(session, args);
+      case 'set_task_field':
+        return this.valorDeCampo(session, args);
       default:
         return { ok: false, status: 500, error: { message: 'Herramienta sin implementar.' } };
     }
@@ -267,6 +269,43 @@ export class McpService {
     }
     const body = { ...elegir(datos, CAMPOS_CREAR_TAREA), status: columna.name };
     return this.api(session, 'POST', `/boards/${encodeURIComponent(boardId)}/tasks`, body);
+  }
+
+  /**
+   * El valor de un campo personalizado (`docs/PLAN-CAMPOS-PERSONALIZADOS.md`).
+   *
+   * La ruta recibe un solo `value` cuya forma depende del tipo del campo —texto,
+   * número, sí/no o lista de ids—, y el catálogo no admite uniones en un esquema
+   * (trampa 2). Así que la herramienta pide **un parámetro con tipo por cada
+   * forma** y aquí se elige el que llegó. Más de uno a la vez es ambiguo y se
+   * rechaza en vez de adivinar; qué forma corresponde a qué tipo lo valida la
+   * ruta, que es la que conoce el campo.
+   */
+  private async valorDeCampo(
+    session: McpSession,
+    args: Record<string, unknown>,
+  ): Promise<ApiResult> {
+    const formas = (['text', 'number', 'checked', 'ids'] as const).filter(
+      (forma) => args[forma] !== undefined,
+    );
+    const vaciar = args.clear === true;
+    if (formas.length + (vaciar ? 1 : 0) !== 1) {
+      return {
+        ok: false,
+        status: 400,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Indica exactamente uno: text, number, checked, ids o clear: true.',
+        },
+      };
+    }
+    const value = vaciar ? null : args[formas[0]];
+    return this.api(
+      session,
+      'PUT',
+      `/tasks/${encodeURIComponent(String(args.taskId))}/fields/${encodeURIComponent(String(args.fieldId))}`,
+      { value },
+    );
   }
 
   /** Mueve una tarea dentro de su tablero, con el `status` de la columna destino. */
@@ -494,6 +533,10 @@ export function validar(schema: JsonSchema, valor: unknown, ruta = 'arguments'):
     }
     case 'integer':
       return Number.isInteger(valor) ? null : `${ruta} tiene que ser un número entero.`;
+    case 'number':
+      return typeof valor === 'number' && Number.isFinite(valor)
+        ? null
+        : `${ruta} tiene que ser un número.`;
     case 'boolean':
       return typeof valor === 'boolean' ? null : `${ruta} tiene que ser verdadero o falso.`;
     default:

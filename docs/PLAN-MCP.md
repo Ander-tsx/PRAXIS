@@ -387,7 +387,7 @@ Para contestar en M0. Ninguna bloquea el plan, todas cambian un detalle.
 | M1 — Emisor de tokens | ✅ | 2026-10-02. `PersonalAccessToken` en credentials, `pat_create/list/revoke` |
 | M2 — Canje PAT → access | ✅ | `pat_exchange`: JWT `access` de 2 min, estado de cuenta en cada canje |
 | M3 — `/api/mcp` + 4 lecturas (spike) | ✅ | Probado con curl y con el **MCP Inspector oficial** (SDK de cliente), directo y a través de `web` (M15) |
-| M4 — Catálogo completo | ✅ | 48 herramientas: 15 de lectura, 23 de escritura y 10 de borrado; tres son lotes |
+| M4 — Catálogo completo | ✅ | 48 herramientas: 15 de lectura, 23 de escritura y 10 de borrado; tres son lotes. **53 desde 2026-10-07**: +5 de campos personalizados (ver abajo) |
 | M5 — Pantalla de Integraciones | ✅ | `/main/integrations`: interruptor, tokens, enseñar una vez, revocar, guía de conexión |
 | M6 — Límites y endurecimiento | ✅ | 60/min por token, `mcp_tool_call` en el registro (M12), revocar al cambiar contraseña |
 | M7 — OAuth 2.1 | ☐ | condicional a M12 |
@@ -472,3 +472,20 @@ el MCP.**
 con cada tarea pendiente), editar el contenido de un documento (solo en vivo,
 E4 de PLAN-DOCUMENTOS), chat, miembros, roles e invitaciones. Se añaden cuando
 alguien los pida, con su ruta y su prueba.
+
+## Campos personalizados (2026-10-07)
+
+Cinco herramientas más para los campos de `docs/PLAN-CAMPOS-PERSONALIZADOS.md`:
+`list_custom_fields` (read), `create_custom_field`, `update_custom_field` y
+`set_task_field` (write), y `delete_custom_field` (delete). Las tareas ya
+devolvían sus valores en `fieldValues`.
+
+- ⚠️ **`set_task_field` no lleva un `value` libre.** La ruta (`PUT
+  /tasks/:id/fields/:fieldId`) acepta texto, número, booleano o lista según el
+  tipo del campo, y el catálogo no admite uniones (trampa 2). La herramienta
+  pide un parámetro con tipo por forma —`text`, `number`, `checked`, `ids`,
+  `clear`— y `mcp.service.ts` (`valorDeCampo`) elige el que llegó; dos a la vez
+  es un 400 en vez de adivinar. Qué forma vale para qué tipo lo decide la ruta.
+- El catálogo estrenó **`PUT`** (`HttpMethod`) y el tipo **`number`** de
+  esquema, con decimales; `validar` los conoce y `mcp-tools.spec.ts` comprueba
+  que la ruta `PUT` existe.

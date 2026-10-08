@@ -1,5 +1,6 @@
 import {
   COLUMN_COLORS,
+  CUSTOM_FIELD_TYPES,
   LABEL_COLORS,
   type PatScope,
   Priority,
@@ -36,7 +37,7 @@ import {
 
 /** Un esquema JSON, el subconjunto que usamos. Sin `oneOf`/`anyOf` (trampa 2). */
 export interface JsonSchema {
-  type: 'object' | 'string' | 'integer' | 'boolean' | 'array';
+  type: 'object' | 'string' | 'integer' | 'number' | 'boolean' | 'array';
   description?: string;
   properties?: Record<string, JsonSchema>;
   required?: string[];
@@ -61,7 +62,7 @@ export interface JsonSchema {
  */
 export type ToolAnchor = 'organization' | 'projectId' | 'workspaceId' | 'boardId' | 'taskId';
 
-export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /** Lo que hace una herramienta que es una sola llamada. */
 export interface ToolCall {
@@ -83,7 +84,8 @@ export type CustomTool =
   | 'move_task'
   | 'move_tasks'
   | 'delete_tasks'
-  | 'list_my_tasks';
+  | 'list_my_tasks'
+  | 'set_task_field';
 
 export interface McpTool {
   name: string;
@@ -159,6 +161,21 @@ const CAMPOS_DE_TAREA_NUEVA: Record<string, JsonSchema> = {
 export const CAMPOS_CREAR_TAREA = Object.keys(CAMPOS_DE_TAREA_NUEVA);
 
 const IRREVERSIBLE = 'Irreversible: no se puede deshacer.';
+
+/** Las opciones de un campo de selección, al crearlo o editarlo. */
+const OPCIONES_DE_CAMPO: JsonSchema = {
+  type: 'array',
+  description: 'Opciones (solo SELECT y MULTI_SELECT)',
+  maxItems: 50,
+  items: object(
+    {
+      id: text('Id de una opción que ya existía (para conservarla)', 40),
+      name: text('Nombre', 40, 1),
+      color: oneOf('Color', LABEL_COLORS),
+    },
+    ['name', 'color'],
+  ),
+};
 
 /* ─── El catálogo ───────────────────────────────────────────────────────── */
 
@@ -278,6 +295,15 @@ export const MCP_TOOLS: readonly McpTool[] = [
     anchor: 'projectId',
     inputSchema: object({ projectId: id('Proyecto') }, ['projectId']),
     call: { method: 'GET', path: '/projects/{projectId}/labels' },
+  },
+  {
+    name: 'list_custom_fields',
+    description:
+      'Campos personalizados de un proyecto (p. ej. «Reviewer»): id, nombre, tipo y opciones. Las tareas traen sus valores en `fieldValues` por `fieldId`; en selecciones el valor es el id de la opción.',
+    scope: 'read',
+    anchor: 'projectId',
+    inputSchema: object({ projectId: id('Proyecto') }, ['projectId']),
+    call: { method: 'GET', path: '/projects/{projectId}/fields' },
   },
   {
     name: 'list_members',
@@ -584,6 +610,72 @@ export const MCP_TOOLS: readonly McpTool[] = [
     call: { method: 'POST', path: '/projects/{projectId}/labels', body: ['name', 'color'] },
   },
   {
+    name: 'create_custom_field',
+    description:
+      'Crea un campo personalizado en un proyecto: vale para todas sus tareas. El tipo no se cambia después. `options` solo en SELECT y MULTI_SELECT.',
+    scope: 'write',
+    anchor: 'projectId',
+    inputSchema: object(
+      {
+        projectId: id('Proyecto'),
+        name: text('Nombre, único en el proyecto', 40, 1),
+        type: oneOf('Tipo', CUSTOM_FIELD_TYPES),
+        options: OPCIONES_DE_CAMPO,
+        showOnCard: bool('Mostrarlo en la tarjeta del tablero'),
+      },
+      ['projectId', 'name', 'type'],
+    ),
+    call: {
+      method: 'POST',
+      path: '/projects/{projectId}/fields',
+      body: ['name', 'type', 'options', 'showOnCard'],
+    },
+  },
+  {
+    name: 'update_custom_field',
+    description:
+      'Renombra un campo, cambia sus opciones, su orden o si sale en la tarjeta. `options` es la lista entera: conserva el `id` de las que sigan; una que falte se quita de las tareas.',
+    scope: 'write',
+    anchor: 'projectId',
+    inputSchema: object(
+      {
+        projectId: id('Proyecto'),
+        fieldId: id('Campo'),
+        name: text('Nombre', 40, 1),
+        options: OPCIONES_DE_CAMPO,
+        showOnCard: bool('Mostrarlo en la tarjeta del tablero'),
+        order: int('Posición (0 = primero)', 0, 1000),
+      },
+      ['projectId', 'fieldId'],
+    ),
+    call: {
+      method: 'PATCH',
+      path: '/projects/{projectId}/fields/{fieldId}',
+      body: ['name', 'options', 'showOnCard', 'order'],
+    },
+  },
+  {
+    name: 'set_task_field',
+    description:
+      'Pone el valor de un campo personalizado en una tarea. Usa el parámetro de su tipo: `text` (TEXT, URL, DATE aaaa-mm-dd, SELECT con el id de la opción), `number`, `checked` (CHECKBOX) o `ids` (MULTI_SELECT: ids de opción; PERSON: ids de miembros). `clear: true` lo vacía.',
+    scope: 'write',
+    anchor: 'taskId',
+    inputSchema: object(
+      {
+        taskId: id('Tarea'),
+        fieldId: id('Campo'),
+        text: text('Valor de texto, enlace, fecha o id de opción', 2048),
+        number: { type: 'number', description: 'Valor numérico' },
+        checked: bool('Valor de una casilla'),
+        ids: ids('Ids de opción o de personas', 50),
+        clear: bool('true para vaciar el campo'),
+      },
+      ['taskId', 'fieldId'],
+    ),
+    custom: 'set_task_field',
+    customMethod: 'PUT',
+  },
+  {
     name: 'create_sprint',
     description: 'Crea un sprint en un tablero con Scrum.',
     scope: 'write',
@@ -745,6 +837,17 @@ export const MCP_TOOLS: readonly McpTool[] = [
       'labelId',
     ]),
     call: { method: 'DELETE', path: '/projects/{projectId}/labels/{labelId}' },
+  },
+  {
+    name: 'delete_custom_field',
+    description: `Borra un campo personalizado y su valor en todas las tareas. ${IRREVERSIBLE}`,
+    scope: 'delete',
+    anchor: 'projectId',
+    inputSchema: object({ projectId: id('Proyecto'), fieldId: id('Campo') }, [
+      'projectId',
+      'fieldId',
+    ]),
+    call: { method: 'DELETE', path: '/projects/{projectId}/fields/{fieldId}' },
   },
   {
     name: 'delete_sprint',

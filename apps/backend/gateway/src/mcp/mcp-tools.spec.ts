@@ -163,7 +163,7 @@ describe('Las rutas del catálogo existen', () => {
     for (const linea of fuente.split('\n')) {
       const controlador = linea.match(/@Controller\((?:'([^']*)')?\)/);
       if (controlador) base = controlador[1] ?? '';
-      const metodo = linea.match(/@(Get|Post|Patch|Delete)\((?:'([^']*)')?\)/);
+      const metodo = linea.match(/@(Get|Post|Put|Patch|Delete)\((?:'([^']*)')?\)/);
       if (metodo)
         rutas.add(`${metodo[1].toUpperCase()} ${normalizar(`${base}/${metodo[2] ?? ''}`)}`);
     }
@@ -175,4 +175,55 @@ describe('Las rutas del catálogo existen', () => {
       expect(rutas).toContain(`${call.method} ${normalizar(call.path)}`);
     },
   );
+
+  /* Las personalizadas montan su ruta en `mcp.service.ts`; la del valor de un
+     campo es la única con `PUT`, y una errata aquí también sería un 404. */
+  it('set_task_field (PUT del valor de un campo)', () => {
+    expect(rutas).toContain(`PUT ${normalizar('/tasks/{taskId}/fields/{fieldId}')}`);
+  });
+});
+
+describe('Campos personalizados en el MCP', () => {
+  const tool = (nombre: string) => {
+    const encontrada = MCP_TOOLS.find((t) => t.name === nombre);
+    if (!encontrada) throw new Error(`Falta ${nombre}`);
+    return encontrada;
+  };
+
+  it('están las cinco herramientas, con su alcance', () => {
+    expect(tool('list_custom_fields').scope).toBe('read');
+    expect(tool('create_custom_field').scope).toBe('write');
+    expect(tool('update_custom_field').scope).toBe('write');
+    expect(tool('set_task_field').scope).toBe('write');
+    expect(tool('delete_custom_field').scope).toBe('delete');
+  });
+
+  it('el valor acepta un número con decimales, no un texto en su lugar', () => {
+    const schema = tool('set_task_field').inputSchema;
+    expect(validar(schema, { taskId: 'task0001', fieldId: 'campo-1', number: 3.5 })).toBeNull();
+    expect(validar(schema, { taskId: 'task0001', fieldId: 'campo-1', number: '3' })).toMatch(
+      /número/,
+    );
+  });
+
+  it('las opciones de un campo son objetos cerrados con color del vocabulario', () => {
+    const schema = tool('create_custom_field').inputSchema;
+    expect(
+      validar(schema, {
+        projectId: 'p1',
+        name: 'Entorno',
+        type: 'SELECT',
+        options: [{ name: 'Prod', color: 'error' }],
+      }),
+    ).toBeNull();
+    expect(
+      validar(schema, {
+        projectId: 'p1',
+        name: 'Entorno',
+        type: 'SELECT',
+        options: [{ name: 'Prod', color: 'fucsia' }],
+      }),
+    ).toMatch(/color/);
+    expect(validar(schema, { projectId: 'p1', name: 'X', type: 'FECHA' })).toMatch(/type/);
+  });
 });

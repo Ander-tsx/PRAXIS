@@ -128,7 +128,7 @@ a **filas de propiedades** (kyloo-design §4):
   tipo de aviso nuevo en projects-service y su pintura en el frontend; el
   `TASK_ASSIGNED` actual diría «te asignaron la tarea», que no es lo mismo que
   «eres el revisor».
-- **PRAX, MCP y automatizaciones** no leen ni escriben campos todavía. Para PRAX,
+- **PRAX y automatizaciones** no leen ni escriben campos todavía (el **MCP sí**, desde la misma fecha: ver PLAN-MCP). Para PRAX,
   medir con `medir-prompt` antes de meterlos en el briefing.
 - **La lista móvil de la tabla** (`TarjetaDeTarea`) no enseña los campos: en
   móvil se ven y editan en el panel.
