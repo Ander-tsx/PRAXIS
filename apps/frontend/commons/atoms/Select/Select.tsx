@@ -289,7 +289,7 @@ export function Select({
             aria-labelledby={label ? `${campoId}-etiqueta` : undefined}
             tabIndex={-1}
             onKeyDown={alTeclear}
-            className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-border py-1"
+            className="absolute z-50 mt-1 max-h-60 w-full origin-top animate-desplegar-menu overflow-y-auto rounded-xl border border-border py-1"
             style={{
               background: colors.surfaceElevated,
               boxShadow: `0 8px 24px ${alpha(colors.overlay, 45)}`,

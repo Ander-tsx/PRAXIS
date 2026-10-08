@@ -59,9 +59,14 @@ export function PropertyRow({
       {label}
     </span>
   );
+  /**
+   * ⚠️ **En el teléfono, apilada**: el nombre arriba y el valor debajo, a todo
+   * el ancho. A 390 px, dos columnas dejaban al valor en ~230 px: la fecha se
+   * partía en dos líneas, «Reviewer» se cortaba y la lista de personas no cabía.
+   */
   return (
-    <div className="group/row grid grid-cols-[8.5rem_minmax(0,1fr)] items-start gap-2 rounded-lg px-2 py-0.5 transition-colors hover:bg-white/[0.03] max-sm:grid-cols-[7rem_minmax(0,1fr)]">
-      <span className="flex min-h-9 min-w-0 items-center gap-2 font-sans text-[13px] text-text-secondary">
+    <div className="group/row grid grid-cols-[8.5rem_minmax(0,1fr)] items-start gap-2 rounded-lg px-2 py-0.5 transition-colors hover:bg-white/[0.03] max-sm:grid-cols-1 max-sm:gap-0 max-sm:py-1.5">
+      <span className="flex min-h-9 min-w-0 items-center gap-2 font-sans text-[13px] text-text-secondary max-sm:min-h-6 max-sm:text-xs">
         {icon && <span className="text-text-secondary/80">{icon}</span>}
         {htmlFor ? (
           <label htmlFor={htmlFor} className="min-w-0 truncate">

@@ -136,3 +136,40 @@ a **filas de propiedades** (kyloo-design §4):
 - Las capturas de referencia de escritorio (`00-escritorio-capturas`, I1 de
   PLAN-MOVIL) del panel y de la tabla **cambian a propósito** y hay que
   regenerarlas en macOS (los `-darwin.png` no se pueden generar desde Windows).
+
+## Segunda entrega (2026-10-08)
+
+Lo pidió el dueño tras probarlo: «no lo hiciste responsive para mobile, los
+nombres largos se salen de los desplegables; a Archivos dale un aviso como el de
+Documentos y una opción de adjuntar enlaces; y que los desplegables salgan
+animados».
+
+- **Enlaces en Archivos.** La sección ofrece «Adjuntar PDF» y «Adjuntar enlace»
+  (un Google Doc, un Figma, un PR) y, vacía, dice para qué sirve, como
+  Documentos. Los enlaces van en su propia tabla, `task_links` (migración
+  `20261008010000_task_links`, solo aditiva), con `POST /tasks/:id/links` y
+  `DELETE /tasks/:id/links/:linkId` (`canEditTask`; quitar uno ajeno, además
+  `canDeleteTask`, igual que los adjuntos). Sin título, la acción lo lee de la
+  página con `obtenerPreviewDeEnlace` —el del chat, con su guard SSRF— y
+  descarta los de una pantalla de acceso («Sign-in»), que es lo que devuelve un
+  Google Doc privado. La marca de la tarjeta cuenta PDF y enlaces juntos.
+- **En el MCP desde el primer día**: `add_task_link` y `delete_task_link`.
+- **Móvil**: las filas de propiedades se **apilan** (nombre arriba, valor
+  debajo, a todo el ancho) por debajo de `sm`; la lista móvil de la tabla
+  enseña los campos «en la tarjeta» y ordena por ellos.
+- **Animaciones**: los desplegables del panel, el `Select`, el calendario y el
+  flotante de la tabla entran con `animate-desplegar-menu`, la misma de los
+  menús del resto de la aplicación.
+
+### Trampas de esta entrega
+
+7. 🔴 **Un `<fieldset>` no se encoge.** Su `min-width` por defecto es
+   `min-content`, así que la lista de encargados crecía hasta el ancho del
+   nombre más largo y se salía de la pantalla del teléfono, con `truncate` y
+   todo. `min-w-0` en cada `fieldset` del panel.
+8. ⚠️ **`animate-desplegar-panel` recorta lo de dentro** (`overflow: hidden`
+   permanente en su hijo). En la lista de etiquetas se habría comido el
+   desplegable de color del gestor: por eso el panel usa `desplegar-menu`.
+9. ⚠️ **Adjuntos y etiquetas invalidaban el tablero con un `del` exacto**
+   (trampa 26 de CLAUDE.md): la marca de un PDF recién subido podía tardar un
+   minuto en salir en la tarjeta. Ahora `delByPrefix`, también en los enlaces.

@@ -72,6 +72,8 @@ const TASK_INCLUDE = {
   fieldValues: {
     select: { fieldId: true, text: true, number: true, date: true, bool: true, ids: true },
   },
+  /** Los enlaces adjuntos (un Google Doc, un PR). Ligeros: URL y título. */
+  links: { orderBy: { createdAt: 'asc' } },
   /**
    * Los comentarios viajan **con la tarea**, también en el listado del tablero.
    *

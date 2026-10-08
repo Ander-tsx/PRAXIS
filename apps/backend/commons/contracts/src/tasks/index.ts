@@ -17,3 +17,4 @@ export * from './toggle-checklist.dto';
 export * from './delete-checklist.dto';
 export * from './find-tasks-by-project.dto';
 export * from './custom-field.dto';
+export * from './task-link.dto';

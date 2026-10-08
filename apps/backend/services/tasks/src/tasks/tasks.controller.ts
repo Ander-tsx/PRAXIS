@@ -9,12 +9,14 @@ import {
   CreateCustomFieldDto,
   CreateLabelDto,
   CreateTaskDto,
+  CreateTaskLinkDto,
   DeleteAttachmentDto,
   DeleteChecklistDto,
   DeleteCommentDto,
   DeleteCustomFieldDto,
   DeleteLabelDto,
   DeleteTaskDto,
+  DeleteTaskLinkDto,
   FindAttachmentsDto,
   FindCommentsDto,
   FindCustomFieldsDto,
@@ -41,6 +43,7 @@ import { CommentsService } from './comments.service';
 import { CustomFieldsService } from './custom-fields.service';
 import { LabelsService } from './labels.service';
 import { type DimensionCruce, StatsService } from './stats.service';
+import { TaskLinksService } from './task-links.service';
 import { TasksService } from './tasks.service';
 
 @Controller()
@@ -49,6 +52,7 @@ export class TasksController {
     private readonly tasksService: TasksService,
     private readonly labelsService: LabelsService,
     private readonly customFieldsService: CustomFieldsService,
+    private readonly taskLinksService: TaskLinksService,
     private readonly commentsService: CommentsService,
     private readonly attachmentsService: AttachmentsService,
     private readonly statsService: StatsService,
@@ -225,6 +229,18 @@ export class TasksController {
   @MessagePattern({ cmd: 'field_delete' })
   deleteField(@Payload() dto: DeleteCustomFieldDto) {
     return this.customFieldsService.deleteField(dto);
+  }
+
+  // ─── Enlaces ──────────────────────────────────────────────────────────────
+
+  @MessagePattern({ cmd: 'task_link_create' })
+  createTaskLink(@Payload() dto: CreateTaskLinkDto) {
+    return this.taskLinksService.create(dto);
+  }
+
+  @MessagePattern({ cmd: 'task_link_delete' })
+  deleteTaskLink(@Payload() dto: DeleteTaskLinkDto) {
+    return this.taskLinksService.delete(dto);
   }
 
   @MessagePattern({ cmd: 'field_set_value' })

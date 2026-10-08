@@ -282,8 +282,8 @@ export function SelectorDeFecha({
           <div
             role="dialog"
             aria-label="Elegir fecha"
-            className={`absolute top-full z-50 mt-2 w-72 rounded-xl p-3 ${
-              align === 'right' ? 'right-0' : 'left-0'
+            className={`absolute top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] animate-desplegar-menu rounded-xl p-3 ${
+              align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'
             }`}
             style={{
               background: colors.surfaceElevated,

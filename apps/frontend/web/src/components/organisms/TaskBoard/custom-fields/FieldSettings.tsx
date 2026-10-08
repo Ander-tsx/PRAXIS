@@ -16,7 +16,7 @@ import {
   colors,
   fieldTakesOptions,
 } from '@praxis/commons';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useProjectFields } from './ProjectFieldsContext';
 import { swallowEscape } from './swallow-escape';
 
@@ -68,6 +68,7 @@ export function FieldSettings({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const tipoId = useId();
 
   const withOptions = fieldTakesOptions(type);
 
@@ -141,8 +142,13 @@ export function FieldSettings({
         </p>
       ) : (
         <div className="flex flex-col gap-1">
+          {/* El rótulo es nuestro y no el del átomo, para que «Tipo» se lea
+              igual que «Nombre» de arriba y no con otro cuerpo y otro color. */}
+          <label htmlFor={tipoId} className="text-xs font-medium text-text-secondary">
+            Tipo
+          </label>
           <Select
-            label="Tipo"
+            id={tipoId}
             value={type}
             onValueChange={(value) => setType(value as CustomFieldType)}
             options={CUSTOM_FIELD_TYPES.map((t) => ({
@@ -155,7 +161,7 @@ export function FieldSettings({
       )}
 
       {withOptions && (
-        <fieldset className="flex flex-col gap-1.5">
+        <fieldset className="flex min-w-0 flex-col gap-1.5">
           <legend className="mb-1 text-xs font-medium text-text-secondary">Opciones</legend>
           {options.map((option, index) => (
             <div key={option.key} className="flex items-center gap-1.5">

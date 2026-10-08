@@ -540,39 +540,21 @@ export function TaskDialog({
           canToggle={canToggleChecklist}
         />
         {/* Los documentos del proyecto son la forma principal de dar contexto a
-          una tarea (E9 de `docs/PLAN-DOCUMENTOS.md`); los PDF siguen, plegados
-          mientras no haya ninguno. */}
+          una tarea (E9 de `docs/PLAN-DOCUMENTOS.md`). Debajo, los archivos:
+          PDF y enlaces (un Google Doc, un PR), con el mismo aviso de para qué
+          sirven que Documentos. Sin permiso y sin nada que enseñar, no sale. */}
         <TaskDocuments projectId={projectId} taskId={task.id} canEdit={canEdit} />
-        {task.attachments.length > 0 ? (
+        {(canEdit || task.attachments.length > 0 || (task.links?.length ?? 0) > 0) && (
           <TaskAttachments
             projectId={projectId}
             taskId={task.id}
             attachments={task.attachments}
+            links={task.links ?? []}
             usersById={usersById}
             currentUserId={currentUserId}
             canUpload={canEdit}
             canModerate={canDelete}
           />
-        ) : (
-          canEdit && (
-            <details className="group mt-6 open:mt-0">
-              <summary className="flex min-h-6 cursor-pointer list-none items-center justify-between gap-2 px-1 group-open:hidden">
-                <span className={SECTION_TITLE_CLASS}>Archivos</span>
-                <span className="rounded-md px-1.5 py-0.5 font-sans text-xs text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary">
-                  + Adjuntar un PDF
-                </span>
-              </summary>
-              <TaskAttachments
-                projectId={projectId}
-                taskId={task.id}
-                attachments={task.attachments}
-                usersById={usersById}
-                currentUserId={currentUserId}
-                canUpload={canEdit}
-                canModerate={canDelete}
-              />
-            </details>
-          )
         )}
         {/**
          * Las notas, **al final y fuera del formulario**, por lo mismo que las
@@ -759,7 +741,7 @@ function AssigneesProperty({
                 const user = usersById.get(id);
                 const label = user ? personLabel(user) : 'Alguien que ya no está';
                 return (
-                  <span key={id} className="flex min-w-0 items-center gap-1.5">
+                  <span key={id} className="flex min-w-0 max-w-full items-center gap-1.5">
                     <Avatar
                       size="sm"
                       label={label}
@@ -773,7 +755,7 @@ function AssigneesProperty({
           )
         }
       >
-        <fieldset disabled={readOnly} className="flex flex-col gap-1">
+        <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-1">
           <legend className="sr-only">Encargados</legend>
           {members.length > 6 && (
             <input
@@ -868,7 +850,7 @@ function LabelsProperty({
         }
       >
         <div className="flex flex-col gap-2">
-          <fieldset className="flex flex-col gap-2" disabled={readOnly}>
+          <fieldset className="flex min-w-0 flex-col gap-2" disabled={readOnly}>
             <legend className="sr-only">Etiquetas</legend>
             {labels.length === 0 ? (
               <p className="px-1 font-sans text-xs text-text-secondary">
@@ -943,10 +925,15 @@ function PickerShell({
       >
         {summary}
       </button>
+      {/* Entra con `animate-desplegar-menu` al quitarse `hidden`: una animación
+          CSS arranca cada vez que el elemento vuelve a pintarse.
+          ⚠️ No `animate-desplegar-panel`: ese deja el contenido con
+          `overflow: hidden` y recortaría el desplegable de color del gestor de
+          etiquetas, que vive aquí dentro. */}
       <div
         id={panelId}
         hidden={!open}
-        className="mt-1 rounded-xl border border-border bg-surface p-2"
+        className="mt-1 origin-top animate-desplegar-menu rounded-lg border border-white/[0.08] bg-surface-elevated p-2 shadow-lg shadow-black/20"
       >
         {children}
       </div>

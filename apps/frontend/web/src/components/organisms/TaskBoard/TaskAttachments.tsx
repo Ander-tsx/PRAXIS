@@ -4,12 +4,17 @@ import {
   deleteAttachmentAction,
   uploadAttachmentAction,
 } from '@/app/(privado)/projects/[id]/actions';
+import {
+  addTaskLinkAction,
+  deleteTaskLinkAction,
+} from '@/app/(privado)/projects/[id]/link-actions';
 import { TASK_INITIAL_STATE } from '@/lib/projects/action-state';
 import { validateAttachment } from '@/lib/projects/validation';
 import {
   ATTACHMENT_ALLOWED_MIME,
   ATTACHMENT_MAX_BYTES,
   type TaskAttachment,
+  type TaskLink,
   type UserProfile,
   alpha,
   colors,
@@ -19,6 +24,7 @@ import {
   personLabel,
   useAccion,
 } from '@praxis/commons';
+import { Link2, Paperclip, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { PdfViewer } from './PdfViewer';
 import {
@@ -33,6 +39,8 @@ export interface TaskAttachmentsProps {
   projectId: string;
   taskId: string;
   attachments: TaskAttachment[];
+  /** Enlaces adjuntos (un Google Doc, un PR). */
+  links: TaskLink[];
   usersById: Map<string, UserProfile>;
   currentUserId: string;
   canUpload: boolean;
@@ -62,6 +70,7 @@ export function TaskAttachments({
   projectId,
   taskId,
   attachments,
+  links,
   usersById,
   currentUserId,
   canUpload,
@@ -86,25 +95,73 @@ export function TaskAttachments({
   }, [state]);
 
   const total = attachments.reduce((sum, file) => sum + file.size, 0);
+  /** Qué formulario está abierto: ninguno, subir un PDF o añadir un enlace. */
+  const [modo, setModo] = useState<'nada' | 'pdf' | 'enlace'>('nada');
+  const cantidad = attachments.length + links.length;
+
+  /* Al confirmar la subida, se pliega: ya está en la lista. */
+  useEffect(() => {
+    if (state.done) setModo('nada');
+  }, [state]);
 
   return (
     <section className={SECTION_CLASS}>
-      <h4 className={`${SECTION_TITLE_CLASS} px-1`}>
-        Archivos{' '}
-        {attachments.length > 0 && (
-          <span className={SECTION_COUNT_CLASS}>
-            {attachments.length} · {formatBytes(total)}
+      <header className="flex min-h-6 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-1">
+        <h4 className={SECTION_TITLE_CLASS}>
+          Archivos
+          {cantidad > 0 && (
+            <span className={SECTION_COUNT_CLASS}>
+              {cantidad}
+              {attachments.length > 0 && ` · ${formatBytes(total)}`}
+            </span>
+          )}
+        </h4>
+        {canUpload && modo === 'nada' && (
+          <span className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setModo('pdf')}
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-white/[0.07] hover:text-text-primary"
+            >
+              <Paperclip className="h-3.5 w-3.5" />
+              Adjuntar PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => setModo('enlace')}
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-white/[0.07] hover:text-text-primary"
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              Adjuntar enlace
+            </button>
           </span>
         )}
-      </h4>
+      </header>
 
       <div className={SECTION_BODY_CLASS}>
-        {attachments.length === 0 && (
+        {/* El aviso de para qué sirve, como en Documentos: una sección vacía
+            sin una frase se lee como algo que no funciona. */}
+        {cantidad === 0 && modo === 'nada' && (
           <p className="font-sans text-xs text-text-secondary">
             {canUpload
-              ? `Solo PDF, hasta ${formatBytes(ATTACHMENT_MAX_BYTES)} cada uno.`
-              : 'Esta tarea no tiene archivos.'}
+              ? `Adjunta PDFs (hasta ${formatBytes(ATTACHMENT_MAX_BYTES)}) o enlaces a un Google Doc, un Figma o un PR: lo que haga falta tener a mano para esta tarea.`
+              : 'Esta tarea no tiene archivos ni enlaces.'}
           </p>
+        )}
+
+        {links.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {links.map((link) => (
+              <LinkRow
+                key={link.id}
+                link={link}
+                addedBy={usersById.get(link.addedBy)}
+                projectId={projectId}
+                taskId={taskId}
+                canDelete={canUpload && (link.addedBy === currentUserId || canModerate)}
+              />
+            ))}
+          </ul>
         )}
 
         {attachments.length > 0 && (
@@ -122,8 +179,17 @@ export function TaskAttachments({
           </ul>
         )}
 
-        {canUpload && (
-          <form ref={formRef} action={formAction} className="flex items-center gap-2" noValidate>
+        {canUpload && modo === 'enlace' && (
+          <NewLinkForm projectId={projectId} taskId={taskId} onDone={() => setModo('nada')} />
+        )}
+
+        {canUpload && modo === 'pdf' && (
+          <form
+            ref={formRef}
+            action={formAction}
+            className="flex animate-desplegar-menu flex-wrap items-center gap-2 origin-top"
+            noValidate
+          >
             <input type="hidden" name="projectId" value={projectId} />
             <input type="hidden" name="taskId" value={taskId} />
             <input
@@ -137,16 +203,28 @@ export function TaskAttachments({
                 const elegido = evento.target.files?.[0];
                 setRechazo(elegido ? validateAttachment(elegido.type, elegido.size) : null);
               }}
-              className="flex-1 cursor-pointer font-sans text-xs text-white file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:font-sans file:text-xs file:font-semibold file:text-white"
+              className="min-w-0 flex-1 cursor-pointer font-sans text-xs text-text-secondary file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:font-sans file:text-xs file:font-semibold file:text-text-primary"
             />
-            <button
-              type="submit"
-              disabled={uploading || rechazo !== null}
-              className="shrink-0 cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ background: alpha(colors.primary, 20) }}
-            >
-              {uploading ? 'Subiendo…' : 'Adjuntar'}
-            </button>
+            <span className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setRechazo(null);
+                  setModo('nada');
+                }}
+                className="cursor-pointer rounded-lg px-2.5 py-1.5 font-sans text-xs text-text-secondary hover:text-text-primary"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={uploading || rechazo !== null}
+                className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: alpha(colors.primary, 20) }}
+              >
+                {uploading ? 'Subiendo…' : 'Subir PDF'}
+              </button>
+            </span>
           </form>
         )}
 
@@ -160,6 +238,178 @@ export function TaskAttachments({
       </div>
     </section>
   );
+}
+
+/** Un enlace adjunto: título (o dominio), el dominio debajo y quitarlo. */
+function LinkRow({
+  link,
+  addedBy,
+  projectId,
+  taskId,
+  canDelete,
+}: {
+  link: TaskLink;
+  addedBy: UserProfile | undefined;
+  projectId: string;
+  taskId: string;
+  canDelete: boolean;
+}) {
+  const [quitando, setQuitando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const dominio = dominioDe(link.url);
+
+  return (
+    <li className="flex items-center gap-3 rounded-xl p-2.5" style={SECTION_PANEL}>
+      <a
+        href={link.url}
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        className="group flex min-w-0 flex-1 items-center gap-3"
+      >
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-text-secondary"
+          style={{ background: 'rgba(255,255,255,0.08)' }}
+        >
+          <Link2 className="h-4 w-4" />
+        </span>
+        <span className="flex min-w-0 flex-col">
+          <span
+            className="truncate font-sans text-xs text-text-primary group-hover:underline"
+            title={link.title ?? link.url}
+          >
+            {link.title ?? dominio}
+          </span>
+          <span className="truncate font-sans text-[11px] text-text-secondary">
+            {dominio}
+            {addedBy && ` · ${personLabel(addedBy)}`}
+          </span>
+        </span>
+      </a>
+
+      {canDelete && (
+        <button
+          type="button"
+          disabled={quitando}
+          aria-label={`Quitar el enlace ${link.title ?? dominio}`}
+          title="Quitar"
+          onClick={async () => {
+            setQuitando(true);
+            setError(null);
+            const result = await deleteTaskLinkAction({ projectId, taskId, linkId: link.id });
+            setQuitando(false);
+            if (result.error) setError(result.error);
+          }}
+          className="shrink-0 cursor-pointer rounded p-1 text-text-secondary transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {error && (
+        <span role="alert" className="font-sans text-[11px]" style={{ color: colors.error }}>
+          {error}
+        </span>
+      )}
+    </li>
+  );
+}
+
+/** Añadir un enlace: la URL y, si se quiere, un título. Sin título se lee de la página. */
+function NewLinkForm({
+  projectId,
+  taskId,
+  onDone,
+}: {
+  projectId: string;
+  taskId: string;
+  onDone: () => void;
+}) {
+  const [url, setUrl] = useState('');
+  const [title, setTitle] = useState('');
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function guardar() {
+    if (!url.trim()) return setError('Pega el enlace.');
+    setGuardando(true);
+    setError(null);
+    const result = await addTaskLinkAction({ projectId, taskId, url, title });
+    setGuardando(false);
+    if (result.error) return setError(result.error);
+    onDone();
+  }
+
+  const campo =
+    'h-9 w-full min-w-0 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary hover:border-white/[0.14] focus:border-primary focus:bg-white/[0.06]';
+
+  return (
+    <div
+      className="flex origin-top animate-desplegar-menu flex-col gap-2"
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          void guardar();
+        }
+        if (event.key === 'Escape') {
+          event.stopPropagation();
+          event.nativeEvent.stopImmediatePropagation();
+          onDone();
+        }
+      }}
+    >
+      <input
+        // biome-ignore lint/a11y/noAutofocus: se abre para pegar el enlace
+        autoFocus
+        type="url"
+        inputMode="url"
+        aria-label="Enlace"
+        placeholder="https://docs.google.com/…"
+        value={url}
+        maxLength={2048}
+        onChange={(event) => setUrl(event.target.value)}
+        className={campo}
+      />
+      <input
+        aria-label="Título del enlace (opcional)"
+        placeholder="Título (opcional: si no, se lee de la página)"
+        value={title}
+        maxLength={200}
+        onChange={(event) => setTitle(event.target.value)}
+        className={campo}
+      />
+      {error && (
+        <p role="alert" className="font-sans text-xs" style={{ color: colors.error }}>
+          {error}
+        </p>
+      )}
+      <span className="flex justify-end gap-1">
+        <button
+          type="button"
+          onClick={onDone}
+          className="cursor-pointer rounded-lg px-2.5 py-1.5 font-sans text-xs text-text-secondary hover:text-text-primary"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          disabled={guardando}
+          onClick={() => void guardar()}
+          className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          style={{ background: alpha(colors.primary, 20) }}
+        >
+          {guardando ? 'Añadiendo…' : 'Añadir enlace'}
+        </button>
+      </span>
+    </div>
+  );
+}
+
+/** `https://www.figma.com/file/…` → `figma.com`. */
+function dominioDe(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
 }
 
 function AttachmentRow({

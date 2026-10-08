@@ -124,7 +124,7 @@ export class LabelsService {
     const boardIds = [...new Set(rows.map((row) => row.task.boardId))];
     await Promise.all([
       ...rows.map((row) => this.redis.del(`task:${row.task.id}`)),
-      ...boardIds.map((id) => this.redis.del(`tasks:board:${id}`)),
+      ...boardIds.map((id) => this.redis.delByPrefix(`tasks:board:${id}`)),
     ]);
   }
 

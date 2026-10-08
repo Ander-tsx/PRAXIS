@@ -856,7 +856,21 @@ export interface Task {
    * eventos en vivo o del asistente pueden no traerlo.
    */
   fieldValues?: TaskFieldValue[];
+  /** Enlaces adjuntos (un Google Doc, un PR). Opcional por lo mismo que `documents`. */
+  links?: TaskLink[];
   subtasks: Task[];
+}
+
+/** Un enlace adjunto a una tarea. Va en «Archivos» junto a los PDF. */
+export interface TaskLink {
+  id: string;
+  taskId: string;
+  /** Siempre `http(s)`: lo valida el servidor. */
+  url: string;
+  /** El de la página al añadirlo, o el que se escribió. Sin él, se enseña el dominio. */
+  title: string | null;
+  addedBy: string;
+  createdAt: string;
 }
 
 /* ─── Campos personalizados (docs/PLAN-CAMPOS-PERSONALIZADOS.md) ─────────── */

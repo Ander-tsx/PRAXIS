@@ -404,7 +404,7 @@ function OptionsEditor({
       </button>
       {open && (
         <div
-          className="absolute right-0 left-0 z-30 mt-1 rounded-xl border border-border p-1"
+          className="absolute right-0 left-0 z-30 mt-1 origin-top animate-desplegar-menu rounded-xl border border-border p-1"
           style={{
             background: colors.surfaceElevated,
             boxShadow: `0 12px 32px ${alpha(colors.overlay, 55)}`,
@@ -553,7 +553,7 @@ export function AnchoredPanel({
   return createPortal(
     <div
       ref={panelRef}
-      className="fixed z-50 rounded-xl border border-border p-2"
+      className="fixed z-50 origin-top animate-desplegar-menu rounded-xl border border-border p-2"
       style={{
         top: position?.top ?? -9999,
         left: position?.left ?? -9999,

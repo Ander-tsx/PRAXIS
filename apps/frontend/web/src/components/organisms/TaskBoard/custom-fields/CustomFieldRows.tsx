@@ -129,7 +129,11 @@ function CustomFieldRow({
 }
 
 function SettingsBox({ children }: { children: React.ReactNode }) {
-  return <div className="m-1 rounded-lg border border-border bg-surface p-3">{children}</div>;
+  return (
+    <div className="m-1 origin-top animate-desplegar-menu rounded-lg border border-border bg-surface p-3">
+      {children}
+    </div>
+  );
 }
 
 function GearIcon() {

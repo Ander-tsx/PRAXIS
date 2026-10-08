@@ -26,6 +26,7 @@ model Task {
   assignees    TaskAssignee[]
   labels       TaskLabel[]
   fieldValues  TaskFieldValue[]
+  links        TaskLink[]
   comments     TaskComment[]
   attachments  TaskAttachment[]
   documents    TaskDocument[]
@@ -318,6 +319,28 @@ model TaskLabel {
   @@index([labelId])
   @@schema("tasks")
   @@map("task_labels")
+}
+
+/// Un enlace adjunto a una tarea: un Google Doc, un Figma, un PR.
+///
+/// Va con los archivos —la sección «Archivos» del panel ofrece adjuntar un PDF o
+/// un enlace— pero en su propia tabla: un adjunto guarda bytes y cuenta contra
+/// el almacén de la organización; un enlace no guarda nada más que la URL.
+model TaskLink {
+  id        String   @id @default(uuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  /// Solo `http(s)`: lo valida el DTO. Se pinta como `<a>` y nunca como HTML.
+  url       String
+  /// El título de la página si se pudo leer al añadirlo, o el que puso quien lo
+  /// añadió. Sin título, la interfaz enseña el dominio.
+  title     String?
+  addedBy   String
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
+  @@schema("tasks")
+  @@map("task_links")
 }
 
 /// Los ocho tipos de campo personalizado (`docs/PLAN-CAMPOS-PERSONALIZADOS.md`).

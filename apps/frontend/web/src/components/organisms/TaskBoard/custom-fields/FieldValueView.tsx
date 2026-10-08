@@ -24,11 +24,18 @@ export function FieldValueView({
   input,
   usersById,
   dense = false,
+  linkAsText = false,
 }: {
   field: CustomField;
   input: FieldInput;
   usersById: Map<string, UserProfile>;
   dense?: boolean;
+  /**
+   * El enlace como texto y no como `<a>`: para pintarlo dentro de algo que ya
+   * es un botón —la tarjeta de la lista móvil—, donde un enlace dentro de un
+   * botón no es HTML válido.
+   */
+  linkAsText?: boolean;
 }) {
   if (isEmptyFieldInput(input)) {
     return <span className="text-text-disabled">—</span>;
@@ -58,6 +65,9 @@ export function FieldValueView({
       );
 
     case 'URL':
+      if (linkAsText) {
+        return <span className="truncate text-info">{shortUrl(String(input))}</span>;
+      }
       return (
         <a
           href={String(input)}

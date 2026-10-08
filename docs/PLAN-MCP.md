@@ -489,3 +489,6 @@ devolvían sus valores en `fieldValues`.
 - El catálogo estrenó **`PUT`** (`HttpMethod`) y el tipo **`number`** de
   esquema, con decimales; `validar` los conoce y `mcp-tools.spec.ts` comprueba
   que la ruta `PUT` existe.
+
+**2026-10-08**: `add_task_link` (write) y `delete_task_link` (delete), los
+enlaces de una tarea. **55 herramientas.**

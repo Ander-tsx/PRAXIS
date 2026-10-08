@@ -190,6 +190,12 @@ describe('Campos personalizados en el MCP', () => {
     return encontrada;
   };
 
+  it('los enlaces de una tarea: añadir escribe, quitar borra', () => {
+    expect(tool('add_task_link').scope).toBe('write');
+    expect(tool('delete_task_link').scope).toBe('delete');
+    expect(tool('add_task_link').inputSchema.required).toEqual(['taskId', 'url']);
+  });
+
   it('están las cinco herramientas, con su alcance', () => {
     expect(tool('list_custom_fields').scope).toBe('read');
     expect(tool('create_custom_field').scope).toBe('write');

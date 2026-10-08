@@ -610,6 +610,22 @@ export const MCP_TOOLS: readonly McpTool[] = [
     call: { method: 'POST', path: '/projects/{projectId}/labels', body: ['name', 'color'] },
   },
   {
+    name: 'add_task_link',
+    description:
+      'Adjunta un enlace a una tarea (un Google Doc, un Figma, un PR). Solo http(s). Sin título, se enseña el dominio. La tarea los trae en `links`.',
+    scope: 'write',
+    anchor: 'taskId',
+    inputSchema: object(
+      {
+        taskId: id('Tarea'),
+        url: text('URL http(s)', 2048, 1),
+        title: text('Título', 200, 1),
+      },
+      ['taskId', 'url'],
+    ),
+    call: { method: 'POST', path: '/tasks/{taskId}/links', body: ['url', 'title'] },
+  },
+  {
     name: 'create_custom_field',
     description:
       'Crea un campo personalizado en un proyecto: vale para todas sus tareas. El tipo no se cambia después. `options` solo en SELECT y MULTI_SELECT.',
@@ -837,6 +853,14 @@ export const MCP_TOOLS: readonly McpTool[] = [
       'labelId',
     ]),
     call: { method: 'DELETE', path: '/projects/{projectId}/labels/{labelId}' },
+  },
+  {
+    name: 'delete_task_link',
+    description: 'Quita un enlace de una tarea: uno tuyo, o cualquiera si puedes eliminar tareas.',
+    scope: 'delete',
+    anchor: 'taskId',
+    inputSchema: object({ taskId: id('Tarea'), linkId: id('Enlace') }, ['taskId', 'linkId']),
+    call: { method: 'DELETE', path: '/tasks/{taskId}/links/{linkId}' },
   },
   {
     name: 'delete_custom_field',

@@ -163,7 +163,8 @@ export function TaskCard({
    * campo `notesCount` que el backend tendría que mantener al día.
    */
   const notas = task.comments.length;
-  const adjuntos = task.attachments.length;
+  /* PDF y enlaces cuentan juntos: los dos viven en «Archivos» del panel. */
+  const adjuntos = task.attachments.length + (task.links?.length ?? 0);
 
   /**
    * Los documentos vinculados, con su título. Uno que ya no existe —se borró y
@@ -440,7 +441,7 @@ export function TaskCard({
           <Mark
             color={colors.accent}
             glyph={<AttachmentGlyph className="h-3 w-3" />}
-            title={adjuntos === 1 ? '1 archivo adjunto' : `${adjuntos} archivos adjuntos`}
+            title={adjuntos === 1 ? '1 archivo o enlace' : `${adjuntos} archivos y enlaces`}
           >
             {adjuntos}
           </Mark>
@@ -506,7 +507,14 @@ export function TaskCard({
  * Solo los que tienen valor. Un «Reviewer: —» en cada tarjeta de la columna
  * ocuparía sitio para decir que no hay nada.
  */
-function CardFields({ task }: { task: Task }) {
+export function CardFields({
+  task,
+  linkAsText = false,
+}: {
+  task: Task;
+  /** Dentro de un botón (la lista móvil de la tabla): sin `<a>`. */
+  linkAsText?: boolean;
+}) {
   const { fields, usersById } = useProjectFields();
   const rows = fields
     .filter((field) => field.showOnCard)
@@ -520,7 +528,13 @@ function CardFields({ task }: { task: Task }) {
         <div key={field.id} className="flex min-w-0 items-center gap-1.5">
           <dt className="max-w-[45%] shrink-0 truncate text-text-secondary">{field.name}</dt>
           <dd className="flex min-w-0 items-center text-text-primary">
-            <FieldValueView field={field} input={input} usersById={usersById} dense />
+            <FieldValueView
+              field={field}
+              input={input}
+              usersById={usersById}
+              dense
+              linkAsText={linkAsText}
+            />
           </dd>
         </div>
       ))}

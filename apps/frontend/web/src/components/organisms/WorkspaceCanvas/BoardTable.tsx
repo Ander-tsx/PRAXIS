@@ -29,6 +29,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { CardFields } from '../TaskBoard/TaskCard';
 import { TaskDialog } from '../TaskBoard/TaskDialog';
 import { AnchoredPanel, FieldEditor, useFieldValue } from '../TaskBoard/custom-fields/FieldEditor';
 import { FieldSettings } from '../TaskBoard/custom-fields/FieldSettings';
@@ -375,6 +376,13 @@ export function BoardTable({
             <option value="titulo">Tarea</option>
             <option value="vencimiento">Vence</option>
             <option value="prioridad">Prioridad</option>
+            {/* Los campos del proyecto también ordenan aquí, como sus columnas
+                en escritorio. */}
+            {fields.map((f) => (
+              <option key={f.id} value={`campo:${f.id}`}>
+                {f.name}
+              </option>
+            ))}
           </select>
         </label>
         {pendientes.map((t, i) => (
@@ -932,6 +940,9 @@ function TarjetaDeTarea({
       <span className="line-clamp-2 [overflow-wrap:anywhere] font-sans text-[15px] font-medium text-white">
         {t.title}
       </span>
+      {/* Los campos marcados «mostrar en la tarjeta», como en el tablero. Sin
+          `<a>`: esta tarjeta entera es un botón. */}
+      <CardFields task={t} linkAsText />
       <span className="flex flex-wrap items-center gap-1.5">
         <span
           className="max-w-[10rem] truncate rounded-md px-2 py-0.5 font-sans text-[11px] font-medium"

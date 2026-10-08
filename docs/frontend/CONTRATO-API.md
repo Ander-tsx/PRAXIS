@@ -709,6 +709,18 @@ Del **proyecto**, como las etiquetas (`docs/PLAN-CAMPOS-PERSONALIZADOS.md`).
 - La tarea sale con `fieldValues: [{ fieldId, text, number, date, bool, ids }]`,
   solo los que tienen algo.
 
+## Enlaces de una tarea 🔒
+
+Van en «Archivos» del panel junto a los PDF, pero sin bytes: URL y título.
+
+| Método | Ruta | Cuerpo | Permiso |
+|---|---|---|---|
+| POST | `/tasks/:taskId/links` | `{ url, title? }` → 201 | `canEditTask` |
+| DELETE | `/tasks/:taskId/links/:linkId` | — | `canEditTask`; uno ajeno, además `canDeleteTask` |
+
+- `url` solo `http(s)`, hasta 2048; `title` hasta 200. 50 enlaces por tarea.
+- La tarea sale con `links: [{ id, url, title, addedBy, createdAt }]`.
+
 ## Comentarios 🔒
 
 | Método | Ruta | Body | Permiso |

@@ -14,7 +14,10 @@ type Campo = {
   type: string;
   options: { id: string; name: string; color: string }[];
 };
-type Tarea = { id: string; fieldValues?: { fieldId: string; text: string | null; ids: string[] }[] };
+type Tarea = {
+  id: string;
+  fieldValues?: { fieldId: string; text: string | null; ids: string[] }[];
+};
 
 test.describe('Campos personalizados', () => {
   test('crear un campo, ponerle valor y leerlo con la tarea', async ({ request }) => {
@@ -123,6 +126,34 @@ test.describe('Campos personalizados', () => {
       data: { value: 'hola' },
     });
     expect(respuesta.status()).toBe(403);
+  });
+
+  test('un enlace se adjunta, sale con la tarea y lo quita su autor', async ({ request }) => {
+    const mundo = await crearMundo(request);
+    const auth = { headers: comoBearer(mundo.duenno.accessToken) };
+    const tarea = await crearTarea(request, mundo.duenno.accessToken, mundo);
+
+    const creado = await request.post(`/api/tasks/${tarea.id}/links`, {
+      ...auth,
+      data: { url: 'https://docs.google.com/document/d/abc/edit', title: 'Especificación' },
+    });
+    expect(creado.status()).toBe(201);
+    const enlace = await data<{ id: string; url: string }>(creado);
+
+    const leida = await data<{ links?: { id: string }[] }>(
+      await request.get(`/api/tasks/${tarea.id}`, auth),
+    );
+    expect(leida.links?.map((l) => l.id)).toContain(enlace.id);
+
+    /* Solo http(s): un `javascript:` sería un script a un clic. */
+    const malo = await request.post(`/api/tasks/${tarea.id}/links`, {
+      ...auth,
+      data: { url: 'javascript:alert(1)' },
+    });
+    expect(malo.status()).toBe(400);
+
+    const quitado = await request.delete(`/api/tasks/${tarea.id}/links/${enlace.id}`, auth);
+    expect(quitado.status()).toBe(200);
   });
 
   test('sin canEditTask se leen pero no se gestionan', async ({ request }) => {

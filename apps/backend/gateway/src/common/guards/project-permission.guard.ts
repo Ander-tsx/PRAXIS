@@ -47,6 +47,8 @@ const TASK_CONTROLLERS = new Set([
   'TaskDocumentsController',
   /* El valor de un campo personalizado: `PUT /tasks/:taskId/fields/:fieldId`. */
   'TaskFieldValuesController',
+  /* Los enlaces de una tarea: `/tasks/:taskId/links`. */
+  'TaskLinksController',
 ]);
 
 /**

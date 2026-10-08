@@ -96,7 +96,10 @@ export class AttachmentsController {
   })
   @ApiOperation({ summary: 'Adjunta un archivo a una tarea' })
   @ApiResponse({ status: 201, description: 'Archivo adjuntado' })
-  @ApiResponse({ status: 402, description: 'El almacén de la organización no da para este archivo' })
+  @ApiResponse({
+    status: 402,
+    description: 'El almacén de la organización no da para este archivo',
+  })
   async upload(
     @Param('taskId') taskId: string,
     @Request() req: Express.Request,
