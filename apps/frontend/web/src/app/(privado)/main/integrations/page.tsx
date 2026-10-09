@@ -95,8 +95,39 @@ export default async function IntegrationsPage() {
         {cabecera}
 
         <IntegrationRow
-          title="Tu agente de IA (MCP)"
-          description="Deja que Claude, Cursor u otro agente compatible con MCP lea y gestione tus proyectos como si fueras tú."
+          title="Conectar un agente de IA (MCP)"
+          description="La forma recomendada. Conecta Claude, ChatGPT u otro cliente compatible entrando con tu cuenta de Kyloo, sin copiar ningún token, y elige qué organizaciones puede ver."
+          status={
+            !conIntegraciones
+              ? 'Disponible en Pro'
+              : !oauthActivo
+                ? 'Pronto'
+                : !mcpAllowed
+                  ? 'Desactivado'
+                  : (conexiones ?? []).some((c) => !c.revokedAt)
+                    ? 'Conectado'
+                    : 'Sin conectar'
+          }
+          defaultOpen={conIntegraciones && oauthActivo}
+          disabled={conIntegraciones && !oauthActivo}
+        >
+          {!conIntegraciones
+            ? disponibleEnPro
+            : oauthActivo && (
+                <ConexionesDeIa
+                  conexiones={conexiones ?? []}
+                  organizaciones={organizaciones.map((o) => ({
+                    id: o.id,
+                    name: o.name ?? 'Espacio personal',
+                  }))}
+                  endpoint={endpoint}
+                />
+              )}
+        </IntegrationRow>
+
+        <IntegrationRow
+          title="Token personal (clientes sin OAuth)"
+          description="Para agentes que no saben iniciar sesión solos (scripts, clientes antiguos). Un token por organización que pegas a mano; si tu cliente admite OAuth, usa la opción de arriba."
           status={
             !conIntegraciones
               ? 'Disponible en Pro'
@@ -106,7 +137,7 @@ export default async function IntegrationsPage() {
                   ? 'Conectado'
                   : 'Sin conectar'
           }
-          defaultOpen={conIntegraciones}
+          defaultOpen={conIntegraciones && !oauthActivo}
         >
           {conIntegraciones ? (
             <McpIntegration
@@ -119,30 +150,6 @@ export default async function IntegrationsPage() {
             />
           ) : (
             disponibleEnPro
-          )}
-        </IntegrationRow>
-
-        <IntegrationRow
-          title="ChatGPT y Claude (con tu cuenta de Kyloo)"
-          description="Conecta ChatGPT o Claude en la web sin copiar ningún token: entras con tu cuenta y eliges qué organizaciones pueden ver."
-          status={
-            !oauthActivo
-              ? 'Pronto'
-              : (conexiones ?? []).some((c) => !c.revokedAt)
-                ? 'Conectado'
-                : 'Sin conectar'
-          }
-          disabled={!oauthActivo}
-        >
-          {oauthActivo && (
-            <ConexionesDeIa
-              conexiones={conexiones ?? []}
-              organizaciones={organizaciones.map((o) => ({
-                id: o.id,
-                name: o.name ?? 'Espacio personal',
-              }))}
-              endpoint={endpoint}
-            />
           )}
         </IntegrationRow>
 

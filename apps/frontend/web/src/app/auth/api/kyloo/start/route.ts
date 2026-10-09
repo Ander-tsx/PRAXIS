@@ -3,6 +3,7 @@ import {
   configKyloo,
   nuevoIntento,
   opcionesCookieIntento,
+  origenCanonico,
   rutaSegura,
   sellarIntento,
   urlDeAutorizacion,
@@ -23,6 +24,13 @@ export async function GET(request: NextRequest) {
   const config = configKyloo();
   if (!config) {
     return NextResponse.redirect(new URL('/auth/login?kyloo_error=no_disponible', origen), 303);
+  }
+
+  /* Antes de crear la cookie del intento: si se hiciera en `www`, el retorno
+     caería en el dominio canónico sin ella. */
+  const canonico = origenCanonico(origen);
+  if (canonico !== origen) {
+    return NextResponse.redirect(`${canonico}/auth/api/kyloo/start${request.nextUrl.search}`, 303);
   }
 
   const next = rutaSegura(request.nextUrl.searchParams.get('next'));

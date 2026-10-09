@@ -36,6 +36,22 @@ export function configKyloo(): ConfigKyloo | null {
 }
 
 /**
+ * El origen con el que está dado de alta el cliente en Accounts. La `redirect_uri`
+ * tiene que coincidir carácter a carácter, y la aplicación responde en
+ * `usepraxis.space` y en `www.usepraxis.space`: sin esto, quien entra por el
+ * segundo recibe `invalid_redirect` de Accounts. Sale del origen público del MCP,
+ * que ya es el canónico; sin esa variable (desarrollo) vale el de la petición.
+ */
+export function origenCanonico(origenDePeticion: string): string {
+  try {
+    const canonico = process.env.MCP_RESOURCE_URL;
+    return canonico ? new URL(canonico).origin : origenDePeticion;
+  } catch {
+    return origenDePeticion;
+  }
+}
+
+/**
  * Solo rutas de esta aplicación: `//evil.com` y `/\evil.com` son rutas
  * «relativas» para un `startsWith('/')` y abrirían una redirección a otro sitio
  * tras autenticarse.

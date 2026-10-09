@@ -180,7 +180,7 @@ export default function SignupPage() {
           </Button>
         }
         alternatives={
-          <div className="flex flex-col gap-3">
+          <div className="mx-auto flex w-full max-w-[400px] flex-col gap-3">
             <BotonGoogle
               clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''}
               onCredencial={handleGoogle}

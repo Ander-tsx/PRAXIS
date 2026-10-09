@@ -164,12 +164,16 @@ export default function LoginPage() {
         alternatives={
           <div className="flex flex-col gap-3">
             {sinConfirmar && <AvisoDeConfirmacion email={email} />}
-            <BotonGoogle
-              clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''}
-              onCredencial={handleGoogle}
-              deshabilitado={isLoading}
-            />
-            <BotonKyloo next={destino} />
+            {/* Un solo contenedor para los dos: Google se mide contra él y topa en 400 px,
+                así que Kyloo se limita al mismo ancho y los dos botones miden igual. */}
+            <div className="mx-auto flex w-full max-w-[400px] flex-col gap-3">
+              <BotonGoogle
+                clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''}
+                onCredencial={handleGoogle}
+                deshabilitado={isLoading}
+              />
+              <BotonKyloo next={destino} />
+            </div>
           </div>
         }
         footer={

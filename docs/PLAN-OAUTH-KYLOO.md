@@ -135,6 +135,19 @@ variables de producción y no se rodeó).
 7. Rellenar `razonSocial` y `domicilio` en `web/src/content/legal/entidad.ts` y crear los buzones
    `privacidad@` y `soporte@usepraxis.space`.
 
+## Lo que apareció al probarlo en producción (2026-10-09)
+
+- 🔴 **Claude web: «Couldn’t register with Praxis’s sign-in service».** La petición de registro
+  nunca llegó a la API: el preflight `OPTIONS` lo contestaba Next sin `Access-Control-Allow-Origin`,
+  el navegador descartaba el `POST` y en el servidor no quedaba ni un rastro. Arreglado con CORS
+  abierto **solo** en los endpoints públicos del protocolo (`next.config.ts` de Accounts: metadatos,
+  `jwks`, `oauth2/register`, `oauth2/token`). No usan cookies, así que `*` es seguro.
+- **`invalid_redirect` al entrar con Kyloo por `www.usepraxis.space`.** El cliente se dio de alta con
+  `usepraxis.space` y la `redirect_uri` se compara carácter a carácter. `/auth/api/kyloo/start` ahora
+  salta primero al origen canónico (el de `MCP_RESOURCE_URL`) y solo después crea la cookie del intento.
+- **`NEXT_PUBLIC_KYLOO_LOGIN` no llegaba al build de la web**: faltaba el `ARG` en el Dockerfile.
+- Integraciones: la vía OAuth es la primera y la abierta; el token personal queda como alternativa.
+
 ## Qué se verificó
 
 - KYLOO-AUTH: 32 pruebas de integración (flujo completo con registro dinámico, consentimiento
