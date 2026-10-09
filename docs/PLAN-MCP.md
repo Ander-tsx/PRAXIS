@@ -2,7 +2,8 @@
 
 > Etapa **por empezar** (plan redactado el 2026-09-30, sin una línea de código).
 > **M0–M6 cerradas el 2026-10-02** (ver «Registro de la entrega»). Solo queda
-> M7 (OAuth), condicionado a que M12 enseñe uso real.
+> M7 (OAuth), que se **implementó el 2026-10-09** sin esperar a M12: ver
+> [PLAN-OAUTH-KYLOO.md](PLAN-OAUTH-KYLOO.md).
 > Sale de [PRAX-MCP-SEGUNDA-ITERACION](PRAX-MCP-SEGUNDA-ITERACION.md), que planteó
 > la dirección A (Praxis servidor) y dejó sin decidir qué poderes tiene. Este plan
 > **decide**, y por eso lo sustituye en esa dirección. La dirección B (PRAX como
