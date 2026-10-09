@@ -195,6 +195,9 @@ importers:
       joi:
         specifier: ^18.2.3
         version: 18.2.3
+      jose:
+        specifier: ^5.9.6
+        version: 5.10.0
       multer:
         specifier: ^2.2.0
         version: 2.2.0

@@ -1,9 +1,13 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ClientProxy } from '@nestjs/microservices';
 import { scopeCovers } from '@praxis/contracts';
+import type { McpConnectionView } from '@praxis/contracts';
+import { firstValueFrom } from 'rxjs';
 import { McpAccessError, McpAccessService, type McpSession } from './mcp-access.service';
 import {
   CAMPOS_CREAR_TAREA,
+  HERRAMIENTAS_DE_ORGANIZACION,
   type JsonSchema,
   MCP_TOOLS,
   MCP_TOOLS_BY_NAME,
@@ -33,13 +37,17 @@ export type JsonRpcResponse =
 /** Lo que devuelve una llamada a la API: el `data` del sobre, o su error. */
 type ApiResult = { ok: true; data: unknown } | { ok: false; status: number; error: unknown };
 
-const INSTRUCCIONES = [
-  'Praxis es un gestor de proyectos: organización → proyectos → espacios → tableros → columnas → tareas.',
-  'Este token vale para una sola organización; todo lo que hagas queda a nombre de quien lo creó.',
-  'Para orientarte: list_projects → list_workspaces → list_boards → get_board (columnas) → list_tasks.',
-  'Antes de escribir en un proyecto, get_my_permissions dice qué puedes hacer.',
-  'Las herramientas delete_* son irreversibles: confírmalo con tu usuario antes de usarlas.',
-].join(' ');
+function instrucciones(session: Pick<McpSession, 'connection'>): string {
+  return [
+    'Praxis es un gestor de proyectos: organización → proyectos → espacios → tableros → columnas → tareas.',
+    session.connection
+      ? 'Trabajas en una organización a la vez: list_organizations dice cuáles hay y cuál está activa, y switch_organization cambia. Todo lo que hagas queda a nombre de quien te conectó.'
+      : 'Este token vale para una sola organización; todo lo que hagas queda a nombre de quien lo creó.',
+    'Para orientarte: list_projects → list_workspaces → list_boards → get_board (columnas) → list_tasks.',
+    'Antes de escribir en un proyecto, get_my_permissions dice qué puedes hacer.',
+    'Las herramientas delete_* son irreversibles: confírmalo con tu usuario antes de usarlas.',
+  ].join(' ');
+}
 
 /**
  * El servidor MCP (docs/PLAN-MCP.md, M1 y M3–M4).
@@ -65,6 +73,8 @@ export class McpService {
 
   constructor(
     private readonly access: McpAccessService,
+    @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
+    @Inject('BILLING_SERVICE') private readonly billingClient: ClientProxy,
     config: ConfigService,
   ) {
     const puerto = config.get<number>('HTTP_PORT') ?? 3000;
@@ -84,7 +94,7 @@ export class McpService {
     try {
       switch (message.method) {
         case 'initialize':
-          return this.ok(id, this.initialize(message.params));
+          return this.ok(id, this.initialize(session, message.params));
         case 'ping':
           return this.ok(id, {});
         case 'tools/list':
@@ -102,14 +112,14 @@ export class McpService {
     }
   }
 
-  private initialize(params: Record<string, unknown> | undefined) {
+  private initialize(session: McpSession, params: Record<string, unknown> | undefined) {
     const pedida = typeof params?.protocolVersion === 'string' ? params.protocolVersion : null;
     return {
       protocolVersion:
         pedida && MCP_PROTOCOL_VERSIONS.includes(pedida) ? pedida : MCP_PROTOCOL_VERSIONS[0],
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: 'praxis', title: 'Praxis', version: '1.0.0' },
-      instructions: INSTRUCCIONES,
+      instructions: instrucciones(session),
     };
   }
 
@@ -139,6 +149,16 @@ export class McpService {
     }
 
     this.access.limitar(session.personalTokenId);
+
+    /* La organización activa no se puede usar (te sacaron, bajó el plan, apagaron
+       el MCP): solo pasan las herramientas que sirven para cambiar de organización. */
+    if (session.bloqueo && !HERRAMIENTAS_DE_ORGANIZACION.has(tool.name)) {
+      return this.resultadoDeError(session.bloqueo.getStatus(), {
+        code: session.bloqueo.code,
+        message: `${session.bloqueo.message} Usa list_organizations y switch_organization para trabajar en otra.`,
+        details: session.bloqueo.details,
+      });
+    }
 
     const args = (params.arguments ?? {}) as Record<string, unknown>;
     const invalida = validar(tool.inputSchema, args);
@@ -245,9 +265,75 @@ export class McpService {
         return this.misTareas(session, args);
       case 'set_task_field':
         return this.valorDeCampo(session, args);
+      case 'list_organizations':
+        return this.listarOrganizaciones(session);
+      case 'switch_organization':
+        return this.cambiarOrganizacion(session, String(args.targetOrgId));
       default:
         return { ok: false, status: 500, error: { message: 'Herramienta sin implementar.' } };
     }
+  }
+
+  /* ─── Organizaciones ──────────────────────────────────────────────────── */
+
+  /** Las organizaciones de esa persona, para poner nombre a los ids de la conexión. */
+  private async organizacionesDe(userId: string) {
+    const todas = await firstValueFrom(
+      this.billingClient.send<{ id: string; name: string | null; kind: string }[]>(
+        { cmd: 'billing_orgs_of' },
+        { userId },
+      ),
+    ).catch(() => []);
+    return Array.isArray(todas) ? todas : [];
+  }
+
+  private async listarOrganizaciones(session: McpSession): Promise<ApiResult> {
+    const permitidas = new Set(session.connection?.allowedOrgIds ?? [session.organizationId]);
+    const organizaciones = (await this.organizacionesDe(session.userId))
+      .filter((o) => permitidas.has(o.id))
+      .map((o) => ({
+        id: o.id,
+        name: o.name,
+        personal: o.kind === 'PERSONAL',
+        active: o.id === session.organizationId,
+      }));
+    return { ok: true, data: organizaciones };
+  }
+
+  private async cambiarOrganizacion(session: McpSession, targetOrgId: string): Promise<ApiResult> {
+    if (!session.connection) {
+      return {
+        ok: false,
+        status: 400,
+        error: {
+          code: 'NOT_SUPPORTED',
+          message:
+            'Un token personal vale para una sola organización. Crea otro token, o conecta por OAuth para poder cambiar.',
+        },
+      };
+    }
+    if (!session.connection.allowedOrgIds.includes(targetOrgId)) {
+      return {
+        ok: false,
+        status: 403,
+        error: {
+          code: 'OUT_OF_SCOPE',
+          message:
+            'Esa organización no está entre las de esta conexión. Quien te conectó puede añadirla en Integraciones, en Praxis.',
+        },
+      };
+    }
+    /* Que se pueda USAR, antes de guardarla: cambiar a una que ya no deja entrar
+       sería dejar la conexión en un callejón. Lanza con el motivo exacto. */
+    await this.access.exigirOrganizacionUsable(session.userId, targetOrgId);
+
+    await firstValueFrom(
+      this.credentialsClient.send<McpConnectionView>(
+        { cmd: 'mcp_conn_update' },
+        { userId: session.userId, id: session.connection.id, activeOrgId: targetOrgId },
+      ),
+    );
+    return { ok: true, data: { activeOrgId: targetOrgId } };
   }
 
   /**

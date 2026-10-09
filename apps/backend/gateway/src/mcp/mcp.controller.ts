@@ -2,6 +2,7 @@ import { Controller, Delete, Get, Headers, HttpStatus, Post, Req, Res } from '@n
 import { ApiExcludeController } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
+import { KylooOAuthService } from './kyloo-oauth.service';
 import { McpAccessError, McpAccessService } from './mcp-access.service';
 import { type JsonRpcMessage, type JsonRpcResponse, McpService } from './mcp.service';
 
@@ -32,6 +33,7 @@ export class McpController {
   constructor(
     private readonly access: McpAccessService,
     private readonly mcp: McpService,
+    private readonly oauth: KylooOAuthService,
   ) {}
 
   @Post()
@@ -90,12 +92,24 @@ export class McpController {
         ? error
         : new McpAccessError(HttpStatus.INTERNAL_SERVER_ERROR, 'INTERNAL', 'Error interno.');
     if (e.getStatus() === HttpStatus.UNAUTHORIZED) {
-      res.set('www-authenticate', 'Bearer realm="praxis", error="invalid_token"');
+      /* Con `resource_metadata` (RFC 9728) un cliente MCP sabe dónde descubrir
+         el servidor de autorización y arranca el OAuth solo: es lo que hace que
+         «Añadir conector» funcione sin que nadie pegue nada. */
+      const metadatos = this.oauth.activo
+        ? `, resource_metadata="${this.metadatosDelRecurso()}"`
+        : '';
+      res.set('www-authenticate', `Bearer realm="praxis", error="invalid_token"${metadatos}`);
     }
     return res.status(e.getStatus()).json({
       jsonrpc: '2.0',
       id: null,
       error: { code: -32001, message: e.message, data: { code: e.code, details: e.details } },
     });
+  }
+
+  /** `https://host/.well-known/oauth-protected-resource/<ruta del MCP>` (RFC 9728 §3.1). */
+  private metadatosDelRecurso(): string {
+    const recurso = new URL(this.oauth.recurso);
+    return `${recurso.origin}/.well-known/oauth-protected-resource${recurso.pathname}`;
   }
 }

@@ -85,7 +85,9 @@ export type CustomTool =
   | 'move_tasks'
   | 'delete_tasks'
   | 'list_my_tasks'
-  | 'set_task_field';
+  | 'set_task_field'
+  | 'list_organizations'
+  | 'switch_organization';
 
 export interface McpTool {
   name: string;
@@ -180,6 +182,32 @@ const OPCIONES_DE_CAMPO: JsonSchema = {
 /* ─── El catálogo ───────────────────────────────────────────────────────── */
 
 export const MCP_TOOLS: readonly McpTool[] = [
+  /* Organización: con OAuth, una conexión llega a varias y trabaja en una a la vez. */
+  {
+    name: 'list_organizations',
+    description: 'Organizaciones a las que llega esta conexión, con la activa marcada.',
+    scope: 'read',
+    anchor: 'organization',
+    inputSchema: object({}),
+    custom: 'list_organizations',
+    customMethod: 'GET',
+  },
+  {
+    name: 'switch_organization',
+    description:
+      'Cambia la organización con la que trabajas. Vale para las siguientes llamadas. Solo con conexión OAuth.',
+    scope: 'read',
+    anchor: 'organization',
+    /* ⚠️ `targetOrgId` y no `organizationId`: I2 prohíbe que una herramienta reciba
+       «la organización» como dato, porque la organización sale de la sesión. Esta
+       no opera DENTRO de otra, **cambia la sesión** a una de las que la conexión ya
+       tiene, y el servidor comprueba que lo esté. Un nombre distinto evita que un
+       esquema con `organizationId` vuelva a parecer inocente. */
+    inputSchema: object({ targetOrgId: id('Una de las de list_organizations') }, ['targetOrgId']),
+    custom: 'switch_organization',
+    customMethod: 'GET',
+  },
+
   /* Lectura */
   {
     name: 'list_projects',
@@ -904,6 +932,12 @@ export const MCP_TOOLS: readonly McpTool[] = [
     call: { method: 'DELETE', path: '/projects/{projectId}' },
   },
 ];
+
+/** Las dos que siguen funcionando cuando la organización activa no se puede usar. */
+export const HERRAMIENTAS_DE_ORGANIZACION: ReadonlySet<string> = new Set([
+  'list_organizations',
+  'switch_organization',
+]);
 
 /** Por nombre, para `tools/call`. */
 export const MCP_TOOLS_BY_NAME = new Map(MCP_TOOLS.map((tool) => [tool.name, tool]));

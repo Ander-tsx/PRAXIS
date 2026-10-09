@@ -170,9 +170,16 @@ export class PersonalTokensService {
 
   /** Revoca todos los de una persona. Lo llama el cambio de contraseña (I4). */
   async revocarTodos(userId: string): Promise<void> {
+    const ahora = new Date();
     await this.prisma.personalAccessToken.updateMany({
       where: { userId, revokedAt: null },
-      data: { revokedAt: new Date() },
+      data: { revokedAt: ahora },
+    });
+    /* Y las conexiones por OAuth: el token de Kyloo que lleva el cliente no
+       caduca con la contraseña de Praxis, así que la fila es lo único que corta. */
+    await this.prisma.mcpConnection.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: ahora },
     });
   }
 

@@ -1,13 +1,17 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import {
+  type ExchangedMcpConnection,
   type ExchangedPersonalToken,
   PAT_CALLS_PER_MINUTE,
   PAT_PREFIX,
   type PatScope,
+  patScopesFromOAuth,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { QuotaService } from '../billing/quota.service';
+import { KylooOAuthService } from './kyloo-oauth.service';
+import { McpAccessError } from './mcp-errors';
 import type { ToolAnchor } from './mcp-tools';
 
 /** Lo que vale durante una petición al MCP. */
@@ -18,19 +22,23 @@ export interface McpSession {
   scopes: PatScope[];
   /** JWT `typ: access` de vida corta para llamar a la API (M5). */
   accessToken: string;
+  /**
+   * Solo en una sesión por OAuth: la conexión, con las organizaciones a las que
+   * llega. Un token personal vale para una sola y no tiene esto.
+   */
+  connection?: { id: string; clientName: string; allowedOrgIds: string[] };
+  /**
+   * Por qué la organización activa **no se puede usar ahora** (se salió de ella,
+   * su plan bajó, apagaron el MCP). La sesión sigue abierta para que el agente
+   * pueda cambiar de organización; solo las herramientas de organización pasan.
+   */
+  bloqueo?: McpAccessError;
 }
 
-/** Un error que el MCP devuelve tal cual: estado HTTP, código y mensaje (M8). */
-export class McpAccessError extends HttpException {
-  constructor(
-    status: number,
-    readonly code: string,
-    message: string,
-    readonly details?: unknown,
-  ) {
-    super({ code, message, details }, status);
-  }
-}
+/* `McpAccessError` vive en `mcp-errors.ts` y se reexporta: kyloo-oauth.service lo usa y esta
+   clase usa a kyloo-oauth.service, y un ciclo de importación entre ambos deja la inyección
+   con `undefined` sin ningún error al arrancar. */
+export { McpAccessError } from './mcp-errors';
 
 /** Ver `ID_SEGURO` en `mcp.service.ts`: los ids sembrados no son hexadecimales. */
 const ID_SEGURO = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
@@ -61,6 +69,7 @@ export class McpAccessService {
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     @Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy,
     private readonly quota: QuotaService,
+    private readonly oauth: KylooOAuthService,
   ) {}
 
   /**
@@ -72,13 +81,14 @@ export class McpAccessService {
    */
   async abrir(authorization: string | undefined): Promise<McpSession> {
     const [tipo, token] = authorization?.split(' ') ?? [];
-    if (tipo !== 'Bearer' || !token?.startsWith(PAT_PREFIX)) {
+    if (tipo !== 'Bearer' || !token) {
       throw new McpAccessError(
         HttpStatus.UNAUTHORIZED,
         'UNAUTHORIZED',
-        `Falta el token. Crea uno en Integraciones y mándalo como «Authorization: Bearer ${PAT_PREFIX}…».`,
+        `Falta el token. Conecta con tu cuenta de Kyloo (OAuth) o crea un token en Integraciones y mándalo como «Authorization: Bearer ${PAT_PREFIX}…».`,
       );
     }
+    if (!token.startsWith(PAT_PREFIX)) return this.abrirConOAuth(token);
 
     const sesion = await firstValueFrom(
       this.credentialsClient.send<ExchangedPersonalToken>({ cmd: 'pat_exchange' }, { token }),
@@ -91,11 +101,79 @@ export class McpAccessService {
       );
     }
 
+    await this.exigirOrganizacionUsable(sesion.userId, sesion.organizationId);
+    return sesion;
+  }
+
+  /**
+   * Una conexión por OAuth (Kyloo Accounts).
+   *
+   * El token solo identifica **la conexión**: la organización con la que se
+   * trabaja se lee de ella en cada llamada, de modo que cambiarla —o revocar la
+   * conexión— surte efecto en la siguiente petición y no cuando el token caduque.
+   */
+  private async abrirConOAuth(token: string): Promise<McpSession> {
+    const verificado = await this.oauth.verificar(token);
+
+    const conexion = await firstValueFrom(
+      this.credentialsClient.send<ExchangedMcpConnection>(
+        { cmd: 'mcp_conn_session' },
+        { connectionId: verificado.connectionId, sub: verificado.sub },
+      ),
+    ).catch(() => null);
+    if (!conexion) {
+      throw new McpAccessError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Esta conexión fue revocada o ya no existe. Vuelve a conectar desde tu cliente.',
+      );
+    }
+
+    const scopes = patScopesFromOAuth(verificado.scope);
+    if (scopes.length === 0) {
+      throw new McpAccessError(
+        HttpStatus.FORBIDDEN,
+        'INSUFFICIENT_SCOPE',
+        'El token no concede ningún permiso sobre Praxis.',
+      );
+    }
+
+    const sesion: McpSession = {
+      /* La clave del límite de M9 y del registro: la conexión hace de "token". */
+      personalTokenId: conexion.connectionId,
+      userId: conexion.userId,
+      organizationId: conexion.activeOrgId,
+      scopes,
+      accessToken: conexion.accessToken,
+      connection: {
+        id: conexion.connectionId,
+        clientName: conexion.clientName,
+        allowedOrgIds: conexion.allowedOrgIds,
+      },
+    };
+
+    /* A diferencia de un token personal, aquí un fallo de la organización activa
+       no cierra la puerta: el agente tiene que poder pedir las suyas y cambiar. */
+    try {
+      await this.exigirOrganizacionUsable(conexion.userId, conexion.activeOrgId);
+    } catch (error) {
+      if (!(error instanceof McpAccessError)) throw error;
+      sesion.bloqueo = error;
+    }
+    return sesion;
+  }
+
+  /**
+   * Las tres comprobaciones de siempre sobre una organización: que sigas
+   * dentro, que su plan traiga integraciones y que su interruptor esté
+   * encendido. Se usa en cada petición y al cambiar de organización.
+   */
+  async exigirOrganizacionUsable(userId: string, organizationId: string): Promise<void> {
     /* El plan primero: si no trae integraciones, ese es el motivo que hay que
        dar, aunque el interruptor también esté apagado. Lanza un 402 con
        `puedeAmpliar` (QuotaService). */
     try {
-      await this.quota.exigirIntegraciones(sesion.userId, sesion.organizationId);
+      await this.quota.exigirIntegraciones(userId, organizationId);
     } catch (error) {
       if (error instanceof HttpException) {
         const cuerpo = error.getResponse() as { code: string; message: string; details?: unknown };
@@ -107,7 +185,7 @@ export class McpAccessService {
     const acceso = await firstValueFrom(
       this.billingClient.send<{ miembro: boolean; mcpAllowed: boolean }>(
         { cmd: 'billing_org_mcp_access' },
-        { organizationId: sesion.organizationId, userId: sesion.userId },
+        { organizationId, userId },
       ),
     ).catch(() => null);
 
@@ -125,8 +203,6 @@ export class McpAccessService {
         'Esta organización no permite conectar agentes por MCP. Lo decide quien la administra, en Integraciones.',
       );
     }
-
-    return sesion;
   }
 
   /**

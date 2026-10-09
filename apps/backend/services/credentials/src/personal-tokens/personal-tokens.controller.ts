@@ -1,5 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
+import { McpConnectionsService } from './mcp-connections.service';
 import { PersonalTokensService } from './personal-tokens.service';
 
 /**
@@ -11,7 +12,10 @@ import { PersonalTokensService } from './personal-tokens.service';
  */
 @Controller()
 export class PersonalTokensController {
-  constructor(private readonly tokens: PersonalTokensService) {}
+  constructor(
+    private readonly tokens: PersonalTokensService,
+    private readonly conexiones: McpConnectionsService,
+  ) {}
 
   @MessagePattern({ cmd: 'pat_create' })
   crear(
@@ -41,5 +45,51 @@ export class PersonalTokensController {
   @MessagePattern({ cmd: 'pat_exchange' })
   canjear(@Payload() dto: { token: string }) {
     return this.tokens.canjear(dto.token);
+  }
+
+  /* ─── Conexiones por OAuth (Kyloo Accounts) ───────────────────────────── */
+
+  @MessagePattern({ cmd: 'mcp_conn_identify' })
+  identificar(@Payload() dto: { sub: string; email: string }) {
+    return this.conexiones.identificar(dto);
+  }
+
+  @MessagePattern({ cmd: 'mcp_conn_save' })
+  guardarConexion(
+    @Payload()
+    dto: {
+      userId: string;
+      kylooSub: string;
+      clientId: string;
+      clientName: string;
+      allowedOrgIds: string[];
+      activeOrgId: string;
+    },
+  ) {
+    return this.conexiones.guardar(dto);
+  }
+
+  @MessagePattern({ cmd: 'mcp_conn_list' })
+  listarConexiones(@Payload() dto: { userId: string }) {
+    return this.conexiones.listar(dto.userId);
+  }
+
+  @MessagePattern({ cmd: 'mcp_conn_update' })
+  actualizarConexion(
+    @Payload()
+    dto: { userId: string; id: string; allowedOrgIds?: string[]; activeOrgId?: string },
+  ) {
+    return this.conexiones.actualizar(dto.userId, dto.id, dto);
+  }
+
+  @MessagePattern({ cmd: 'mcp_conn_revoke' })
+  revocarConexion(@Payload() dto: { userId: string; id: string }) {
+    return this.conexiones.revocar(dto.userId, dto.id);
+  }
+
+  /** La sesión de cada llamada del MCP con token OAuth. */
+  @MessagePattern({ cmd: 'mcp_conn_session' })
+  sesionDeConexion(@Payload() dto: { connectionId: string; sub: string }) {
+    return this.conexiones.sesion(dto);
   }
 }

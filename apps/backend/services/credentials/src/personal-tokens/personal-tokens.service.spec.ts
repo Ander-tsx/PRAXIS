@@ -73,6 +73,8 @@ describe('PersonalTokensService', () => {
         for (const fila of filas) if (!fila.revokedAt) Object.assign(fila, data);
       }),
     },
+    /* Cambiar la contraseña también revoca las conexiones por OAuth. */
+    mcpConnection: { updateMany: jest.fn(async () => ({ count: 0 })) },
   };
 
   const jwt = new JwtService({ secret: 'secreto-de-prueba' });
@@ -179,6 +181,9 @@ describe('PersonalTokensService', () => {
     const { token } = await crear();
     await servicio.revocarTodos('ana');
     await expect(servicio.canjear(token)).rejects.toMatchObject({ error: { statusCode: 401 } });
+    expect(prisma.mcpConnection.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: 'ana', revokedAt: null } }),
+    );
   });
 
   it('no se revoca el token de otra persona', async () => {

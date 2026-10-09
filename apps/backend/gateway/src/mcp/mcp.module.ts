@@ -3,7 +3,11 @@ import { ClientsModule } from '@nestjs/microservices';
 import { clienteDeServicio } from '@praxis/local-transport';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
+import { KylooInternalController } from './kyloo-internal.controller';
+import { KylooInternalGuard } from './kyloo-internal.guard';
+import { KylooOAuthService } from './kyloo-oauth.service';
 import { McpAccessService } from './mcp-access.service';
+import { McpConnectionsController } from './mcp-connections.controller';
 import { McpController } from './mcp.controller';
 import { McpService } from './mcp.service';
 import { PersonalTokensController } from './personal-tokens.controller';
@@ -26,7 +30,12 @@ import { PersonalTokensController } from './personal-tokens.controller';
       clienteDeServicio('TASKS'),
     ]),
   ],
-  controllers: [McpController, PersonalTokensController],
-  providers: [McpAccessService, McpService],
+  controllers: [
+    McpController,
+    PersonalTokensController,
+    McpConnectionsController,
+    KylooInternalController,
+  ],
+  providers: [McpAccessService, McpService, KylooOAuthService, KylooInternalGuard],
 })
 export class McpModule {}

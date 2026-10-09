@@ -93,6 +93,16 @@ export const envValidationSchema = Joi.object({
    * botón que responde 503 al pulsarlo.
    */
   STRIPE_PRICE_PRO: Joi.string().optional().allow(''),
+  /**
+   * Kyloo Accounts como servidor de autorización del MCP (docs/PLAN-OAUTH-KYLOO.md).
+   * Sin `KYLOO_ISSUER` el MCP solo admite tokens personales, y las rutas internas
+   * que llama Accounts responden 503. Las tres juntas o ninguna.
+   */
+  KYLOO_ISSUER: Joi.string().uri().optional().allow(''),
+  /** La dirección pública del MCP, que es el `aud` de los tokens OAuth. */
+  MCP_RESOURCE_URL: Joi.string().uri().optional().allow(''),
+  /** Secreto compartido con Accounts para firmar sus llamadas internas (HMAC). 32+ caracteres. */
+  KYLOO_INTERNAL_SECRET: Joi.string().min(32).optional().allow(''),
   STRIPE_PRICE_TEAM: Joi.string().optional().allow(''),
   STRIPE_PRICE_BUSINESS: Joi.string().optional().allow(''),
   /**
