@@ -8,6 +8,7 @@ import { NOTIFICATION_INITIAL_STATE } from '@/lib/main/action-state';
 import type { McpConnectionView } from '@/lib/main/integrations';
 import { Button, Checkbox, useAccion } from '@praxis/commons';
 import { type FormEvent, useState } from 'react';
+import { GuiaDeConexion } from './GuiaDeConexion';
 
 export interface OrgDeConexion {
   id: string;
@@ -36,22 +37,7 @@ export function ConexionesDeIa({
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-3">
-        <h3 className="font-sans text-base font-medium text-text-primary">Cómo conectarlo</h3>
-        <ol className="flex max-w-2xl list-decimal flex-col gap-1.5 pl-5 font-sans text-sm text-text-secondary">
-          <li>
-            En ChatGPT o Claude, añade un conector personalizado con esta dirección:
-            <code className="mt-1 block w-fit rounded bg-white/10 px-2 py-1 font-mono text-xs text-text-primary">
-              {endpoint}
-            </code>
-          </li>
-          <li>Te llevará a Kyloo: entra con la misma cuenta que usas en Praxis.</li>
-          <li>
-            Elige a qué organizaciones puede llegar y qué puede hacer. Puedes cambiarlo aquí cuando
-            quieras, sin volver a conectar.
-          </li>
-        </ol>
-      </section>
+      <GuiaDeConexion endpoint={endpoint} />
 
       <section className="flex flex-col gap-3">
         <h3 className="font-sans text-base font-medium text-text-primary">Tus conexiones</h3>
