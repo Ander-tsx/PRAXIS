@@ -26,6 +26,13 @@ import { UsersModule } from './users/users.module';
            Es público —viaja en el JavaScript del navegador—, así que no es un
            secreto y no vive en Secret Manager. */
         GOOGLE_CLIENT_ID: Joi.string().optional().allow(''),
+
+        /* Kyloo Accounts como proveedor de identidad (OIDC). Las tres juntas o
+           ninguna: sin ellas la entrada con Kyloo responde 503 y el resto sigue.
+           El secreto vive solo aquí, nunca en el servidor web. */
+        KYLOO_ISSUER: Joi.string().uri().optional().allow(''),
+        KYLOO_CLIENT_ID: Joi.string().optional().allow(''),
+        KYLOO_CLIENT_SECRET: Joi.string().optional().allow(''),
         /**
          * ⚠️ **La unidad es obligatoria, y no es quisquillosidad.**
          *

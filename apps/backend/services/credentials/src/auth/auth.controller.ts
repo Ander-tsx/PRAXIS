@@ -1,7 +1,13 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
-import { GoogleLoginDto, LoginDto, RegisterDto, VerifyTokenDto } from '@praxis/contracts';
+import {
+  GoogleLoginDto,
+  KylooLoginDto,
+  LoginDto,
+  RegisterDto,
+  VerifyTokenDto,
+} from '@praxis/contracts';
 
 import { AuthService } from './auth.service';
 
@@ -17,6 +23,11 @@ export class AuthController {
   @MessagePattern({ cmd: 'auth_login' })
   login(@Payload() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @MessagePattern({ cmd: 'auth_kyloo' })
+  loginWithKyloo(@Payload() dto: KylooLoginDto) {
+    return this.authService.loginWithKyloo(dto);
   }
 
   @MessagePattern({ cmd: 'auth_google' })

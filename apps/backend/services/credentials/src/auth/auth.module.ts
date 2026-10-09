@@ -5,6 +5,7 @@ import { MailService } from '../mail/mail.service';
 import { PersonalTokensModule } from '../personal-tokens/personal-tokens.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { KylooOidcService } from './kyloo-oidc.service';
 import { TokensService } from './tokens.service';
 
 @Module({
@@ -22,6 +23,6 @@ import { TokensService } from './tokens.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, TokensService, MailService],
+  providers: [AuthService, TokensService, MailService, KylooOidcService],
 })
 export class AuthModule {}

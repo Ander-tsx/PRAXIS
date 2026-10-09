@@ -2,11 +2,13 @@
 
 import { AuthPanel } from '@/components/organisms/AuthPanel';
 import { BotonGoogle } from '@/components/organisms/BotonGoogle';
-import { navigateAfterAuth } from '@/lib/auth/navigation';
+import { BotonKyloo } from '@/components/organisms/BotonKyloo';
+import { ERRORES_KYLOO } from '@/lib/auth/kyloo';
+import { destinoTrasEntrar, navigateAfterAuth } from '@/lib/auth/navigation';
 import { Button, Input } from '@praxis/commons/atoms';
 import { AuthForm } from '@praxis/commons/molecules';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 // Validación espejo de LoginDto del backend
 // email: formato válido, password: 8-64 caracteres
@@ -37,6 +39,17 @@ export default function LoginPage() {
   /** El correo de esta cuenta está sin confirmar. No es un error del formulario. */
   const [sinConfirmar, setSinConfirmar] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  /** A dónde volver al terminar: `?next=` lo trae la propia pantalla, y Kyloo lo necesita ya en el primer salto. */
+  const [destino, setDestino] = useState<string | undefined>();
+
+  /* Al volver de Kyloo con un fallo, la URL trae `?kyloo_error=<clave>` (ver
+     `/auth/api/kyloo/callback`). Se lee tras montar porque en el servidor no
+     hay `window`. */
+  useEffect(() => {
+    const clave = new URLSearchParams(window.location.search).get('kyloo_error');
+    if (clave) setGlobalError(ERRORES_KYLOO[clave] ?? ERRORES_KYLOO.error ?? '');
+    setDestino(destinoTrasEntrar());
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -149,14 +162,15 @@ export default function LoginPage() {
           </Button>
         }
         alternatives={
-          <>
+          <div className="flex flex-col gap-3">
             {sinConfirmar && <AvisoDeConfirmacion email={email} />}
             <BotonGoogle
               clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''}
               onCredencial={handleGoogle}
               deshabilitado={isLoading}
             />
-          </>
+            <BotonKyloo next={destino} />
+          </div>
         }
         footer={
           <>

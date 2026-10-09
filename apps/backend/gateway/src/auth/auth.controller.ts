@@ -16,6 +16,7 @@ import { Throttle } from '@nestjs/throttler';
 import {
   EmailOnlyDto,
   GoogleLoginDto,
+  KylooLoginDto,
   LoginDto,
   LogoutBodyDto,
   RefreshTokenDto,
@@ -168,6 +169,34 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'El enlace caducó o ya se usó' })
   async resetPassword(@Body() body: ResetPasswordDto) {
     return firstValueFrom(this.credentialsClient.send({ cmd: 'auth_reset_password' }, body));
+  }
+
+  @Post('kyloo')
+  @HttpCode(HttpStatus.OK)
+  /* Mismo apretón que google: cada intento canjea un código contra Accounts y
+     puede acabar creando una cuenta. */
+  @Throttle(LIMITE_AUTENTICACION)
+  @ApiOperation({ summary: 'Iniciar sesión con Kyloo Accounts' })
+  @ApiBody({ type: KylooLoginDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Sesión iniciada; devuelve los mismos tokens que login',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Kyloo no aceptó el intento o el correo no está verificado',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Hay una cuenta con ese correo sin confirmar: no se vincula sola',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'La entrada con Kyloo no está configurada en este entorno',
+  })
+  async kyloo(@Body() body: KylooLoginDto) {
+    this.logger.log('POST /auth/kyloo → credentials-service');
+    return firstValueFrom(this.credentialsClient.send({ cmd: 'auth_kyloo' }, body));
   }
 
   @Post('google')

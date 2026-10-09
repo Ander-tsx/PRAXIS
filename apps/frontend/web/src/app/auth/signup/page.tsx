@@ -2,6 +2,7 @@
 
 import { AuthPanel } from '@/components/organisms/AuthPanel';
 import { BotonGoogle } from '@/components/organisms/BotonGoogle';
+import { BotonKyloo } from '@/components/organisms/BotonKyloo';
 import { navigateAfterAuth } from '@/lib/auth/navigation';
 import { Button, Input } from '@praxis/commons/atoms';
 import { AuthForm } from '@praxis/commons/molecules';
@@ -179,11 +180,14 @@ export default function SignupPage() {
           </Button>
         }
         alternatives={
-          <BotonGoogle
-            clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''}
-            onCredencial={handleGoogle}
-            deshabilitado={isLoading}
-          />
+          <div className="flex flex-col gap-3">
+            <BotonGoogle
+              clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''}
+              onCredencial={handleGoogle}
+              deshabilitado={isLoading}
+            />
+            <BotonKyloo />
+          </div>
         }
         footer={
           <>

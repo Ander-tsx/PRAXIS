@@ -9,11 +9,13 @@ import { type LoginTicket, OAuth2Client, type TokenPayload } from 'google-auth-l
 import { PersonalTokensService } from '../personal-tokens/personal-tokens.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { KylooOidcService } from './kyloo-oidc.service';
 import { TokensService } from './tokens.service';
 
 import {
   GoogleLoginDto,
   JwtPayloadDto,
+  KylooLoginDto,
   LoginDto,
   RegisterDto,
   VerifyTokenDto,
@@ -87,6 +89,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly tokens: TokensService,
     private readonly personalTokens: PersonalTokensService,
+    private readonly kyloo: KylooOidcService,
   ) {}
 
   private tokenHash(token: string): string {
@@ -567,7 +570,7 @@ export class AuthService {
 
     if (porGoogle?.user) {
       /* La foto de Google se renueva en cada entrada (la cambian desde Google), pero
-         **solo** en su campo: `avatarUrl` es lo que se ve, y puede ser una subida. */
+       **solo** en su campo: `avatarUrl` es lo que se ve, y puede ser una subida. */
       if (perfil.picture && perfil.picture !== porGoogle.user.googleAvatarUrl) {
         await this.prisma.user.update({
           where: { id: porGoogle.user.id },
@@ -656,6 +659,82 @@ export class AuthService {
       throw new RpcException({ statusCode: 500, message: 'No se pudo crear el perfil' });
     }
 
+    return this.emitirSesion(creada.user.id, creada.user.status);
+  }
+
+  /**
+   * Entrada con Kyloo Accounts (OIDC, código + PKCE).
+   *
+   * La identidad sale de un id_token **verificado** (`KylooOidcService`). A
+   * partir de ahí, la misma decisión delicada que con Google: ¿a qué cuenta de
+   * Praxis corresponde?
+   *
+   * 1. Por `kylooSub`, que es lo estable. Camino normal desde la segunda vez.
+   * 2. Por correo, **solo si la cuenta existente ya demostró poseer ese
+   *    buzón** (`emailVerifiedAt`). Distinto de Google, y a propósito: allí la
+   *    cuenta con contraseña podía haberse registrado sin verificar nada, y
+   *    unir las dos identidades era entregar la cuenta a quien puso la
+   *    contraseña. Hoy registrarse exige confirmar el correo, así que una
+   *    cuenta con `emailVerifiedAt` pertenece a quien controla el buzón — que
+   *    es justo quien Kyloo acaba de verificar. Sin verificar, 409: el
+   *    atacante que reservó el correo conservaría la contraseña.
+   * 3. Si no hay nadie, cuenta nueva sin contraseña, ya verificada.
+   */
+  async loginWithKyloo(dto: KylooLoginDto) {
+    const perfil = await this.kyloo.perfilDesdeCodigo(dto);
+
+    const porKyloo = await this.prisma.credential.findUnique({
+      where: { kylooSub: perfil.sub },
+      include: { user: true },
+    });
+    if (porKyloo?.user) return this.emitirSesion(porKyloo.user.id, porKyloo.user.status);
+
+    const porCorreo = await this.prisma.credential.findFirst({
+      where: { email: { equals: perfil.email, mode: 'insensitive' } },
+      include: { user: true },
+    });
+
+    if (porCorreo) {
+      if (porCorreo.emailVerifiedAt === null) {
+        throw new RpcException({
+          statusCode: 409,
+          message:
+            'Ya existe una cuenta con este correo sin confirmar. Confírmala con el enlace que se envió al registrarla para poder vincular Kyloo.',
+        });
+      }
+      /* Una cuenta que ya está vinculada a OTRA identidad de Kyloo no se
+         reasigna: sería cambiarle la cuenta a alguien con solo conocer su correo. */
+      if (porCorreo.kylooSub !== null) {
+        throw new RpcException({
+          statusCode: 409,
+          message: 'Esta cuenta ya está vinculada a otra cuenta de Kyloo.',
+        });
+      }
+      const vinculada = await this.prisma.credential.update({
+        where: { id: porCorreo.id },
+        data: { kylooSub: perfil.sub },
+        include: { user: true },
+      });
+      if (!vinculada.user) {
+        throw new RpcException({ statusCode: 500, message: 'La cuenta no tiene perfil asociado' });
+      }
+      return this.emitirSesion(vinculada.user.id, vinculada.user.status);
+    }
+
+    const [firstName = '', ...resto] = perfil.name.trim().split(/\s+/);
+    const creada = await this.prisma.credential.create({
+      data: {
+        email: perfil.email,
+        passwordHash: null,
+        kylooSub: perfil.sub,
+        emailVerifiedAt: new Date(),
+        user: { create: { firstName, lastName: resto.join(' ') } },
+      },
+      include: { user: true },
+    });
+    if (!creada.user) {
+      throw new RpcException({ statusCode: 500, message: 'No se pudo crear el perfil' });
+    }
     return this.emitirSesion(creada.user.id, creada.user.status);
   }
 
