@@ -5,9 +5,11 @@ import { ClientsModule } from '@nestjs/microservices';
 import { clienteDeServicio } from '@praxis/local-transport';
 import { AuthController } from './auth.controller';
 import { JwtGuard } from './jwt.guard';
+import { ModoLocalGuard } from './modo-local.guard';
 
 @Module({
   imports: [
+    ConfigModule,
     ClientsModule.registerAsync([
       clienteDeServicio('CREDENTIALS'),
       /**
@@ -30,7 +32,7 @@ import { JwtGuard } from './jwt.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [JwtGuard],
+  providers: [JwtGuard, ModoLocalGuard],
   exports: [JwtGuard, JwtModule, ClientsModule],
 })
 export class AuthModule {}

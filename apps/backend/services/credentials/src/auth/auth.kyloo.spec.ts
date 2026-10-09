@@ -3,27 +3,30 @@ import { AuthService } from './auth.service';
 const dto = { code: 'c', codeVerifier: 'v'.repeat(43), redirectUri: 'r', nonce: 'n' };
 const perfil = { sub: 'kyloo-sub-1', email: 'ana@ejemplo.com', name: 'Ana María Pérez' };
 
-function montar() {
+function montar(modo: 'local' | 'kyloo' = 'local') {
   const credential = {
     findUnique: jest.fn(),
     findFirst: jest.fn(),
     update: jest.fn(),
     create: jest.fn(),
   };
+  const redis = { del: jest.fn().mockResolvedValue(1) };
+  const personalTokens = { revocarTodos: jest.fn().mockResolvedValue(undefined) };
+  const config = { get: jest.fn((clave: string) => (clave === 'AUTH_MODE' ? modo : undefined)) };
   const kyloo = { perfilDesdeCodigo: jest.fn().mockResolvedValue(perfil) };
   // biome-ignore lint/suspicious/noExplicitAny: dobles de prueba
   const servicio = new AuthService(
     { credential } as any,
+    redis as any,
     {} as any,
+    config as any,
     {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
+    personalTokens as any,
     kyloo as any,
   );
   // biome-ignore lint/suspicious/noExplicitAny: método privado
   const emitir = jest.spyOn(servicio as any, 'emitirSesion').mockResolvedValue({ userId: 'u1' });
-  return { servicio, credential, emitir };
+  return { servicio, credential, emitir, redis, personalTokens };
 }
 
 const usuario = { id: 'u1', status: 'ACTIVE' };
@@ -92,5 +95,141 @@ describe('AuthService.loginWithKyloo', () => {
       user: { create: { firstName: 'Ana', lastName: 'María Pérez' } },
     });
     expect(data.emailVerifiedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe('AuthService.loginWithKyloo con AUTH_MODE=kyloo', () => {
+  it('vincula una cuenta sin confirmar: la prueba de posesión es la de Kyloo', async () => {
+    const { servicio, credential, emitir } = montar('kyloo');
+    credential.findUnique.mockResolvedValue(null);
+    credential.findFirst.mockResolvedValue({ id: 'c1', emailVerifiedAt: null, kylooSub: null });
+    credential.update.mockResolvedValue({ user: usuario });
+    await servicio.loginWithKyloo(dto);
+    const { data } = credential.update.mock.calls[0][0];
+    expect(data.kylooSub).toBe('kyloo-sub-1');
+    expect(data.emailVerifiedAt).toBeInstanceOf(Date);
+    expect(emitir).toHaveBeenCalled();
+  });
+
+  it('borra la contraseña heredada al vincular: la puerta vieja se cierra', async () => {
+    const { servicio, credential } = montar('kyloo');
+    credential.findUnique.mockResolvedValue(null);
+    credential.findFirst.mockResolvedValue({
+      id: 'c1',
+      emailVerifiedAt: new Date(),
+      kylooSub: null,
+    });
+    credential.update.mockResolvedValue({ user: usuario });
+    await servicio.loginWithKyloo(dto);
+    expect(credential.update.mock.calls[0][0].data.passwordHash).toBeNull();
+  });
+
+  it('sigue sin reasignar una cuenta vinculada a otra identidad', async () => {
+    const { servicio, credential } = montar('kyloo');
+    credential.findUnique.mockResolvedValue(null);
+    credential.findFirst.mockResolvedValue({
+      id: 'c1',
+      emailVerifiedAt: new Date(),
+      kylooSub: 'otra-persona',
+    });
+    await expect(servicio.loginWithKyloo(dto)).rejects.toMatchObject({
+      error: { statusCode: 409 },
+    });
+  });
+
+  it('sigue el cambio de correo hecho en Kyloo', async () => {
+    const { servicio, credential } = montar('kyloo');
+    credential.findUnique.mockResolvedValue({
+      id: 'c1',
+      email: 'vieja@ejemplo.com',
+      user: usuario,
+    });
+    credential.update.mockResolvedValue({});
+    await servicio.loginWithKyloo(dto);
+    expect(credential.update).toHaveBeenCalledWith({
+      where: { id: 'c1' },
+      data: { email: 'ana@ejemplo.com' },
+    });
+  });
+
+  it('en modo local no toca el correo de una cuenta ya vinculada', async () => {
+    const { servicio, credential } = montar('local');
+    credential.findUnique.mockResolvedValue({
+      id: 'c1',
+      email: 'vieja@ejemplo.com',
+      user: usuario,
+    });
+    await servicio.loginWithKyloo(dto);
+    expect(credential.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthService.verificarCredencialHeredada', () => {
+  // biome-ignore lint/suspicious/noExplicitAny: bcrypt real, dobles de lo demás
+  const bcrypt = require('bcrypt');
+
+  async function cuenta(sobre: Record<string, unknown> = {}) {
+    return {
+      email: 'ana@ejemplo.com',
+      passwordHash: await bcrypt.hash('la-contrasena-buena', 4),
+      emailVerifiedAt: new Date(),
+      user: { firstName: 'Ana', lastName: 'Pérez', status: 'ACTIVE' },
+      ...sobre,
+    };
+  }
+
+  it('devuelve la identidad si la contraseña vale', async () => {
+    const { servicio, credential } = montar();
+    credential.findFirst.mockResolvedValue(await cuenta());
+    await expect(
+      servicio.verificarCredencialHeredada('ana@ejemplo.com', 'la-contrasena-buena'),
+    ).resolves.toEqual({ email: 'ana@ejemplo.com', name: 'Ana Pérez' });
+  });
+
+  it.each([
+    ['contraseña equivocada', {}, 'otra-cosa'],
+    ['correo sin confirmar', { emailVerifiedAt: null }, 'la-contrasena-buena'],
+    [
+      'cuenta suspendida',
+      { user: { firstName: 'A', lastName: 'B', status: 'SUSPENDED' } },
+      'la-contrasena-buena',
+    ],
+    ['cuenta sin contraseña (solo Google)', { passwordHash: null }, 'la-contrasena-buena'],
+  ])('responde null: %s', async (_motivo, sobre, clave) => {
+    const { servicio, credential } = montar();
+    credential.findFirst.mockResolvedValue(await cuenta(sobre));
+    await expect(
+      servicio.verificarCredencialHeredada('ana@ejemplo.com', clave),
+    ).resolves.toBeNull();
+  });
+
+  it('responde null si la cuenta no existe', async () => {
+    const { servicio, credential } = montar();
+    credential.findFirst.mockResolvedValue(null);
+    await expect(
+      servicio.verificarCredencialHeredada('nadie@ejemplo.com', 'x'),
+    ).resolves.toBeNull();
+  });
+});
+
+describe('AuthService.revocarTodoDe', () => {
+  it('cierra las sesiones y revoca tokens y conexiones de esa persona', async () => {
+    const { servicio, credential, redis, personalTokens } = montar();
+    credential.findUnique.mockResolvedValue({ user: { id: 'u1' } });
+    await expect(servicio.revocarTodoDe('kyloo-sub-1', 'ana@ejemplo.com')).resolves.toEqual({
+      revocadas: true,
+    });
+    expect(redis.del).toHaveBeenCalledWith('auth:sessions:u1');
+    expect(personalTokens.revocarTodos).toHaveBeenCalledWith('u1');
+  });
+
+  it('si no conoce a esa persona, no revoca nada y no falla', async () => {
+    const { servicio, credential, redis } = montar();
+    credential.findUnique.mockResolvedValue(null);
+    credential.findFirst.mockResolvedValue(null);
+    await expect(servicio.revocarTodoDe('x', 'x@ejemplo.com')).resolves.toEqual({
+      revocadas: false,
+    });
+    expect(redis.del).not.toHaveBeenCalled();
   });
 });

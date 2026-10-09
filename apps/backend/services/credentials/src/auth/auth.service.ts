@@ -22,6 +22,8 @@ import {
 } from '@praxis/contracts';
 
 const SALT_ROUNDS = 10;
+/** Un hash de bcrypt válido de una cadena que nadie escribe: para gastar el mismo tiempo cuando la cuenta no existe. */
+const HASH_SIN_CUENTA = '$2b$10$OL4eJFuMgLrIwxiHO4IwbO6gjGJuCMEZVyc7t3Sc1eawaQuz1qyQi';
 const TOKEN_CACHE_TTL = 300; // 5 min
 const SESSION_TTL = 60 * 60 * 24 * 7; // 7 días
 
@@ -683,11 +685,26 @@ export class AuthService {
   async loginWithKyloo(dto: KylooLoginDto) {
     const perfil = await this.kyloo.perfilDesdeCodigo(dto);
 
+    const delegado = this.config.get<string>('AUTH_MODE') === 'kyloo';
+
     const porKyloo = await this.prisma.credential.findUnique({
       where: { kylooSub: perfil.sub },
       include: { user: true },
     });
-    if (porKyloo?.user) return this.emitirSesion(porKyloo.user.id, porKyloo.user.status);
+    if (porKyloo?.user) {
+      /* D7: la identidad es el `sub`, el correo es un dato. Si cambió en Kyloo, aquí también —
+         pero solo si nadie más lo tiene, y nunca por una cuenta sin el correo verificado. */
+      if (delegado && porKyloo.email.toLowerCase() !== perfil.email) {
+        await this.prisma.credential
+          .update({ where: { id: porKyloo.id }, data: { email: perfil.email } })
+          .catch((error: unknown) =>
+            this.log.warn(
+              `No se pudo seguir el cambio de correo de ${porKyloo.id}: ${String(error)}`,
+            ),
+          );
+      }
+      return this.emitirSesion(porKyloo.user.id, porKyloo.user.status);
+    }
 
     const porCorreo = await this.prisma.credential.findFirst({
       where: { email: { equals: perfil.email, mode: 'insensitive' } },
@@ -695,15 +712,18 @@ export class AuthService {
     });
 
     if (porCorreo) {
-      if (porCorreo.emailVerifiedAt === null) {
+      /* En modo `local`, Kyloo es una opción más y un correo sin confirmar aquí no se vincula (nadie
+         ha probado ser su dueño). En modo `kyloo` la prueba de posesión es la de Kyloo, que ya
+         verificó el correo: exigir además la nuestra dejaría fuera a quien se registró y nunca
+         confirmó. */
+      if (!delegado && porCorreo.emailVerifiedAt === null) {
         throw new RpcException({
           statusCode: 409,
           message:
             'Ya existe una cuenta con este correo sin confirmar. Confírmala con el enlace que se envió al registrarla para poder vincular Kyloo.',
         });
       }
-      /* Una cuenta que ya está vinculada a OTRA identidad de Kyloo no se
-         reasigna: sería cambiarle la cuenta a alguien con solo conocer su correo. */
+      /* Nunca se reasigna: sería cambiarle la cuenta a alguien con solo conocer su correo. */
       if (porCorreo.kylooSub !== null) {
         throw new RpcException({
           statusCode: 409,
@@ -712,7 +732,14 @@ export class AuthService {
       }
       const vinculada = await this.prisma.credential.update({
         where: { id: porCorreo.id },
-        data: { kylooSub: perfil.sub },
+        data: {
+          kylooSub: perfil.sub,
+          /* D5: con Kyloo como única puerta, la contraseña heredada sobra. Borrarla cierra la
+             puerta vieja y deshace el caso de quien reservó un correo ajeno sin confirmarlo. */
+          ...(delegado
+            ? { passwordHash: null, emailVerifiedAt: porCorreo.emailVerifiedAt ?? new Date() }
+            : {}),
+        },
         include: { user: true },
       });
       if (!vinculada.user) {
@@ -736,6 +763,63 @@ export class AuthService {
       throw new RpcException({ statusCode: 500, message: 'No se pudo crear el perfil' });
     }
     return this.emitirSesion(creada.user.id, creada.user.status);
+  }
+
+  /**
+   * D4 — ¿esta contraseña vale para una cuenta heredada de Praxis?
+   *
+   * Lo pregunta Kyloo Accounts (llamada firmada) cuando alguien entra con un correo que Kyloo aún
+   * no conoce. Si vale, Kyloo crea su cuenta con **su propio hash**; nada de lo de aquí sale. Solo
+   * responde `null` o la identidad, sin decir por qué falló: cuenta inexistente, contraseña mala,
+   * correo sin confirmar, cuenta suspendida y cuenta sin contraseña (solo Google) son lo mismo
+   * hacia fuera.
+   */
+  async verificarCredencialHeredada(
+    email: string,
+    password: string,
+  ): Promise<{ email: string; name: string } | null> {
+    const credential = await this.prisma.credential.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      include: { user: true },
+    });
+    /* El mismo coste de bcrypt exista o no la cuenta: si no, el tiempo de respuesta delata qué
+       correos tienen cuenta. */
+    const hash = credential?.passwordHash ?? HASH_SIN_CUENTA;
+    const coincide = await bcrypt.compare(password, hash).catch(() => false);
+    if (
+      !credential?.passwordHash ||
+      !coincide ||
+      !credential.user ||
+      credential.user.status !== 'ACTIVE' ||
+      credential.emailVerifiedAt === null
+    ) {
+      return null;
+    }
+    return {
+      email: credential.email,
+      name: `${credential.user.firstName} ${credential.user.lastName}`.trim(),
+    };
+  }
+
+  /**
+   * D6 — Kyloo cambió o restableció una contraseña (o borró la cuenta): fuera todas las sesiones,
+   * tokens personales y conexiones OAuth de esa persona. Sin esto, el refresh token de 7 días de
+   * quien robó una sesión seguiría vivo después de que la víctima cambiara la contraseña.
+   */
+  async revocarTodoDe(sub: string, email: string): Promise<{ revocadas: boolean }> {
+    const credential =
+      (await this.prisma.credential.findUnique({
+        where: { kylooSub: sub },
+        include: { user: true },
+      })) ??
+      (await this.prisma.credential.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' } },
+        include: { user: true },
+      }));
+    if (!credential?.user) return { revocadas: false };
+    await this.redis.del(claveDeSesiones(credential.user.id));
+    await this.personalTokens.revocarTodos(credential.user.id);
+    return { revocadas: true };
   }
 
   /**

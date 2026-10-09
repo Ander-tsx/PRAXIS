@@ -98,7 +98,19 @@ export const envValidationSchema = Joi.object({
    * Sin `KYLOO_ISSUER` el MCP solo admite tokens personales, y las rutas internas
    * que llama Accounts responden 503. Las tres juntas o ninguna.
    */
-  KYLOO_ISSUER: Joi.string().uri().optional().allow(''),
+  KYLOO_ISSUER: Joi.string()
+    .uri()
+    .when('AUTH_MODE', {
+      is: 'kyloo',
+      // biome-ignore lint/suspicious/noThenProperty: `then` es la API de Joi.
+      then: Joi.required(),
+      otherwise: Joi.optional().allow(''),
+    }),
+  /**
+   * Cómo se autentica la gente (docs/PLAN-AUTH-KYLOO.md). `local`: contraseña y Google de siempre.
+   * `kyloo`: Kyloo Accounts es la única puerta y las rutas propias responden 403 `AUTH_DELEGATED`.
+   */
+  AUTH_MODE: Joi.string().valid('local', 'kyloo').default('local'),
   /** La dirección pública del MCP, que es el `aud` de los tokens OAuth. */
   MCP_RESOURCE_URL: Joi.string().uri().optional().allow(''),
   /** Secreto compartido con Accounts para firmar sus llamadas internas (HMAC). 32+ caracteres. */

@@ -7,6 +7,7 @@ import {
   Inject,
   NotFoundException,
   Post,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
@@ -38,6 +39,24 @@ class IdentidadKylooDto {
   @IsString()
   @MaxLength(200)
   clientId: string;
+}
+
+class LegacyLoginDto {
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @MaxLength(200)
+  password: string;
+}
+
+class RevocarDto {
+  @IsString()
+  @MaxLength(200)
+  sub: string;
+
+  @IsEmail()
+  email: string;
 }
 
 class GuardarConexionDto extends IdentidadKylooDto {
@@ -179,5 +198,41 @@ export class KylooInternalController {
       ),
     );
     return { connectionId: conexion.id };
+  }
+
+  /**
+   * PLAN-AUTH-KYLOO D4 — migración perezosa de contraseñas. Kyloo pregunta, cuando alguien entra
+   * con un correo que no conoce, si esa contraseña vale para una cuenta heredada de Praxis. Si
+   * vale devuelve la identidad (Kyloo crea la cuenta con su propio hash); si no, un 401 que no
+   * dice por qué.
+   */
+  @Post('legacy-login')
+  @HttpCode(HttpStatus.OK)
+  async entradaHeredada(@Body() dto: LegacyLoginDto) {
+    const identidad = await firstValueFrom(
+      this.credentialsClient.send<{ email: string; name: string } | null>(
+        { cmd: 'auth_legacy_verify' },
+        { email: dto.email, password: dto.password },
+      ),
+    ).catch(() => null);
+    if (!identidad) {
+      throw new UnauthorizedException({
+        code: 'INVALID_CREDENTIALS',
+        message: 'Credenciales inválidas',
+      });
+    }
+    return identidad;
+  }
+
+  /** PLAN-AUTH-KYLOO D6 — Kyloo cambió una credencial: se cierra todo lo que esa persona tenía abierto. */
+  @Post('revoke')
+  @HttpCode(HttpStatus.OK)
+  async revocar(@Body() dto: RevocarDto) {
+    return firstValueFrom(
+      this.credentialsClient.send<{ revocadas: boolean }>(
+        { cmd: 'auth_revoke_all_of' },
+        { sub: dto.sub, email: dto.email },
+      ),
+    );
   }
 }

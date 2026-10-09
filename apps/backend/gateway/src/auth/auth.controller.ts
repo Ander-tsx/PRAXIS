@@ -26,6 +26,7 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from './jwt.guard';
+import { ModoLocalGuard } from './modo-local.guard';
 
 /**
  * Apretón para las dos rutas donde adivinar sale a cuenta: 10 por minuto y por
@@ -50,7 +51,36 @@ export class AuthController {
     @Inject('BILLING_SERVICE') private readonly billingClient: ClientProxy,
   ) {}
 
+  /**
+   * Crea el espacio personal sin esperarlo (ver `register`). Es idempotente: `billing_personal_org`
+   * devuelve el que ya existe, así que también se puede llamar tras cada entrada con Kyloo.
+   */
+  private crearEspacioPersonal(userId: string, email?: string): void {
+    firstValueFrom(
+      this.credentialsClient.send<{ firstName?: string }[]>(
+        { cmd: 'user_find_by_ids' },
+        { ids: [userId] },
+      ),
+    )
+      .then((perfiles) =>
+        firstValueFrom(
+          this.billingClient.send(
+            { cmd: 'billing_personal_org' },
+            {
+              userId: userId,
+              name: perfiles[0]?.firstName ? `Espacio de ${perfiles[0].firstName}` : 'Mi espacio',
+              email: email,
+            },
+          ),
+        ),
+      )
+      .catch((error: Error) => {
+        this.logger.warn(`No se pudo crear el espacio de ${userId}: ${error.message}`);
+      });
+  }
+
   @Post('login')
+  @UseGuards(ModoLocalGuard)
   @HttpCode(HttpStatus.OK)
   @Throttle(LIMITE_AUTENTICACION)
   @ApiOperation({ summary: 'Iniciar sesión' })
@@ -63,6 +93,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @UseGuards(ModoLocalGuard)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Registrar nuevo usuario' })
   @ApiResponse({ status: 201, description: 'Usuario registrado exitosamente' })
@@ -92,29 +123,7 @@ export class AuthController {
      * crea igualmente la primera vez que alguien la necesite. Lo que se pierde
      * es que salga en el selector hasta entonces, no la cuenta.
      */
-    if (alta?.userId) {
-      firstValueFrom(
-        this.credentialsClient.send<{ firstName?: string }[]>(
-          { cmd: 'user_find_by_ids' },
-          { ids: [alta.userId] },
-        ),
-      )
-        .then((perfiles) =>
-          firstValueFrom(
-            this.billingClient.send(
-              { cmd: 'billing_personal_org' },
-              {
-                userId: alta.userId,
-                name: perfiles[0]?.firstName ? `Espacio de ${perfiles[0].firstName}` : 'Mi espacio',
-                email: alta.email,
-              },
-            ),
-          ),
-        )
-        .catch((error: Error) => {
-          this.logger.warn(`No se pudo crear el espacio de ${alta.userId}: ${error.message}`);
-        });
-    }
+    if (alta?.userId) this.crearEspacioPersonal(alta.userId, alta.email);
 
     return alta;
   }
@@ -126,6 +135,7 @@ export class AuthController {
    * credencial y probar a ciegas tiene que costar tiempo.
    */
   @Post('verify-email')
+  @UseGuards(ModoLocalGuard)
   @HttpCode(HttpStatus.OK)
   @Throttle(LIMITE_AUTENTICACION)
   @ApiOperation({ summary: 'Confirma el correo de una cuenta' })
@@ -142,6 +152,7 @@ export class AuthController {
    * un comprobador de quién está registrado aquí.
    */
   @Post('resend-verification')
+  @UseGuards(ModoLocalGuard)
   @HttpCode(HttpStatus.OK)
   @Throttle(LIMITE_AUTENTICACION)
   @ApiOperation({ summary: 'Reenvía el correo de confirmación' })
@@ -152,6 +163,7 @@ export class AuthController {
 
   /** Arranca la recuperación. Responde igual exista o no la cuenta. */
   @Post('forgot-password')
+  @UseGuards(ModoLocalGuard)
   @HttpCode(HttpStatus.OK)
   @Throttle(LIMITE_AUTENTICACION)
   @ApiOperation({ summary: 'Manda el enlace para elegir contraseña nueva' })
@@ -162,6 +174,7 @@ export class AuthController {
 
   /** Fija la contraseña nueva con el token del enlace y cierra las sesiones. */
   @Post('reset-password')
+  @UseGuards(ModoLocalGuard)
   @HttpCode(HttpStatus.OK)
   @Throttle(LIMITE_AUTENTICACION)
   @ApiOperation({ summary: 'Fija una contraseña nueva con el enlace recibido' })
@@ -196,10 +209,17 @@ export class AuthController {
   })
   async kyloo(@Body() body: KylooLoginDto) {
     this.logger.log('POST /auth/kyloo → credentials-service');
-    return firstValueFrom(this.credentialsClient.send({ cmd: 'auth_kyloo' }, body));
+    const sesion = await firstValueFrom(
+      this.credentialsClient.send<{ userId?: string }>({ cmd: 'auth_kyloo' }, body),
+    );
+    /* Con Kyloo como única puerta, las cuentas nuevas nacen aquí y no por `register`: sin esto
+       quien se registra no tendría espacio personal hasta que alguien lo pidiera. */
+    if (sesion?.userId) this.crearEspacioPersonal(sesion.userId);
+    return sesion;
   }
 
   @Post('google')
+  @UseGuards(ModoLocalGuard)
   @HttpCode(HttpStatus.OK)
   /* Mismo apretón que login: aunque aquí no se adivinan contraseñas, cada
      intento obliga a verificar una firma y puede acabar creando una cuenta. */

@@ -30,6 +30,16 @@ export class AuthController {
     return this.authService.loginWithKyloo(dto);
   }
 
+  @MessagePattern({ cmd: 'auth_legacy_verify' })
+  verificarCredencialHeredada(@Payload() dto: { email: string; password: string }) {
+    return this.authService.verificarCredencialHeredada(dto.email, dto.password);
+  }
+
+  @MessagePattern({ cmd: 'auth_revoke_all_of' })
+  revocarTodoDe(@Payload() dto: { sub: string; email: string }) {
+    return this.authService.revocarTodoDe(dto.sub, dto.email);
+  }
+
   @MessagePattern({ cmd: 'auth_google' })
   loginWithGoogle(@Payload() dto: GoogleLoginDto) {
     return this.authService.loginWithGoogle(dto);
