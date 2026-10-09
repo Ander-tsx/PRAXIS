@@ -1,8 +1,10 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   abrirIntento,
   desafioPkce,
+  entradaDelegada,
   nuevoIntento,
+  rutaDeKyloo,
   rutaSegura,
   sellarIntento,
   urlDeAutorizacion,
@@ -87,5 +89,56 @@ describe('urlDeAutorizacion', () => {
       code_challenge_method: 'S256',
       redirect_uri: 'https://usepraxis.space/auth/api/kyloo/callback',
     });
+  });
+});
+
+describe('entrada delegada en Kyloo (AUTH_MODE)', () => {
+  const entorno = { ...process.env };
+  afterEach(() => {
+    process.env = { ...entorno };
+  });
+
+  it('solo se delega con AUTH_MODE=kyloo Y el cliente de Kyloo configurado', () => {
+    process.env.AUTH_MODE = 'kyloo';
+    // biome-ignore lint/performance/noDelete: asignar undefined a process.env lo convierte en la cadena "undefined".
+    delete process.env.KYLOO_ISSUER;
+    // biome-ignore lint/performance/noDelete: ídem.
+    delete process.env.KYLOO_CLIENT_ID;
+    expect(entradaDelegada()).toBe(false); // sin cliente no se puede delegar: se quedaría sin puerta
+
+    process.env.KYLOO_ISSUER = 'https://accounts.ejemplo/api/auth';
+    process.env.KYLOO_CLIENT_ID = 'abc';
+    expect(entradaDelegada()).toBe(true);
+
+    process.env.AUTH_MODE = 'local';
+    expect(entradaDelegada()).toBe(false);
+  });
+
+  it('arma la ruta de inicio conservando el destino y la pantalla', () => {
+    expect(rutaDeKyloo('login')).toBe('/auth/api/kyloo/start');
+    expect(rutaDeKyloo('signup', '/projects/x')).toBe(
+      '/auth/api/kyloo/start?screen=signup&next=%2Fprojects%2Fx',
+    );
+  });
+
+  it('pide a Kyloo la pantalla de registro con screen_hint', () => {
+    const intento = nuevoIntento('/projects');
+    const url = new URL(
+      urlDeAutorizacion(
+        { issuer: 'https://k.example/api/auth', clientId: 'c' },
+        intento,
+        'https://p/cb',
+        'signup',
+      ),
+    );
+    expect(url.searchParams.get('screen_hint')).toBe('signup');
+    const sin = new URL(
+      urlDeAutorizacion(
+        { issuer: 'https://k.example/api/auth', clientId: 'c' },
+        intento,
+        'https://p/cb',
+      ),
+    );
+    expect(sin.searchParams.has('screen_hint')).toBe(false);
   });
 });

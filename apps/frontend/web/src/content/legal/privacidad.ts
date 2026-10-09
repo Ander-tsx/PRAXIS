@@ -49,8 +49,8 @@ export const PRIVACIDAD: Articulo = {
       filas: [
         [
           'Identificación y cuenta',
-          'Nombre, apellidos, correo, contraseña (guardada cifrada, nunca en claro), foto de perfil, estado de presencia',
-          'Tú, al registrarte o editar tu perfil; Google o Kyloo Accounts si entras con ellos (nombre y correo verificado)',
+          'Nombre, apellidos, correo, foto de perfil, estado de presencia. La contraseña no la guarda Praxis: la custodia Kyloo Accounts',
+          'Tú, al crear tu cuenta de Kyloo o editar tu perfil; Kyloo Accounts nos confirma tu identidad (nombre y correo verificado), y Google si entras con él',
         ],
         [
           'Contenido de trabajo',
@@ -166,8 +166,8 @@ export const PRIVACIDAD: Articulo = {
         ],
         [
           'Kyloo Accounts',
-          'Inicio de sesión con tu cuenta Kyloo',
-          'Identidad básica: nombre y correo verificado',
+          'Tu cuenta de acceso: alta, inicio de sesión, verificación del correo, recuperación y cambio de contraseña, doble factor y conexión de agentes de IA (OAuth)',
+          'Tu correo, tu nombre y tu contraseña (con hash irreversible, nunca en claro), y los datos técnicos de cada inicio de sesión',
         ],
       ],
     },
@@ -277,7 +277,7 @@ export const PRIVACIDAD: Articulo = {
       tipo: 'lista',
       items: [
         'Las comunicaciones viajan cifradas (HTTPS/WSS).',
-        'Las contraseñas se guardan con hash; los tokens personales se guardan solo como hash.',
+        'Tus credenciales de acceso las custodia **Kyloo Accounts**: las contraseñas se guardan solo con un hash irreversible, nunca en claro, y Praxis no las ve. Los tokens personales también se guardan solo como hash.',
         'La sesión vive en cookies httpOnly, nunca en el almacenamiento accesible por JavaScript.',
         'Permisos por organización, proyecto y rol; los límites de plan se aplican en el servidor.',
         'Límites de intentos de inicio de sesión y verificación del correo antes de entrar.',

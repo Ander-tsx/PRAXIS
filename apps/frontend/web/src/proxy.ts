@@ -1,3 +1,4 @@
+import { entradaDelegada, rutaDeKyloo } from '@/lib/auth/kyloo';
 import { recordarConversacion } from '@/lib/ultimo-chat';
 import {
   SESSION_COOKIE,
@@ -65,6 +66,21 @@ const LOGIN_PATH = '/auth/login';
  * ya estaba dentro no puede acabar rebotado.
  */
 const SOLO_INVITADOS = new Set(['/', '/auth/login', '/auth/signup']);
+
+/**
+ * Con `AUTH_MODE=kyloo` (docs/PLAN-AUTH-KYLOO.md) Kyloo Accounts es la única puerta: estas
+ * pantallas ya no existen aquí y llevan a Kyloo. Las tres últimas se abrían desde un enlace del
+ * correo de Praxis; un enlace viejo termina igualmente donde se puede entrar.
+ *
+ * En modo `local` (desarrollo, e2e) no se toca: siguen siendo las de siempre.
+ */
+const PANTALLAS_DELEGADAS: Record<string, 'login' | 'signup'> = {
+  '/auth/login': 'login',
+  '/auth/signup': 'signup',
+  '/auth/forgot-password': 'login',
+  '/auth/reset-password': 'login',
+  '/auth/verify-email': 'login',
+};
 
 /**
  * A dónde va quien ya tiene sesión y pide una de las pantallas de arriba.
@@ -177,9 +193,28 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
    * presencia de la cookie dejaría a esa persona encerrada fuera.
    */
   if (SOLO_INVITADOS.has(pathname)) {
-    if (!(await hasValidSessionToken(resolveToken(request, response)))) return response;
+    if (!(await hasValidSessionToken(resolveToken(request, response)))) {
+      const pantalla = PANTALLAS_DELEGADAS[pathname];
+      if (pantalla && entradaDelegada()) {
+        const salto = redirectToZone(
+          request,
+          rutaDeKyloo(pantalla, request.nextUrl.searchParams.get('next')),
+        );
+        for (const cookie of response.cookies.getAll()) salto.cookies.set(cookie);
+        return salto;
+      }
+      return response;
+    }
 
     const salto = redirectToZone(request, DESTINO_TRAS_ENTRAR);
+    for (const cookie of response.cookies.getAll()) salto.cookies.set(cookie);
+    return salto;
+  }
+
+  /* Las pantallas de correo (recuperar, restablecer, confirmar) no son «solo invitados» pero
+     tampoco tienen sentido en modo `kyloo`. */
+  if (PANTALLAS_DELEGADAS[pathname] && !SOLO_INVITADOS.has(pathname) && entradaDelegada()) {
+    const salto = redirectToZone(request, rutaDeKyloo('login'));
     for (const cookie of response.cookies.getAll()) salto.cookies.set(cookie);
     return salto;
   }

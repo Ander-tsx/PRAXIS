@@ -48,8 +48,8 @@ export const TERMINOS: Articulo = {
     {
       tipo: 'lista',
       items: [
-        'Puedes entrar con correo y contraseña, con tu cuenta de Google o con tu cuenta de Kyloo. Vincular una cuenta externa no nos da acceso a nada más que tu identidad básica: nombre y correo verificado.',
-        'Eres responsable de lo que ocurra con tu sesión, tu contraseña y tus **tokens personales** de integración. No los compartas; si sospechas que alguien los tiene, cambia la contraseña y revoca los tokens desde Integraciones.',
+        'Para entrar a Praxis usas tu **cuenta de Kyloo** (Kyloo Accounts), con correo y contraseña o con tu cuenta de Google. Es la misma cuenta para todos los productos de Kyloo. **Kyloo custodia tus credenciales** —contraseña, verificación del correo y, si lo activas, doble factor—; Praxis guarda tu perfil, tus roles y tu contenido, y no ve tu contraseña.',
+        'Eres responsable de lo que ocurra con tu sesión, tu contraseña y tus **tokens personales** de integración. No los compartas; si sospechas que alguien los tiene, cambia la contraseña en tu cuenta de Kyloo —eso cierra tus sesiones y revoca tus tokens y conexiones en Praxis— o revócalos desde Integraciones.',
         'Una persona, una cuenta. No vendas, prestes ni transfieras tu cuenta.',
         'Hay un tope de **tres organizaciones propias por persona**, la personal incluida.',
         `Avísanos de inmediato a ${correoSoporte} si detectas un uso no autorizado. No respondemos por pérdidas causadas por no haber protegido tus credenciales.`,

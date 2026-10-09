@@ -52,6 +52,23 @@ export function origenCanonico(origenDePeticion: string): string {
 }
 
 /**
+ * ¿Kyloo es la única puerta? (`AUTH_MODE=kyloo`, docs/PLAN-AUTH-KYLOO.md). Se lee en cada
+ * llamada y no al cargar el módulo: es una variable de ejecución, no de compilación.
+ */
+export function entradaDelegada(): boolean {
+  return process.env.AUTH_MODE === 'kyloo' && configKyloo() !== null;
+}
+
+/** A dónde mandar a quien pide una pantalla de acceso propia cuando Kyloo es la única puerta. */
+export function rutaDeKyloo(screen: 'login' | 'signup', next?: string | null): string {
+  const params = new URLSearchParams();
+  if (screen === 'signup') params.set('screen', 'signup');
+  if (next) params.set('next', next);
+  const query = params.toString();
+  return `/auth/api/kyloo/start${query ? `?${query}` : ''}`;
+}
+
+/**
  * Solo rutas de esta aplicación: `//evil.com` y `/\evil.com` son rutas
  * «relativas» para un `startsWith('/')` y abrirían una redirección a otro sitio
  * tras autenticarse.
@@ -81,9 +98,12 @@ export function urlDeAutorizacion(
   config: ConfigKyloo,
   intento: IntentoKyloo,
   redirectUri: string,
+  /** `signup` abre Kyloo en «Crear cuenta» en vez de «Iniciar sesión» (convención `screen_hint`). */
+  screenHint?: 'signup',
 ): string {
   const url = new URL(`${config.issuer}/oauth2/authorize`);
   url.search = new URLSearchParams({
+    ...(screenHint ? { screen_hint: screenHint } : {}),
     client_id: config.clientId,
     redirect_uri: redirectUri,
     response_type: 'code',

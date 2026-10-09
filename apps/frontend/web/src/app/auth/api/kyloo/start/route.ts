@@ -35,7 +35,13 @@ export async function GET(request: NextRequest) {
 
   const next = rutaSegura(request.nextUrl.searchParams.get('next'));
   const intento = nuevoIntento(next);
-  const destino = urlDeAutorizacion(config, intento, `${origen}/auth/api/kyloo/callback`);
+  const screenHint = request.nextUrl.searchParams.get('screen') === 'signup' ? 'signup' : undefined;
+  const destino = urlDeAutorizacion(
+    config,
+    intento,
+    `${origen}/auth/api/kyloo/callback`,
+    screenHint,
+  );
 
   const response = NextResponse.redirect(destino, 303);
   response.cookies.set(KYLOO_FLOW_COOKIE, await sellarIntento(intento), opcionesCookieIntento);
