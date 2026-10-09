@@ -85,6 +85,12 @@ ENV JWT_SECRET=build-time-placeholder-sin-valor-en-runtime
 ARG GOOGLE_CLIENT_ID=""
 ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
 
+# «Continuar con Kyloo» (docs/PLAN-OAUTH-KYLOO.md). Mismo fallo mudo que el de
+# Google: como variable del servicio, en runtime, `BotonKyloo` no vería el `1` y
+# el botón no se pintaría, sin ningún error. Vacío = la entrada con Kyloo apagada.
+ARG NEXT_PUBLIC_KYLOO_LOGIN=""
+ENV NEXT_PUBLIC_KYLOO_LOGIN=$NEXT_PUBLIC_KYLOO_LOGIN
+
 # Los precios que pinta la tabla comparativa, por el mismo motivo que el de
 # arriba: son `NEXT_PUBLIC_*`, o sea que Next los incrusta al construir.
 #
