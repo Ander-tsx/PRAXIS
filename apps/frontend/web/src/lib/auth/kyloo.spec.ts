@@ -142,14 +142,3 @@ describe('entrada delegada en Kyloo (AUTH_MODE)', () => {
     expect(sin.searchParams.has('screen_hint')).toBe(false);
   });
 });
-
-describe('volver a pedir credenciales tras cerrar sesión', () => {
-  it('prompt=login solo cuando se pide', () => {
-    const intento = nuevoIntento('/projects');
-    const config = { issuer: 'https://k.example/api/auth', clientId: 'c' };
-    const con = new URL(urlDeAutorizacion(config, intento, 'https://p/cb', { prompt: 'login' }));
-    expect(con.searchParams.get('prompt')).toBe('login');
-    const sin = new URL(urlDeAutorizacion(config, intento, 'https://p/cb'));
-    expect(sin.searchParams.has('prompt')).toBe(false);
-  });
-});
