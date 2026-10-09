@@ -1,6 +1,6 @@
 # PLAN-AUTH-KYLOO — Kyloo Accounts como único autenticador de Praxis
 
-> **Estado:** en curso (2026-10-09, rama `feature/auth-kyloo` en este repositorio y en `../KYLOO-AUTH`).
+> **Estado:** entregado sin desplegar (2026-10-09, rama `feature/auth-kyloo` en este repositorio y en `../KYLOO-AUTH`).
 > Continúa [PLAN-OAUTH-KYLOO](PLAN-OAUTH-KYLOO.md): allí «Continuar con Kyloo» era una opción junto a
 > Google; aquí pasa a ser **la única puerta**. Sustituye a las opciones «alta bajo demanda» y
 > «entrada única con ticket» que se barajaron al cerrar aquel plan.
@@ -74,4 +74,37 @@ Praxis /auth/api/kyloo/callback ◀── code ───────────
 
 ## Registro
 
-_(se rellena al cerrar cada fase)_
+**2026-10-09 — fases A a F entregadas en `feature/auth-kyloo` (sin desplegar).**
+
+- **A** (`credentials`, `gateway`): `AUTH_MODE`, `ModoLocalGuard` (403 `AUTH_DELEGATED`), vinculación D5/D7,
+  `verificarCredencialHeredada` y `revocarTodoDe`, y las rutas internas `legacy-login` y `revoke`.
+- **B** (`KYLOO-AUTH/apps/api`): gancho `before` de `/sign-in/email` (migración perezosa), `onPasswordReset`
+  y `after` de `/change-password` (revocación), `PraxisClient.entradaHeredada/revocar`.
+- **C** (`web`): `proxy.ts` redirige las cinco pantallas; `screen_hint=signup`; en Kyloo, `/entrar` salta a
+  `/registro` una vez por intento.
+- **D**: términos y aviso de privacidad dicen que Kyloo custodia las credenciales.
+- **E**: pruebas unitarias (credentials 58, gateway 178, web, Kyloo 14) e integración (Kyloo 36) en verde, y
+  una prueba de punta a punta con **los dos sistemas reales** (sin navegador): cuenta heredada → Kyloo con su
+  contraseña de Praxis → OIDC → misma cuenta de Praxis vinculada y hash borrado → persona nueva con su espacio
+  personal → cambiar la contraseña en Kyloo tumba el refresh token de Praxis. Y las cuatro rutas propias dan
+  403 `AUTH_DELEGATED`.
+- **F**: [AUTH-KYLOO-PRODUCCION](deploy/AUTH-KYLOO-PRODUCCION.md).
+
+### Trampas que aparecieron
+
+- 🔴 **Antes de este plan, las cuentas nuevas por Kyloo o Google no recibían espacio personal.** Solo
+  `register` lo creaba. Con Kyloo como única puerta, `POST /auth/kyloo` ahora lo pide tras cada entrada
+  (`billing_personal_org` es idempotente).
+- ⚠️ **Praxis exige correo verificado por Kyloo.** En local Kyloo no pide confirmar el correo (`REQUIRE_EMAIL_VERIFICATION=false`)
+  y Praxis rechaza esa cuenta, con razón; en producción la confirmación es obligatoria.
+- ⚠️ **Dos instancias de Kyloo contra la misma base chocan** al registrar el mismo recurso OAuth (`oauth_resource_identifier_unique`).
+  Solo afecta a las pruebas de integración: el bloque de migración arranca la suya con `MCP_RESOURCES: []`.
+- ⚠️ El query de `/oauth2/authorize` va **firmado**: no se puede quitar `screen_hint` al redirigir a `/registro`;
+  por eso el salto se recuerda en `sessionStorage` por `sig`.
+- 🍎 `pkill -f "monolith/dist/main.js"` no mata nada: el proceso es `node … dist/main.js`. Se mata por `max-old-space-size=512 dist/main.js`.
+
+### Pendiente
+
+- Verlo en un navegador (las pantallas de Kyloo con la marca Praxis, la PWA al salir y volver de Kyloo).
+- Desplegar según [AUTH-KYLOO-PRODUCCION](deploy/AUTH-KYLOO-PRODUCCION.md).
+- Retirar el código de contraseñas de Praxis, semanas después y solo si todo va bien (no antes: es el `local` de e2e).
