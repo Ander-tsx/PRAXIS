@@ -1,5 +1,6 @@
 import {
   KYLOO_FLOW_COOKIE,
+  KYLOO_RELOGIN_COOKIE,
   configKyloo,
   nuevoIntento,
   opcionesCookieIntento,
@@ -36,14 +37,15 @@ export async function GET(request: NextRequest) {
   const next = rutaSegura(request.nextUrl.searchParams.get('next'));
   const intento = nuevoIntento(next);
   const screenHint = request.nextUrl.searchParams.get('screen') === 'signup' ? 'signup' : undefined;
-  const destino = urlDeAutorizacion(
-    config,
-    intento,
-    `${origen}/auth/api/kyloo/callback`,
+  /* Si acaba de cerrar sesión en Praxis, Kyloo vuelve a pedirle credenciales (ver la cookie). */
+  const reautenticar = request.cookies.has(KYLOO_RELOGIN_COOKIE);
+  const destino = urlDeAutorizacion(config, intento, `${origen}/auth/api/kyloo/callback`, {
     screenHint,
-  );
+    prompt: reautenticar ? 'login' : undefined,
+  });
 
   const response = NextResponse.redirect(destino, 303);
+  if (reautenticar) response.cookies.delete(KYLOO_RELOGIN_COOKIE);
   response.cookies.set(KYLOO_FLOW_COOKIE, await sellarIntento(intento), opcionesCookieIntento);
   return response;
 }

@@ -1,3 +1,4 @@
+import { KYLOO_RELOGIN_COOKIE, KYLOO_RELOGIN_SEGUNDOS, configKyloo } from '@/lib/auth/kyloo';
 import { REFRESH_COOKIE, SESSION_COOKIE, clearSessionCookies } from '@/lib/auth/session-cookie';
 import { fetchAlGateway } from '@praxis/commons/api/despertar';
 import { type NextRequest, NextResponse } from 'next/server';
@@ -77,5 +78,16 @@ export async function POST(request: NextRequest) {
 
   const response = NextResponse.json({ success: true });
   clearSessionCookies(response);
+  /* La sesión de Kyloo sigue abierta (es de todos sus productos): se anota que la próxima
+     entrada con Kyloo tiene que pedir credenciales. Ver `KYLOO_RELOGIN_COOKIE`. */
+  if (configKyloo()) {
+    response.cookies.set(KYLOO_RELOGIN_COOKIE, '1', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: KYLOO_RELOGIN_SEGUNDOS,
+    });
+  }
   return response;
 }

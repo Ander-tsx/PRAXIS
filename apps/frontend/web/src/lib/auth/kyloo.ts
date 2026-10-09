@@ -13,6 +13,19 @@ import { SignJWT, jwtVerify } from 'jose';
  * verificador PKCE, que es el secreto que ata el código a este navegador.
  */
 export const KYLOO_FLOW_COOKIE = 'praxis_kyloo_flow';
+
+/**
+ * Se pone al cerrar sesión en Praxis y hace que la **siguiente** entrada con Kyloo pida
+ * credenciales de nuevo (`prompt=login`).
+ *
+ * Cerrar sesión en Praxis no cierra la de Kyloo —es una cuenta compartida con otros productos
+ * y cerrarla desde aquí sacaría a la persona de todos—, así que sin esto «Entrar» volvería a
+ * dejarla dentro sin preguntar nada: en un equipo compartido, quien se sienta después entraría
+ * en la cuenta de la anterior, y nadie podría cambiar de cuenta. 12 horas: lo bastante para
+ * cubrir «salí y vuelvo luego», y no para quedarse para siempre.
+ */
+export const KYLOO_RELOGIN_COOKIE = 'praxis_kyloo_relogin';
+export const KYLOO_RELOGIN_SEGUNDOS = 12 * 60 * 60;
 const DURACION_SEG = 10 * 60;
 
 export interface IntentoKyloo {
@@ -98,12 +111,17 @@ export function urlDeAutorizacion(
   config: ConfigKyloo,
   intento: IntentoKyloo,
   redirectUri: string,
-  /** `signup` abre Kyloo en «Crear cuenta» en vez de «Iniciar sesión» (convención `screen_hint`). */
-  screenHint?: 'signup',
+  opciones: {
+    /** `signup` abre Kyloo en «Crear cuenta» en vez de «Iniciar sesión» (convención `screen_hint`). */
+    screenHint?: 'signup';
+    /** `login` obliga a Kyloo a pedir credenciales aunque ya tenga sesión abierta. */
+    prompt?: 'login';
+  } = {},
 ): string {
   const url = new URL(`${config.issuer}/oauth2/authorize`);
   url.search = new URLSearchParams({
-    ...(screenHint ? { screen_hint: screenHint } : {}),
+    ...(opciones.screenHint ? { screen_hint: opciones.screenHint } : {}),
+    ...(opciones.prompt ? { prompt: opciones.prompt } : {}),
     client_id: config.clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
