@@ -13,15 +13,17 @@ import { type NextRequest, NextResponse } from 'next/server';
  * - 🔴 **El cuerpo pasa crudo** (`arrayBuffer`) y las cabeceras de firma
  *   (`x-kyloo-timestamp`, `x-kyloo-signature`) tal cual: la firma HMAC cubre los
  *   bytes exactos. Reserializar el JSON la rompería sin un solo aviso útil.
- * - **Solo `organizations` y `connections`**, por `POST`. Nada más del gateway se
- *   alcanza por esta puerta.
+ * - **Solo `organizations`, `connections`, `legacy-login` y `revoke`**, por `POST`. Nada más
+ *   del gateway se alcanza por esta puerta. Las dos últimas son de PLAN-AUTH-KYLOO
+ *   (migración perezosa de contraseñas y revocación de sesiones): olvidarlas aquí no da
+ *   ningún error en local, que apunta directo al gateway, y en producción las dos dan 404.
  *
  * La autenticación es la firma, que comprueba el gateway (`KylooInternalGuard`);
  * aquí no se mira nada.
  */
 export const dynamic = 'force-dynamic';
 
-const RUTAS = new Set(['organizations', 'connections']);
+const RUTAS = new Set(['organizations', 'connections', 'legacy-login', 'revoke']);
 
 export async function POST(
   request: NextRequest,
