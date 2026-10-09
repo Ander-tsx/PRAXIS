@@ -22,7 +22,6 @@ import {
   SECTION_PANEL,
   SECTION_TITLE_CLASS,
 } from './section-panel';
-import { NotesGlyph } from './task-marks';
 
 /**
  * «Editar» y «Eliminar» de una nota: mismo tamaño y mismo relleno.
@@ -98,7 +97,6 @@ export function TaskNotes({
   return (
     <section className={SECTION_CLASS}>
       <h4 className={`${SECTION_TITLE_CLASS} px-1`}>
-        <NotesGlyph className="h-3.5 w-3.5" />
         Notas{' '}
         {comments.length > 0 && <span className={SECTION_COUNT_CLASS}>{comments.length}</span>}
       </h4>

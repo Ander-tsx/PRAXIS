@@ -20,6 +20,7 @@ import {
   useAccion,
 } from '@praxis/commons';
 import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { DescripcionMarkdown } from './DescripcionMarkdown';
 import { GestorDeEtiquetas } from './GestorDeEtiquetas';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
@@ -375,18 +376,9 @@ export function TaskDialog({
             className="-mx-2 resize-none rounded-lg bg-transparent px-2 py-1 font-sans text-xl font-semibold leading-snug text-text-primary outline-none transition-colors [field-sizing:content] placeholder:text-text-disabled hover:bg-white/[0.03] focus:bg-white/[0.04] focus:ring-1 focus:ring-white/10 disabled:hover:bg-transparent"
           />
 
-          <textarea
-            id="task-description"
-            name="description"
-            aria-label="Descripción"
-            placeholder={readOnly ? 'Sin descripción' : 'Añade una descripción…'}
-            defaultValue={task.description ?? ''}
-            rows={2}
-            disabled={readOnly}
-            /* El mismo estilo que el título: los dos son el contenido de la tarea,
-               no una propiedad, y se editan en el sitio, sin caja. */
-            className="-mx-2 min-h-[2.75rem] resize-none rounded-lg bg-transparent px-2 py-1.5 font-sans text-sm leading-relaxed text-text-primary outline-none transition-colors [field-sizing:content] placeholder:text-text-secondary hover:bg-white/[0.03] focus:bg-white/[0.04] focus:ring-1 focus:ring-white/10 disabled:hover:bg-transparent"
-          />
+          {/* La descripción es Markdown simplificado en vivo; viaja al guardado
+              como un `input` oculto con el mismo nombre de siempre. */}
+          <DescripcionMarkdown initial={task.description ?? ''} readOnly={readOnly} />
 
           {/**
            * **Propiedades con el nombre encima** y el campo a todo su ancho, en
