@@ -187,6 +187,23 @@ export default function SignupPage() {
         }
         footer={
           <>
+            <span className="mb-3 block text-xs text-text-secondary">
+              Al crear tu cuenta aceptas los{' '}
+              <Link
+                href="/terminos"
+                className="underline underline-offset-2 hover:text-text-primary"
+              >
+                términos y condiciones
+              </Link>{' '}
+              y el{' '}
+              <Link
+                href="/privacidad"
+                className="underline underline-offset-2 hover:text-text-primary"
+              >
+                aviso de privacidad
+              </Link>
+              .
+            </span>
             ¿Ya tienes cuenta?{' '}
             <Link
               href="/auth/login"

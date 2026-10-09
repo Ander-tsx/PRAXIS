@@ -37,6 +37,8 @@ const DE_TU: ReadonlyArray<readonly [prefijo: string, titulo: string]> = [
   ['/main/profile', 'Perfil'],
   ['/admin', 'Administración'],
   ['/ayuda', 'Ayuda'],
+  ['/main/legal/terminos', 'Términos y condiciones'],
+  ['/main/legal/privacidad', 'Aviso de privacidad'],
 ];
 
 export function pantallaMovil(pathname: string): PantallaMovil {

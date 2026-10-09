@@ -12,8 +12,8 @@ const NAV_ITEMS = [
 ] as const;
 
 const LEGAL_ITEMS = [
-  { label: 'Privacidad', href: '#' },
-  { label: 'Términos de uso', href: '#' },
+  { label: 'Privacidad', href: '/privacidad' },
+  { label: 'Términos de uso', href: '/terminos' },
 ] as const;
 
 /**

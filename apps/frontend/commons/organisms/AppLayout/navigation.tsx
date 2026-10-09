@@ -253,6 +253,34 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
   {
+    label: 'Términos y condiciones',
+    href: '/main/legal/terminos',
+    section: SECTION_CONFIGURACION,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M7 3h7l5 5v11a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2zM14 3v5h5M9 13h6M9 17h6"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: 'Aviso de privacidad',
+    href: '/main/legal/privacidad',
+    section: SECTION_CONFIGURACION,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3zM9.5 12l2 2 3.5-4"
+        />
+      </svg>
+    ),
+  },
+  {
     label: 'Soporte',
     href: '/soporte',
     section: SECTION_CONFIGURACION,
