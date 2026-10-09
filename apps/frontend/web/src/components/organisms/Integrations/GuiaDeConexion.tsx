@@ -13,6 +13,7 @@ import {
   Sparkles,
   Terminal,
 } from 'lucide-react';
+import Image from 'next/image';
 import { type ComponentType, type ReactNode, useState } from 'react';
 
 type Icono = ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
@@ -26,6 +27,8 @@ interface Paso {
 interface Cliente {
   id: string;
   nombre: string;
+  /** El logotipo del producto, de `public/integrations`; sin él, un icono genérico. */
+  logo?: { src: string; ancho: number; alto: number };
   icono: Icono;
   /** Una línea para quien duda de si es su caso. */
   para: string;
@@ -34,8 +37,8 @@ interface Cliente {
 }
 
 /**
- * Los iconos son genéricos a propósito: los logotipos de las marcas no son
- * nuestros, y una guía con un logo desactualizado confunde más que una sin él.
+ * Los logotipos de Claude, ChatGPT y Claude Code son los de cada producto, puestos por el dueño
+ * en `public/integrations`; los iconos de cada paso y la pestaña «Otros» son genéricos.
  *
  * ⚠️ **Los nombres de menú de ChatGPT y Claude cambian con el plan y el
  * idioma.** Los pasos dicen qué buscar, no una ruta exacta, y la nota de cada
@@ -46,6 +49,7 @@ const CLIENTES: Cliente[] = [
   {
     id: 'claude',
     nombre: 'Claude',
+    logo: { src: '/integrations/claude.png', ancho: 96, alto: 96 },
     icono: Sparkles,
     para: 'La web claude.ai y la aplicación de escritorio.',
     pasos: (endpoint) => [
@@ -81,6 +85,7 @@ const CLIENTES: Cliente[] = [
   {
     id: 'chatgpt',
     nombre: 'ChatGPT',
+    logo: { src: '/integrations/chatgpt.png', ancho: 96, alto: 96 },
     icono: MessageCircle,
     para: 'chatgpt.com, en los planes que permiten conectores personalizados.',
     pasos: (endpoint) => [
@@ -116,6 +121,7 @@ const CLIENTES: Cliente[] = [
   {
     id: 'claude-code',
     nombre: 'Claude Code',
+    logo: { src: '/integrations/claude-code.png', ancho: 96, alto: 78 },
     icono: Terminal,
     para: 'El agente de línea de comandos.',
     pasos: (endpoint) => [
@@ -202,7 +208,17 @@ export function GuiaDeConexion({ endpoint }: { endpoint: string }) {
                   : 'border-border text-text-secondary hover:border-border-strong hover:text-text-primary'
               }`}
             >
-              <Icono className="h-4 w-4" aria-hidden />
+              {c.logo ? (
+                <Image
+                  src={c.logo.src}
+                  alt=""
+                  width={c.logo.ancho}
+                  height={c.logo.alto}
+                  className="h-5 w-auto rounded-[4px]"
+                />
+              ) : (
+                <Icono className="h-4 w-4" aria-hidden />
+              )}
               {c.nombre}
             </button>
           );
