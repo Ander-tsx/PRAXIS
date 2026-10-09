@@ -259,5 +259,8 @@ export const config = {
   /* `sw.js` fuera: el navegador lo pide a menudo para ver si hay versión
      nueva, y no tiene nada que ver con la sesión. Pasar por el guard le haría
      renovarla en cada comprobación. */
-  matcher: ['/', '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth/api/|sw\\.js).*)'],
+  matcher: [
+    '/',
+    '/((?!_next/static|_next/image|favicon.ico|fonts/|api/|auth/api/|sw\\.js|\\.well-known/).*)',
+  ],
 };

@@ -1,7 +1,7 @@
 'use server';
 
 import type { CrearTokenState, NotificationState } from '@/lib/main/action-state';
-import type { PersonalTokenView } from '@/lib/main/integrations';
+import type { McpConnectionView, PersonalTokenView } from '@/lib/main/integrations';
 import { ApiError } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import type { OrganizationView } from '@praxis/commons/billing/planes';
@@ -103,6 +103,64 @@ export async function permitirMcpAction(
   } catch (error) {
     return {
       error: error instanceof ApiError ? error.message : 'No se pudo cambiar el permiso.',
+      done: null,
+    };
+  }
+}
+
+/* ─── Clientes de IA conectados por OAuth (docs/PLAN-OAUTH-KYLOO.md) ──────── */
+
+export async function actualizarConexionAction(
+  _prev: NotificationState,
+  formData: FormData,
+): Promise<NotificationState> {
+  if (!(await getSession())) return { error: SESION_CADUCADA, done: null };
+
+  const id = String(formData.get('id') ?? '');
+  const allowedOrgIds = formData.getAll('allowedOrgIds').map(String);
+  const activeOrgId = String(formData.get('activeOrgId') ?? '');
+
+  if (allowedOrgIds.length === 0) return { error: 'Deja al menos una organización.', done: null };
+  if (!allowedOrgIds.includes(activeOrgId)) {
+    return { error: 'La organización activa tiene que estar entre las marcadas.', done: null };
+  }
+
+  try {
+    const guardada = await createServerApiClient().patch<McpConnectionView>(
+      `/me/mcp/connections/${id}`,
+      { allowedOrgIds, activeOrgId },
+    );
+    if (guardada?.activeOrgId !== activeOrgId) {
+      return { error: 'El servidor no guardó el cambio.', done: null };
+    }
+    revalidatePath('/main/integrations');
+    return { error: null, done: id };
+  } catch (error) {
+    return {
+      error: error instanceof ApiError ? error.message : 'No se pudo guardar la conexión.',
+      done: null,
+    };
+  }
+}
+
+export async function revocarConexionAction(
+  _prev: NotificationState,
+  formData: FormData,
+): Promise<NotificationState> {
+  if (!(await getSession())) return { error: SESION_CADUCADA, done: null };
+
+  const id = String(formData.get('id') ?? '');
+  try {
+    const revocada = await createServerApiClient().delete<McpConnectionView>(
+      `/me/mcp/connections/${id}`,
+    );
+    if (!revocada?.revokedAt)
+      return { error: 'El servidor no confirmó la revocación.', done: null };
+    revalidatePath('/main/integrations');
+    return { error: null, done: id };
+  } catch (error) {
+    return {
+      error: error instanceof ApiError ? error.message : 'No se pudo revocar la conexión.',
       done: null,
     };
   }

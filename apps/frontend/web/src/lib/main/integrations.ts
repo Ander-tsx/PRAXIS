@@ -24,3 +24,21 @@ export interface PersonalTokenView {
 export function tokenVivo(token: PersonalTokenView, ahora = Date.now()): boolean {
   return !token.revokedAt && (!token.expiresAt || Date.parse(token.expiresAt) > ahora);
 }
+
+/**
+ * Un cliente de IA conectado por OAuth con la cuenta de Kyloo (ChatGPT, Claude
+ * web). Espejo de `McpConnectionView` en `@praxis/contracts`.
+ *
+ * A diferencia de un token, no vale para una organización sino para un
+ * **conjunto**, con una activa que se cambia sin reconectar.
+ */
+export interface McpConnectionView {
+  id: string;
+  clientId: string;
+  clientName: string;
+  allowedOrgIds: string[];
+  activeOrgId: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}

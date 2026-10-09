@@ -1,5 +1,9 @@
-import { IntegrationRow, McpIntegration } from '@/components/organisms/Integrations';
-import type { PersonalTokenView } from '@/lib/main/integrations';
+import {
+  ConexionesDeIa,
+  IntegrationRow,
+  McpIntegration,
+} from '@/components/organisms/Integrations';
+import type { McpConnectionView, PersonalTokenView } from '@/lib/main/integrations';
 import { AppHeader } from '@praxis/commons';
 import { createServerApiClient, loadPrivateChrome } from '@praxis/commons/auth';
 import type { CatalogoDePlanes, OrganizationView } from '@praxis/commons/billing/planes';
@@ -18,16 +22,22 @@ export const metadata: Metadata = { title: 'Integraciones' };
  * otro plan se enseñan, pero con «Disponible en Pro» en vez del contenido.
  */
 export default async function IntegrationsPage() {
-  const { organizacionActivaId: organizationId } = await loadPrivateChrome();
+  const { organizacionActivaId: organizationId, organizaciones } = await loadPrivateChrome();
   const api = createServerApiClient();
 
-  const [organizacion, catalogo, tokens] = organizationId
+  /* Kyloo Accounts como servidor de autorización: sin él no hay "conectar con tu cuenta". */
+  const oauthActivo = Boolean(process.env.KYLOO_ISSUER);
+
+  const [organizacion, catalogo, tokens, conexiones] = organizationId
     ? await Promise.all([
         api.get<OrganizationView>(`/organizations/${organizationId}`).catch(() => null),
         api.get<CatalogoDePlanes>('/me/billing/planes').catch(() => null),
         api.get<PersonalTokenView[]>('/me/tokens').catch(() => null),
+        oauthActivo
+          ? api.get<McpConnectionView[]>('/me/mcp/connections').catch(() => null)
+          : Promise.resolve(null),
       ])
-    : [null, null, null];
+    : [null, null, null, null];
 
   const cabecera = (
     <header className="flex flex-col gap-2 pb-6">
@@ -109,6 +119,30 @@ export default async function IntegrationsPage() {
             />
           ) : (
             disponibleEnPro
+          )}
+        </IntegrationRow>
+
+        <IntegrationRow
+          title="ChatGPT y Claude (con tu cuenta de Kyloo)"
+          description="Conecta ChatGPT o Claude en la web sin copiar ningún token: entras con tu cuenta y eliges qué organizaciones pueden ver."
+          status={
+            !oauthActivo
+              ? 'Pronto'
+              : (conexiones ?? []).some((c) => !c.revokedAt)
+                ? 'Conectado'
+                : 'Sin conectar'
+          }
+          disabled={!oauthActivo}
+        >
+          {oauthActivo && (
+            <ConexionesDeIa
+              conexiones={conexiones ?? []}
+              organizaciones={organizaciones.map((o) => ({
+                id: o.id,
+                name: o.name ?? 'Espacio personal',
+              }))}
+              endpoint={endpoint}
+            />
           )}
         </IntegrationRow>
 
