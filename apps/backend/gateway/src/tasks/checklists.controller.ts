@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Inject,
   Param,
+  Patch,
   Post,
   Request,
   UseGuards,
@@ -17,6 +18,7 @@ import {
   DeleteChecklistBodyDto,
   ProjectPermission,
   ToggleChecklistBodyDto,
+  UpdateChecklistBodyDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
@@ -86,6 +88,34 @@ export class ChecklistsController {
     return firstValueFrom(
       this.tasksClient.send(
         { cmd: 'checklist_toggle' },
+        {
+          ...body,
+          id,
+          projectId: req.projectId,
+          requesterId: req.user!.userId,
+        },
+      ),
+    );
+  }
+
+  /**
+   * Cambia el texto de un ítem (requiere canEditTask). Marcar es `toggle` y pide menos
+   * (`canMoveTask`); reescribir el paso es redefinir la tarea, como añadirlo o borrarlo.
+   */
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @ApiOperation({ summary: 'Cambia el texto de un ítem del checklist' })
+  @ApiResponse({ status: 200, description: 'Ítem actualizado' })
+  update(
+    @Param('taskId') taskId: string,
+    @Param('id') id: string,
+    @Request() req: Express.Request,
+    @Body() body: UpdateChecklistBodyDto,
+  ) {
+    return firstValueFrom(
+      this.tasksClient.send(
+        { cmd: 'checklist_update' },
         {
           ...body,
           id,

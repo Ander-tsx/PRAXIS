@@ -24,6 +24,7 @@ import {
   PurgeTasksDto,
   RestatusTasksDto,
   ToggleChecklistDto,
+  UpdateChecklistDto,
   UpdateTaskDto,
 } from '@praxis/contracts';
 import { opcionesDeCliente } from '@praxis/local-transport';
@@ -1547,6 +1548,32 @@ export class TasksService {
 
     // También la lista del tablero: la tarjeta enseña el avance del checklist,
     // y sin esto se queda con el recuento viejo hasta que caduque (trampa #3).
+    await Promise.all([
+      this.redis.del(`task:${item.taskId}`),
+      this.redis.delByPrefix(`tasks:board:${item.task.boardId}`),
+    ]);
+
+    return updated;
+  }
+
+  /**
+   * Cambia el texto de un paso. Es **redefinir** la tarea, no ejecutarla —como añadir y borrar—,
+   * así que pide `canEditTask` y no `canMoveTask`. Un texto de solo espacios se rechaza igual
+   * que al crear: `MinLength(1)` lo deja pasar, y el paso quedaría invisible en la lista.
+   */
+  async updateChecklist(dto: UpdateChecklistDto) {
+    await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
+
+    const item = await this.loadChecklistInProject(dto.id, dto.projectId);
+
+    const text = dto.text.trim();
+    if (!text) throw new RpcException({ statusCode: 400, message: 'El paso no puede estar vacío' });
+
+    const updated = await this.prisma.checklist.update({
+      where: { id: dto.id },
+      data: { text },
+    });
+
     await Promise.all([
       this.redis.del(`task:${item.taskId}`),
       this.redis.delByPrefix(`tasks:board:${item.task.boardId}`),

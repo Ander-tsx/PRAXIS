@@ -1480,6 +1480,37 @@ export async function toggleChecklistItemAction(
   return { error: null, done: 'toggled' };
 }
 
+/** Cambia el texto de un paso. Pide `canEditTask`; marcar y desmarcar es otra acción. */
+export async function updateChecklistItemAction(
+  _prev: TaskState,
+  formData: FormData,
+): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const itemId = String(formData.get('itemId') ?? '');
+  const text = String(formData.get('text') ?? '').trim();
+
+  if (!text) return { error: 'El paso no puede estar vacío.', done: null };
+  if (text.length > 500) return { error: 'El paso admite 500 caracteres como máximo.', done: null };
+
+  try {
+    const updated = await api.patch<ChecklistItem>(`/tasks/${taskId}/checklists/${itemId}`, {
+      text,
+    });
+    if (updated?.text !== text) {
+      return { error: 'El servidor no guardó el cambio.', done: null };
+    }
+  } catch (error) {
+    return { error: describe(error, 'No se pudo editar el paso.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'updated' };
+}
+
 export async function deleteChecklistItemAction(
   _prev: TaskState,
   formData: FormData,

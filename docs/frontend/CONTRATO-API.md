@@ -1221,6 +1221,7 @@ una: quien trabaja solo tiene la suya, de un asiento.
 |---|---|---|---|
 | POST | `/tasks/:taskId/checklists` | `{ text, order? }` | `canEditTask` |
 | POST | `/tasks/:taskId/checklists/:id/toggle` | — | `canMoveTask` ⚠️ |
+| PATCH | `/tasks/:taskId/checklists/:id` | `{ text }` (1–500) | `canEditTask` |
 | DELETE | `/tasks/:taskId/checklists/:id` | — | `canEditTask` |
 
 ⚠️ **Marcar un paso pide `canMoveTask`, no `canEditTask`:** marcarlo es ejecutar

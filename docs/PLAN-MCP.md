@@ -493,3 +493,7 @@ devolvían sus valores en `fieldValues`.
 
 **2026-10-08**: `add_task_link` (write) y `delete_task_link` (delete), los
 enlaces de una tarea. **55 herramientas.**
+
+**2026-10-11**: `update_checklist_item` (write): cambia el texto de un punto del checklist
+(`PATCH /tasks/:taskId/checklists/:id`, `canEditTask`; marcar sigue siendo `toggle_checklist_item`).
+**56 herramientas.**

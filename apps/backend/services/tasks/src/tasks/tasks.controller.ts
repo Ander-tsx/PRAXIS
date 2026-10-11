@@ -32,6 +32,7 @@ import {
   RestatusTasksDto,
   SetTaskFieldValueDto,
   ToggleChecklistDto,
+  UpdateChecklistDto,
   UpdateCommentDto,
   UpdateCustomFieldDto,
   UpdateLabelDto,
@@ -321,6 +322,11 @@ export class TasksController {
   @MessagePattern({ cmd: 'checklist_toggle' })
   toggleChecklist(@Payload() dto: ToggleChecklistDto) {
     return this.tasksService.toggleChecklist(dto);
+  }
+
+  @MessagePattern({ cmd: 'checklist_update' })
+  updateChecklist(@Payload() dto: UpdateChecklistDto) {
+    return this.tasksService.updateChecklist(dto);
   }
 
   @MessagePattern({ cmd: 'checklist_delete' })

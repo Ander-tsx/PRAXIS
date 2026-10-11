@@ -601,6 +601,17 @@ export const MCP_TOOLS: readonly McpTool[] = [
     call: { method: 'POST', path: '/tasks/{taskId}/checklists', body: ['text', 'order'] },
   },
   {
+    name: 'update_checklist_item',
+    description: 'Cambia el texto de un punto del checklist. Marcarlo es toggle_checklist_item.',
+    scope: 'write',
+    anchor: 'taskId',
+    inputSchema: object(
+      { taskId: id('Tarea'), itemId: id('Punto del checklist'), text: text('Texto', 500, 1) },
+      ['taskId', 'itemId', 'text'],
+    ),
+    call: { method: 'PATCH', path: '/tasks/{taskId}/checklists/{itemId}', body: ['text'] },
+  },
+  {
     name: 'toggle_checklist_item',
     description: 'Marca o desmarca un punto del checklist.',
     scope: 'write',

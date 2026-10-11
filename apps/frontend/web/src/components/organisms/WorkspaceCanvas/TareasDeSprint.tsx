@@ -13,6 +13,7 @@ import {
 } from '@praxis/commons';
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { DescripcionMarkdown } from '../TaskBoard/DescripcionMarkdown';
 import { rangoDeFechas } from './scrum';
 
 const api = createApiClient({ gatewayPath: '/api/gateway' });
@@ -100,7 +101,7 @@ export function TareasDeSprint({
           backlog.
         </p>
       ) : (
-        <div className="flex max-h-[60vh] flex-col gap-5 overflow-y-auto">
+        <div className="scrollbar-none flex max-h-[60vh] flex-col gap-5 overflow-y-auto">
           <Grupo
             titulo="Terminadas"
             tareas={hechas}
@@ -153,7 +154,7 @@ function Grupo({
                 type="button"
                 aria-expanded={desplegada}
                 onClick={() => onAbrir(desplegada ? null : t.id)}
-                className="flex w-full cursor-pointer items-center gap-3 py-2.5 text-left transition-colors hover:bg-white/[0.03]"
+                className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04]"
               >
                 <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary">
                   {t.title}
@@ -211,14 +212,14 @@ function Detalle({
   ];
 
   return (
-    <div className="flex flex-col gap-3 pb-4 pt-1">
-      <p className="whitespace-pre-wrap break-words font-sans text-sm text-text-primary">
+    <div className="flex flex-col gap-3 px-3 pb-4 pt-1">
+      <p className="whitespace-pre-wrap break-words font-sans text-sm font-medium text-text-primary">
         {tarea.title}
       </p>
+      {/* La descripción se escribe en Markdown: se enseña con el mismo visor de solo lectura que
+          el panel de la tarea, no como texto con asteriscos. */}
       {tarea.description ? (
-        <p className="whitespace-pre-wrap break-words font-sans text-sm text-text-secondary">
-          {tarea.description}
-        </p>
+        <DescripcionMarkdown key={tarea.id} initial={tarea.description} readOnly />
       ) : (
         <p className="font-sans text-xs italic text-text-secondary">Sin descripción.</p>
       )}

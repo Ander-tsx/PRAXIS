@@ -4,6 +4,7 @@ import {
   addChecklistItemAction,
   deleteChecklistItemAction,
   toggleChecklistItemAction,
+  updateChecklistItemAction,
 } from '@/app/(privado)/projects/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/projects/action-state';
 import {
@@ -15,7 +16,8 @@ import {
   colors,
   useAccion,
 } from '@praxis/commons';
-import { useEffect, useRef } from 'react';
+import { Pencil } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import {
   SECTION_BODY_CLASS,
   SECTION_CLASS,
@@ -180,7 +182,44 @@ function ChecklistRow({
     deleteChecklistItemAction,
     TASK_INITIAL_STATE,
   );
-  const error = toggleState.error ?? deleteState.error;
+  const [updateState, updateAction, updating] = useAccion(
+    updateChecklistItemAction,
+    TASK_INITIAL_STATE,
+  );
+  const [editando, setEditando] = useState(false);
+  const [borrador, setBorrador] = useState(text);
+  const error = toggleState.error ?? deleteState.error ?? updateState.error;
+
+  /* Al desmontarse el campo el navegador puede disparar un `blur` tardío con el cierre de antes:
+     sin esto, Enter guardaba dos veces y Escape —que cancela— acababa guardando. */
+  const edicionCerrada = useRef(true);
+
+  function empezarAEditar() {
+    setBorrador(text);
+    edicionCerrada.current = false;
+    setEditando(true);
+  }
+
+  /**
+   * Guarda y sale de la edición. Sin cambios, o vacío, solo sale: un paso vacío no existe (para
+   * quitarlo está la cruz), y mandar el mismo texto sería una petición para nada.
+   *
+   * ⚠️ Con `onSubmit` + `FormData` a mano y no `<form action>`: React 19 resetea los formularios
+   * de acción al terminar y el campo volvería al texto de antes de editar (ver CLAUDE.md).
+   */
+  function guardar() {
+    if (edicionCerrada.current) return;
+    edicionCerrada.current = true;
+    const nuevo = borrador.trim();
+    setEditando(false);
+    if (!nuevo || nuevo === text) return;
+    const datos = new FormData();
+    datos.set('projectId', projectId);
+    datos.set('taskId', taskId);
+    datos.set('itemId', itemId);
+    datos.set('text', nuevo);
+    updateAction(datos);
+  }
 
   return (
     <li className="group flex items-start gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-white/5">
@@ -222,15 +261,59 @@ function ChecklistRow({
         {/* El texto entero, partido en las líneas que haga falta: un paso puede ser una
             frase de varias líneas y cortarlo con «…» lo hacía ilegible (el `title` no
             existe en táctil). Lo hecho se apaga, además de tacharse. */}
-        <span
-          className={[
-            'min-w-0 flex-1 whitespace-pre-wrap break-words font-sans text-[13px] leading-snug',
-            completed ? 'text-text-secondary line-through' : 'text-white',
-          ].join(' ')}
-        >
-          {text}
-        </span>
+        {editando ? (
+          <textarea
+            // biome-ignore lint/a11y/noAutofocus: se entra a editar a propósito, y el foco es lo esperado
+            autoFocus
+            value={borrador}
+            onChange={(e) => setBorrador(e.target.value)}
+            onFocus={(e) => e.currentTarget.setSelectionRange(borrador.length, borrador.length)}
+            onBlur={guardar}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                guardar();
+              }
+              if (e.key === 'Escape') {
+                /* Solo cancela la edición: sin esto, Escape cerraría el panel de la tarea. */
+                e.preventDefault();
+                e.stopPropagation();
+                e.nativeEvent.stopImmediatePropagation();
+                edicionCerrada.current = true;
+                setBorrador(text);
+                setEditando(false);
+              }
+            }}
+            maxLength={500}
+            rows={Math.min(6, Math.max(1, Math.ceil(borrador.length / 48)))}
+            aria-label="Editar paso"
+            className="min-w-0 flex-1 resize-none rounded-md border border-white/[0.2] bg-white/[0.06] px-2 py-1 font-sans text-[13px] leading-snug text-white outline-none focus:border-primary/70"
+          />
+        ) : (
+          <span
+            onDoubleClick={canEdit ? empezarAEditar : undefined}
+            className={[
+              'min-w-0 flex-1 whitespace-pre-wrap break-words font-sans text-[13px] leading-snug',
+              completed ? 'text-text-secondary line-through' : 'text-white',
+            ].join(' ')}
+          >
+            {text}
+          </span>
+        )}
       </form>
+
+      {canEdit && !editando && (
+        <button
+          type="button"
+          onClick={empezarAEditar}
+          disabled={updating}
+          aria-label={`Editar «${text}»`}
+          title="Editar"
+          className="shrink-0 cursor-pointer rounded p-1 text-white opacity-0 transition-opacity hover:text-primary focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed [@media(hover:none)]:opacity-60"
+        >
+          <Pencil className="h-3 w-3" aria-hidden="true" />
+        </button>
+      )}
 
       {canEdit && (
         <form action={deleteAction} className="shrink-0">
