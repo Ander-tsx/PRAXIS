@@ -111,6 +111,11 @@ export const envValidationSchema = Joi.object({
    * `kyloo`: Kyloo Accounts es la única puerta y las rutas propias responden 403 `AUTH_DELEGATED`.
    */
   AUTH_MODE: Joi.string().valid('local', 'kyloo').default('local'),
+  /**
+   * Con `AUTH_MODE=kyloo`, deja abiertos contraseña y Google como red de seguridad si Kyloo falla
+   * (ver `ModoLocalORespaldoGuard`). `false` los cierra del todo.
+   */
+  AUTH_FALLBACK_LOCAL: Joi.string().valid('true', 'false').default('true'),
   /** La dirección pública del MCP, que es el `aud` de los tokens OAuth. */
   MCP_RESOURCE_URL: Joi.string().uri().optional().allow(''),
   /** Secreto compartido con Accounts para firmar sus llamadas internas (HMAC). 32+ caracteres. */

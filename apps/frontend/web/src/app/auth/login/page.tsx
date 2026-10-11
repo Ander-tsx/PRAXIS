@@ -41,13 +41,18 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   /** A dónde volver al terminar: `?next=` lo trae la propia pantalla, y Kyloo lo necesita ya en el primer salto. */
   const [destino, setDestino] = useState<string | undefined>();
+  /** Kyloo falló y esto es la red de seguridad: solo entrar, sin registro ni recuperación. */
+  const [enRespaldo, setEnRespaldo] = useState(false);
 
   /* Al volver de Kyloo con un fallo, la URL trae `?kyloo_error=<clave>` (ver
      `/auth/api/kyloo/callback`). Se lee tras montar porque en el servidor no
      hay `window`. */
   useEffect(() => {
     const clave = new URLSearchParams(window.location.search).get('kyloo_error');
-    if (clave) setGlobalError(ERRORES_KYLOO[clave] ?? ERRORES_KYLOO.error ?? '');
+    if (clave) {
+      setGlobalError(ERRORES_KYLOO[clave] ?? ERRORES_KYLOO.error ?? '');
+      setEnRespaldo(true);
+    }
     setDestino(destinoTrasEntrar());
   }, []);
 
@@ -177,22 +182,24 @@ export default function LoginPage() {
           </div>
         }
         footer={
-          <>
-            <Link
-              href="/auth/forgot-password"
-              className="font-medium text-primary hover:text-primary-hover underline underline-offset-2 transition-colors"
-            >
-              ¿Olvidaste tu contraseña?
-            </Link>
-            <span className="mx-2 text-text-secondary">·</span>
-            ¿No tienes cuenta?{' '}
-            <Link
-              href="/auth/signup"
-              className="font-medium text-primary hover:text-primary-hover underline underline-offset-2 transition-colors"
-            >
-              Crear cuenta
-            </Link>
-          </>
+          enRespaldo ? undefined : (
+            <>
+              <Link
+                href="/auth/forgot-password"
+                className="font-medium text-primary hover:text-primary-hover underline underline-offset-2 transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+              <span className="mx-2 text-text-secondary">·</span>
+              ¿No tienes cuenta?{' '}
+              <Link
+                href="/auth/signup"
+                className="font-medium text-primary hover:text-primary-hover underline underline-offset-2 transition-colors"
+              >
+                Crear cuenta
+              </Link>
+            </>
+          )
         }
       >
         <Input

@@ -26,7 +26,7 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from './jwt.guard';
-import { ModoLocalGuard } from './modo-local.guard';
+import { ModoLocalGuard, ModoLocalORespaldoGuard } from './modo-local.guard';
 
 /**
  * Apretón para las dos rutas donde adivinar sale a cuenta: 10 por minuto y por
@@ -80,7 +80,7 @@ export class AuthController {
   }
 
   @Post('login')
-  @UseGuards(ModoLocalGuard)
+  @UseGuards(ModoLocalORespaldoGuard)
   @HttpCode(HttpStatus.OK)
   @Throttle(LIMITE_AUTENTICACION)
   @ApiOperation({ summary: 'Iniciar sesión' })
@@ -219,7 +219,7 @@ export class AuthController {
   }
 
   @Post('google')
-  @UseGuards(ModoLocalGuard)
+  @UseGuards(ModoLocalORespaldoGuard)
   @HttpCode(HttpStatus.OK)
   /* Mismo apretón que login: aunque aquí no se adivinan contraseñas, cada
      intento obliga a verificar una firma y puede acabar creando una cuenta. */

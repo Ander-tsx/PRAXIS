@@ -103,6 +103,29 @@ Praxis /auth/api/kyloo/callback ◀── code ───────────
   por eso el salto se recuerda en `sessionStorage` por `sig`.
 - 🍎 `pkill -f "monolith/dist/main.js"` no mata nada: el proceso es `node … dist/main.js`. Se mata por `max-old-space-size=512 dist/main.js`.
 
+### Incidente del 2026-10-10 y red de seguridad (D10)
+
+Con `AUTH_MODE=kyloo` en producción **nadie podía entrar**: `ERR_TOO_MANY_REDIRECTS`. Tres causas encadenadas:
+
+1. 🔴 **El canje de código (`/oauth2/token`) tenía 60/min por IP, y todas las entradas salen de la
+   misma IP** —el servidor de Praxis—. Unas decenas de logins bastaban para el 429.
+2. 🔴 **El fallo del callback volvía a Kyloo en bucle**: `/auth/login?kyloo_error=…` → el proxy
+   redirigía a `/auth/api/kyloo/start` → Kyloo → callback falla → … Cada vuelta gastaba otro canje,
+   así que se alimentaba sola, y el tráfico acabó bloqueado por el **borde de Railway**
+   (`429 rate limited`, `server: railway-hikari`) para todo `accounts.kyloo.com.mx`.
+3. Praxis web seguía con la versión anterior (`prompt=login`) porque su deploy de las 15:01 había fallado.
+
+Se volvió atrás con `AUTH_MODE=local` (la vuelta atrás documentada) y se corrigió:
+límites de `/oauth2/token` y `/oauth2/userinfo` a 600/min, el proxy ya no redirige con `?kyloo_error`,
+y **D10: red de seguridad automática** — con `AUTH_MODE=kyloo`, contraseña y Google siguen abiertos en el
+gateway (`ModoLocalORespaldoGuard`; registro, verificación y recuperación, no). La pantalla los muestra
+**solo** si Kyloo falla (`?kyloo_error=`) o no responde (`/auth/api/kyloo/start` comprueba el
+`openid-configuration` con 4 s de margen), con aviso y sin enlaces de registro. `AUTH_FALLBACK_LOCAL=false` los cierra.
+Coste asumido: la contraseña solo existe en cuentas heredadas sin migrar (vincular borra el hash), el resto
+entra por Google, y por este camino no hay 2FA de Kyloo.
+
+⚠️ **No se vuelve a `AUTH_MODE=kyloo` hasta que `accounts.kyloo.com.mx` deje de dar 429 en el borde.**
+
 ### Pendiente
 
 - Verlo en un navegador (las pantallas de Kyloo con la marca Praxis, la PWA al salir y volver de Kyloo).

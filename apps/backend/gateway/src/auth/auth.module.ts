@@ -5,7 +5,7 @@ import { ClientsModule } from '@nestjs/microservices';
 import { clienteDeServicio } from '@praxis/local-transport';
 import { AuthController } from './auth.controller';
 import { JwtGuard } from './jwt.guard';
-import { ModoLocalGuard } from './modo-local.guard';
+import { ModoLocalGuard, ModoLocalORespaldoGuard } from './modo-local.guard';
 
 @Module({
   imports: [
@@ -32,7 +32,7 @@ import { ModoLocalGuard } from './modo-local.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [JwtGuard, ModoLocalGuard],
+  providers: [JwtGuard, ModoLocalGuard, ModoLocalORespaldoGuard],
   exports: [JwtGuard, JwtModule, ClientsModule],
 })
 export class AuthModule {}

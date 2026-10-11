@@ -20,6 +20,19 @@ import { type NextRequest, NextResponse } from 'next/server';
  * **navegación**, no un `fetch`: el botón es un enlace, que es lo que un
  * navegador sabe seguir hacia otro origen sin CORS.
  */
+/** ¿Contesta el servidor de Kyloo? Un fallo o más de 4 s se cuenta como caído. */
+async function kylooResponde(issuer: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${issuer}/.well-known/openid-configuration`, {
+      signal: AbortSignal.timeout(4000),
+      cache: 'no-store',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const origen = getPublicOrigin(request);
   const config = configKyloo();
@@ -32,6 +45,12 @@ export async function GET(request: NextRequest) {
   const canonico = origenCanonico(origen);
   if (canonico !== origen) {
     return NextResponse.redirect(`${canonico}/auth/api/kyloo/start${request.nextUrl.search}`, 303);
+  }
+
+  /* Si Kyloo no responde, no se manda a la persona a una pantalla de error del navegador: se
+     queda en Praxis con el aviso y el login de siempre (red de seguridad, solo entrar). */
+  if (!(await kylooResponde(config.issuer))) {
+    return NextResponse.redirect(new URL('/auth/login?kyloo_error=no_disponible', origen), 303);
   }
 
   const next = rutaSegura(request.nextUrl.searchParams.get('next'));

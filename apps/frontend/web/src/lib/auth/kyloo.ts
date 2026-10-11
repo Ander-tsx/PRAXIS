@@ -170,7 +170,8 @@ export const opcionesCookieIntento = {
 
 /** Mensajes de la pantalla de entrada según `?kyloo_error=`. */
 export const ERRORES_KYLOO: Record<string, string> = {
-  no_disponible: 'La entrada con Kyloo no está disponible ahora mismo.',
+  no_disponible:
+    'Kyloo no responde ahora mismo. Entra con tu correo y contraseña de Praxis o con Google.',
   cancelado: 'Cancelaste la entrada con Kyloo.',
   intento_invalido: 'El intento de entrada caducó. Vuelve a pulsar «Continuar con Kyloo».',
   no_verificado: 'Kyloo no pudo verificar tu cuenta. Inténtalo de nuevo.',
@@ -178,5 +179,6 @@ export const ERRORES_KYLOO: Record<string, string> = {
     'Ya existe una cuenta de Praxis con este correo sin confirmar. Confírmala con el enlace que se te envió al registrarla y vuelve a intentarlo.',
   vinculada: 'Esa cuenta de Praxis ya está vinculada a otra cuenta de Kyloo.',
   limite: 'Demasiados intentos seguidos. Espera un minuto y vuelve a probar.',
-  error: 'No se pudo iniciar sesión con Kyloo.',
+  error:
+    'No se pudo iniciar sesión con Kyloo. Puedes entrar con tu correo y contraseña de Praxis o con Google.',
 };
