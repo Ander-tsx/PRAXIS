@@ -195,7 +195,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   if (SOLO_INVITADOS.has(pathname)) {
     if (!(await hasValidSessionToken(resolveToken(request, response)))) {
       const pantalla = PANTALLAS_DELEGADAS[pathname];
-      if (pantalla && entradaDelegada()) {
+      /* ⚠️ Con `kyloo_error` NO se vuelve a Kyloo: es el callback diciendo que el intento falló.
+         Redirigir de nuevo —como se hacía— cerraba un bucle sin fin (Kyloo → callback falla →
+         /auth/login → Kyloo…) que, además, gasta el límite de canjes de Kyloo y se alimenta solo.
+         La pantalla se muestra con su mensaje y el botón «Continuar con Kyloo». */
+      const fallaDeKyloo = request.nextUrl.searchParams.has('kyloo_error');
+      if (pantalla && entradaDelegada() && !fallaDeKyloo) {
         const salto = redirectToZone(
           request,
           rutaDeKyloo(pantalla, request.nextUrl.searchParams.get('next')),
