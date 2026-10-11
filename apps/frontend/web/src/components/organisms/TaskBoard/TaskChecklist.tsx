@@ -15,8 +15,9 @@ import {
   checklistProgress,
   colors,
   useAccion,
+  useEsMovil,
 } from '@praxis/commons';
-import { Pencil } from 'lucide-react';
+import { Pencil, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
   SECTION_BODY_CLASS,
@@ -186,6 +187,8 @@ function ChecklistRow({
     updateChecklistItemAction,
     TASK_INITIAL_STATE,
   );
+  const esMovil = useEsMovil();
+  const formularioDeMarcar = useRef<HTMLFormElement>(null);
   const [editando, setEditando] = useState(false);
   const [borrador, setBorrador] = useState(text);
   const error = toggleState.error ?? deleteState.error ?? updateState.error;
@@ -223,7 +226,11 @@ function ChecklistRow({
 
   return (
     <li className="group flex items-start gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-white/5">
-      <form action={toggleAction} className="flex min-w-0 flex-1 items-start gap-2.5">
+      <form
+        ref={formularioDeMarcar}
+        action={toggleAction}
+        className="flex min-w-0 flex-1 items-start gap-2.5"
+      >
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="taskId" value={taskId} />
         <input type="hidden" name="itemId" value={itemId} />
@@ -290,10 +297,19 @@ function ChecklistRow({
             className="min-w-0 flex-1 resize-none rounded-md border border-white/[0.2] bg-white/[0.06] px-2 py-1 font-sans text-[13px] leading-snug text-white outline-none focus:border-primary/70"
           />
         ) : (
+          // biome-ignore lint/a11y/useKeyWithClickEvents: ampliar la zona de toque en móvil; con teclado se marca con el botón de al lado, que ya es accesible
           <span
             onDoubleClick={canEdit ? empezarAEditar : undefined}
+            /* En móvil el paso entero es la zona de toque —no solo el cuadradito de 18 px—, con
+               el alto de un dedo. En escritorio el texto no marca: el doble clic lo edita. */
+            onClick={
+              esMovil && canToggle && !toggling
+                ? () => formularioDeMarcar.current?.requestSubmit()
+                : undefined
+            }
             className={[
               'min-w-0 flex-1 whitespace-pre-wrap break-words font-sans text-[13px] leading-snug',
+              esMovil && canToggle ? 'min-h-8 cursor-pointer py-1.5' : '',
               completed ? 'text-text-secondary line-through' : 'text-white',
             ].join(' ')}
           >
@@ -309,9 +325,9 @@ function ChecklistRow({
           disabled={updating}
           aria-label={`Editar «${text}»`}
           title="Editar"
-          className="shrink-0 cursor-pointer rounded p-1 text-white opacity-0 transition-opacity hover:text-primary focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed [@media(hover:none)]:opacity-60"
+          className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-white opacity-0 transition-opacity hover:bg-white/10 hover:text-primary focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed [@media(hover:none)]:opacity-60"
         >
-          <Pencil className="h-3 w-3" aria-hidden="true" />
+          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
       )}
 
@@ -327,18 +343,9 @@ function ChecklistRow({
             title="Eliminar"
             /* Aparece al pasar por encima, pero con foco también: si no, con
                teclado sería invisible e inalcanzable. */
-            className="cursor-pointer rounded p-1 text-white opacity-0 transition-opacity hover:text-error focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed [@media(hover:none)]:opacity-60"
+            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-white opacity-0 transition-opacity hover:bg-white/10 hover:text-error focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed [@media(hover:none)]:opacity-60"
           >
-            <svg
-              className="h-3 w-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </form>
       )}

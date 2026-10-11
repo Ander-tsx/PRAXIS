@@ -12,7 +12,7 @@ import {
   displayName,
 } from '@praxis/commons';
 import { ChevronDown } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { DescripcionMarkdown } from '../TaskBoard/DescripcionMarkdown';
 import { rangoDeFechas } from './scrum';
 
@@ -154,7 +154,9 @@ function Grupo({
                 type="button"
                 aria-expanded={desplegada}
                 onClick={() => onAbrir(desplegada ? null : t.id)}
-                className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04]"
+                className={`flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04] ${
+                  desplegada ? 'bg-white/[0.06]' : ''
+                }`}
               >
                 <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary">
                   {t.title}
@@ -212,33 +214,39 @@ function Detalle({
   ];
 
   return (
-    <div className="flex flex-col gap-3 px-3 pb-4 pt-1">
-      <p className="whitespace-pre-wrap break-words font-sans text-sm font-medium text-text-primary">
+    /* El interior de la tarea: un bloque aparte, sangrado y con borde de acento, para que se
+       lea de un vistazo qué es de la tarea y qué es la lista que la contiene. */
+    <div className="mb-3 ml-5 mt-1 flex flex-col gap-4 rounded-xl border border-l-2 border-white/10 border-l-primary/70 bg-black/25 p-4">
+      <p className="whitespace-pre-wrap break-words font-sans text-[15px] font-semibold leading-snug text-text-primary">
         {tarea.title}
       </p>
-      {/* La descripción se escribe en Markdown: se enseña con el mismo visor de solo lectura que
-          el panel de la tarea, no como texto con asteriscos. */}
-      {tarea.description ? (
-        <DescripcionMarkdown key={tarea.id} initial={tarea.description} readOnly />
-      ) : (
-        <p className="font-sans text-xs italic text-text-secondary">Sin descripción.</p>
-      )}
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-sans text-xs">
-        {filas
-          .filter(([, valor]) => valor)
-          .map(([clave, valor]) => (
-            <div key={clave} className="contents">
-              <dt className="text-text-secondary">{clave}</dt>
-              <dd className="text-text-primary">{valor}</dd>
-            </div>
-          ))}
-      </dl>
+
+      <SeccionDeDetalle titulo="Descripción">
+        {/* Se escribe en Markdown: se enseña con el mismo visor de solo lectura que el panel de
+            la tarea, no como texto con asteriscos. */}
+        {tarea.description ? (
+          <DescripcionMarkdown key={tarea.id} initial={tarea.description} readOnly />
+        ) : (
+          <p className="font-sans text-xs italic text-text-secondary">Sin descripción.</p>
+        )}
+      </SeccionDeDetalle>
+
+      <SeccionDeDetalle titulo="Datos">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 font-sans text-xs">
+          {filas
+            .filter(([, valor]) => valor)
+            .map(([clave, valor]) => (
+              <div key={clave} className="contents">
+                <dt className="text-text-secondary">{clave}</dt>
+                <dd className="text-text-primary">{valor}</dd>
+              </div>
+            ))}
+        </dl>
+      </SeccionDeDetalle>
+
       {tarea.checklists.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <span className="font-sans text-xs text-text-secondary">
-            Checklist · {hechos}/{tarea.checklists.length}
-          </span>
-          <ul className="flex flex-col gap-0.5">
+        <SeccionDeDetalle titulo={`Checklist · ${hechos}/${tarea.checklists.length}`}>
+          <ul className="flex flex-col gap-1">
             {tarea.checklists.map((c) => (
               <li
                 key={c.id}
@@ -250,13 +258,27 @@ function Detalle({
               </li>
             ))}
           </ul>
-        </div>
+        </SeccionDeDetalle>
       )}
+
       {tarea.comments.length > 0 && (
-        <span className="font-sans text-xs text-text-secondary">
-          {tarea.comments.length} {tarea.comments.length === 1 ? 'nota' : 'notas'}
-        </span>
+        <SeccionDeDetalle titulo="Notas">
+          <span className="font-sans text-xs text-text-primary">
+            {tarea.comments.length} {tarea.comments.length === 1 ? 'nota' : 'notas'}
+          </span>
+        </SeccionDeDetalle>
       )}
     </div>
+  );
+}
+
+function SeccionDeDetalle({ titulo, children }: { titulo: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-1.5">
+      <h5 className="font-sans text-[10px] font-semibold uppercase tracking-[0.12em] text-text-secondary">
+        {titulo}
+      </h5>
+      {children}
+    </section>
   );
 }
