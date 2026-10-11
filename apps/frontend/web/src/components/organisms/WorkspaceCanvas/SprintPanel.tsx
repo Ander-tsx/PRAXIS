@@ -38,6 +38,8 @@ export interface SprintPanelProps {
   onEmpezar: () => void;
   onCerrarSprint: () => void;
   onDescartar: () => void;
+  /** Abre las tareas de un sprint cerrado (de solo lectura). */
+  onVerTareas: (sprint: Sprint) => void;
 }
 
 /**
@@ -71,6 +73,7 @@ export function SprintPanel({
   onEmpezar,
   onCerrarSprint,
   onDescartar,
+  onVerTareas,
 }: SprintPanelProps) {
   const enCurso = sprint.status === 'ACTIVE';
   const dias = enCurso ? diasRestantes(sprint) : null;
@@ -108,7 +111,12 @@ export function SprintPanel({
           />
           {enCurso && <Progreso sprint={sprint} metricas={metricas} unidad={unidad} />}
           <PorPersona tareas={tareas} unidad={unidad} usersById={usersById} />
-          <Anteriores sprints={sprints} metricas={metricas} unidad={unidad} />
+          <Anteriores
+            sprints={sprints}
+            metricas={metricas}
+            unidad={unidad}
+            onVerTareas={onVerTareas}
+          />
 
           {canManageSprint && (
             <div className="flex flex-wrap gap-2 border-t border-border pt-6">
@@ -401,10 +409,12 @@ function Anteriores({
   sprints,
   metricas,
   unidad,
+  onVerTareas,
 }: {
   sprints: Sprint[];
   metricas: SprintMetrics;
   unidad: Unidad;
+  onVerTareas: (sprint: Sprint) => void;
 }) {
   const cerrados = useMemo(() => sprintsCerrados(sprints), [sprints]);
   const velocidad = useMemo(
@@ -470,6 +480,13 @@ function Anteriores({
                   .filter(Boolean)
                   .join(' · ')}
               </p>
+              <button
+                type="button"
+                onClick={() => onVerTareas(s)}
+                className="w-fit cursor-pointer font-sans text-xs text-text-primary underline underline-offset-2 transition-colors hover:text-text-secondary"
+              >
+                Ver tareas
+              </button>
             </li>
           );
         })}

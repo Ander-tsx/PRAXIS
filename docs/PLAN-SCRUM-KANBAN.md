@@ -1000,3 +1000,13 @@ quitó; el backlog, en cambio, no pinta su contenido cerrado.
 - ⚠️ **`biome check --write` sobre una carpeta entera reformatea archivos
   ajenos.** Se pasa solo sobre los archivos tocados.
 
+### Registro — 2026-10-11: «Ver tareas» de un sprint cerrado
+
+S15 prometía un sprint cerrado «navegable» y solo se entregó el resumen del cierre: **ninguna pantalla
+listaba las tareas de un sprint cerrado** (Kanban, Tabla y Calendario cargan solo el sprint en curso y el
+backlog; «Todo» es eso, no el historial). Ahora cada sprint anterior, en el panel Sprint y en
+«Sprints anteriores» del menú del tablero, tiene **Ver tareas**: un diálogo de solo lectura
+(`TareasDeSprint`) que pide `GET /boards/:id/tasks?sprintId=…` **al abrir** —no con la página— y separa
+terminadas de sin terminar. ⚠️ Una tarea que no se terminó pasó al sprint siguiente, así que aquí solo
+están las que se quedaron en ese sprint.
+

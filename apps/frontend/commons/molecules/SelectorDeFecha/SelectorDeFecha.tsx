@@ -50,8 +50,9 @@ export interface SelectorDeFechaProps {
   /** Clases para el botón, detrás de las propias: la caja del panel de tarea. */
   className?: string;
   /**
-   * «12 oct 2026» en vez de «12 de octubre de 2026»: para una columna estrecha,
-   * donde la forma larga se partía en dos líneas.
+   * «12 oct 2026» en vez de «12 de octubre de 2026». **Es lo predeterminado en todos los
+   * selectores de la aplicación**: la forma larga se partía en dos líneas en cualquier columna
+   * estrecha y no aportaba nada. `corto={false}` la recupera.
    */
   corto?: boolean;
 }
@@ -145,7 +146,7 @@ export function SelectorDeFecha({
   align = 'left',
   hideLabel = false,
   className = '',
-  corto = false,
+  corto = true,
 }: SelectorDeFechaProps) {
   const [valor, setValor] = useState(defaultValue);
   const [abierto, setAbierto] = useState(false);
