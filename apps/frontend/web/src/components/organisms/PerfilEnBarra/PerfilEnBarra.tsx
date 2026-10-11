@@ -6,9 +6,9 @@ import {
   useGoogleAvatarAction,
 } from '@/app/(privado)/main/profile/actions';
 import { Avatar, olvidarDatosSinConexion, useEsMovil } from '@praxis/commons';
-import { Camera, ImageUp, Loader2, LogOut, Mail } from 'lucide-react';
+import { Camera, ImageUp, Loader2, LogOut, Mail, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PresencePicker } from '../PresencePicker';
 
 export interface PerfilEnBarraProps {
@@ -28,9 +28,6 @@ const CAMPO =
 /* En móvil, 16 px: con menos, Safari amplía la página al enfocar el campo. */
 const CAMPO_MOVIL =
   'min-h-11 w-full rounded-xl bg-white/5 px-3.5 font-sans text-base text-white ring-1 ring-inset ring-white/10 placeholder:text-text-secondary focus:outline-none focus:ring-white/35 disabled:opacity-60';
-
-const BOTON_DE_FOTO =
-  'flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-white/5 px-2 font-sans font-medium text-text-primary transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50';
 
 const FILA =
   'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left font-sans text-[13px] font-medium transition-colors';
@@ -78,6 +75,18 @@ export function PerfilEnBarra({
   const [saliendo, setSaliendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fotoLocal, setFotoLocal] = useState<string | null>(null);
+  /** El menú del lápiz, solo cuando hay dos formas de poner la foto. */
+  const [menuDeFoto, setMenuDeFoto] = useState(false);
+  const fotoRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuDeFoto) return;
+    const fuera = (e: PointerEvent) => {
+      if (!fotoRef.current?.contains(e.target as Node)) setMenuDeFoto(false);
+    };
+    document.addEventListener('pointerdown', fuera);
+    return () => document.removeEventListener('pointerdown', fuera);
+  }, [menuDeFoto]);
 
   const etiqueta = nombre.trim() || email;
   const hayCambios =
@@ -155,12 +164,72 @@ export function PerfilEnBarra({
     >
       {/* ── Foto y quién eres ───────────────────────────────────── */}
       <div className="flex items-center gap-3">
-        <div className="relative shrink-0">
+        <div ref={fotoRef} className="relative shrink-0">
           <Avatar label={etiqueta} mine size="xl" src={fotoLocal ?? avatarSrc} />
           {subiendoFoto && (
             <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60">
               <Loader2 className="h-4 w-4 animate-spin text-white" aria-hidden="true" />
             </span>
+          )}
+          <input
+            ref={archivoRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            tabIndex={-1}
+            onChange={(e) => {
+              const archivo = e.target.files?.[0];
+              e.target.value = '';
+              if (archivo) void subirFoto(archivo);
+            }}
+          />
+          {/* Un lápiz sobre la foto. Con la foto de Google a mano abre un menú de dos
+              opciones; sin ella, va directo a elegir un archivo. */}
+          <button
+            type="button"
+            aria-label="Cambiar foto"
+            aria-haspopup={googleAvatarSrc ? 'menu' : undefined}
+            aria-expanded={googleAvatarSrc ? menuDeFoto : undefined}
+            disabled={subiendoFoto}
+            onClick={() =>
+              googleAvatarSrc ? setMenuDeFoto((v) => !v) : archivoRef.current?.click()
+            }
+            className={`absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full bg-[#2a2a2a] text-white ring-2 ring-[#1c1c1c] transition-colors hover:bg-[#3a3a3a] disabled:opacity-50 ${
+              esMovil ? 'h-8 w-8' : 'h-6 w-6'
+            }`}
+          >
+            <Pencil className={esMovil ? 'h-3.5 w-3.5' : 'h-3 w-3'} aria-hidden="true" />
+          </button>
+          {menuDeFoto && googleAvatarSrc && (
+            <div
+              role="menu"
+              className="absolute left-0 top-full z-10 mt-2 flex w-44 flex-col gap-0.5 rounded-xl border border-white/10 bg-[#252525] p-1 shadow-xl"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuDeFoto(false);
+                  archivoRef.current?.click();
+                }}
+                className={`${FILA} text-text-primary hover:bg-white/10 hover:text-white`}
+              >
+                <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+                Subir foto
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuDeFoto(false);
+                  void volverAGoogle();
+                }}
+                className={`${FILA} text-text-primary hover:bg-white/10 hover:text-white`}
+              >
+                <ImageUp className="h-3.5 w-3.5" aria-hidden="true" />
+                Usar la de Google
+              </button>
+            </div>
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -181,42 +250,6 @@ export function PerfilEnBarra({
             <span className="truncate">{email}</span>
           </p>
         </div>
-      </div>
-
-      {/* Las dos formas de poner la foto, aplicadas al instante. */}
-      <div className="flex gap-1.5">
-        <input
-          ref={archivoRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="sr-only"
-          tabIndex={-1}
-          onChange={(e) => {
-            const archivo = e.target.files?.[0];
-            e.target.value = '';
-            if (archivo) void subirFoto(archivo);
-          }}
-        />
-        <button
-          type="button"
-          onClick={() => archivoRef.current?.click()}
-          disabled={subiendoFoto}
-          className={`${BOTON_DE_FOTO} ${esMovil ? 'min-h-11 rounded-xl text-[14px]' : 'min-h-8 text-[12px]'}`}
-        >
-          <Camera className="h-3.5 w-3.5" aria-hidden="true" />
-          Subir foto
-        </button>
-        {googleAvatarSrc && (
-          <button
-            type="button"
-            onClick={() => void volverAGoogle()}
-            disabled={subiendoFoto}
-            className={`${BOTON_DE_FOTO} ${esMovil ? 'min-h-11 rounded-xl text-[14px]' : 'min-h-8 text-[12px]'}`}
-          >
-            <ImageUp className="h-3.5 w-3.5" aria-hidden="true" />
-            Usar la de Google
-          </button>
-        )}
       </div>
 
       {/* ── Nombre y apellidos ──────────────────────────────────── */}

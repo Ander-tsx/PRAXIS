@@ -212,6 +212,7 @@ export function SprintStrip({
       <TareasDeSprint
         sprint={sprintAbierto}
         board={board}
+        usersById={usersById}
         onCerrar={() => setSprintAbierto(null)}
       />
 

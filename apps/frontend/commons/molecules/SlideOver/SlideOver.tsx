@@ -38,6 +38,12 @@ export interface SlideOverProps {
    * botón o con Escape.
    */
   closeOnOutsideClick?: boolean;
+  /**
+   * Se pregunta en cada clic fuera, y con `true` ese clic **no** cierra el panel. Para el
+   * backlog: soltar una tarea en el tablero también genera un clic fuera, y cerrarlo ahí
+   * rompería justo el gesto para el que existe.
+   */
+  ignorarClicFuera?: () => boolean;
   /** Nombre accesible del panel, para lectores de pantalla y pruebas. */
   ariaLabel?: string;
 }
@@ -121,6 +127,7 @@ export function SlideOver({
   size = 'md',
   tone = 'default',
   closeOnOutsideClick = true,
+  ignorarClicFuera,
   ariaLabel,
 }: SlideOverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -189,6 +196,7 @@ export function SlideOver({
 
     const handleGlobalClick = (event: MouseEvent) => {
       if (!closeOnOutsideClick || !esLaDeEncima()) return;
+      if (ignorarClicFuera?.()) return;
       const target = event.target as Node;
       if (!document.contains(target)) return;
       if (panelRef.current && panelRef.current.contains(target)) return;
@@ -212,7 +220,7 @@ export function SlideOver({
       document.removeEventListener('click', handleGlobalClick);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open, onClose, closeOnOutsideClick]);
+  }, [open, onClose, closeOnOutsideClick, ignorarClicFuera]);
 
   /**
    * Entrar y salir de la pila, **solo cuando cambia `open`**. Estaba en el

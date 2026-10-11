@@ -12,7 +12,7 @@ import {
   colors,
   useAccion,
 } from '@praxis/commons';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ColumnTasks } from '../TaskBoard/ColumnTasks';
 import type { ArrastreEnCurso, DestinoDeTarea, Disposicion } from '../TaskBoard/arrastre';
 import { BACKLOG } from './scrum';
@@ -67,8 +67,8 @@ export interface BacklogPanelProps {
  * - se **lleva** al sprint soltándola en una columna, y se devuelve soltándola
  *   aquí.
  *
- * No se cierra al hacer clic fuera: soltar una tarea en el tablero es un clic
- * fuera, y cerrarse ahí rompería justo el gesto para el que existe.
+ * Se cierra al hacer clic fuera, **salvo el que termina un arrastre**: soltar una tarea en el
+ * tablero también es un clic fuera, y cerrarse ahí rompería justo el gesto para el que existe.
  */
 export function BacklogPanel({
   abierto,
@@ -82,6 +82,26 @@ export function BacklogPanel({
   ...resto
 }: BacklogPanelProps) {
   const [busqueda, setBusqueda] = useState('');
+
+  /* Soltar una tarea en el tablero genera un clic fuera, y no debe cerrar el panel. Se ignora
+     mientras dura el arrastre y un instante después: el clic llega tras el `pointerup`, a
+     veces antes de que React haya vuelto a pintar sin arrastre. */
+  const arrastrando = resto.arrastre !== null;
+  const huboArrastre = useRef(false);
+  const finDelArrastre = useRef(0);
+  useEffect(() => {
+    if (arrastrando) {
+      huboArrastre.current = true;
+    } else if (huboArrastre.current) {
+      huboArrastre.current = false;
+      finDelArrastre.current = Date.now();
+    }
+  }, [arrastrando]);
+  const ignorarClicFuera = useCallback(
+    () => huboArrastre.current || Date.now() - finDelArrastre.current < 400,
+    [],
+  );
+
   const termino = busqueda.trim().toLowerCase();
   const visibles = useMemo(
     () => (termino ? tareas.filter((t) => t.title.toLowerCase().includes(termino)) : tareas),
@@ -123,7 +143,9 @@ export function BacklogPanel({
          distintas el que queda debajo no cubre entero al que se abre encima. */
       size="lg"
       tone="dark"
-      closeOnOutsideClick={false}
+      /* Se cierra al hacer clic fuera, salvo el que cierra un arrastre: soltar una tarea en
+         el tablero también es un clic fuera y tiene que dejar el panel como está. */
+      ignorarClicFuera={ignorarClicFuera}
       ariaLabel="Backlog del tablero"
     >
       {/* Cerrado, el panel sigue montado para animar la entrada, pero **sin

@@ -130,7 +130,7 @@ test('la app registra siempre /sw.js, sin versión en la URL (D6)', async ({ pag
   expect(new URL(script).search).toBe('');
 });
 
-test('una versión nueva espera a que se pulse «Actualizar» (D6)', async ({ page }) => {
+test('una versión nueva se aplica sola, sin aviso (D6)', async ({ page }) => {
   await page.goto('/auth/login');
   await conServiceWorker(page);
 
@@ -138,33 +138,21 @@ test('una versión nueva espera a que se pulse «Actualizar» (D6)', async ({ pa
    * Un despliegue de verdad cambia los bytes de `/sw.js`, pero Playwright no
    * puede interceptar la descarga del propio script del SW para fingirlo. Lo
    * más parecido: registrar el mismo SW con otra URL en el mismo ámbito. Para
-   * el navegador es un SW nuevo y recorre el mismo camino —instalar, esperar,
-   * activar al pedirlo—, que es lo que se comprueba aquí.
+   * el navegador es un SW nuevo y recorre el mismo camino —instalar, activar—.
    */
-  await page.evaluate(() => navigator.serviceWorker.register('/sw.js?simulacro=1', { scope: '/' }));
-
-  const aviso = page.getByText('Hay una versión nueva');
-  await expect(aviso).toBeVisible();
-
-  /* Esperando no manda: nada se recarga hasta que se pide. */
   await page.evaluate(() => {
     (window as unknown as { __sigue: boolean }).__sigue = true;
   });
-  await page.waitForTimeout(1500);
-  expect(await page.evaluate(() => (window as unknown as { __sigue?: boolean }).__sigue)).toBe(
-    true,
-  );
-
   await Promise.all([
     page.waitForEvent('load'),
-    page.getByRole('button', { name: 'Actualizar' }).click(),
+    page.evaluate(() => navigator.serviceWorker.register('/sw.js?simulacro=1', { scope: '/' })),
   ]);
-  /* Recargó, y quien manda ahora es el nuevo. (Tras recargar, la app vuelve a
-     registrar `/sw.js` y el simulacro queda como «viejo»: eso solo pasa por la
-     URL inventada de esta prueba, no en un despliegue.) */
+
+  /* Recargó sin que nadie pulsara nada, y no hay ningún aviso que pulsar. */
   expect(await page.evaluate(() => (window as unknown as { __sigue?: boolean }).__sigue)).toBe(
     undefined,
   );
+  await expect(page.getByText('Hay una versión nueva')).toHaveCount(0);
   await page.waitForFunction(() =>
     navigator.serviceWorker.controller?.scriptURL.includes('simulacro=1'),
   );

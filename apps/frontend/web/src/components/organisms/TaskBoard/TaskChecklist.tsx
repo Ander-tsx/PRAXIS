@@ -98,7 +98,7 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
         )}
 
         {task.checklists.length > 0 && (
-          <ul className="flex flex-col gap-1">
+          <ul className="flex flex-col gap-0.5">
             {task.checklists.map((item) => (
               <ChecklistRow
                 key={item.id}
@@ -183,8 +183,8 @@ function ChecklistRow({
   const error = toggleState.error ?? deleteState.error;
 
   return (
-    <li className="group flex items-center gap-2 rounded-lg px-1 py-0.5 transition-colors hover:bg-white/5">
-      <form action={toggleAction} className="flex min-w-0 flex-1 items-center gap-2">
+    <li className="group flex items-start gap-2 rounded-lg px-1 py-1 transition-colors hover:bg-white/5">
+      <form action={toggleAction} className="flex min-w-0 flex-1 items-start gap-2.5">
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="taskId" value={taskId} />
         <input type="hidden" name="itemId" value={itemId} />
@@ -198,7 +198,7 @@ function ChecklistRow({
           disabled={!canToggle || toggling}
           aria-pressed={completed}
           aria-label={completed ? `Desmarcar «${text}»` : `Marcar «${text}»`}
-          className="flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-not-allowed"
+          className="mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-not-allowed"
           style={{
             borderColor: completed ? colors.success : 'rgba(255,255,255,0.2)',
             background: completed ? alpha(colors.success, 25) : 'transparent',
@@ -219,12 +219,14 @@ function ChecklistRow({
           )}
         </button>
 
+        {/* El texto entero, partido en las líneas que haga falta: un paso puede ser una
+            frase de varias líneas y cortarlo con «…» lo hacía ilegible (el `title` no
+            existe en táctil). Lo hecho se apaga, además de tacharse. */}
         <span
           className={[
-            'min-w-0 flex-1 truncate font-sans text-xs',
-            completed ? 'text-white line-through' : 'text-white',
+            'min-w-0 flex-1 whitespace-pre-wrap break-words font-sans text-[13px] leading-snug',
+            completed ? 'text-text-secondary line-through' : 'text-white',
           ].join(' ')}
-          title={text}
         >
           {text}
         </span>
@@ -242,7 +244,7 @@ function ChecklistRow({
             title="Eliminar"
             /* Aparece al pasar por encima, pero con foco también: si no, con
                teclado sería invisible e inalcanzable. */
-            className="cursor-pointer rounded p-1 text-white opacity-0 transition-opacity hover:text-error focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
+            className="cursor-pointer rounded p-1 text-white opacity-0 transition-opacity hover:text-error focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed [@media(hover:none)]:opacity-60"
           >
             <svg
               className="h-3 w-3"

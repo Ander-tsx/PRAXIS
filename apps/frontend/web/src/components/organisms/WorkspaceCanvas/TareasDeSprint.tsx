@@ -7,8 +7,11 @@ import {
   type Paginated,
   type Sprint,
   type Task,
+  type UserProfile,
   createApiClient,
+  displayName,
 } from '@praxis/commons';
+import { ChevronDown } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { rangoDeFechas } from './scrum';
 
@@ -17,11 +20,11 @@ const api = createApiClient({ gatewayPath: '/api/gateway' });
 /** Un sprint cerrado no pasa de unos cientos de tareas; el tope del gateway es 1000. */
 const LIMITE = 1000;
 
-/** «12 oct»: la misma forma abreviada de los selectores de fecha. */
+/** «12 oct 2026»: la misma forma abreviada de los selectores de fecha. */
 function diaCorto(iso: string): string {
-  return new Date(iso)
-    .toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
-    .replace('.', '');
+  const d = new Date(iso);
+  const mes = d.toLocaleDateString('es-MX', { month: 'short' }).replace('.', '');
+  return `${d.getDate()} ${mes} ${d.getFullYear()}`;
 }
 
 /**
@@ -37,15 +40,20 @@ function diaCorto(iso: string): string {
 export function TareasDeSprint({
   sprint,
   board,
+  usersById,
   onCerrar,
 }: {
   /** El sprint a mostrar, o `null` con el diálogo cerrado. */
   sprint: Sprint | null;
   board: Board;
+  /** Para nombrar a los encargados. Sin él, solo se cuenta cuántos eran. */
+  usersById?: Map<string, UserProfile>;
   onCerrar: () => void;
 }) {
   const [tareas, setTareas] = useState<Task[] | null>(null);
   const [error, setError] = useState(false);
+  /** Una sola desplegada a la vez. */
+  const [abierta, setAbierta] = useState<string | null>(null);
   const id = sprint?.id ?? null;
 
   useEffect(() => {
@@ -53,6 +61,7 @@ export function TareasDeSprint({
     let vigente = true;
     setTareas(null);
     setError(false);
+    setAbierta(null);
     api
       .get<Paginated<Task>>(`/boards/${board.id}/tasks?sprintId=${id}&limit=${LIMITE}`)
       .then((page) => {
@@ -92,8 +101,22 @@ export function TareasDeSprint({
         </p>
       ) : (
         <div className="flex max-h-[60vh] flex-col gap-5 overflow-y-auto">
-          <Grupo titulo="Terminadas" tareas={hechas} columnas={columnas} />
-          <Grupo titulo="Sin terminar" tareas={otras} columnas={columnas} />
+          <Grupo
+            titulo="Terminadas"
+            tareas={hechas}
+            columnas={columnas}
+            usersById={usersById}
+            abierta={abierta}
+            onAbrir={setAbierta}
+          />
+          <Grupo
+            titulo="Sin terminar"
+            tareas={otras}
+            columnas={columnas}
+            usersById={usersById}
+            abierta={abierta}
+            onAbrir={setAbierta}
+          />
         </div>
       )}
     </Dialog>
@@ -104,10 +127,16 @@ function Grupo({
   titulo,
   tareas,
   columnas,
+  usersById,
+  abierta,
+  onAbrir,
 }: {
   titulo: string;
   tareas: Task[];
   columnas: Map<string, string>;
+  usersById?: Map<string, UserProfile>;
+  abierta: string | null;
+  onAbrir: (id: string | null) => void;
 }) {
   if (tareas.length === 0) return null;
   return (
@@ -116,27 +145,117 @@ function Grupo({
         {titulo} <span className="tabular-nums">· {tareas.length}</span>
       </h4>
       <ul className="flex flex-col">
-        {tareas.map((t) => (
-          <li
-            key={t.id}
-            className="flex items-baseline justify-between gap-3 border-b border-border py-2.5 last:border-b-0"
-          >
-            <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary">
-              {t.title}
-            </span>
-            <span className="shrink-0 font-sans text-xs tabular-nums text-text-secondary">
-              {[
-                columnas.get(t.columnId),
-                PRIORITY_LABELS[t.priority],
-                t.estimatePoints !== null && `${t.estimatePoints} pt`,
-                t.completedAt && diaCorto(t.completedAt),
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </span>
-          </li>
-        ))}
+        {tareas.map((t) => {
+          const desplegada = abierta === t.id;
+          return (
+            <li key={t.id} className="border-b border-border last:border-b-0">
+              <button
+                type="button"
+                aria-expanded={desplegada}
+                onClick={() => onAbrir(desplegada ? null : t.id)}
+                className="flex w-full cursor-pointer items-center gap-3 py-2.5 text-left transition-colors hover:bg-white/[0.03]"
+              >
+                <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary">
+                  {t.title}
+                </span>
+                <span className="shrink-0 font-sans text-xs tabular-nums text-text-secondary">
+                  {[columnas.get(t.columnId), t.completedAt && diaCorto(t.completedAt)]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-text-secondary transition-transform ${
+                    desplegada ? 'rotate-180' : ''
+                  }`}
+                  aria-hidden="true"
+                />
+              </button>
+              {desplegada && <Detalle tarea={t} columnas={columnas} usersById={usersById} />}
+            </li>
+          );
+        })}
       </ul>
     </section>
+  );
+}
+
+/** Lo que la tarea tenía al cerrarse el sprint, todo dentro del mismo diálogo. */
+function Detalle({
+  tarea,
+  columnas,
+  usersById,
+}: {
+  tarea: Task;
+  columnas: Map<string, string>;
+  usersById?: Map<string, UserProfile>;
+}) {
+  const encargados = tarea.assignees.map((a) => {
+    const usuario = usersById?.get(a.userId);
+    return usuario ? displayName(usuario) : null;
+  });
+  const hechos = tarea.checklists.filter((c) => c.completed).length;
+  const filas: [string, string | null][] = [
+    ['Columna', columnas.get(tarea.columnId) ?? null],
+    ['Prioridad', PRIORITY_LABELS[tarea.priority]],
+    ['Puntos', tarea.estimatePoints !== null ? String(tarea.estimatePoints) : null],
+    ['Fecha límite', tarea.dueDate ? diaCorto(tarea.dueDate) : null],
+    ['Terminada', tarea.completedAt ? diaCorto(tarea.completedAt) : null],
+    [
+      'Encargados',
+      tarea.assignees.length === 0
+        ? null
+        : encargados.every(Boolean)
+          ? encargados.join(', ')
+          : `${tarea.assignees.length}`,
+    ],
+  ];
+
+  return (
+    <div className="flex flex-col gap-3 pb-4 pt-1">
+      <p className="whitespace-pre-wrap break-words font-sans text-sm text-text-primary">
+        {tarea.title}
+      </p>
+      {tarea.description ? (
+        <p className="whitespace-pre-wrap break-words font-sans text-sm text-text-secondary">
+          {tarea.description}
+        </p>
+      ) : (
+        <p className="font-sans text-xs italic text-text-secondary">Sin descripción.</p>
+      )}
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-sans text-xs">
+        {filas
+          .filter(([, valor]) => valor)
+          .map(([clave, valor]) => (
+            <div key={clave} className="contents">
+              <dt className="text-text-secondary">{clave}</dt>
+              <dd className="text-text-primary">{valor}</dd>
+            </div>
+          ))}
+      </dl>
+      {tarea.checklists.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <span className="font-sans text-xs text-text-secondary">
+            Checklist · {hechos}/{tarea.checklists.length}
+          </span>
+          <ul className="flex flex-col gap-0.5">
+            {tarea.checklists.map((c) => (
+              <li
+                key={c.id}
+                className={`whitespace-pre-wrap break-words font-sans text-xs ${
+                  c.completed ? 'text-text-secondary line-through' : 'text-text-primary'
+                }`}
+              >
+                {c.completed ? '✓' : '○'} {c.text}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {tarea.comments.length > 0 && (
+        <span className="font-sans text-xs text-text-secondary">
+          {tarea.comments.length} {tarea.comments.length === 1 ? 'nota' : 'notas'}
+        </span>
+      )}
+    </div>
   );
 }

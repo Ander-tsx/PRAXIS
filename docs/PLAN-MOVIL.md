@@ -76,7 +76,7 @@ viven en una caché cuyo nombre lleva el id de la cuenta. Cerrar sesión borra
 todas las cachés de datos (mensaje al SW y `caches.delete` desde la página). En
 un móvil compartido, quien entra después no puede ver nada del anterior.
 
-**D6 — Una versión nueva nunca se impone a media tarea.** El SW nuevo se
+**D6 — ~~Una versión nueva nunca se impone a media tarea.~~ Revisada el 2026-10-11: la actualización es forzada, sin botón.** *(Texto original:)* El SW nuevo se
 instala y **espera**; la app enseña «Hay una versión nueva · Actualizar», y solo
 al pulsar se hace `skipWaiting` y se recarga. Recargar solos podría tirar un
 documento a medio escribir. La versión del build va **dentro** del script
