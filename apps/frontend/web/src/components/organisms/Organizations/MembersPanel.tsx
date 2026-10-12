@@ -48,7 +48,7 @@ export function MembersPanel({
       {/* En móvil cada fila es un bloque —miembro arriba, rol y acciones debajo—:
           tres columnas no caben en 390 px y la tabla se desplazaba de lado (M6 de
           docs/PLAN-MOVIL.md). Desde `md`, la tabla de siempre. */}
-      <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#191919]">
+      <div className="overflow-x-auto rounded-xl border border-white/10 bg-surface">
         <table className="w-full text-left font-sans text-sm text-white max-md:block">
           <thead className="border-b border-white/10 bg-white/5 text-xs uppercase text-white/60 max-md:hidden">
             <tr>
@@ -201,7 +201,7 @@ function RoleDropdown({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-10 mt-1 w-48 overflow-hidden rounded-xl border border-white/10 bg-[#202020] shadow-xl">
+        <div className="absolute left-0 top-full z-10 mt-1 w-48 overflow-hidden rounded-xl border border-white/10 bg-surface-2 shadow-xl">
           <div className="flex max-h-[200px] flex-col overflow-y-auto p-1 scrollbar-none">
             {options.map((opt) => (
               <button
@@ -399,7 +399,7 @@ function CustomFloatingRoleSelect({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-[#202020] shadow-xl">
+        <div className="absolute left-0 top-full z-20 mt-1 w-full overflow-hidden rounded-xl border border-white/10 bg-surface-2 shadow-xl">
           <div className="flex flex-col p-1">
             {options.map((opt) => (
               <button

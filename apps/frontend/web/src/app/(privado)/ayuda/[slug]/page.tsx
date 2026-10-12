@@ -1,6 +1,6 @@
-import { ARTICULOS, articuloPorSlug } from '@/content/ayuda/articulos';
 import { ArticuloDeAyuda } from '@/components/organisms/Ayuda/ArticuloDeAyuda';
 import { AyudaShell } from '@/components/organisms/Ayuda/AyudaShell';
+import { ARTICULOS, articuloPorSlug } from '@/content/ayuda/articulos';
 import { AppHeader } from '@praxis/commons';
 import type { Metadata } from 'next';
 import Link from 'next/link';

@@ -94,11 +94,11 @@ export default async function ActivityPage({ searchParams }: PageProps) {
         <ActivityToolbar accion={accionFiltro} desde={desde} hasta={hasta} />
 
         {!registro ? (
-          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-error">
+          <p className="rounded-xl border border-white/10 bg-surface px-6 py-16 text-center font-sans text-sm text-error">
             No se pudo leer el registro. Vuelve a intentarlo.
           </p>
         ) : registro.items.length === 0 ? (
-          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-white/50">
+          <p className="rounded-xl border border-white/10 bg-surface px-6 py-16 text-center font-sans text-sm text-white/50">
             {hayFiltros
               ? 'Ninguna acción encaja con estos filtros.'
               : 'Todavía no se ha registrado ninguna acción de administración.'}

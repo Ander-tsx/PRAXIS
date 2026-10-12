@@ -72,13 +72,14 @@ const apiDelNavegador = createApiClient({ gatewayPath: '/api/gateway' });
  * página) a transparente (en el límite del tablero), con paradas intermedias: un lineal a secas se
  * nota como una banda; esta curva es más suave al principio, que es donde el ojo la busca.
  */
-const SUPERFICIE = BOARD_SURFACE.background;
+const SUPERFICIE = 'var(--color-surface)';
 function degradado(direccion: string): string {
-  return `linear-gradient(${direccion}, ${SUPERFICIE} 0%, ${SUPERFICIE}e6 22%, ${SUPERFICIE}99 48%, ${SUPERFICIE}40 75%, ${SUPERFICIE}00 100%)`;
+  const velo = (porcentaje: number) =>
+    `color-mix(in srgb, ${SUPERFICIE} ${porcentaje}%, transparent)`;
+  return `linear-gradient(${direccion}, ${velo(100)} 0%, ${velo(90)} 22%, ${velo(60)} 48%, ${velo(25)} 75%, ${velo(0)} 100%)`;
 }
 const DEGRADADO_IZQUIERDA = degradado('to right');
 const DEGRADADO_DERECHA = degradado('to left');
-const DEGRADADO_ABAJO = degradado('to top');
 
 export interface BoardColumnsProps {
   board: Board;
@@ -675,7 +676,7 @@ export function BoardColumns({
         /* Móvil: una columna por pantalla, con imán al deslizar y un borde de
            la siguiente asomando —para que se vea que hay más— (M3 de
            `docs/PLAN-MOVIL.md`). Desde `md`, los 288 px de siempre. */
-        className="group flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-[#202020] max-md:w-[calc(100vw-3rem)] max-md:snap-center"
+        className="group flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-surface-2 max-md:w-[calc(100vw-3rem)] max-md:snap-center"
         style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
       >
         {/**
@@ -864,26 +865,28 @@ export function BoardColumns({
        *
        * Antes la pista de columnas recortaba en seco en el límite del tablero (el margen de la
        * página más el relleno de su superficie), y una columna o una tarea a medio salir se veía
-       * cortada con un cuchillo a 44 px del borde. Ahora la pista se extiende por los costados y
-       * por abajo hasta el borde de la página (`-mx` / `-mb`) y el relleno interior (`px`) deja
+       * cortada con un cuchillo a 44 px del borde. Ahora la pista se extiende por los costados
+       * hasta el borde de la página (`-mx`) y el relleno interior (`px`) deja
        * **el contenido en reposo exactamente donde estaba**: lo que cabe se ve entero y sin
        * degradado encima. Solo lo que sale del margen entra en la franja, y ahí se funde con el
        * fondo hasta desaparecer justo en el borde de la página.
        *
-       * Los degradados son capas encima, con `pointer-events: none` (no estorban al arrastrar), y
-       * la de abajo se detiene sobre la barra de desplazamiento para no apagarla. `--sangrado-*`
-       * es el margen real de la página + el relleno de la superficie del tablero (16 px): 2 / 2,5 /
-       * 3 rem según el ancho (`p-4`, `md:p-6`, `lg:px-8` del contenedor de página). Si ese
-       * relleno cambia, cambian aquí.
+       * Los degradados son capas encima, con `pointer-events: none` (no estorban al arrastrar).
+       * **Solo en los costados**: la página de un tablero no tiene scroll vertical, y un degradado
+       * abajo no sacaba nada suave: tapaba el pie de las columnas, justo donde está «Añadir tarea».
+       * Las barras de desplazamiento están ocultas (`scrollbar-none`) para no romper el efecto.
+       * `--sangrado-x` es el margen real de la página + el relleno de la superficie del tablero
+       * (16 px): 2 / 2,5 / 3 rem según el ancho (`p-4`, `md:p-6`, `lg:px-8` del contenedor de
+       * página). Si ese relleno cambia, cambia aquí.
        */}
-      <div className="relative -mx-[var(--sangrado-x)] -mb-[var(--sangrado-y)] flex min-h-0 flex-1 flex-col [--sangrado-x:2rem] [--sangrado-y:2rem] md:[--sangrado-x:2.5rem] md:[--sangrado-y:2.5rem] lg:[--sangrado-x:3rem]">
+      <div className="relative -mx-[var(--sangrado-x)] flex min-h-0 flex-1 flex-col [--sangrado-x:2rem] md:[--sangrado-x:2.5rem] lg:[--sangrado-x:3rem]">
         <div
           ref={(el) => {
             registrarPista(el);
             pistaMovil.current = el;
           }}
           onScroll={reposicion.invalidar}
-          className="scrollbar-slim flex min-h-0 flex-1 items-stretch gap-4 overflow-x-auto px-[var(--sangrado-x)] max-md:snap-x max-md:snap-mandatory max-md:gap-3"
+          className="scrollbar-none flex min-h-0 flex-1 items-stretch gap-4 overflow-x-auto px-[var(--sangrado-x)] pb-1 max-md:snap-x max-md:snap-mandatory max-md:gap-3"
         >
           {columnasVisibles.flatMap((column, index) =>
             index === huecoDeColumna
@@ -932,11 +935,6 @@ export function BoardColumns({
           aria-hidden="true"
           className="pointer-events-none absolute inset-y-0 right-0 z-10 w-[var(--sangrado-x)]"
           style={{ background: DEGRADADO_DERECHA }}
-        />
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-2 z-10 h-[calc(var(--sangrado-y)-0.5rem)]"
-          style={{ background: DEGRADADO_ABAJO }}
         />
       </div>
 
@@ -1079,7 +1077,7 @@ export function BoardColumns({
               tira. Es lo que devuelve el contraste a las tarjetas y lo que hace
               que se reconozca como la columna de siempre. */}
           <div
-            className="flex min-h-0 flex-1 flex-col rounded-2xl bg-[#191919] p-2"
+            className="flex min-h-0 flex-1 flex-col rounded-2xl bg-surface p-2"
             style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
           >
             <ColumnTasks
@@ -1237,7 +1235,7 @@ function ColumnaFantasma({
 }) {
   return (
     <div
-      className="flex flex-col gap-3 rounded-2xl bg-[#191919] px-4 py-4"
+      className="flex flex-col gap-3 rounded-2xl bg-surface px-4 py-4"
       style={{ boxShadow: `0 24px 48px -12px ${alpha(colors.overlay, 70)}` }}
     >
       <span className="flex min-w-0 items-center gap-2">

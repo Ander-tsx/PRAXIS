@@ -3,7 +3,10 @@ import type { Articulo, Categoria } from './tipos';
 /** El orden de aquí es el del índice. */
 export const CATEGORIAS: Categoria[] = [
   { nombre: 'Primeros pasos', descripcion: 'Qué es Praxis y cómo se organiza todo.' },
-  { nombre: 'Trabajo en proyectos', descripcion: 'Tableros, tareas, sprints, documentos y equipo.' },
+  {
+    nombre: 'Trabajo en proyectos',
+    descripcion: 'Tableros, tareas, sprints, documentos y equipo.',
+  },
   { nombre: 'Comunicación', descripcion: 'Chats y avisos.' },
   { nombre: 'PRAX, el asistente', descripcion: 'Cómo te ayuda y qué no hace por su cuenta.' },
   { nombre: 'Automatización', descripcion: 'Reglas que trabajan por ti.' },
@@ -29,7 +32,11 @@ export const ARTICULOS: Articulo[] = [
         tipo: 'tabla',
         cabecera: ['Nivel', 'Qué es', 'Ejemplo'],
         filas: [
-          ['Organización', 'El equipo que paga el plan y reparte los asientos.', 'Estudio Nordeste'],
+          [
+            'Organización',
+            'El equipo que paga el plan y reparte los asientos.',
+            'Estudio Nordeste',
+          ],
           ['Proyecto', 'Un trabajo con su propio equipo, roles y permisos.', 'Rediseño del panel'],
           ['Espacio', 'Una carpeta dentro del proyecto, de tableros o de documentos.', 'Producto'],
           ['Tablero / documento', 'Donde se trabaja de verdad.', 'Sprint 12, Guía de marca'],
@@ -453,7 +460,10 @@ export const ARTICULOS: Articulo[] = [
         texto:
           'Una **organización** contiene los proyectos y es lo que paga el plan. Tienes siempre una **personal** y puedes crear equipos con «Nuevo espacio de trabajo» en el selector de arriba de la barra lateral (con nombre e imagen).',
       },
-      { tipo: 'lista', items: ['Puedes ser dueño de **hasta tres** organizaciones, la personal incluida.'] },
+      {
+        tipo: 'lista',
+        items: ['Puedes ser dueño de **hasta tres** organizaciones, la personal incluida.'],
+      },
       { tipo: 'h2', texto: 'Asientos' },
       {
         tipo: 'p',

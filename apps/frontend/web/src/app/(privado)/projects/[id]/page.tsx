@@ -764,10 +764,10 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
          * `ProjectMembers`, `ProjectRoles` y `ProjectRules` pintan sus paneles
          * con `bg-surface`/`bg-surface-elevated`, y sin este contenedor esos
          * tokens resuelven al `#161b27` azulado de la paleta general en vez de
-         * al monocromo `#191919` que ya usa el resto de la pantalla —el mismo
+         * al monocromo `var(--color-surface)` que ya usa el resto de la pantalla —el mismo
          * desajuste que documenta `projects/[id]/loading.tsx` para el tablero,
          * y que `RoleForm`, `DeleteRoleForm` e `InviteMemberDialog` sorteaban
-         * cada uno con su propio `bg-[#191919]` a pelo. Con el contenedor, esos
+         * cada uno con su propio `bg-surface` a pelo. Con el contenedor, esos
          * tres dejan de hacer falta y las filas dejan de desentonar del resto
          * del proyecto.
          */}

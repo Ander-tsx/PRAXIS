@@ -18,7 +18,7 @@ export function DeleteRoleForm({ projectId, role, membersUsing, onCancel }: Dele
   const blocked = membersUsing > 0;
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-error/40 bg-[#191919] p-6 ring-1 ring-error/20">
+    <div className="flex flex-col gap-4 rounded-xl border border-error/40 bg-surface p-6 ring-1 ring-error/20">
       <header>
         <h4 className="font-sans text-base font-semibold text-white">Eliminar «{role.name}»</h4>
         <p className="font-sans text-xs text-white/50 mt-1">

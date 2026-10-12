@@ -619,7 +619,7 @@ export function MessageBubble({
    *
    * ⚠️ Mezclaba `primary` al 16% contra `#080807` —casi negro— y el resultado
    * era un `#18172f` que **queda a la misma claridad que el fondo de la
-   * aplicación** (`#191919`) y solo se diferencia en el tono. Eso es lo peor de
+   * aplicación** (`var(--color-surface)`) y solo se diferencia en el tono. Eso es lo peor de
    * los dos mundos: no se despega, y el poco azul que tiene destaca como una
    * mancha. De ahí que el contraste se leyera como malo pese a ser un color
    * «fuerte».
@@ -629,7 +629,7 @@ export function MessageBubble({
    * burbuja se lea como una superficie y no como un tinte. Sigue siendo el
    * morado de la marca: cambia el tono, no la identidad.
    */
-  const fondo = mine ? `color-mix(in srgb, ${colors.primary} 20%, #262430)` : '#131312';
+  const fondo = mine ? `color-mix(in srgb, ${colors.primary} 20%, var(--color-surface-3))` : 'var(--color-surface-sunken)';
 
   /**
    * Si la flecha del desplegable tiene algo que desplegar.
@@ -1169,7 +1169,7 @@ export function MessageBubble({
                     : 'pointer-events-none opacity-0'
                 }`}
                 style={{
-                  background: '#131312',
+                  background: 'var(--color-surface-sunken)',
                   borderColor: colors.borderStrong,
                   color: selectorAbierto ? colors.primary : colors.textSecondary,
                   boxShadow: `0 4px 12px ${alpha(colors.overlay, 35)}`,
@@ -1193,7 +1193,7 @@ export function MessageBubble({
                     selectorAbajo ? 'top-full mt-2' : 'bottom-full mb-2'
                   } ${mine ? 'right-0' : 'left-0'}`}
                   style={{
-                    background: '#131312',
+                    background: 'var(--color-surface-sunken)',
                     borderColor: colors.borderStrong,
                     boxShadow: `0 10px 30px ${alpha(colors.overlay, 50)}`,
                   }}
@@ -1283,7 +1283,7 @@ export function MessageBubble({
                     menuArriba ? 'bottom-full mb-2' : 'top-full mt-2'
                   } ${mine ? 'right-0' : 'left-0'}`}
                   style={{
-                    background: '#131312',
+                    background: 'var(--color-surface-sunken)',
                     borderColor: 'rgba(255,255,255,0.05)',
                     boxShadow: `0 10px 40px -10px rgba(0,0,0,0.5)`,
                   }}
@@ -1530,7 +1530,7 @@ export function MessageBubble({
             onPointerCancel={onHojaGestoFin}
             className="fixed inset-x-0 bottom-0 z-10 flex flex-col gap-1 rounded-t-2xl border-t p-3 ease-out"
             style={{
-              background: '#131312',
+              background: 'var(--color-surface-sunken)',
               borderColor: colors.border,
               paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
               touchAction: 'none',

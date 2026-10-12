@@ -65,7 +65,7 @@ export function InvitacionAInstalar() {
   return (
     <section
       aria-label="Instalar Praxis"
-      className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] z-[250] flex items-start gap-3 rounded-2xl border border-white/10 bg-[#252525] p-4 shadow-2xl md:hidden"
+      className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] z-[250] flex items-start gap-3 rounded-2xl border border-white/10 bg-surface-3 p-4 shadow-2xl md:hidden"
     >
       <img src="/icons/icon-192.png" alt="" className="h-10 w-10 shrink-0 rounded-xl" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">

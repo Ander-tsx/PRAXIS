@@ -33,8 +33,8 @@ export interface PageSkeletonProps {
  * la derecha). Así que al cargar cualquier pantalla aparecía una barra que
  * luego desaparecía.
  *
- * Y el fondo tampoco coincidía: el esqueleto pintaba `#0c0c0b` —el negro base
- * de la aplicación— y `<main>` es `#191919`. O sea que además del salto de
+ * Y el fondo tampoco coincidía: el esqueleto pintaba `var(--color-background)` —el negro base
+ * de la aplicación— y `<main>` es `var(--color-surface)`. O sea que además del salto de
  * disposición había un cambio de fondo a media carga.
  *
  * Ninguna de las dos cosas da un error. Solo parpadean.
@@ -59,7 +59,7 @@ export function PageSkeleton({
     <main
       aria-label={title}
       aria-busy="true"
-      className={`relative flex-1 bg-[#191919] ${lleno ? 'min-h-0 overflow-hidden' : 'overflow-y-auto'}`}
+      className={`relative flex-1 bg-surface ${lleno ? 'min-h-0 overflow-hidden' : 'overflow-y-auto'}`}
     >
       <span className="sr-only">Cargando {title}</span>
 

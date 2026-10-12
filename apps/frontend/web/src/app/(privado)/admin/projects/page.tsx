@@ -121,11 +121,11 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
         />
 
         {listado === null ? (
-          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-error">
+          <p className="rounded-xl border border-white/10 bg-surface px-6 py-16 text-center font-sans text-sm text-error">
             No se pudieron cargar los proyectos. Vuelve a intentarlo.
           </p>
         ) : items.length === 0 ? (
-          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-white/50">
+          <p className="rounded-xl border border-white/10 bg-surface px-6 py-16 text-center font-sans text-sm text-white/50">
             {busqueda || estadoFiltro
               ? 'Ningún proyecto encaja con lo que buscas.'
               : 'Todavía no hay proyectos en la plataforma.'}

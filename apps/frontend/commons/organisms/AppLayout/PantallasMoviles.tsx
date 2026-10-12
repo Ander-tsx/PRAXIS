@@ -8,6 +8,7 @@ import { personLabel } from '../../api/domain';
 import { avatarHref } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
 import { ProjectMonogram } from '../../atoms/ProjectMonogram';
+import { SelectorDeTema } from '../../molecules/SelectorDeTema';
 import { olvidarDatosSinConexion } from '../../pwa/sinConexion';
 import { usePresence } from '../../realtime/presence';
 import { SidebarInboxList, cuandoCorto, resumenDe, useDatosDeTu } from './AppShell';
@@ -384,15 +385,18 @@ export function PantallaTu() {
         </section>
       ))}
 
-      <button
-        type="button"
-        onClick={() => void cerrarSesion()}
-        disabled={saliendo}
-        className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white/[0.04] px-4 font-sans text-[15px] font-medium text-error transition-colors active:bg-white/10 disabled:opacity-60"
-      >
-        <LogOut className="h-5 w-5" aria-hidden="true" />
-        {saliendo ? 'Saliendo…' : 'Cerrar sesión'}
-      </button>
+      <div className="flex items-stretch gap-2">
+        <button
+          type="button"
+          onClick={() => void cerrarSesion()}
+          disabled={saliendo}
+          className="flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-white/[0.04] px-4 font-sans text-[15px] font-medium text-error transition-colors active:bg-white/10 disabled:opacity-60"
+        >
+          <LogOut className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span className="truncate">{saliendo ? 'Saliendo…' : 'Cerrar sesión'}</span>
+        </button>
+        <SelectorDeTema className="min-h-12 rounded-2xl px-1" />
+      </div>
     </div>
   );
 }

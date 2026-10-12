@@ -16,7 +16,7 @@ import { alpha, colors } from '../../tokens';
  *
  * ## El tono es un velo, no un gris
  *
- * ⚠️ **`alpha(textPrimary)` y no un `#202020` literal**, que es como estaba en
+ * ⚠️ **`alpha(textPrimary)` y no un `var(--color-surface-2)` literal**, que es como estaba en
  * los cuatro `loading.tsx` que había. Un hex fijo solo funciona sobre la
  * superficie para la que se eligió: el mismo bloque cae sobre `surface` en una
  * pantalla normal y sobre `surface-elevated` dentro de un panel, y en tema

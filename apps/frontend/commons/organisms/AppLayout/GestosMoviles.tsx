@@ -167,7 +167,7 @@ export function GestosMoviles() {
     <div aria-hidden="true" className="pointer-events-none md:hidden">
       {atras > 0 && (
         <span
-          className="fixed left-0 top-1/2 z-[350] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-[#252525] text-white shadow-lg"
+          className="fixed left-0 top-1/2 z-[350] flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-surface-3 text-white shadow-lg"
           style={{
             transform: `translate(${Math.min(atras, 96) * 0.6 - 20}px, -50%)`,
             opacity: 0.35 + progresoAtras * 0.65,
@@ -187,7 +187,7 @@ export function GestosMoviles() {
       )}
       {(tiron > 0 || refrescando) && (
         <span
-          className="fixed left-1/2 top-0 z-[350] flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-[#252525] text-white shadow-lg"
+          className="fixed left-1/2 top-0 z-[350] flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-surface-3 text-white shadow-lg"
           style={{
             transform: `translate(-50%, calc(env(safe-area-inset-top, 0px) + ${recorrido - 20}px))`,
             opacity: refrescando ? 1 : 0.3 + progresoRefresco * 0.7,

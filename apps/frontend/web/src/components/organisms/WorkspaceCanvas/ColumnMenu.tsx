@@ -185,7 +185,7 @@ export function ColumnMenu({
           aria-label={`Opciones de la columna ${columnName}`}
           className="absolute right-0 top-full z-30 mt-1 w-56 rounded-xl p-1.5"
           style={{
-            background: '#1c1c1b',
+            background: 'var(--color-surface-elevated)',
             boxShadow: `0 12px 32px ${alpha(colors.overlay, 55)}, 0 0 0 1px ${alpha(colors.border, 70)}`,
           }}
         >
@@ -355,7 +355,7 @@ export function ColumnMenu({
                     event.currentTarget.form?.requestSubmit();
                   }
                 }}
-                className="h-9 rounded-lg border border-white/10 bg-[#191919] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
+                className="h-9 rounded-lg border border-white/10 bg-surface px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
               />
 
               {/* El estado de las tareas guarda el **nombre** de la columna, así

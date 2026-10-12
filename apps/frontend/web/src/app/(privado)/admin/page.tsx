@@ -138,11 +138,11 @@ export default async function UsersPage({ searchParams }: PageProps) {
         />
 
         {listado === null ? (
-          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-error">
+          <p className="rounded-xl border border-white/10 bg-surface px-6 py-16 text-center font-sans text-sm text-error">
             No se pudieron cargar las cuentas. Vuelve a intentarlo.
           </p>
         ) : items.length === 0 ? (
-          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-white/50">
+          <p className="rounded-xl border border-white/10 bg-surface px-6 py-16 text-center font-sans text-sm text-white/50">
             {busqueda || estadoFiltro
               ? 'Ninguna cuenta encaja con lo que buscas.'
               : 'Todavía no hay cuentas en la plataforma.'}

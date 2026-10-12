@@ -98,19 +98,20 @@ export function OrgIdentityForm({
 
   const inicial = (name.trim() || initialName.trim() || 'O').charAt(0).toUpperCase();
 
-  const preview = imageUrl || glyphByKey(seleccion.iconKey) ? (
-    <Glyph
-      iconKey={seleccion.iconKey}
-      imageUrl={imageUrl}
-      color={seleccion.color}
-      size="md"
-      shape="square"
-    />
-  ) : (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-elevated font-sans text-base font-semibold text-text-primary">
-      {inicial}
-    </span>
-  );
+  const preview =
+    imageUrl || glyphByKey(seleccion.iconKey) ? (
+      <Glyph
+        iconKey={seleccion.iconKey}
+        imageUrl={imageUrl}
+        color={seleccion.color}
+        size="md"
+        shape="square"
+      />
+    ) : (
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface-elevated font-sans text-base font-semibold text-text-primary">
+        {inicial}
+      </span>
+    );
 
   if (!puedeEditar) {
     return (

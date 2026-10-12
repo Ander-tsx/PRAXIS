@@ -13,11 +13,7 @@ export interface EntradaDeIndice {
 }
 
 /** Sin acentos y en minúsculas: «Facturación» se encuentra escribiendo «facturacion». */
-const normalizar = (t: string) =>
-  t
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
+const normalizar = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 /**
  * El índice de la ayuda: buscador y artículos por categoría.
@@ -39,9 +35,7 @@ export function IndiceDeAyuda({
   const visibles = useMemo(() => {
     const q = normalizar(consulta.trim());
     if (!q) return entradas;
-    return entradas.filter((e) =>
-      normalizar(`${e.titulo} ${e.resumen} ${e.texto}`).includes(q),
-    );
+    return entradas.filter((e) => normalizar(`${e.titulo} ${e.resumen} ${e.texto}`).includes(q));
   }, [consulta, entradas]);
 
   return (

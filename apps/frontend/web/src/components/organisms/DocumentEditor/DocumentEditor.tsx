@@ -613,7 +613,7 @@ function Presentes({ gente }: { gente: { name: string; color: string; id: number
       {visibles.map((g) => (
         <span
           key={g.id}
-          className="-ml-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#191919] font-sans text-[10px] font-semibold text-[#0c0c0b] first:ml-0"
+          className="-ml-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface font-sans text-[10px] font-semibold text-background first:ml-0"
           style={{ background: g.color }}
         >
           {g.name.slice(0, 1).toUpperCase()}

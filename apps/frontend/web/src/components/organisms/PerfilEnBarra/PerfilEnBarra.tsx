@@ -5,7 +5,7 @@ import {
   uploadAvatarAction,
   useGoogleAvatarAction,
 } from '@/app/(privado)/main/profile/actions';
-import { Avatar, olvidarDatosSinConexion, useEsMovil } from '@praxis/commons';
+import { Avatar, SelectorDeTema, olvidarDatosSinConexion, useEsMovil } from '@praxis/commons';
 import { Camera, ImageUp, Loader2, LogOut, Mail, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -194,7 +194,7 @@ export function PerfilEnBarra({
             onClick={() =>
               googleAvatarSrc ? setMenuDeFoto((v) => !v) : archivoRef.current?.click()
             }
-            className={`absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full bg-[#2a2a2a] text-white ring-2 ring-[#1c1c1c] transition-colors hover:bg-[#3a3a3a] disabled:opacity-50 ${
+            className={`absolute -bottom-0.5 -right-0.5 flex items-center justify-center rounded-full bg-surface-3 text-white ring-2 ring-surface transition-colors hover:bg-surface-sunken disabled:opacity-50 ${
               esMovil ? 'h-8 w-8' : 'h-6 w-6'
             }`}
           >
@@ -203,7 +203,7 @@ export function PerfilEnBarra({
           {menuDeFoto && googleAvatarSrc && (
             <div
               role="menu"
-              className="absolute left-0 top-full z-10 mt-2 flex w-44 flex-col gap-0.5 rounded-xl border border-white/10 bg-[#252525] p-1 shadow-xl"
+              className="absolute left-0 top-full z-10 mt-2 flex w-44 flex-col gap-0.5 rounded-xl border border-white/10 bg-surface-3 p-1 shadow-xl"
             >
               <button
                 type="button"
@@ -320,16 +320,19 @@ export function PerfilEnBarra({
 
       {/* ── La cuenta ─────────────────────────────────────────────
           En móvil va al final de la pantalla «Tú»: ver la cabecera. */}
-      <div className={esMovil ? 'hidden' : 'border-t border-border pt-2'}>
+      <div className={esMovil ? 'hidden' : 'flex items-center gap-1.5 border-t border-border pt-2'}>
+        {/* «Cerrar sesión» ocupaba toda la fila para una frase corta: se queda con lo que
+            necesita y comparte la línea con el selector de tema. */}
         <button
           type="button"
           onClick={() => void cerrarSesion()}
           disabled={saliendo}
-          className={`${FILA} text-text-primary hover:bg-white/5 hover:text-white disabled:opacity-60`}
+          className={`${FILA} w-auto min-w-0 flex-1 text-text-primary hover:bg-white/5 hover:text-white disabled:opacity-60`}
         >
           <LogOut className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden="true" />
-          {saliendo ? 'Saliendo…' : 'Cerrar sesión'}
+          <span className="truncate">{saliendo ? 'Saliendo…' : 'Cerrar sesión'}</span>
         </button>
+        <SelectorDeTema />
       </div>
     </div>
   );

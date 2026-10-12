@@ -416,7 +416,7 @@ export function WorkspaceCanvas({
       className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
         soloMias
           ? 'bg-primary text-primary-foreground'
-          : 'text-white hover:bg-[#191919] hover:text-white'
+          : 'text-white hover:bg-surface hover:text-white'
       }`}
     >
       <svg
@@ -448,8 +448,8 @@ export function WorkspaceCanvas({
 
   if (!activeWorkspace) {
     return (
-      <div className="flex flex-col h-full bg-[#191919]">
-        <div className="flex shrink-0 flex-wrap items-center gap-1 rounded-lg bg-[#191919] px-4 py-2">
+      <div className="flex flex-col h-full bg-surface">
+        <div className="flex shrink-0 flex-wrap items-center gap-1 rounded-lg bg-surface px-4 py-2">
           {barraDelTablero}
         </div>
 
@@ -488,7 +488,7 @@ export function WorkspaceCanvas({
 
   if (deDocumentos && !documentoActivo) {
     return (
-      <div className="flex h-full flex-col bg-[#191919]">
+      <div className="flex h-full flex-col bg-surface">
         <div className="flex shrink-0 flex-wrap items-center gap-1 px-4 py-2">
           {barraDelTablero}
         </div>
@@ -528,8 +528,8 @@ export function WorkspaceCanvas({
 
   if (!boardActivo) {
     return (
-      <div className="flex flex-col h-full bg-[#191919]">
-        <div className="flex shrink-0 flex-wrap items-center gap-1 bg-[#191919] px-4 py-2">
+      <div className="flex flex-col h-full bg-surface">
+        <div className="flex shrink-0 flex-wrap items-center gap-1 bg-surface px-4 py-2">
           {barraDelTablero}
         </div>
 

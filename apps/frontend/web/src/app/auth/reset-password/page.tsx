@@ -1,7 +1,7 @@
 'use client';
 
-import { AuthForm, Button, Input } from '@praxis/commons';
 import { AuthPanel } from '@/components/organisms/AuthPanel';
+import { AuthForm, Button, Input } from '@praxis/commons';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { type FormEvent, Suspense, useState } from 'react';
@@ -96,7 +96,10 @@ function Formulario() {
           Ya puedes entrar con la nueva. Por seguridad hemos cerrado las sesiones que hubiera
           abiertas en otros dispositivos.
         </p>
-        <Link href="/auth/login" className="font-sans text-sm text-text-primary underline underline-offset-2 hover:opacity-70">
+        <Link
+          href="/auth/login"
+          className="font-sans text-sm text-text-primary underline underline-offset-2 hover:opacity-70"
+        >
           Entrar
         </Link>
       </Marco>

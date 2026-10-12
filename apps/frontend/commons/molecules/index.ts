@@ -8,6 +8,7 @@ export * from './AuthForm';
 export * from './Pagination';
 export * from './ProjectPicker';
 export * from './ThemeToggle';
+export * from './SelectorDeTema';
 export * from './PresenceSwitcher';
 export * from './SlideOver';
 export * from './DataTable';

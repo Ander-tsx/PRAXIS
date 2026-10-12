@@ -33,7 +33,9 @@ function numero(nombre: string): number {
 
 describe('límites de los adjuntos de PRAX', () => {
   it('los números coinciden con los del contrato', () => {
-    expect(ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE).toBe(numero('ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE'));
+    expect(ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE).toBe(
+      numero('ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE'),
+    );
     expect(ASSISTANT_ATTACHMENT_MAX_BYTES).toBe(numero('ASSISTANT_ATTACHMENT_MAX_BYTES'));
     expect(ASSISTANT_PDF_MAX_INLINE_PAGES).toBe(numero('ASSISTANT_PDF_MAX_INLINE_PAGES'));
     expect(ASSISTANT_TEXT_MAX_CHARS).toBe(numero('ASSISTANT_TEXT_MAX_CHARS'));

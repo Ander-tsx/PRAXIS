@@ -250,7 +250,7 @@ export function TaskCard({
       }}
       onClick={fantasma ? undefined : alPulsar}
       className={[
-        'relative flex flex-col gap-2 rounded-xl bg-[#191919] p-3 text-left',
+        'relative flex flex-col gap-2 rounded-xl bg-surface p-3 text-left',
         'transition-[box-shadow,outline-color] duration-150 ease-out',
         fantasma ? 'pointer-events-none w-full' : '',
         /**
@@ -496,7 +496,7 @@ export function TaskCard({
             })}
           {task.assignees.length > 7 && (
             <span
-              className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-[#1c1c1b] font-sans text-[11px] font-medium text-white ring-2 ring-[#131312]"
+              className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated font-sans text-[11px] font-medium text-white ring-2 ring-surface-sunken"
               title={`${task.assignees.length - 7} más`}
             >
               +{task.assignees.length - 7}
@@ -566,7 +566,7 @@ function mineFirst<T extends { userId: string }>(assignees: T[], currentUserId: 
  *
  * Se distingue de `Chip` a propósito — ver la nota de la fila de píldoras. El
  * borde va al 35 % del tono y el fondo al 8 %: lo justo para que la píldora
- * exista sobre el `#191919` de la tarjeta sin competir con las de estado.
+ * exista sobre el `var(--color-surface)` de la tarjeta sin competir con las de estado.
  *
  * `title` lleva el texto largo («3 notas») porque el contenido visible es solo
  * la cifra; sin él, un lector de pantalla anunciaría «3» a secas.

@@ -55,7 +55,7 @@ export function RolesPanel({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#191919] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
+      <div className="overflow-x-auto rounded-xl border border-white/10 bg-surface [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
         <table className="w-full text-left font-sans text-sm text-white">
           <thead className="border-b border-white/10 bg-white/5">
             <tr>
@@ -154,7 +154,7 @@ function Formulario({
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#191919] p-6 shadow-sm">
+    <div className="rounded-xl border border-white/10 bg-surface p-6 shadow-sm">
       <div className="flex items-center gap-4 mb-8">
         <button
           type="button"

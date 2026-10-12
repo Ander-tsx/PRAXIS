@@ -194,7 +194,7 @@ export function EntityPanel({
                 evento.currentTarget.form?.requestSubmit();
               }
             }}
-            className="h-9 rounded-lg border border-white/10 bg-[#191919] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
+            className="h-9 rounded-lg border border-white/10 bg-surface px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
           />
 
           {(errorDeNombre ?? renombrar.error) && (
@@ -245,7 +245,7 @@ export function EntityPanel({
                 onChange={(evento) => setConfirmacion(evento.target.value)}
                 autoComplete="off"
                 aria-invalid={!puedeBorrar}
-                className="h-9 rounded-lg border border-white/10 bg-[#191919] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
+                className="h-9 rounded-lg border border-white/10 bg-surface px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
               />
             </>
           )}

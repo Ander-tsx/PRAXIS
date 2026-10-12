@@ -128,7 +128,7 @@ export function DeleteAccount({ email, variante = 'boton' }: DeleteAccountProps)
               placeholder={email}
               autoComplete="off"
               disabled={borrando}
-              className="w-full bg-[#191919] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all disabled:opacity-50"
+              className="w-full bg-surface border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all disabled:opacity-50"
             />
           </div>
 

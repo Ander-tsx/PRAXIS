@@ -86,7 +86,7 @@ export function ColumnaCerrada({
 
   return (
     <div
-      className="flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-[#1b1b1b] max-md:w-[calc(100vw-3rem)] max-md:snap-center"
+      className="flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-surface-2 max-md:w-[calc(100vw-3rem)] max-md:snap-center"
       style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
       data-columna-cerrada
     >
@@ -169,7 +169,7 @@ export function ColumnaCerrada({
       <div /* `pt-1`/`pb-1` de más: el borde de «tarjeta abierta» o de hover es un `outline` de 2 px que
           sale de la tarjeta, y el contenedor con scroll recorta lo que sobresale: la primera tarjeta
           lo perdía por arriba. */
-        className="scrollbar-slim flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-4 pt-1"
+        className="scrollbar-none flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-4 pt-1"
       >
         {tareas.length === 0 ? (
           <p className="px-2 py-4 font-sans text-xs text-text-secondary">

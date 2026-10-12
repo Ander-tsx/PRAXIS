@@ -369,7 +369,7 @@ function ProyectosLista({
                 {equiposPorProyecto[project.id]?.slice(0, 3).map((user) => (
                   <div
                     key={user.id}
-                    className="relative rounded-full ring-2 ring-[#080807] bg-[#191919]"
+                    className="relative rounded-full ring-2 ring-[#080807] bg-surface"
                   >
                     <Avatar
                       label={
@@ -498,7 +498,7 @@ function ProyectosGrilla({
                   {equiposPorProyecto[project.id]?.slice(0, 3).map((user) => (
                     <div
                       key={user.id}
-                      className="relative rounded-full ring-2 ring-[#131312] bg-[#191919] group-hover:ring-[#161615] group-hover:bg-[#161615] transition-colors"
+                      className="relative rounded-full ring-2 ring-surface-sunken bg-surface group-hover:ring-surface-sunken group-hover:bg-surface-sunken transition-colors"
                     >
                       <Avatar
                         label={
@@ -513,7 +513,7 @@ function ProyectosGrilla({
                     </div>
                   ))}
                   {(equiposPorProyecto[project.id]?.length ?? 0) > 3 && (
-                    <div className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[10px] font-medium text-white ring-2 ring-[#131312] group-hover:ring-[#161615] transition-colors">
+                    <div className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[10px] font-medium text-white ring-2 ring-surface-sunken group-hover:ring-surface-sunken transition-colors">
                       +{equiposPorProyecto[project.id]!.length - 3}
                     </div>
                   )}

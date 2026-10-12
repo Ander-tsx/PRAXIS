@@ -22,7 +22,7 @@ export const FloatingLabelSelect = forwardRef<HTMLSelectElement, FloatingLabelSe
           {...props}
         >
           {options.map((opt) => (
-            <option key={opt.value} value={opt.value} className="bg-[#1a1a1a] text-white">
+            <option key={opt.value} value={opt.value} className="bg-surface-sunken text-white">
               {opt.label}
             </option>
           ))}

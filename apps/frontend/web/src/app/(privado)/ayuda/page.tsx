@@ -1,5 +1,5 @@
-import { ARTICULOS, CATEGORIAS, articulosDe } from '@/content/ayuda/articulos';
 import { AyudaShell } from '@/components/organisms/Ayuda/AyudaShell';
+import { ARTICULOS, CATEGORIAS, articulosDe } from '@/content/ayuda/articulos';
 import { AppHeader } from '@praxis/commons';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -42,9 +42,7 @@ export default function AyudaPage() {
             <section key={categoria.nombre} className="flex flex-col gap-3">
               <div>
                 <h2 className="font-display text-2xl text-text-primary">{categoria.nombre}</h2>
-                <p className="font-sans text-[14px] text-text-secondary">
-                  {categoria.descripcion}
-                </p>
+                <p className="font-sans text-[14px] text-text-secondary">{categoria.descripcion}</p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {articulosDe(categoria.nombre).map((articulo) => (

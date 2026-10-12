@@ -201,11 +201,9 @@ export function ColumnTasks({
          * tarea» se queda fijo abajo en vez de irse con el scroll, que es lo
          * único que hace falta cuando la columna está llena.
          *
-         * `scrollbar-slim`: la barra **sí se ve**, fina y en gris. Estuvo oculta
-         * y eso escondía algo que hacía falta saber: una columna con veinte
-         * tareas se veía exactamente igual que una con cinco. El contador de la
-         * cabecera dice el total, pero no dónde estás dentro de él. El tamaño del
-         * pulgar sí.
+         * `scrollbar-none`: **sin barra visible** (decisión del 2026-10-12, para no romper el
+         * difuminado de los bordes del tablero). El contador de la cabecera dice el total y la
+         * columna sigue desplazándose con rueda, trackpad o dedo.
          *
          * ⚠️ **El relleno de 1 (4 px) es lo que deja ver entero el borde azul de
          * las tarjetas al pasar por encima.** Un contenedor que desborda en un
@@ -218,14 +216,14 @@ export function ColumnTasks({
           onScroll={alDesplazar}
           className={
             enRejilla
-              ? 'scrollbar-slim grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] content-start gap-3 overflow-y-auto p-1'
+              ? 'scrollbar-none grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] content-start gap-3 overflow-y-auto p-1'
               : /* ⚠️ **Sin `flex-1`, y es deliberado.** Con él la lista se estiraba
                    hasta abajo del todo y «Añadir tarea» se quedaba pegado al
                    borde de la columna, a media pantalla de la última tarjeta:
                    parecía un pie de la columna y no el final de la lista. Sin
                    él, la lista mide lo que miden sus tarjetas y solo se encoge
                    —y entonces se desplaza— cuando ya no caben. */
-                'scrollbar-slim flex min-h-0 flex-col gap-2 overflow-y-auto p-1'
+                'scrollbar-none flex min-h-0 flex-col gap-2 overflow-y-auto p-1'
           }
         >
           {visibles.length === 0 && posicionDelHueco < 0 ? (
@@ -238,7 +236,7 @@ export function ColumnTasks({
               ]
                 .filter(Boolean)
                 .join(' ')}
-              style={{ background: '#191919' }}
+              style={{ background: 'var(--color-surface)' }}
             >
               <span className="font-sans text-xs text-white">
                 {arrastrandoTarea ? 'Suelta aquí' : textoVacio}
@@ -354,7 +352,7 @@ function NewTaskInline({
   return (
     <form
       action={formAction}
-      className="flex shrink-0 flex-col gap-2 rounded-xl bg-[#1c1c1b] p-2"
+      className="flex shrink-0 flex-col gap-2 rounded-xl bg-surface-elevated p-2"
       style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 40)}` }}
       noValidate
     >
@@ -394,7 +392,7 @@ function NewTaskInline({
         placeholder="Qué hay que hacer"
         autoComplete="off"
         aria-label={`Título de la tarea nueva en ${columnName}`}
-        className="h-9 rounded-lg border border-white/10 bg-[#191919] px-2.5 font-sans text-xs text-white outline-none placeholder:text-white focus:border-primary"
+        className="h-9 rounded-lg border border-white/10 bg-surface px-2.5 font-sans text-xs text-white outline-none placeholder:text-white focus:border-primary"
       />
 
       <div className="flex items-center gap-1.5">

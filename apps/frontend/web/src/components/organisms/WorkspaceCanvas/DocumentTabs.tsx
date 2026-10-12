@@ -61,7 +61,7 @@ export function DocumentTabs({
               'font-sans text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
               activo
                 ? 'font-semibold text-text-primary'
-                : 'text-text-secondary hover:bg-[#1c1c1b] hover:text-text-primary',
+                : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary',
             ].join(' ')}
             style={activo ? { background: alpha(colors.primary, 12) } : undefined}
           >

@@ -195,7 +195,7 @@ export function InviteMemberDialog({
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#191919] p-6">
+    <div className="rounded-xl border border-white/10 bg-surface p-6">
       <header className="mb-4 flex flex-col gap-1">
         <h3 className="font-sans text-base font-semibold text-white">Invitar al proyecto</h3>
         <p className="font-sans text-sm text-white/60">

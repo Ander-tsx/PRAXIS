@@ -19,8 +19,8 @@ const COLUMNAS = [4, 2, 3, 1];
 /**
  * ⚠️ **La columna es una caja, no una lista suelta.**
  *
- * `BoardColumns` la pinta como `w-72 rounded-2xl bg-[#202020]` con las tarjetas
- * (`bg-[#191919]`) dentro. Sin ese contenedor el esqueleto enseñaba tarjetas
+ * `BoardColumns` la pinta como `w-72 rounded-2xl bg-surface-2` con las tarjetas
+ * (`bg-surface`) dentro. Sin ese contenedor el esqueleto enseñaba tarjetas
  * flotando sobre el fondo y, al llegar el tablero, aparecían cuatro cajas
  * grandes de golpe.
  *
@@ -28,7 +28,7 @@ const COLUMNAS = [4, 2, 3, 1];
  * es la excepción a «usa los tokens» de CLAUDE.md. El primer intento usó
  * `colors.surface`, que es lo correcto en abstracto y aquí salía **azulado**: el
  * tablero no vive bajo `[data-tone="dark"]`, así que el token resuelve al
- * `#161b27` de la paleta general mientras `BoardColumns` pinta un `#202020`
+ * `#161b27` de la paleta general mientras `BoardColumns` pinta un `var(--color-surface-2)`
  * fijo. Un esqueleto que cambia de color al cargar es peor que uno feo.
  *
  * Mientras el tablero escriba sus colores a pelo, esto los escribe igual. El
@@ -37,9 +37,7 @@ const COLUMNAS = [4, 2, 3, 1];
  */
 function Columna({ tarjetas }: { tarjetas: number }) {
   return (
-    <div
-      className="flex h-fit max-h-full w-72 shrink-0 flex-col gap-3 overflow-hidden rounded-2xl bg-[#202020] p-3"
-    >
+    <div className="flex h-fit max-h-full w-72 shrink-0 flex-col gap-3 overflow-hidden rounded-2xl bg-surface-2 p-3">
       <div className="flex items-center gap-2 px-1">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-4 w-6" />
@@ -49,7 +47,7 @@ function Columna({ tarjetas }: { tarjetas: number }) {
         <div
           // biome-ignore lint/suspicious/noArrayIndexKey: cajas decorativas
           key={i}
-          className="flex flex-col gap-2.5 rounded-xl bg-[#191919] p-3"
+          className="flex flex-col gap-2.5 rounded-xl bg-surface p-3"
         >
           <Skeleton className="h-4 w-4/5" />
           <div className="flex gap-1.5">

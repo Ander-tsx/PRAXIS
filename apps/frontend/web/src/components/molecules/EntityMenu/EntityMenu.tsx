@@ -87,7 +87,7 @@ export function EntityMenu(props: EntityMenuProps) {
           aria-label={`Opciones del ${props.entidad} ${props.nombre}`}
           className="absolute right-0 top-full z-30 mt-1 w-60 rounded-xl p-1.5"
           style={{
-            background: '#1c1c1b',
+            background: 'var(--color-surface-elevated)',
             boxShadow: `0 12px 32px ${alpha(colors.overlay, 55)}, 0 0 0 1px ${alpha(colors.border, 70)}`,
           }}
         >

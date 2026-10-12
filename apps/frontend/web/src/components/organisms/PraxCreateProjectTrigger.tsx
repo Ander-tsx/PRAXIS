@@ -141,7 +141,7 @@ export function PraxCreateProjectTrigger({
         <div
           role="dialog"
           aria-label="Nuevo proyecto"
-          className={`absolute inset-y-0 right-0 flex w-full max-w-md flex-col overflow-y-auto border-l border-white/[0.08] bg-[#0c0c0b] shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+          className={`absolute inset-y-0 right-0 flex w-full max-w-md flex-col overflow-y-auto border-l border-white/[0.08] bg-background shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
             dentro ? 'translate-x-0' : 'translate-x-full'
           }`}
         >

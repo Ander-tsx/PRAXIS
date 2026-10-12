@@ -176,7 +176,7 @@ export function DockColumn() {
       >
         <div
           className={[
-            'absolute inset-0 flex flex-col overflow-hidden bg-[#191919] border-l border-border',
+            'absolute inset-0 flex flex-col overflow-hidden bg-surface border-l border-border',
             abierto ? 'md:border-l' : 'md:border-l-0',
           ].join(' ')}
         >

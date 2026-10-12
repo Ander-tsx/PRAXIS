@@ -41,7 +41,7 @@ export function VistaSelector({
     <div
       role="tablist"
       aria-label="Vista del tablero"
-      className="flex shrink-0 items-center gap-0.5 rounded-lg border border-white/10 bg-[#191919] p-0.5"
+      className="flex shrink-0 items-center gap-0.5 rounded-lg border border-white/10 bg-surface p-0.5"
     >
       {vistas.map((v) => {
         const activo = v === value;

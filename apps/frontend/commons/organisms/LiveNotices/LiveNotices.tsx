@@ -326,7 +326,7 @@ export function LiveNotices() {
    * ⚠️ **El `theme` va explícito, y no se puede omitir.**
    *
    * `sileo` pinta una píldora **de color contrario al tema** (`{light:
-   * '#1a1a1a', dark: '#f2f2f2'}`), que es lo que le da protagonismo sin invadir:
+   * 'var(--color-surface-sunken)', dark: '#f2f2f2'}`), que es lo que le da protagonismo sin invadir:
    * sobre la aplicación oscura sale clara y al revés. Para acertar necesita
    * saber el tema, y si no se le pasa lo deduce de `prefers-color-scheme` — que
    * aquí **es la respuesta equivocada**: el tema de PRAXIS se elige a mano y

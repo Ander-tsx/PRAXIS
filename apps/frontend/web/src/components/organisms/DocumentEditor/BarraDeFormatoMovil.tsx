@@ -67,7 +67,7 @@ export function BarraDeFormatoMovil({
     <div
       role="toolbar"
       aria-label="Formato"
-      className="scrollbar-none fixed inset-x-0 z-40 flex h-12 items-center gap-0.5 overflow-x-auto border-t border-white/10 bg-[#202020]/95 px-1.5 backdrop-blur-md md:hidden"
+      className="scrollbar-none fixed inset-x-0 z-40 flex h-12 items-center gap-0.5 overflow-x-auto border-t border-white/10 bg-surface-2/95 px-1.5 backdrop-blur-md md:hidden"
       style={{ bottom: 'var(--teclado, 0px)' }}
     >
       <Boton

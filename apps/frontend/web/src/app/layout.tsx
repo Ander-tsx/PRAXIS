@@ -171,6 +171,14 @@ export const viewport: Viewport = {
  * declaraciones de las mismas familias y cinco `<body>` que tenían que coincidir
  * entre sí para que cruzar de zona no cambiara nada a la vista.
  */
+/**
+ * Con `praxis_theme=system` el servidor no sabe qué prefiere el navegador y pinta oscuro. Este script
+ * va **en la cabecera, antes del primer pintado**, lee la cookie y pone el tema que toca: así quien
+ * sigue al sistema en claro no ve un fogonazo oscuro. También escucha los cambios del sistema.
+ * Con `dark` o `light` no hace nada: el servidor ya los pintó.
+ */
+const SCRIPT_DE_TEMA = `(function(){try{var m=document.cookie.match(/(?:^|; )praxis_theme=([^;]+)/);if(!m||decodeURIComponent(m[1])!=='system')return;var q=matchMedia('(prefers-color-scheme: light)');var a=function(){document.documentElement.setAttribute('data-theme',q.matches?'light':'dark')};a();q.addEventListener('change',a)}catch(e){}})()`;
+
 export default async function RootLayout({
   children,
 }: {
@@ -182,8 +190,14 @@ export default async function RootLayout({
     <html
       lang="es"
       data-theme={theme}
+      /* El script de la cabecera puede cambiar `data-theme` antes de hidratar. */
+      suppressHydrationWarning
       className={`${inter.variable} ${lora.variable} ${fraunces.variable} ${grotesk.variable} ${khteka.variable} h-full`}
     >
+      <head>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: es una constante nuestra, sin datos de nadie */}
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_DE_TEMA }} />
+      </head>
       {/*
         ⚠️ **Sin `flex flex-col`, y no es cosmético.**
 
