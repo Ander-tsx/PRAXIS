@@ -67,6 +67,19 @@ export interface PlanificacionDelTablero {
 
 const apiDelNavegador = createApiClient({ gatewayPath: '/api/gateway' });
 
+/**
+ * Los degradados de los bordes del tablero. Del color de la superficie (opaco, en el borde de la
+ * página) a transparente (en el límite del tablero), con paradas intermedias: un lineal a secas se
+ * nota como una banda; esta curva es más suave al principio, que es donde el ojo la busca.
+ */
+const SUPERFICIE = BOARD_SURFACE.background;
+function degradado(direccion: string): string {
+  return `linear-gradient(${direccion}, ${SUPERFICIE} 0%, ${SUPERFICIE}e6 22%, ${SUPERFICIE}99 48%, ${SUPERFICIE}40 75%, ${SUPERFICIE}00 100%)`;
+}
+const DEGRADADO_IZQUIERDA = degradado('to right');
+const DEGRADADO_DERECHA = degradado('to left');
+const DEGRADADO_ABAJO = degradado('to top');
+
 export interface BoardColumnsProps {
   board: Board;
   projectId: string;
@@ -846,51 +859,85 @@ export function BoardColumns({
           cuantas: (tasksByColumn.get(column.id) ?? []).length,
         }))}
       />
-      <div
-        ref={(el) => {
-          registrarPista(el);
-          pistaMovil.current = el;
-        }}
-        onScroll={reposicion.invalidar}
-        className="scrollbar-slim -mx-1 flex min-h-0 flex-1 items-stretch gap-4 overflow-x-auto px-1 pb-1 max-md:snap-x max-md:snap-mandatory max-md:gap-3"
-      >
-        {columnasVisibles.flatMap((column, index) =>
-          index === huecoDeColumna
-            ? [
-                <HuecoDeColumna key="hueco-columna" ancho={arrastrandoColumna?.ancho ?? 288} />,
-                pintarColumna(column, index),
-              ]
-            : [pintarColumna(column, index)],
-        )}
-        {huecoDeColumna >= columnasVisibles.length && (
-          <HuecoDeColumna key="hueco-columna" ancho={arrastrandoColumna?.ancho ?? 288} />
-        )}
+      {/**
+       * El tablero **sangra hasta el borde de la página** y se desvanece en el camino.
+       *
+       * Antes la pista de columnas recortaba en seco en el límite del tablero (el margen de la
+       * página más el relleno de su superficie), y una columna o una tarea a medio salir se veía
+       * cortada con un cuchillo a 44 px del borde. Ahora la pista se extiende por los costados y
+       * por abajo hasta el borde de la página (`-mx` / `-mb`) y el relleno interior (`px`) deja
+       * **el contenido en reposo exactamente donde estaba**: lo que cabe se ve entero y sin
+       * degradado encima. Solo lo que sale del margen entra en la franja, y ahí se funde con el
+       * fondo hasta desaparecer justo en el borde de la página.
+       *
+       * Los degradados son capas encima, con `pointer-events: none` (no estorban al arrastrar), y
+       * la de abajo se detiene sobre la barra de desplazamiento para no apagarla. `--sangrado-*`
+       * es el margen real de la página + el relleno de la superficie del tablero (16 px): 2 / 2,5 /
+       * 3 rem según el ancho (`p-4`, `md:p-6`, `lg:px-8` del contenedor de página). Si ese
+       * relleno cambia, cambian aquí.
+       */}
+      <div className="relative -mx-[var(--sangrado-x)] -mb-[var(--sangrado-y)] flex min-h-0 flex-1 flex-col [--sangrado-x:2rem] [--sangrado-y:2rem] md:[--sangrado-x:2.5rem] md:[--sangrado-y:2.5rem] lg:[--sangrado-x:3rem]">
+        <div
+          ref={(el) => {
+            registrarPista(el);
+            pistaMovil.current = el;
+          }}
+          onScroll={reposicion.invalidar}
+          className="scrollbar-slim flex min-h-0 flex-1 items-stretch gap-4 overflow-x-auto px-[var(--sangrado-x)] max-md:snap-x max-md:snap-mandatory max-md:gap-3"
+        >
+          {columnasVisibles.flatMap((column, index) =>
+            index === huecoDeColumna
+              ? [
+                  <HuecoDeColumna key="hueco-columna" ancho={arrastrandoColumna?.ancho ?? 288} />,
+                  pintarColumna(column, index),
+                ]
+              : [pintarColumna(column, index)],
+          )}
+          {huecoDeColumna >= columnasVisibles.length && (
+            <HuecoDeColumna key="hueco-columna" ancho={arrastrandoColumna?.ancho ?? 288} />
+          )}
 
-        {/* La última: no es una columna de las del tablero, no se arrastra a ella ni se reordena. */}
-        {planificacion && (
-          <ColumnaCerrada
-            boardId={board.id}
-            projectId={projectId}
-            nombre={planificacion.nombreColumnaCerrada}
-            tareas={cerradas}
-            total={Math.max(planificacion.cerradas.total, cerradas.length)}
-            nombreDeSprint={planificacion.nombreDeSprint}
-            usersById={usersById}
-            currentUserId={currentUserId}
-            puedeRenombrar={planificacion.puedeRenombrarCerrada}
-            onOpenTask={setOpenTask}
-            openTaskId={openTask?.id ?? null}
-            onCargarMas={cargarMasCerradas}
-            cargandoMas={cargandoCerradas}
-            errorAlCargar={errorCerradas}
-          />
-        )}
+          {/* La última: no es una columna de las del tablero, no se arrastra a ella ni se reordena. */}
+          {planificacion && (
+            <ColumnaCerrada
+              boardId={board.id}
+              projectId={projectId}
+              nombre={planificacion.nombreColumnaCerrada}
+              tareas={cerradas}
+              total={Math.max(planificacion.cerradas.total, cerradas.length)}
+              nombreDeSprint={planificacion.nombreDeSprint}
+              usersById={usersById}
+              currentUserId={currentUserId}
+              puedeRenombrar={planificacion.puedeRenombrarCerrada}
+              onOpenTask={setOpenTask}
+              openTaskId={openTask?.id ?? null}
+              onCargarMas={cargarMasCerradas}
+              cargandoMas={cargandoCerradas}
+              errorAlCargar={errorCerradas}
+            />
+          )}
 
-        {canCreateColumn && (
-          <div className="self-start">
-            <AddColumnCard boardId={board.id} projectId={projectId} nextOrder={columns.length} />
-          </div>
-        )}
+          {canCreateColumn && (
+            <div className="self-start">
+              <AddColumnCard boardId={board.id} projectId={projectId} nextOrder={columns.length} />
+            </div>
+          )}
+        </div>
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[var(--sangrado-x)]"
+          style={{ background: DEGRADADO_IZQUIERDA }}
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-[var(--sangrado-x)]"
+          style={{ background: DEGRADADO_DERECHA }}
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-2 z-10 h-[calc(var(--sangrado-y)-0.5rem)]"
+          style={{ background: DEGRADADO_ABAJO }}
+        />
       </div>
 
       {/**
