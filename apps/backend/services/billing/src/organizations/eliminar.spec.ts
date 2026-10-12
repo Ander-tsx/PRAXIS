@@ -12,7 +12,7 @@ function organizacion(sobre: Record<string, unknown> = {}) {
   };
 }
 
-function montar(org: ReturnType<typeof organizacion> | null) {
+function montar(org: ReturnType<typeof organizacion> | null, propias = 2) {
   const llamadas: string[] = [];
   const tx = {
     organizationMember: { deleteMany: async () => void llamadas.push('miembros') },
@@ -21,7 +21,7 @@ function montar(org: ReturnType<typeof organizacion> | null) {
     organization: { delete: async () => void llamadas.push('organizacion') },
   };
   const prisma = {
-    organization: { findUnique: async () => org },
+    organization: { findUnique: async () => org, count: async () => propias },
     organizationMember: {
       findMany: async () => [{ userId: 'dueno' }, { userId: 'ana' }, { userId: null }],
     },
@@ -57,11 +57,20 @@ describe('OrganizationsService.eliminar', () => {
     expect(llamadas).toEqual([]);
   });
 
-  it('no elimina el espacio personal', async () => {
-    const { servicio, llamadas } = montar(organizacion({ kind: OrganizationKind.PERSONAL }));
+  it('elimina el espacio personal si le queda otra organización propia', async () => {
+    const { servicio, llamadas } = montar(organizacion({ kind: OrganizationKind.PERSONAL }), 2);
     const res = await servicio.eliminar({ organizationId: 'org-1', porUserId: 'dueno' });
-    expect(res).toMatchObject({ codigo: 'NO_VALE' });
-    expect(llamadas).toEqual([]);
+    expect(res).toEqual({ ok: true });
+    expect(llamadas).toContain('organizacion');
+  });
+
+  it('no elimina la única organización propia, sea cual sea', async () => {
+    for (const kind of [OrganizationKind.PERSONAL, OrganizationKind.ENTERPRISE]) {
+      const { servicio, llamadas } = montar(organizacion({ kind }), 1);
+      const res = await servicio.eliminar({ organizationId: 'org-1', porUserId: 'dueno' });
+      expect(res).toMatchObject({ codigo: 'NO_VALE' });
+      expect(llamadas).toEqual([]);
+    }
   });
 
   it('no elimina con una suscripción de pago viva: borrarla no deja de cobrarla', async () => {

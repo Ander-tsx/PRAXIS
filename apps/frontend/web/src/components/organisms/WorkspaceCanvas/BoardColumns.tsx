@@ -1039,7 +1039,7 @@ export function BoardColumns({
          */
         <div
           className="fixed inset-0 z-40 flex flex-col gap-4 p-5"
-          style={{ ...BOARD_SURFACE, backgroundColor: '#080807' }}
+          style={{ ...BOARD_SURFACE, backgroundColor: 'var(--color-background)' }}
         >
           <header className="flex flex-wrap items-center gap-3">
             <h4

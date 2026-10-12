@@ -113,10 +113,13 @@ export default async function TeamPage({
                     puedeEditar={permisos.canManageOrganization}
                   />
                 </div>
-                {/* Solo su dueño, y solo una de empresa: el espacio personal no se elimina. */}
-                {org.soyDueno && org.kind !== 'PERSONAL' && org.name && (
+                {/* Solo su dueño. Puede ser incluso la personal, mientras le quede otra propia. */}
+                {org.soyDueno && (
                   <div className="mt-10">
-                    <EliminarOrganizacion organizationId={organizationId} nombre={org.name} />
+                    <EliminarOrganizacion
+                      organizationId={organizationId}
+                      nombre={org.name ?? 'Mi espacio'}
+                    />
                   </div>
                 )}
               </Seccion>

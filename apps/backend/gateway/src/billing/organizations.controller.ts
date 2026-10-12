@@ -923,7 +923,7 @@ export class OrganizationsController {
    */
   @Delete()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Elimina la organización (solo su dueño; no la personal)' })
+  @ApiOperation({ summary: 'Elimina la organización (solo su dueño; debe quedarle otra propia)' })
   @ApiResponse({ status: 403, description: 'Solo quien es dueño puede eliminarla' })
   @ApiResponse({ status: 409, description: 'Tiene proyectos o una suscripción activa' })
   async eliminar(
@@ -943,12 +943,15 @@ export class OrganizationsController {
       );
     }
 
-    /* El espacio personal no se elimina, tenga lo que tenga dentro: se dice antes de contar. */
-    if (vista.kind === 'PERSONAL') {
+    /* Siempre queda al menos una organización propia (no tiene que ser la personal). */
+    const propias = await firstValueFrom(
+      this.billingClient.send<number>({ cmd: 'billing_orgs_owned_count' }, { userId }),
+    ).catch(() => null);
+    if (propias !== null && propias <= 1) {
       throw new HttpException(
         {
           code: 'NO_VALE',
-          message: 'Tu espacio personal no se elimina: es donde caen tus cuotas.',
+          message: 'Necesitas al menos una organización propia. Crea otra antes de eliminar esta.',
           details: {},
         },
         HttpStatus.BAD_REQUEST,

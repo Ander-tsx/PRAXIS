@@ -160,7 +160,7 @@ export function ThreadPanel({
         anchoLibre === null ? (plegada ? 'md:w-96' : 'md:w-80') : ''
       }`}
       style={{
-        background: '#080807',
+        background: 'var(--color-background)',
         ...(anchoLibre !== null ? { width: `${anchoLibre}px` } : {}),
       }}
     >

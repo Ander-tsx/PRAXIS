@@ -10,8 +10,8 @@ import { HardDeleteDialog } from '../admin/HardDeleteDialog';
 /**
  * La zona de peligro de una organización: eliminarla.
  *
- * Solo la ve su dueño y solo en una organización de empresa (el espacio personal no se elimina).
- * El servidor decide de verdad —dueño, no personal, sin proyectos, sin suscripción de pago viva— y
+ * Solo la ve su dueño. El servidor decide de verdad —dueño, que le quede otra propia, sin
+ * proyectos, sin plan de pago vivo— y
  * esta pantalla enseña su motivo cuando se niega; aquí se **dice antes** lo que hace falta, para
  * que no haya que descubrirlo con un error.
  */
@@ -46,7 +46,8 @@ export function EliminarOrganizacion({
           <strong className="font-semibold text-text-primary">eliminar sus proyectos</strong> y, si
           tiene un plan de pago,{' '}
           <strong className="font-semibold text-text-primary">cancelarlo</strong> en Facturación:
-          borrar la organización no deja de cobrarlo.
+          borrar la organización no deja de cobrarlo. Siempre debe quedarte al menos otra
+          organización propia.
         </p>
       </div>
       <div>

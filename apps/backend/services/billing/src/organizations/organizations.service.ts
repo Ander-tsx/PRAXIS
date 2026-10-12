@@ -172,6 +172,16 @@ export class OrganizationsService {
     });
     if (existente) return existente;
 
+    /* Quien eliminó su espacio personal pero conserva otra organización propia no
+       vuelve a tener una vacía: «la de respaldo» pasa a ser su organización propia
+       más antigua. Si no, cada entrada la recrearía y borrarla no serviría de nada. */
+    const propia = await this.prisma.organization.findFirst({
+      where: { ownerUserId: userId },
+      orderBy: { createdAt: 'asc' },
+      include: { subscription: true },
+    });
+    if (propia) return propia;
+
     const nombre = datos?.name?.trim() || 'Mi espacio';
     const semilla = this.datosDeSemilla();
 
@@ -1889,9 +1899,11 @@ export class OrganizationsService {
         codigo: 'SIN_PERMISO',
       } as Fallo;
     }
-    if (organizacion.kind === OrganizationKind.PERSONAL) {
+    /* Siempre queda al menos una propia: es el respaldo donde caen los proyectos sin
+       organización y el plan gratuito. Puede ser cualquiera, no necesariamente la personal. */
+    if ((await this.contarPropias(datos.porUserId)) <= 1) {
       return {
-        error: 'Tu espacio personal no se elimina: es donde caen tus cuotas.',
+        error: 'Necesitas al menos una organización propia. Crea otra antes de eliminar esta.',
         codigo: 'NO_VALE',
       } as Fallo;
     }
@@ -1904,7 +1916,7 @@ export class OrganizationsService {
     if (viva) {
       return {
         error:
-          'Tiene una suscripción activa. Cancélala en Facturación antes de eliminar la organización: borrarla no deja de cobrarla.',
+          'Tiene un plan de pago activo. Cancélalo en Facturación antes de eliminar la organización: borrarla no deja de cobrarlo.',
         codigo: 'EN_USO',
       } as Fallo;
     }
