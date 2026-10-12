@@ -131,7 +131,7 @@ const REDIRECCIONES_EXACTAS: Record<string, string> = {
      no se pueden corregir desde aquí. */
   '/main/perfil': '/projects',
   /* 🚫 La pantalla de perfil se retiró: ahora es un panel de la barra lateral
-     (`PerfilEnBarra`), que se abre pulsando tu nombre y correo. */
+     (`PerfilEnBarra`), que se abre presionando tu nombre y correo. */
   '/main/profile': '/projects',
   /**
    * «Roles y permisos» de la barra lateral no es una pantalla: los papeles son

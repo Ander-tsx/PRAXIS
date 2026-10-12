@@ -680,12 +680,12 @@ function InviteMemberModal({
           </div>
         </div>
         {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+          <div className="p-3 bg-error/10 border border-error/20 rounded-lg text-sm text-error">
             {error}
           </div>
         )}
         {success && (
-          <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-sm text-green-400">
+          <div className="p-3 bg-success/10 border border-success/20 rounded-lg text-sm text-success">
             Invitación enviada con éxito.
           </div>
         )}
@@ -813,7 +813,7 @@ function NewSpaceModal({ onClose, zonePath }: { onClose: () => void; zonePath: s
           </div>
         </div>
         {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+          <div className="p-3 bg-error/10 border border-error/20 rounded-lg text-sm text-error">
             {error}
           </div>
         )}

@@ -337,7 +337,7 @@ function EditorVivo({
         placeholder: ({ node }) =>
           node.type.name === 'heading'
             ? `Título ${node.attrs.level}`
-            : 'Escribe, o pulsa «/» para insertar un bloque',
+            : 'Escribe, o presiona «/» para insertar un bloque',
         showOnlyCurrent: true,
         includeChildren: false,
       }),
@@ -634,7 +634,7 @@ function LineasFantasma() {
       {[92, 78, 85, 40].map((ancho) => (
         <span
           key={ancho}
-          className="h-3.5 animate-pulse rounded bg-white/[0.06]"
+          className="h-3.5 animate-presione rounded bg-white/[0.06]"
           style={{ width: `${ancho}%` }}
         />
       ))}

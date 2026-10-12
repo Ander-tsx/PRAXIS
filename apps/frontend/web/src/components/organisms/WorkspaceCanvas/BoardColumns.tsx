@@ -199,7 +199,7 @@ export function BoardColumns({
   const backlog = planificacion?.backlog;
 
   /* La columna «Closed»: la primera página viene de la página (`planificacion.cerradas`) y el
-     resto se va pidiendo al pulsar «Cargar más». Se juntan sin repetir. */
+     resto se va pidiendo al presionar «Cargar más». Se juntan sin repetir. */
   const [masCerradas, setMasCerradas] = useState<Task[]>([]);
   const [cargandoCerradas, setCargandoCerradas] = useState(false);
   const [errorCerradas, setErrorCerradas] = useState(false);

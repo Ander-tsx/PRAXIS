@@ -41,10 +41,10 @@ export default async function ArticuloPage({ params }: Props) {
           {anterior ? (
             <Link
               href={`/ayuda/${anterior.slug}`}
-              className="flex flex-col gap-0.5 rounded-xl border border-border p-4 transition-colors hover:bg-white/5"
+              className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-4 transition-colors hover:border-border-strong hover:bg-surface-2"
             >
               <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-                ← Anterior
+                Anterior
               </span>
               <span className="font-sans text-[14px] font-semibold text-text-primary">
                 {anterior.titulo}
@@ -56,10 +56,10 @@ export default async function ArticuloPage({ params }: Props) {
           {siguiente && (
             <Link
               href={`/ayuda/${siguiente.slug}`}
-              className="flex flex-col gap-0.5 rounded-xl border border-border p-4 text-right transition-colors hover:bg-white/5"
+              className="flex flex-col gap-1 rounded-xl border border-border bg-surface p-4 text-right transition-colors hover:border-border-strong hover:bg-surface-2"
             >
               <span className="font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-                Siguiente →
+                Siguiente
               </span>
               <span className="font-sans text-[14px] font-semibold text-text-primary">
                 {siguiente.titulo}

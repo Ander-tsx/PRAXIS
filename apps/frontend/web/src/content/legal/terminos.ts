@@ -141,7 +141,7 @@ export const TERMINOS: Articulo = {
     {
       tipo: 'p',
       texto:
-        'Las reglas reaccionan a eventos (una tarea se mueve, vence una fecha…) y ejecutan acciones **sin que nadie las pulse**. Quien las crea o activa es responsable de que hagan lo que pretende, de revisarlas cuando cambie el proyecto y de lo que ocurra por una regla mal configurada, incluidos avisos enviados a otras personas. Las reglas cuentan contra la cuota de tu plan mientras están activas.',
+        'Las reglas reaccionan a eventos (una tarea se mueve, vence una fecha…) y ejecutan acciones **sin que nadie las presione**. Quien las crea o activa es responsable de que hagan lo que pretende, de revisarlas cuando cambie el proyecto y de lo que ocurra por una regla mal configurada, incluidos avisos enviados a otras personas. Las reglas cuentan contra la cuota de tu plan mientras están activas.',
     },
 
     { tipo: 'h2', texto: '11. Documentos, enlaces compartidos y chat' },

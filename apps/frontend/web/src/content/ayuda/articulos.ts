@@ -98,7 +98,7 @@ export const ARTICULOS: Articulo[] = [
       {
         tipo: 'consejo',
         texto:
-          'El botón de arriba a la derecha de la barra la pliega para dejar solo los iconos y ganar espacio. En el móvil, la barra es el menú de la hamburguesa.',
+          'El botón de arriba a la derecha de la barra la pliega para dejar solo los iconos y ganar espacio. En el celular, la barra es el menú de la hamburguesa.',
       },
     ],
   },
@@ -113,10 +113,10 @@ export const ARTICULOS: Articulo[] = [
       {
         tipo: 'pasos',
         items: [
-          'En la pestaña **Inicio**, pulsa el **+** junto a «Proyectos» (o el botón «Nuevo proyecto» de la pantalla de Proyectos).',
+          'En la pestaña **Inicio**, presiona el **+** junto a «Proyectos» (o el botón «Nuevo proyecto» de la pantalla de Proyectos).',
           'Escribe el **nombre** y, si quieres, una descripción.',
           'Opcional: sube una **imagen** o elige un **icono y un color**. Si pones imagen, esa es la que se ve.',
-          'Pulsa **Crear proyecto**. Aparece en el árbol de la barra lateral.',
+          'Presiona **Crear proyecto**. Aparece en el árbol de la barra lateral.',
         ],
       },
       {
@@ -346,7 +346,7 @@ export const ARTICULOS: Articulo[] = [
         items: [
           'Los avisos llegan **en vivo**: aparece una tarjeta y suena un aviso sin que recargues la página.',
           'La bandeja tiene dos vistas: **Sin leer** y **Todos**.',
-          'Al pulsar un aviso se marca como leído y te lleva a lo que lo provocó.',
+          'Al presionar un aviso se marca como leído y te lleva a lo que lo provocó.',
           'Los avisos pueden venir de personas (te asignaron una tarea, te mencionaron) o de **reglas de automatización**.',
         ],
       },
@@ -540,7 +540,7 @@ export const ARTICULOS: Articulo[] = [
       {
         tipo: 'p',
         texto:
-          'Pulsa **tu nombre y correo** al pie de la barra lateral para abrir tu perfil. Se muestra en el hueco de debajo de las pestañas.',
+          'Presiona **tu nombre y correo** al pie de la barra lateral para abrir tu perfil. Se muestra en el hueco de debajo de las pestañas.',
       },
       { tipo: 'h2', texto: 'Editar tu perfil' },
       {

@@ -300,7 +300,7 @@ function TopesRebasados({ excedidas }: { excedidas: QuotaExcedida[] }) {
   if (excedidas.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-2 rounded-r-lg border-l-2 border-amber-500 bg-amber-500/[0.06] py-4 pl-4 pr-4">
+    <section className="flex flex-col gap-2 rounded-r-lg border-l-2 border-warning bg-warning/[0.06] py-4 pl-4 pr-4">
       <h3 className="font-sans text-sm font-semibold text-white">
         Tu plan se queda corto para lo que ya tienes
       </h3>
@@ -311,7 +311,7 @@ function TopesRebasados({ excedidas }: { excedidas: QuotaExcedida[] }) {
       <ul className="mt-1 flex flex-col gap-1.5">
         {excedidas.map((excedida) => (
           <li key={excedida.kind} className="flex gap-2 font-sans text-sm text-white/70">
-            <span aria-hidden="true" className="text-amber-500">
+            <span aria-hidden="true" className="text-warning">
               •
             </span>
             <span>{REBASADO[excedida.kind](excedida)}</span>

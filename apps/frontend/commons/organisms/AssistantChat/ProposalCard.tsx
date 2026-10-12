@@ -1560,7 +1560,7 @@ export function QuestionProposalCard({
   }
 
   /* Ya se contestó en su día, o se acaba de contestar: la tarjeta se queda
-     legible —importa saber qué se preguntó— y sin nada que pulsar. */
+     legible —importa saber qué se preguntó— y sin nada que presionar. */
   const decidida = estado !== 'pendiente' || (estadoGuardado && estadoGuardado !== 'PENDING');
 
   return (
@@ -2043,7 +2043,7 @@ function Marco({
           </Button>
           {error && <span className="font-sans text-sm text-error">{error}</span>}
           {/* Lo que la tarjeta no dice y conviene saber: aceptar no le da a PRAX
-              ningún poder, lo hace quien pulsa. */}
+              ningún poder, lo hace quien presiona. */}
           {!error && onAceptar && (
             <span className="ml-auto hidden font-sans text-[11px] text-text-disabled sm:inline">
               con tus permisos, por el mismo botón que usarías tú

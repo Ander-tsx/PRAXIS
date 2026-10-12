@@ -11,10 +11,10 @@ import { PaginaLegal } from './PaginaLegal';
  */
 export function PaginaLegalPublica({ documento }: { documento: Articulo }) {
   return (
-    <div data-tone="dark" className="min-h-screen bg-background text-text-primary">
+    <div className="min-h-screen bg-background text-text-primary">
       <header className="border-b border-border">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="font-display text-xl text-text-primary">
+          <Link href="/" className="font-sans text-xl font-bold tracking-tight text-text-primary">
             {ENTIDAD.marca}
           </Link>
           <Link

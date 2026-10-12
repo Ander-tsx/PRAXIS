@@ -833,7 +833,7 @@ function ArmazonInterno({
                     className="block rounded-full"
                   >
                     {/* Sin `presence`: el punto lo pinta `estadoSlot`, que
-                        además se puede pulsar. Ver el aviso de esa prop. */}
+                        además se puede presionar. Ver el aviso de esa prop. */}
                     <Avatar
                       label={user.name.trim() || user.email}
                       mine
@@ -1928,7 +1928,7 @@ function SidebarProjectsTree({
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className={`animate-pulse rounded-lg bg-white/5 ${plegada ? 'h-10 w-10' : 'h-9'}`}
+            className={`animate-presione rounded-lg bg-white/5 ${plegada ? 'h-10 w-10' : 'h-9'}`}
           />
         ))}
       </SidebarSection>
@@ -2596,8 +2596,8 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
   if (cargando) {
     return (
       <div className="flex flex-col gap-2 px-1">
-        <div className="h-11 animate-pulse rounded-lg bg-white/5" />
-        <div className="h-11 animate-pulse rounded-lg bg-white/5" />
+        <div className="h-11 animate-presione rounded-lg bg-white/5" />
+        <div className="h-11 animate-presione rounded-lg bg-white/5" />
       </div>
     );
   }
@@ -2846,8 +2846,8 @@ export function SidebarInboxList({
      golpe de una altura a la otra. */
   const loader = (
     <div className={`flex flex-col justify-center gap-2.5 px-4 ${ALTO_VACIO}`} aria-hidden="true">
-      <div className="h-3 w-3/4 animate-pulse rounded bg-white/5" />
-      <div className="h-3 w-1/2 animate-pulse rounded bg-white/5" />
+      <div className="h-3 w-3/4 animate-presione rounded bg-white/5" />
+      <div className="h-3 w-1/2 animate-presione rounded bg-white/5" />
     </div>
   );
 

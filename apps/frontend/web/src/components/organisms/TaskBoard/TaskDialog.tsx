@@ -506,7 +506,7 @@ export function TaskDialog({
           {(state.error || deleteState.error) && (
             <p
               role="alert"
-              className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 font-sans text-xs text-red-400"
+              className="rounded-lg border border-error/20 bg-error/10 p-3 font-sans text-xs text-error"
             >
               {state.error ?? deleteState.error}
             </p>
@@ -581,7 +581,7 @@ export function TaskDialog({
                     <button
                       type="submit"
                       disabled={deleting}
-                      className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 font-sans text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+                      className="rounded-lg border border-error/20 bg-error/10 px-3 py-1.5 font-sans text-xs font-medium text-error transition-colors hover:bg-error/20 disabled:opacity-50"
                     >
                       {deleting ? 'Eliminando…' : 'Sí, eliminar'}
                     </button>

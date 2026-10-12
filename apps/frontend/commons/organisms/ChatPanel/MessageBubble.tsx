@@ -2183,7 +2183,7 @@ function ReproductorVideo({ href }: { href: string }) {
       }`}
     >
       {/* biome-ignore lint/a11y/useMediaCaption: los adjuntos los sube quien escribe y no hay pista de subtítulos que ofrecer */}
-      {/* biome-ignore lint/a11y/useKeyWithClickEvents: pulsar el vídeo para pausarlo es el gesto de cualquier reproductor; el teclado tiene los botones de la barra, que sí son `<button>` y entran en el orden de tabulación */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: presionar el vídeo para pausarlo es el gesto de cualquier reproductor; el teclado tiene los botones de la barra, que sí son `<button>` y entran en el orden de tabulación */}
       <video
         ref={videoRef}
         src={href}

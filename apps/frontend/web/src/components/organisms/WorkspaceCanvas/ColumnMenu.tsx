@@ -155,7 +155,7 @@ export function ColumnMenu({
       ref={wrapperRef}
       className="relative"
       /* El menú vive dentro de una columna arrastrable: sin esto, empezar a
-         escribir o pulsar un color podía arrancar el arrastre de la columna. */
+         escribir o presionar un color podía arrancar el arrastre de la columna. */
       draggable={false}
       onDragStart={(event) => event.stopPropagation()}
     >
@@ -266,7 +266,7 @@ export function ColumnMenu({
               </span>
 
               {/* Botones de envío con `value`: el color elegido es el del botón
-                  pulsado, así que no hace falta estado ni un paso de guardar. */}
+                  presionado, así que no hace falta estado ni un paso de guardar. */}
               <div className="flex flex-wrap gap-1.5">
                 {COLUMN_COLORS.map((option) => (
                   <button

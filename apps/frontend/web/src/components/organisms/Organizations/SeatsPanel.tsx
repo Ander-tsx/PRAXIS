@@ -163,7 +163,7 @@ export function SeatsPanel({
       )}
 
       {state.error && (
-        <p role="alert" className="font-sans text-sm text-red-400">
+        <p role="alert" className="font-sans text-sm text-error">
           {state.error}
         </p>
       )}

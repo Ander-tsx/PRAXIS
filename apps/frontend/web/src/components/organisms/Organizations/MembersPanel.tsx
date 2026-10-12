@@ -127,26 +127,26 @@ function Invitar({
       </form>
 
       {sinAsientos && (
-        <p className="font-sans text-xs text-amber-400">
+        <p className="font-sans text-xs text-warning">
           No quedan asientos disponibles. Amplía el plan antes de invitar.
         </p>
       )}
 
       {state.error && (
-        <p role="alert" className="font-sans text-sm text-red-400">
+        <p role="alert" className="font-sans text-sm text-error">
           {state.error}
         </p>
       )}
 
       {state.enlace && (
-        <div className="flex flex-col gap-2 border-l-2 border-emerald-500/40 py-2 pl-4 bg-emerald-500/5 rounded-r-xl mt-2">
+        <div className="flex flex-col gap-2 border-l-2 border-success/40 py-2 pl-4 bg-success/5 rounded-r-xl mt-2">
           <p className="font-sans text-sm text-white">
             {state.correoEnviado
               ? `Le hemos mandado un correo a ${state.email}.`
               : `Invitación creada para ${state.email}, pero el correo no salió.`}{' '}
             Este enlace también sirve, y no se puede volver a ver:
           </p>
-          <code className="block break-all font-mono text-xs text-emerald-300 bg-black/40 p-2 rounded-lg">
+          <code className="block break-all font-mono text-xs text-success bg-black/40 p-2 rounded-lg">
             {state.enlace}
           </code>
         </div>
@@ -273,7 +273,7 @@ function Fila({
               <span className="truncate text-xs text-white/50">{miembro.email}</span>
             )}
             {(quitar.error || rolState.error) && (
-              <span className="text-[10px] text-red-400 mt-0.5">
+              <span className="text-[10px] text-error mt-0.5">
                 {quitar.error ?? rolState.error}
               </span>
             )}
@@ -286,7 +286,7 @@ function Fila({
             Dueño
           </span>
         ) : miembro.status === 'INVITED' ? (
-          <span className="inline-flex items-center rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">
+          <span className="inline-flex items-center rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
             Invitación pendiente
           </span>
         ) : seLePuedeTocar && miembro.userId && roles.length > 0 ? (
@@ -317,7 +317,7 @@ function Fila({
             <button
               type="submit"
               disabled={quitando}
-              className="rounded-md px-3 py-1.5 font-sans text-xs font-medium text-red-400/80 transition-colors hover:bg-red-500/20 hover:text-red-400 disabled:opacity-40"
+              className="rounded-md px-3 py-1.5 font-sans text-xs font-medium text-error/80 transition-colors hover:bg-error/20 hover:text-error disabled:opacity-40"
             >
               {quitando ? '…' : miembro.status === 'INVITED' ? 'Cancelar' : 'Eliminar'}
             </button>

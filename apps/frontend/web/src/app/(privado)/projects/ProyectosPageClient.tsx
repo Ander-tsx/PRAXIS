@@ -347,7 +347,7 @@ function ProyectosLista({
                 </p>
                 <p className="truncate text-[11px] text-white">
                   {suspendido ? (
-                    <span className="text-amber-500/60">Suspendido</span>
+                    <span className="text-warning/60">Suspendido</span>
                   ) : eresElDueno ? (
                     'Tuyo'
                   ) : (
@@ -452,7 +452,7 @@ function ProyectosGrilla({
                   </p>
                   <p className="mt-0.5 text-[11px] text-white">
                     {suspendido ? (
-                      <span className="text-amber-500/60">Suspendido</span>
+                      <span className="text-warning/60">Suspendido</span>
                     ) : eresElDueno ? (
                       'Tuyo'
                     ) : (

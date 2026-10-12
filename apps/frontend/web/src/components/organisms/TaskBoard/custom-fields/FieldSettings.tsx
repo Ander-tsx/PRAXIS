@@ -298,7 +298,7 @@ function ColorDot({ color, onChange }: { color: LabelColor; onChange: (c: LabelC
   return (
     <button
       type="button"
-      aria-label={`Color ${LABEL_COLOR_LABELS[color]}; pulsa para cambiarlo`}
+      aria-label={`Color ${LABEL_COLOR_LABELS[color]}; presiona para cambiarlo`}
       title={LABEL_COLOR_LABELS[color]}
       onClick={() => onChange(next)}
       className="h-5 w-5 shrink-0 cursor-pointer rounded-full ring-1 ring-inset ring-black/20"

@@ -54,7 +54,7 @@ export interface SkeletonProps {
 export function Skeleton({ className = '', fuerte = false }: SkeletonProps) {
   return (
     <div
-      className={`animate-pulse rounded-lg ${className}`}
+      className={`animate-presione rounded-lg ${className}`}
       style={{ background: fuerte ? VELO_FUERTE : VELO }}
     />
   );
@@ -64,7 +64,7 @@ export function Skeleton({ className = '', fuerte = false }: SkeletonProps) {
 export function SkeletonCircle({ className = '', fuerte = false }: SkeletonProps) {
   return (
     <div
-      className={`animate-pulse rounded-full ${className}`}
+      className={`animate-presione rounded-full ${className}`}
       style={{ background: fuerte ? VELO_FUERTE : VELO }}
     />
   );

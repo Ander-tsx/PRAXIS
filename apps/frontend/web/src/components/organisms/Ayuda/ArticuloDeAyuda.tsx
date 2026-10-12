@@ -1,4 +1,5 @@
 import type { Articulo, Bloque } from '@/content/ayuda/tipos';
+import { Lightbulb, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
@@ -36,7 +37,7 @@ function Texto({ texto }: { texto: string }) {
           return (
             <code
               key={clave}
-              className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.85em] text-text-primary"
+              className="rounded-md border border-border bg-surface-2 px-1.5 py-0.5 font-mono text-[0.85em] text-text-primary"
             >
               {parte.slice(1, -1)}
             </code>
@@ -48,7 +49,7 @@ function Texto({ texto }: { texto: string }) {
             <Link
               key={clave}
               href={enlace[2]}
-              className="text-primary underline underline-offset-2 hover:opacity-80"
+              className="font-medium text-primary underline underline-offset-2 hover:opacity-80"
             >
               {enlace[1]}
             </Link>
@@ -68,22 +69,27 @@ function Nota({
   children: ReactNode;
 }) {
   const consejo = tono === 'consejo';
+  const Icono = consejo ? Lightbulb : TriangleAlert;
   return (
     <aside
-      className={`rounded-xl border px-4 py-3 font-sans text-[14px] leading-relaxed ${
-        consejo
-          ? 'border-primary/30 bg-primary/10 text-white'
-          : 'border-amber-400/30 bg-amber-400/10 text-white'
+      className={`flex gap-3 rounded-xl border border-border border-l-[3px] bg-surface-2 p-4 ${
+        consejo ? 'border-l-primary' : 'border-l-warning'
       }`}
     >
-      <span
-        className={`mb-1 block font-sans text-[11px] font-semibold uppercase tracking-wider ${
-          consejo ? 'text-primary' : 'text-amber-300'
-        }`}
-      >
-        {consejo ? 'Consejo' : 'Ten en cuenta'}
-      </span>
-      {children}
+      <Icono
+        className={`mt-0.5 h-4 w-4 shrink-0 ${consejo ? 'text-primary' : 'text-warning'}`}
+        aria-hidden="true"
+      />
+      <div className="flex min-w-0 flex-col gap-1">
+        <span
+          className={`font-sans text-[12px] font-bold uppercase tracking-wider ${
+            consejo ? 'text-primary' : 'text-warning'
+          }`}
+        >
+          {consejo ? 'Consejo' : 'Ten en cuenta'}
+        </span>
+        <div className="font-sans text-[14px] leading-relaxed text-text-primary">{children}</div>
+      </div>
     </aside>
   );
 }
@@ -94,36 +100,45 @@ function BloqueDeAyuda({ bloque }: { bloque: Bloque }) {
       return (
         <h2
           id={idDeEncabezado(bloque.texto)}
-          className="mt-4 scroll-mt-24 font-display text-2xl text-text-primary"
+          className="mt-4 scroll-mt-24 border-t border-border pt-7 font-sans text-[21px] font-semibold tracking-tight text-text-primary"
         >
           {bloque.texto}
         </h2>
       );
     case 'p':
       return (
-        <p className="font-sans text-[15px] leading-relaxed text-white">
+        <p className="font-sans text-[15px] leading-7 text-text-primary">
           <Texto texto={bloque.texto} />
         </p>
       );
     case 'lista':
       return (
-        <ul className="flex list-disc flex-col gap-2 pl-5 font-sans text-[15px] leading-relaxed text-white marker:text-text-secondary">
+        <ul className="flex flex-col gap-2.5">
           {bloque.items.map((item) => (
-            <li key={item}>
-              <Texto texto={item} />
+            <li key={item} className="flex gap-3 font-sans text-[15px] leading-7 text-text-primary">
+              <span
+                aria-hidden="true"
+                className="mt-[11px] h-1.5 w-1.5 shrink-0 rounded-full bg-text-secondary"
+              />
+              <span className="min-w-0">
+                <Texto texto={item} />
+              </span>
             </li>
           ))}
         </ul>
       );
     case 'pasos':
       return (
-        <ol className="flex flex-col gap-3">
+        <ol className="flex flex-col gap-3.5">
           {bloque.items.map((item, i) => (
-            <li key={item} className="flex gap-3 font-sans text-[15px] leading-relaxed text-white">
-              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/10 font-sans text-[12px] font-semibold text-text-primary">
+            <li
+              key={item}
+              className="flex gap-3.5 font-sans text-[15px] leading-7 text-text-primary"
+            >
+              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-surface-2 font-sans text-[13px] font-semibold text-text-primary">
                 {i + 1}
               </span>
-              <span>
+              <span className="min-w-0">
                 <Texto texto={item} />
               </span>
             </li>
@@ -141,12 +156,12 @@ function BloqueDeAyuda({ bloque }: { bloque: Bloque }) {
       return (
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full min-w-[420px] border-collapse text-left font-sans text-[14px]">
-            <thead className="bg-white/5">
+            <thead className="bg-surface-2">
               <tr>
                 {bloque.cabecera.map((c, i) => (
                   <th
                     key={`${i}-${c}`}
-                    className="px-4 py-2.5 font-sans text-[12px] font-semibold uppercase tracking-wider text-text-secondary"
+                    className="px-4 py-3 font-sans text-[12px] font-semibold uppercase tracking-wider text-text-secondary"
                   >
                     {c}
                   </th>
@@ -159,8 +174,8 @@ function BloqueDeAyuda({ bloque }: { bloque: Bloque }) {
                   {fila.map((celda, i) => (
                     <td
                       key={`${i}-${celda}`}
-                      className={`px-4 py-2.5 align-top leading-relaxed ${
-                        i === 0 ? 'font-medium text-text-primary' : 'text-white'
+                      className={`px-4 py-3 align-top leading-relaxed ${
+                        i === 0 ? 'font-semibold text-text-primary' : 'text-text-primary'
                       }`}
                     >
                       <Texto texto={celda} />
@@ -179,19 +194,22 @@ function BloqueDeAyuda({ bloque }: { bloque: Bloque }) {
 export function ArticuloDeAyuda({ articulo }: { articulo: Articulo }) {
   return (
     <article className="flex flex-col gap-5">
-      <header className="flex flex-col gap-2 border-b border-border pb-5">
-        <span className="font-sans text-[12px] font-semibold uppercase tracking-wider text-text-secondary">
+      <header className="flex flex-col gap-3 pb-2">
+        <span className="w-fit rounded-full bg-surface-2 px-2.5 py-1 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
           {articulo.categoria}
         </span>
-        <h1 className="font-display text-4xl text-text-primary">{articulo.titulo}</h1>
-        <p className="font-sans text-[16px] text-text-secondary">{articulo.resumen}</p>
+        <h1 className="font-sans text-[32px] font-bold leading-tight tracking-tight text-text-primary">
+          {articulo.titulo}
+        </h1>
+        <p className="max-w-2xl font-sans text-[16px] leading-relaxed text-text-secondary">
+          {articulo.resumen}
+        </p>
         {articulo.irA && (
           <Link
             href={articulo.irA.href}
-            className="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-white/10 px-4 py-1.5 font-sans text-[13px] font-semibold text-white transition-colors hover:bg-white/15"
+            className="mt-1 inline-flex w-fit items-center rounded-full bg-primary px-4 py-2 font-sans text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
           >
             {articulo.irA.etiqueta}
-            <span aria-hidden="true">→</span>
           </Link>
         )}
       </header>

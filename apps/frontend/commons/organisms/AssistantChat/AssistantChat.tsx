@@ -415,7 +415,7 @@ export function AssistantChat({
         const fuera = previos.find((adjunto) => adjunto.localId === localId);
         /* El borrador sube ocupando sitio en el servidor: quitarlo del chip sin
            avisar dejaría el archivo colgando para siempre. No se espera a la
-           respuesta —el chip tiene que desaparecer al pulsar— y si falla, el
+           respuesta —el chip tiene que desaparecer al presionar— y si falla, el
            borrador queda huérfano, que es basura y no un error. */
         if (fuera?.id) {
           void fetch(`${gatewayPath}/me/assistant/attachments/${fuera.id}`, { method: 'DELETE' });
@@ -2251,7 +2251,7 @@ function TextoEnVivo({ texto }: { texto: string }) {
     <div className="whitespace-pre-wrap">
       {texto.slice(0, mostrado)}
       <span
-        className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-pulse bg-text-primary"
+        className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-presione bg-text-primary"
         aria-hidden="true"
       />
     </div>

@@ -72,7 +72,7 @@ export function InvitacionAInstalar() {
         <p className="font-sans text-sm font-semibold text-text-primary">Instala Praxis</p>
         {esIOS ? (
           <p className="font-sans text-xs leading-relaxed text-text-secondary">
-            Pulsa <span className="font-semibold text-text-primary">Compartir</span> y luego{' '}
+            Presiona <span className="font-semibold text-text-primary">Compartir</span> y luego{' '}
             <span className="font-semibold text-text-primary">Añadir a pantalla de inicio</span>. Se
             abrirá como una app, a pantalla completa.
           </p>

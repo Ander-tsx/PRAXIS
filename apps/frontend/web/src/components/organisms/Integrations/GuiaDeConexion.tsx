@@ -60,7 +60,7 @@ const CLIENTES: Cliente[] = [
       },
       {
         icono: Plug,
-        titulo: 'Pulsa «Añadir conector personalizado»',
+        titulo: 'Presiona «Añadir conector personalizado»',
         detalle: (
           <>
             Ponle el nombre <b>Praxis</b> y pega la dirección de arriba:{' '}
@@ -70,13 +70,13 @@ const CLIENTES: Cliente[] = [
       },
       {
         icono: LogIn,
-        titulo: 'Pulsa «Conectar» y entra con tu cuenta de Kyloo',
+        titulo: 'Presiona «Conectar» y entra con tu cuenta de Kyloo',
         detalle:
           'Usa el mismo correo que en Praxis. Es la cuenta que Praxis usa para saber quién eres.',
       },
       {
         icono: MousePointerClick,
-        titulo: 'Elige las organizaciones y los permisos, y pulsa «Permitir»',
+        titulo: 'Elige las organizaciones y los permisos, y presiona «Permitir»',
         detalle: 'Lectura, escritura y borrado se conceden por separado. Empieza con lo mínimo.',
       },
     ],
@@ -106,12 +106,12 @@ const CLIENTES: Cliente[] = [
       },
       {
         icono: LogIn,
-        titulo: 'Acepta el aviso y pulsa «Crear» y luego «Conectar»',
+        titulo: 'Acepta el aviso y presiona «Crear» y luego «Conectar»',
         detalle: 'Te llevará a Kyloo: entra con el mismo correo que usas en Praxis.',
       },
       {
         icono: MousePointerClick,
-        titulo: 'Elige las organizaciones y los permisos, y pulsa «Permitir»',
+        titulo: 'Elige las organizaciones y los permisos, y presiona «Permitir»',
         detalle:
           'En un chat nuevo, abre el menú «+» → Más → Modo desarrollador y marca Praxis para usarla.',
       },
@@ -142,7 +142,7 @@ const CLIENTES: Cliente[] = [
       },
       {
         icono: MousePointerClick,
-        titulo: 'Elige las organizaciones y los permisos, y pulsa «Permitir»',
+        titulo: 'Elige las organizaciones y los permisos, y presiona «Permitir»',
       },
     ],
   },

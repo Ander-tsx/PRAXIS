@@ -172,7 +172,7 @@ export function PraxCreateProjectTrigger({
             {/* La organización activa: el proyecto se crea aquí, no en la personal. */}
             {organizationId && <input type="hidden" name="organizationId" value={organizationId} />}
             {error && (
-              <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400">
+              <div className="rounded-lg border border-error/20 bg-error/10 p-3 text-xs text-error">
                 {error}
               </div>
             )}

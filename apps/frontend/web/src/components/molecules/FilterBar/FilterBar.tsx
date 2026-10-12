@@ -195,7 +195,7 @@ export function FilterBar({
           <span className="font-semibold tabular-nums text-text-primary">{total}</span>{' '}
           {total === 1 ? nombreSingular : nombrePlural}
           {/* La salida del filtro, junto al número que el filtro ha cambiado.
-              Sin esto había que borrar el campo a mano y volver a pulsar
+              Sin esto había que borrar el campo a mano y volver a presionar
               «Todas», que es el callejón sin salida que ya se arregló una vez en
               la rejilla de proyectos (§40.4). */}
           {filtrando && (

@@ -130,8 +130,8 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
         disabled={guardando}
         aria-haspopup="menu"
         aria-expanded={abierto}
-        aria-label={`Tu estado: ${actual.etiqueta}. Pulsa para cambiarlo`}
-        title={`${actual.etiqueta} — pulsa para cambiar tu estado`}
+        aria-label={`Tu estado: ${actual.etiqueta}. Presiona para cambiarlo`}
+        title={`${actual.etiqueta} — presiona para cambiar tu estado`}
         className="block h-3 w-3 cursor-pointer rounded-full ring-2 ring-surface transition-transform hover:scale-125 disabled:cursor-not-allowed disabled:opacity-60"
         style={{ background: actual.color }}
       />

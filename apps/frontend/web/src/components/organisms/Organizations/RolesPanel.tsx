@@ -205,7 +205,7 @@ function Formulario({
                   <span className="min-w-0 flex-1 font-sans text-sm text-white/90">
                     {TEXTO_DE_PERMISO[clave]}
                     {!puedoDarlo && (
-                      <span className="ml-2 text-xs text-amber-400">
+                      <span className="ml-2 text-xs text-warning">
                         — no lo tienes, no puedes darlo
                       </span>
                     )}
@@ -243,7 +243,7 @@ function Formulario({
         </div>
 
         {state.error && (
-          <p role="alert" className="font-sans text-sm text-red-400">
+          <p role="alert" className="font-sans text-sm text-error">
             {state.error}
           </p>
         )}
@@ -306,14 +306,14 @@ function RoleColumnHeader({
             <button
               type="submit"
               disabled={pending}
-              className="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+              className="text-xs text-error hover:text-error transition-colors disabled:opacity-50"
             >
               {pending ? '...' : 'Borrar'}
             </button>
           </form>
         </div>
       )}
-      {state.error && <span className="text-[10px] text-red-400 mt-1">{state.error}</span>}
+      {state.error && <span className="text-[10px] text-error mt-1">{state.error}</span>}
     </div>
   );
 }

@@ -84,7 +84,7 @@ export function OrganizationForm() {
         <Button type="submit" isLoading={pending}>
           Crear la organización
         </Button>
-        {/* ⚠️ Se dice antes de pulsar, no en la letra pequeña de después: nace
+        {/* ⚠️ Se dice antes de presionar, no en la letra pequeña de después: nace
             en gratuito, y alguien que espere haber comprado algo aquí se lleva
             una sorpresa al invitar a la undécima persona. */}
         <span className="font-sans text-xs text-white">
