@@ -7,6 +7,7 @@ import {
   ForbiddenException,
   Get,
   HttpCode,
+  HttpException,
   HttpStatus,
   Inject,
   Logger,
@@ -906,6 +907,87 @@ export class OrganizationsController {
         this.billingClient.send(
           { cmd: 'billing_org_transfer' },
           { organizationId, porUserId: req.user!.userId, userId: body.userId },
+        ),
+      ),
+    );
+  }
+
+  /**
+   * Elimina la organización. **No se deshace.**
+   *
+   * Lo decide billing-service (dueño, no personal, sin suscripción de pago viva), pero lo de los
+   * **proyectos** solo puede mirarlo el gateway: viven en projects-service y billing no habla con
+   * él. Se mira **después** de saber que quien pregunta es el dueño —un 409 con «tiene N
+   * proyectos» le diría a cualquiera cuánto trabajo hay en una organización ajena— y **antes** de
+   * borrar, porque un proyecto sin organización queda huérfano (`organizationId` es NOT NULL).
+   */
+  @Delete()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Elimina la organización (solo su dueño; no la personal)' })
+  @ApiResponse({ status: 403, description: 'Solo quien es dueño puede eliminarla' })
+  @ApiResponse({ status: 409, description: 'Tiene proyectos o una suscripción activa' })
+  async eliminar(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+  ) {
+    const userId = req.user!.userId;
+    const vista = oFalla(await this.leer(organizationId, userId));
+    if (!vista.soyDueno) {
+      throw new HttpException(
+        {
+          code: 'SIN_PERMISO',
+          message: 'Solo quien es dueño de la organización puede eliminarla.',
+          details: {},
+        },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    /* El espacio personal no se elimina, tenga lo que tenga dentro: se dice antes de contar. */
+    if (vista.kind === 'PERSONAL') {
+      throw new HttpException(
+        {
+          code: 'NO_VALE',
+          message: 'Tu espacio personal no se elimina: es donde caen tus cuotas.',
+          details: {},
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const proyectos = await firstValueFrom(
+      this.projectsClient.send<{ status: string }[]>(
+        { cmd: 'project_find_by_organization' },
+        { organizationId },
+      ),
+    ).catch(() => {
+      /* Sin saber si hay proyectos no se borra: lo contrario deja proyectos sin organización. */
+      throw new HttpException(
+        {
+          code: 'NO_DISPONIBLE',
+          message: 'No se pudo comprobar si la organización tiene proyectos. Inténtalo de nuevo.',
+          details: {},
+        },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    });
+    const vivos = proyectos.filter((proyecto) => proyecto.status !== 'DELETED').length;
+    if (vivos > 0) {
+      throw new HttpException(
+        {
+          code: 'EN_USO',
+          message: `Todavía tiene ${vivos} ${vivos === 1 ? 'proyecto' : 'proyectos'}. Elimínalos antes de eliminar la organización.`,
+          details: { proyectos: vivos },
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send(
+          { cmd: 'billing_org_delete' },
+          { organizationId, porUserId: userId },
         ),
       ),
     );

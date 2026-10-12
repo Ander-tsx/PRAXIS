@@ -1856,6 +1856,83 @@ export class OrganizationsService {
     return { ok: true };
   }
 
+  /* ─── Eliminar ─────────────────────────────────────────────────────────── */
+
+  /**
+   * Elimina una organización propia. **No se deshace.**
+   *
+   * Solo quien es dueño, y solo una de empresa: el espacio personal es de la persona por
+   * definición y es donde caen sus cuotas, así que no se borra. Se niega, con el motivo, cuando:
+   *
+   * - **hay una suscripción de pago viva.** Borrar la fila no cancela nada en Stripe, y se
+   *   seguiría cobrando por una organización que ya no existe. Se cancela primero en Facturación.
+   * - **quedan proyectos dentro** (lo comprueba el gateway, que es quien habla con projects-service):
+   *   un proyecto sin organización es un proyecto huérfano, y `Project.organizationId` es NOT NULL.
+   *
+   * Los miembros se quitan **antes** que los papeles: `OrganizationMember.roleId` es `Restrict`, y
+   * Postgres comprueba eso al momento, no al final del cascade. Lo demás —suscripción vacía,
+   * imagen, plantillas— cae con la organización; el historial de eventos se queda sin organización
+   * (`SetNull`) porque es la memoria de lo que movió dinero. La memoria de la prueba gratuita
+   * (`TrialRedemption`) tampoco se toca: borrar y recrear no puede dar otro mes.
+   */
+  async eliminar(datos: { organizationId: string; porUserId: string }) {
+    const organizacion = await this.prisma.organization.findUnique({
+      where: { id: datos.organizationId },
+      include: { subscription: true },
+    });
+    if (!organizacion) {
+      return { error: 'Esa organización no existe.', codigo: 'NO_EXISTE' } as Fallo;
+    }
+    if (organizacion.ownerUserId !== datos.porUserId) {
+      return {
+        error: 'Solo quien es dueño de la organización puede eliminarla.',
+        codigo: 'SIN_PERMISO',
+      } as Fallo;
+    }
+    if (organizacion.kind === OrganizationKind.PERSONAL) {
+      return {
+        error: 'Tu espacio personal no se elimina: es donde caen tus cuotas.',
+        codigo: 'NO_VALE',
+      } as Fallo;
+    }
+
+    const suscripcion = organizacion.subscription;
+    const viva =
+      suscripcion &&
+      suscripcion.tier !== PlanTier.FREE &&
+      suscripcion.status !== SubscriptionStatus.CANCELED;
+    if (viva) {
+      return {
+        error:
+          'Tiene una suscripción activa. Cancélala en Facturación antes de eliminar la organización: borrarla no deja de cobrarla.',
+        codigo: 'EN_USO',
+      } as Fallo;
+    }
+
+    const miembros = await this.prisma.organizationMember.findMany({
+      where: { organizationId: datos.organizationId },
+      select: { userId: true },
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.organizationMember.deleteMany({ where: { organizationId: datos.organizationId } });
+      await tx.organizationRole.deleteMany({ where: { organizationId: datos.organizationId } });
+      await tx.projectRoleTemplate.deleteMany({
+        where: { organizationId: datos.organizationId },
+      });
+      await tx.organization.delete({ where: { id: datos.organizationId } });
+    });
+
+    /* Lo cacheado de la organización y de **cada** persona que estaba dentro: su lista de
+       organizaciones y sus permisos ya no son los de hace un segundo. */
+    await this.olvidar(datos.organizationId);
+    for (const { userId } of miembros) {
+      if (userId) await this.olvidar(datos.organizationId, userId);
+    }
+    this.log.log(`Organización ${datos.organizationId} eliminada por ${datos.porUserId}.`);
+    return { ok: true };
+  }
+
   /**
    * Olvida lo cacheado de una organización, y de una persona si se dice cuál.
    *

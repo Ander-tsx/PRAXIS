@@ -413,6 +413,11 @@ export class OrganizationsController {
     return this.organizaciones.apuntar(dto);
   }
 
+  @MessagePattern({ cmd: 'billing_org_delete' })
+  eliminar(@Payload() dto: { organizationId: string; porUserId: string }) {
+    return this.organizaciones.eliminar(dto);
+  }
+
   @MessagePattern({ cmd: 'billing_org_transfer' })
   traspasar(@Payload() dto: { organizationId: string; porUserId: string; userId: string }) {
     return this.organizaciones.traspasar(dto);
