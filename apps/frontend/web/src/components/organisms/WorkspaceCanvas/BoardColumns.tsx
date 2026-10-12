@@ -14,10 +14,12 @@ import {
   type ColumnColor,
   DONE_COLUMN_COLOR,
   type Label,
+  type Paginated,
   type Task,
   type UserProfile,
   alpha,
   colors,
+  createApiClient,
   useAccion,
 } from '@praxis/commons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -33,8 +35,9 @@ import { useReposicionAnimada } from '../TaskBoard/useReposicionAnimada';
 import { AddColumnCard } from './AddColumnCard';
 import { BacklogPanel } from './BacklogPanel';
 import { ColumnMenu } from './ColumnMenu';
+import { ColumnaCerrada } from './ColumnaCerrada';
 import { MinimizarIcono } from './TableroExpandible';
-import { BACKLOG } from './scrum';
+import { BACKLOG, LOTE_DE_CERRADAS } from './scrum';
 import { BOARD_SURFACE } from './superficie-tablero';
 
 /**
@@ -52,7 +55,17 @@ export interface PlanificacionDelTablero {
   nombreNuevo: string;
   /** Pasar tareas entre backlog y sprint es editarlas: `canEditTask`. */
   canPlan: boolean;
+  /** La columna final de solo lectura: lo terminado en sprints cerrados (una página y el total). */
+  cerradas: { items: Task[]; total: number };
+  /** El nombre de cada sprint por id, para la etiqueta de cada tarjeta cerrada. */
+  nombreDeSprint: Map<string, string>;
+  /** Cómo se llama esa columna («Closed» si nadie la renombró). */
+  nombreColumnaCerrada: string;
+  /** Renombrarla es editar el tablero: `canEditBoard`. */
+  puedeRenombrarCerrada: boolean;
 }
+
+const apiDelNavegador = createApiClient({ gatewayPath: '/api/gateway' });
 
 export interface BoardColumnsProps {
   board: Board;
@@ -170,12 +183,44 @@ export function BoardColumns({
   planificacion,
 }: BoardColumnsProps) {
   const backlog = planificacion?.backlog;
+
+  /* La columna «Closed»: la primera página viene de la página (`planificacion.cerradas`) y el
+     resto se va pidiendo al pulsar «Cargar más». Se juntan sin repetir. */
+  const [masCerradas, setMasCerradas] = useState<Task[]>([]);
+  const [cargandoCerradas, setCargandoCerradas] = useState(false);
+  const [errorCerradas, setErrorCerradas] = useState(false);
+  const cerradas = useMemo(() => {
+    const primera = planificacion?.cerradas.items ?? [];
+    const vistas = new Set(primera.map((t) => t.id));
+    return [...primera, ...masCerradas.filter((t) => !vistas.has(t.id))];
+  }, [planificacion?.cerradas.items, masCerradas]);
+  const idsCerradas = useMemo(() => new Set(cerradas.map((t) => t.id)), [cerradas]);
+
+  async function cargarMasCerradas() {
+    setCargandoCerradas(true);
+    setErrorCerradas(false);
+    try {
+      const pagina = Math.floor(cerradas.length / LOTE_DE_CERRADAS) + 1;
+      const res = await apiDelNavegador.get<Paginated<Task>>(
+        `/boards/${board.id}/tasks?closed=true&page=${pagina}&limit=${LOTE_DE_CERRADAS}`,
+      );
+      setMasCerradas((previas) => [...previas, ...res.items]);
+    } catch {
+      setErrorCerradas(true);
+    } finally {
+      setCargandoCerradas(false);
+    }
+  }
+
   /**
    * Las tareas tal como son (para el panel de tarea) y tal como las ve el
    * motor: las del backlog con `columnId = BACKLOG`, para que repartirlas,
    * moverlas en optimista y medir el hueco sea el mismo código para todas.
    */
-  const originales = useMemo(() => (backlog ? [...tasks, ...backlog] : tasks), [tasks, backlog]);
+  const originales = useMemo(
+    () => [...tasks, ...(backlog ?? []), ...cerradas],
+    [tasks, backlog, cerradas],
+  );
   const todas = useMemo(
     () => (backlog ? [...tasks, ...backlog.map((t) => ({ ...t, columnId: BACKLOG }))] : tasks),
     [tasks, backlog],
@@ -821,6 +866,26 @@ export function BoardColumns({
           <HuecoDeColumna key="hueco-columna" ancho={arrastrandoColumna?.ancho ?? 288} />
         )}
 
+        {/* La última: no es una columna de las del tablero, no se arrastra a ella ni se reordena. */}
+        {planificacion && (
+          <ColumnaCerrada
+            boardId={board.id}
+            projectId={projectId}
+            nombre={planificacion.nombreColumnaCerrada}
+            tareas={cerradas}
+            total={Math.max(planificacion.cerradas.total, cerradas.length)}
+            nombreDeSprint={planificacion.nombreDeSprint}
+            usersById={usersById}
+            currentUserId={currentUserId}
+            puedeRenombrar={planificacion.puedeRenombrarCerrada}
+            onOpenTask={setOpenTask}
+            openTaskId={openTask?.id ?? null}
+            onCargarMas={cargarMasCerradas}
+            cargandoMas={cargandoCerradas}
+            errorAlCargar={errorCerradas}
+          />
+        )}
+
         {canCreateColumn && (
           <div className="self-start">
             <AddColumnCard boardId={board.id} projectId={projectId} nextOrder={columns.length} />
@@ -1018,6 +1083,7 @@ export function BoardColumns({
 
       {renderedTask && (
         <TaskDialog
+          /* Una tarea de la columna «Closed» se abre, pero no se toca: todos los permisos, apagados. */
           open={!!openTask}
           onClose={handleCloseTask}
           projectId={projectId}
@@ -1029,14 +1095,14 @@ export function BoardColumns({
           labels={labels}
           usersById={usersById}
           currentUserId={currentUserId}
-          canToggleChecklist={canMoveTask}
-          canComment={canComment}
-          canManageLabels={canManageLabels}
-          canEdit={canEditTask}
-          canDelete={canDeleteTask}
+          canToggleChecklist={canMoveTask && !idsCerradas.has(renderedTask.id)}
+          canComment={canComment && !idsCerradas.has(renderedTask.id)}
+          canManageLabels={canManageLabels && !idsCerradas.has(renderedTask.id)}
+          canEdit={canEditTask && !idsCerradas.has(renderedTask.id)}
+          canDelete={canDeleteTask && !idsCerradas.has(renderedTask.id)}
           onSaved={handleTaskSaved}
           planificacion={
-            planificacion?.canPlan && columns[0]
+            planificacion?.canPlan && columns[0] && !idsCerradas.has(renderedTask.id)
               ? (() => {
                   const enBacklog = (tasksByColumn.get(BACKLOG) ?? []).some(
                     (t) => t.id === renderedTask.id,

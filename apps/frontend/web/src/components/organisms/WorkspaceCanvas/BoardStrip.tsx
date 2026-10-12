@@ -11,6 +11,7 @@ import { TableroMenu } from './TableroMenu';
 import type { VistaTablero } from './VistaSelector';
 import { calcularVelocidad, unidadDe } from './burndown';
 import {
+  NOMBRE_COLUMNA_CERRADA,
   type ScrumDelTablero,
   nombreDelSiguiente,
   sprintActivo,
@@ -149,9 +150,13 @@ export function BoardStrip({
             sprintDestino: enTablero ? { id: enTablero.id, name: enTablero.name } : null,
             nombreNuevo: nombreDelSiguiente(scrum.sprints),
             canPlan: canEditTask,
+            cerradas: scrum.cerradas,
+            nombreDeSprint: new Map(scrum.sprints.map((s) => [s.id, s.name])),
+            nombreColumnaCerrada: board.closedColumnName?.trim() || NOMBRE_COLUMNA_CERRADA,
+            puedeRenombrarCerrada: canEditBoard,
           }
         : undefined,
-    [scrum, panel, cerrarBacklog, enTablero, canEditTask],
+    [scrum, panel, cerrarBacklog, enTablero, canEditTask, canEditBoard, board.closedColumnName],
   );
 
   /**

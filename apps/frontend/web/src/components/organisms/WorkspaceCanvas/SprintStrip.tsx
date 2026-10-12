@@ -15,7 +15,6 @@ import {
 import { type ReactNode, useCallback, useState } from 'react';
 import { CerrarSprintDialog, DescartarSprintDialog, FormularioDeSprint } from './SprintDialogs';
 import { SprintPanel } from './SprintPanel';
-import { TareasDeSprint } from './TareasDeSprint';
 import { type Unidad, conUnidad, valor } from './burndown';
 import { diasRestantes, sprintsPlaneados, textoDiasRestantes } from './scrum';
 
@@ -76,8 +75,6 @@ export function SprintStrip({
   canManageSprint,
 }: SprintStripProps) {
   const [dialogo, setDialogo] = useState<Dialogo>(null);
-  /** El sprint cerrado cuyas tareas se están viendo. */
-  const [sprintAbierto, setSprintAbierto] = useState<Sprint | null>(null);
   const cerrarDialogo = useCallback(() => setDialogo(null), []);
   const cerrarPanel = useCallback(() => onPanel(null), [onPanel]);
   const [estadoPlan, planear, planeando] = useAccion(
@@ -205,16 +202,8 @@ export function SprintStrip({
           onEmpezar={() => setDialogo('empezar')}
           onCerrarSprint={() => setDialogo('cerrar')}
           onDescartar={() => setDialogo('descartar')}
-          onVerTareas={setSprintAbierto}
         />
       )}
-
-      <TareasDeSprint
-        sprint={sprintAbierto}
-        board={board}
-        usersById={usersById}
-        onCerrar={() => setSprintAbierto(null)}
-      />
 
       {enTablero && dialogo === 'empezar' && (
         <FormularioDeSprint

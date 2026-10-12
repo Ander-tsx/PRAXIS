@@ -428,7 +428,8 @@ export const MCP_TOOLS: readonly McpTool[] = [
   },
   {
     name: 'update_board',
-    description: 'Renombra un tablero o le activa Scrum (sprints, backlog, puntos).',
+    description:
+      'Renombra un tablero, le activa Scrum (sprints, backlog, puntos) o renombra su columna final de solo lectura («Closed» por defecto; vacío la restaura).',
     scope: 'write',
     anchor: 'boardId',
     inputSchema: object(
@@ -436,10 +437,15 @@ export const MCP_TOOLS: readonly McpTool[] = [
         boardId: id('Tablero'),
         name: text('Nombre', 100, 2),
         scrumEnabled: bool('Scrum activado'),
+        closedColumnName: text('Nombre de la columna final de Scrum', 40),
       },
       ['boardId'],
     ),
-    call: { method: 'PATCH', path: '/boards/{boardId}', body: ['name', 'scrumEnabled'] },
+    call: {
+      method: 'PATCH',
+      path: '/boards/{boardId}',
+      body: ['name', 'scrumEnabled', 'closedColumnName'],
+    },
   },
   {
     name: 'create_column',

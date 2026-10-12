@@ -520,6 +520,11 @@ export interface Board {
    * por sprints. Ver `docs/PLAN-SCRUM-KANBAN.md`, D1.
    */
   scrumEnabled: boolean;
+  /**
+   * Cómo se llama la columna final de solo lectura de un tablero con Scrum («Closed» por
+   * defecto, `null`). No es una columna de `columns`: enseña lo terminado en sprints ya cerrados.
+   */
+  closedColumnName?: string | null;
 }
 
 export type SprintStatus = 'PLANNED' | 'ACTIVE' | 'CLOSED';

@@ -1000,7 +1000,28 @@ quitó; el backlog, en cambio, no pinta su contenido cerrado.
 - ⚠️ **`biome check --write` sobre una carpeta entera reformatea archivos
   ajenos.** Se pasa solo sobre los archivos tocados.
 
-### Registro — 2026-10-11: «Ver tareas» de un sprint cerrado
+### D22 — La columna «Closed»: lo terminado en sprints cerrados, de solo lectura (2026-10-12)
+
+Sustituye al botón «Ver tareas» del registro de más abajo (que se quitó). Cuando un tablero trabaja
+por sprints, **la última columna** es «Closed» (nombre editable): enseña las tareas **terminadas**
+(`completedAt`) de **sprints ya cerrados**, lo último primero, cada una con una **etiqueta blanca
+con el nombre de su sprint**. Lo que no se terminó pasó al siguiente sprint o al backlog al cerrar y
+no sale ahí.
+
+- **No es una columna de verdad** y por eso no tiene `BoardColumn`: las tareas no se mueven a ella,
+  se **muestran**. No se registra en el motor de arrastre, no se reordena, no tiene menú de color
+  ni de borrado, y sus tarjetas se abren pero no se editan (todos los permisos del panel, apagados).
+  Gris fijo (`#9b9b95`), candado y contador.
+- Lo único que se guarda es **cómo se llama**: `Board.closedColumnName` (nulo = «Closed»), con
+  `PATCH /boards/:id { closedColumnName }` (`canEditBoard`; `''` la restaura) y en el MCP vía
+  `update_board`. Migración `20261011230000_board_closed_column_name`.
+- **Datos:** `GET /boards/:id/tasks?closed=true&page&limit`. Solo el gateway sabe cuáles sprints
+  están cerrados (viven en projects-service), así que resuelve las ids y le pasa a tasks-service
+  `closedSprintIds`; sale ordenado por `completedAt` descendente. La página carga 50 y la columna
+  ofrece «Cargar más».
+- Con Scrum apagado la columna no sale; el historial de sprints sigue siendo el resumen del cierre.
+
+### Registro — 2026-10-11: «Ver tareas» de un sprint cerrado *(sustituido por D22)*
 
 S15 prometía un sprint cerrado «navegable» y solo se entregó el resumen del cierre: **ninguna pantalla
 listaba las tareas de un sprint cerrado** (Kanban, Tabla y Calendario cargan solo el sprint en curso y el

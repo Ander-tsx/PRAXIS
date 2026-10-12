@@ -35,6 +35,12 @@ export class UpdateBoardBodyDto {
   @IsOptional()
   @IsBoolean()
   scrumEnabled?: boolean;
+
+  /** Cómo se llama la columna final de solo lectura de un tablero con Scrum. `''` la devuelve a «Closed». */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  closedColumnName?: string;
 }
 
 export class UpdateBoardDto extends UpdateBoardBodyDto {

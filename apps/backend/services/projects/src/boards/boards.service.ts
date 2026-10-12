@@ -95,6 +95,9 @@ export class BoardsService {
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.scrumEnabled !== undefined && { scrumEnabled: dto.scrumEnabled }),
+        ...(dto.closedColumnName !== undefined && {
+          closedColumnName: dto.closedColumnName.trim() || null,
+        }),
       },
     });
 

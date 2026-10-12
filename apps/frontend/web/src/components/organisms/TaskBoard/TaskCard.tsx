@@ -92,6 +92,12 @@ export interface TaskCardProps {
    * porque en ese momento no se abre nada.
    */
   fantasma?: boolean;
+  /**
+   * Una etiqueta de color sólido y bien contrastada arriba de la tarjeta: en la columna «Closed»
+   * de Scrum, a qué sprint pertenece la tarea terminada. Las etiquetas de la tarea son tenues y
+   * de muchos colores; esta tiene que leerse de un vistazo y no confundirse con ellas.
+   */
+  etiquetaDeSprint?: string;
 }
 
 /**
@@ -151,6 +157,7 @@ export function TaskCard({
   onArrastrar,
   registrarNodo,
   fantasma = false,
+  etiquetaDeSprint,
 }: TaskCardProps) {
   const { done, total } = checklistProgress(task);
   const due = dueState(task.dueDate);
@@ -330,6 +337,11 @@ export function TaskCard({
        * Sin fondo, sin borde y sin cursor propio: tiene que seguir leyéndose
        * como el título de la tarjeta, no como un control dentro de ella.
        */}
+      {etiquetaDeSprint && (
+        <span className="w-fit rounded-md bg-white px-2 py-0.5 font-sans text-[11px] font-bold uppercase tracking-wide text-black">
+          {etiquetaDeSprint}
+        </span>
+      )}
       <h6 className="min-w-0 font-sans text-sm leading-snug text-white">
         <button
           type="button"

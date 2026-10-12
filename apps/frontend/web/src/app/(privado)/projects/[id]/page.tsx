@@ -9,6 +9,7 @@ import { ProjectRoles } from '@/components/organisms/ProjectRoles';
 import { ProjectRules } from '@/components/organisms/ProjectRules';
 import { SuspendedProjectNotice } from '@/components/organisms/SuspendedProjectNotice';
 import { WorkspaceCanvas } from '@/components/organisms/WorkspaceCanvas';
+import { LOTE_DE_CERRADAS } from '@/components/organisms/WorkspaceCanvas/scrum';
 import type { AutomationCatalog } from '@/lib/projects/automation-catalog';
 import {
   AppHeader,
@@ -436,12 +437,13 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     tareas: Task[];
     backlog: Task[];
     metricas: SprintMetrics;
+    cerradas: { items: Task[]; total: number };
   }> {
     const sprints = await api.get<Sprint[]>(`/boards/${boardId}/sprints`).catch(() => []);
     /* El tablero enseña el sprint en curso o, sin él, el planeado. */
     const enTablero =
       sprints.find((s) => s.status === 'ACTIVE') ?? sprints.find((s) => s.status === 'PLANNED');
-    const [tareas, backlog, metricas] = await Promise.all([
+    const [tareas, backlog, metricas, cerradas] = await Promise.all([
       enTablero
         ? api
             .get<Paginated<Task>>(
@@ -457,8 +459,13 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
       api
         .get<SprintMetrics>(`/boards/${boardId}/sprints/metrics`)
         .catch(() => ({ velocitySprintIds: [], tasks: [] }) as SprintMetrics),
+      /* La columna «Closed»: lo terminado en sprints cerrados, una página. Sin ella el tablero
+         se pinta igual, solo que sin esa columna llena. */
+      api
+        .get<Paginated<Task>>(`/boards/${boardId}/tasks?closed=true&limit=${LOTE_DE_CERRADAS}`)
+        .catch(() => ({ items: [] as Task[], total: 0 })),
     ]);
-    return { sprints, tareas, backlog, metricas };
+    return { sprints, tareas, backlog, metricas, cerradas };
   }
 
   const [boardTasks, scrumDeTableros, documentos, historiales, customFields] = await Promise.all([
@@ -510,8 +517,8 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   for (const [boardId, datos] of scrumDeTableros) boardTasks.push([boardId, datos.tareas]);
   const scrumByBoard = new Map(
     scrumDeTableros.map(
-      ([boardId, { sprints, backlog, metricas }]) =>
-        [boardId, { sprints, backlog, metricas }] as const,
+      ([boardId, { sprints, backlog, metricas, cerradas }]) =>
+        [boardId, { sprints, backlog, metricas, cerradas }] as const,
     ),
   );
   /**
