@@ -166,7 +166,11 @@ export function ColumnaCerrada({
         </p>
       )}
 
-      <div className="scrollbar-slim flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-3">
+      <div /* `pt-1`/`pb-1` de más: el borde de «tarjeta abierta» o de hover es un `outline` de 2 px que
+          sale de la tarjeta, y el contenedor con scroll recorta lo que sobresale: la primera tarjeta
+          lo perdía por arriba. */
+        className="scrollbar-slim flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-4 pt-1"
+      >
         {tareas.length === 0 ? (
           <p className="px-2 py-4 font-sans text-xs text-text-secondary">
             Aquí se verá lo que termines en cada sprint, ya cerrado. Es solo de lectura.

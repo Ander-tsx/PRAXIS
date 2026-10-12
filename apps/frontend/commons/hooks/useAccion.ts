@@ -95,6 +95,13 @@ export function useAccion<Estado, Carga = FormData>(
 ): [estado: Awaited<Estado>, enviar: (carga: Carga) => void, enMarcha: boolean] {
   const [lanzadas, setLanzadas] = useState(0);
   const [terminadas, setTerminadas] = useState(0);
+  /**
+   * El último resultado, publicado **fuera de la transición**. El `estado` de `useActionState`
+   * es de prioridad de transición y llega cuando la cola del router lo deja: con una
+   * revalidación en vuelo, un diálogo que cierra al ver `estado.done` se quedaba abierto
+   * segundos sobre una acción que ya había salido bien —y un segundo clic la repetía—.
+   */
+  const [publicado, setPublicado] = useState<{ valor: Awaited<Estado> } | null>(null);
 
   /**
    * Si la acción redirige o cierra el diálogo, el componente se desmonta antes
@@ -115,9 +122,10 @@ export function useAccion<Estado, Carga = FormData>(
 
   const envuelta = useCallback(
     async (estado: Awaited<Estado>, carga: Carga): Promise<Awaited<Estado>> => {
-      setLanzadas((cuantas) => cuantas + 1);
+      let resultado: Awaited<Estado> | undefined;
       try {
-        return await accion(estado, carga);
+        resultado = await accion(estado, carga);
+        return resultado;
       } catch (fallo) {
         /**
          * 🔴 **Una Server Action que se rompe por el camino tumbaba la pantalla
@@ -156,12 +164,15 @@ export function useAccion<Estado, Carga = FormData>(
          * escriba uno sin él, prefiere verlo.
          */
         if (!tieneCampoError(inicial)) throw fallo;
-        return { ...inicial, error: mensajeDeFallo(fallo) } as Awaited<Estado>;
+        resultado = { ...inicial, error: mensajeDeFallo(fallo) } as Awaited<Estado>;
+        return resultado;
       } finally {
         /* El macrotask es lo que deja fuera de la transición este apagado. Ver
            la explicación de arriba: sin él, esta línea se cuelga con ella. */
         window.setTimeout(() => {
-          if (montado.current) setTerminadas((cuantas) => cuantas + 1);
+          if (!montado.current) return;
+          setTerminadas((cuantas) => cuantas + 1);
+          if (resultado !== undefined) setPublicado({ valor: resultado });
         }, 0);
       }
     },
@@ -196,6 +207,18 @@ export function useAccion<Estado, Carga = FormData>(
    */
   const enviar = useCallback(
     (carga: Carga) => {
+      /**
+       * 🔴 **El «en marcha» se enciende AQUÍ, en el gesto, y no dentro de la acción.**
+       *
+       * Antes lo hacía `envuelta`, que corre dentro de la transición: ese `setLanzadas` es de
+       * prioridad de transición y se pinta cuando React lo decide, no cuando se hace clic. Con el
+       * router de Next ocupado —una revalidación todavía en vuelo, un refresco de avisos— el
+       * botón tardaba **segundos** en girar. Es exactamente lo que se vivía al empezar o cerrar
+       * un sprint: un clic sin ninguna respuesta, y un segundo clic que lanzaba la acción otra
+       * vez («el sprint ya está en marcha»). Fuera de la transición, el cambio es urgente y el
+       * botón se apaga en el mismo fotograma.
+       */
+      setLanzadas((cuantas) => cuantas + 1);
       startTransition(() => despachar(carga));
     },
     [despachar],
@@ -215,7 +238,7 @@ export function useAccion<Estado, Carga = FormData>(
     return () => window.clearTimeout(temporizador);
   }, [enMarcha, lanzadas]);
 
-  return [estado, enviar, enMarcha];
+  return [publicado ? publicado.valor : estado, enviar, enMarcha];
 }
 
 /**
