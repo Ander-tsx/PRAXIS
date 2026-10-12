@@ -128,7 +128,7 @@ export function HardDeleteDialog({
             Cancelar
           </Button>
           {/* Deshabilitado hasta que el nombre coincide: el servidor lo comprueba
-              igual, pero un botón que se puede pulsar promete que va a funcionar. */}
+              igual, pero un botón que se puede presionar promete que va a funcionar. */}
           <Button type="submit" variant="danger" isLoading={pending} disabled={!coincide}>
             Borrar para siempre
           </Button>

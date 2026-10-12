@@ -51,7 +51,7 @@ export function RoleForm({ projectId, role, onCancel, onSuccess }: RoleFormProps
   }
 
   return (
-    <div className="flex flex-col gap-5 rounded-xl border border-white/10 bg-[#191919] p-6 ring-1 ring-white/10">
+    <div className="flex flex-col gap-5 rounded-xl border border-white/10 bg-surface p-6 ring-1 ring-white/10">
       <header>
         <h4 className="font-sans text-base font-semibold text-white">
           {role ? `Editar «${role.name}»` : 'Nuevo rol'}

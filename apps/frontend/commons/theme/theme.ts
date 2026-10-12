@@ -1,16 +1,28 @@
-import { DEFAULT_THEME, type ThemeName } from './cookie';
+import { cookies } from 'next/headers';
+import {
+  DEFAULT_THEME,
+  THEME_COOKIE,
+  type ThemeName,
+  type ThemePreference,
+  esPreferenciaValida,
+} from './cookie';
 
 /**
- * El tema de la interfaz, en el servidor.
- *
- * ⚠️ **El modo claro está retirado por ahora**, así que esto siempre devuelve
- * `'dark'` — ignora la cookie `praxis_theme`, incluso una `=light` que quedara
- * de antes. La infraestructura (la cookie, `:root[data-theme="light"]` en
- * `theme.css`, el átomo `ThemeToggle`) sigue en su sitio, dormida: volver a
- * habilitar el claro es restaurar la lectura de la cookie aquí.
+ * Lo que la persona eligió (cookie `praxis_theme`): `dark`, `light` o `system`. Sin cookie, o con
+ * un valor que no conocemos, **oscuro**: es el tema por defecto y el de siempre.
  *
  * Solo se puede llamar desde Server Components, layouts o Server Actions.
  */
+export async function getThemePreference(): Promise<ThemePreference> {
+  const valor = (await cookies()).get(THEME_COOKIE)?.value;
+  return esPreferenciaValida(valor) ? valor : DEFAULT_THEME;
+}
+
+/**
+ * El tema con el que se pinta el servidor. Con `system` no se puede saber qué prefiere el
+ * navegador, así que se pinta oscuro y un script de la cabecera (ver el layout raíz) lo corrige
+ * **antes del primer pintado**, sin parpadeo.
+ */
 export async function getTheme(): Promise<ThemeName> {
-  return DEFAULT_THEME;
+  return (await getThemePreference()) === 'light' ? 'light' : 'dark';
 }

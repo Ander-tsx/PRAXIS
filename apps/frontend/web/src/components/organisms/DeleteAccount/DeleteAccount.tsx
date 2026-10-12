@@ -78,7 +78,7 @@ export function DeleteAccount({ email, variante = 'boton' }: DeleteAccountProps)
           <button
             type="button"
             onClick={() => setAbierto(true)}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left font-sans text-[13px] font-medium text-red-400/80 transition-colors hover:bg-red-500/10 hover:text-red-400"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left font-sans text-[13px] font-medium text-error/80 transition-colors hover:bg-error/10 hover:text-error"
           >
             <svg
               className="h-4 w-4 shrink-0"
@@ -103,12 +103,12 @@ export function DeleteAccount({ email, variante = 'boton' }: DeleteAccountProps)
         )
       ) : (
         <div
-          className={`flex flex-col gap-4 bg-white/5 border border-red-500/20 rounded-2xl p-4 shadow-2xl relative ${
+          className={`flex flex-col gap-4 bg-white/5 border border-error/20 rounded-2xl p-4 shadow-2xl relative ${
             enFila ? 'w-full' : 'sm:p-5 w-full sm:w-[420px]'
           }`}
         >
           <div>
-            <p className="font-sans text-[15px] font-bold text-red-400 mb-1">
+            <p className="font-sans text-[15px] font-bold text-error mb-1">
               Esto no se puede deshacer.
             </p>
             <p className="font-sans text-[13px] text-white leading-relaxed">
@@ -128,12 +128,12 @@ export function DeleteAccount({ email, variante = 'boton' }: DeleteAccountProps)
               placeholder={email}
               autoComplete="off"
               disabled={borrando}
-              className="w-full bg-[#191919] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all disabled:opacity-50"
+              className="w-full bg-surface border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-error/50 focus:ring-1 focus:ring-error/50 transition-all disabled:opacity-50"
             />
           </div>
 
           {error && (
-            <p role="alert" className="font-sans text-xs text-red-400">
+            <p role="alert" className="font-sans text-xs text-error">
               {error}
             </p>
           )}
@@ -143,7 +143,7 @@ export function DeleteAccount({ email, variante = 'boton' }: DeleteAccountProps)
               type="button"
               onClick={() => void eliminar()}
               disabled={!coincide || borrando}
-              className="flex-1 bg-red-500/10 text-red-500 hover:bg-red-500/20 disabled:bg-white/5 disabled:text-white px-4 py-2 rounded-xl text-sm font-bold transition-all"
+              className="flex-1 bg-error/10 text-error hover:bg-error/20 disabled:bg-white/5 disabled:text-white px-4 py-2 rounded-xl text-sm font-bold transition-all"
             >
               {borrando ? 'Eliminando…' : 'Eliminar cuenta'}
             </button>

@@ -97,6 +97,9 @@ export function FormularioDeSprint({
 
   function alEnviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
+    /* Un segundo envío mientras el primero sigue en vuelo repetía la acción y daba «ya está en
+       marcha» sobre un sprint que sí había empezado. */
+    if (enviando) return;
     const datos = new FormData(evento.currentTarget);
     datos.set('projectId', projectId);
     datos.set('boardId', board.id);
@@ -157,8 +160,13 @@ export function FormularioDeSprint({
             {estado.error}
           </p>
         )}
+        {enviando && (
+          <output className="block font-sans text-xs text-text-secondary">
+            {modo === 'empezar' ? 'Empezando el sprint…' : 'Guardando…'}
+          </output>
+        )}
         <div className="mt-2 flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onCerrar}>
+          <Button type="button" variant="ghost" onClick={onCerrar} disabled={enviando}>
             Cancelar
           </Button>
           <Button type="submit" isLoading={enviando}>
@@ -236,6 +244,7 @@ export function CerrarSprintDialog({
   }
 
   function enviar() {
+    if (enviando) return;
     const datos = new FormData();
     datos.set('projectId', projectId);
     datos.set('boardId', board.id);
@@ -321,8 +330,13 @@ export function CerrarSprintDialog({
           </p>
         )}
 
+        {enviando && (
+          <output className="block font-sans text-xs text-text-secondary">
+            Cerrando el sprint…
+          </output>
+        )}
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onCerrar}>
+          <Button type="button" variant="ghost" onClick={onCerrar} disabled={enviando}>
             Cancelar
           </Button>
           <Button type="button" onClick={enviar} isLoading={enviando}>
@@ -404,8 +418,13 @@ export function DescartarSprintDialog({
           {estado.error}
         </p>
       )}
+      {enviando && (
+        <output className="block mt-3 font-sans text-xs text-text-secondary">
+          Descartando el sprint…
+        </output>
+      )}
       <div className="mt-6 flex justify-end gap-2">
-        <Button type="button" variant="ghost" onClick={onCerrar}>
+        <Button type="button" variant="ghost" onClick={onCerrar} disabled={enviando}>
           Cancelar
         </Button>
         <Button
@@ -413,6 +432,7 @@ export function DescartarSprintDialog({
           variant="danger"
           isLoading={enviando}
           onClick={() => {
+            if (enviando) return;
             const datos = new FormData();
             datos.set('projectId', projectId);
             datos.set('boardId', board.id);

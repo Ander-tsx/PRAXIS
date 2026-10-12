@@ -65,7 +65,7 @@ export function FranjaSinConexion() {
   if (!sinRed) return null;
   return (
     <output className="pointer-events-none fixed inset-x-0 top-0 z-[320] flex justify-center px-3 pt-[calc(env(safe-area-inset-top,0px)+0.5rem)]">
-      <span className="rounded-full border border-warning/30 bg-[#2a2416] px-3.5 py-1.5 text-center font-sans text-xs text-warning shadow-lg">
+      <span className="rounded-full border border-warning/30 bg-surface-3 px-3.5 py-1.5 text-center font-sans text-xs text-warning shadow-lg">
         Sin conexión · Ves lo último que se cargó, y lo que cambies no se guardará.
       </span>
     </output>

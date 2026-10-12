@@ -42,7 +42,7 @@ export const transition = {
 /** Nombres de keyframes definidos en globals.css — no duplicar aquí */
 export const keyframeNames = {
   echofloat: 'echo-float',
-  ledPulse: 'led-pulse',
+  ledPulse: 'led-presione',
   bubbleIn: 'bubble-in',
   kanbanSlide: 'kanban-slide',
   shimmer: 'shimmer-move',

@@ -9,6 +9,19 @@
 export type ThemeName = 'dark' | 'light';
 
 /**
+ * Lo que la persona elige: un tema fijo o **seguir al sistema** (`prefers-color-scheme`).
+ * `ThemeName` es lo que se pinta de verdad; `ThemePreference` es lo que se guarda en la cookie.
+ */
+export type ThemePreference = ThemeName | 'system';
+
+export const THEME_PREFERENCES = ['dark', 'light', 'system'] as const;
+
+/** ¿Es una preferencia que conocemos? */
+export function esPreferenciaValida(valor: unknown): valor is ThemePreference {
+  return typeof valor === 'string' && (THEME_PREFERENCES as readonly string[]).includes(valor);
+}
+
+/**
  * Los temas válidos, en runtime.
  *
  * `ThemeName` es un tipo y **desaparece al compilar**: no filtra nada. Hace

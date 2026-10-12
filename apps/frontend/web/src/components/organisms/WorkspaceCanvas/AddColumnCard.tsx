@@ -62,7 +62,7 @@ export function AddColumnCard({ boardId, projectId, nextOrder }: AddColumnCardPr
   return (
     <form
       action={formAction}
-      className="flex w-72 shrink-0 flex-col gap-2 rounded-2xl bg-[#191919] p-4"
+      className="flex w-72 shrink-0 flex-col gap-2 rounded-2xl bg-surface p-4"
     >
       <input type="hidden" name="boardId" value={boardId} />
       <input type="hidden" name="projectId" value={projectId} />
@@ -79,7 +79,7 @@ export function AddColumnCard({ boardId, projectId, nextOrder }: AddColumnCardPr
         placeholder="Por hacer"
         autoComplete="off"
         aria-label="Nombre de la columna"
-        className="h-9 rounded-lg border border-white/10 bg-[#1c1c1b] px-3 font-sans text-sm text-white outline-none placeholder:text-white focus:border-primary"
+        className="h-9 rounded-lg border border-white/10 bg-surface-elevated px-3 font-sans text-sm text-white outline-none placeholder:text-white focus:border-primary"
       />
 
       <div className="flex items-center gap-2">

@@ -40,6 +40,13 @@
    con grep de sus clases (`bg-error-muted` sí aparece 3 veces; `bg-info` y
    `bg-info-muted`, cero). `static` fuerza a Tailwind a emitir todas las
    variables del bloque siempre, las use o no un `className`. */
+/* Tinta y papel del tema (ver `--color-white` más abajo). Oscuro por defecto. */
+:root {
+  --ink: #ffffff;
+  --paper: #000000;
+  color-scheme: dark;
+}
+
 @theme static {
   /* 🎨 Paleta neutra (2026-10-02). Estos fondos, textos y bordes eran el azul
      marino de la versión anterior y la paleta neutra solo existía bajo
@@ -57,6 +64,23 @@
      cambia — un hundido oscuro en tema claro se ve como suciedad, no como
      profundidad. */
   --color-canvas-shadow: #000000;
+
+  /* Las superficies que antes estaban a pelo como hexadecimales (`bg-[#202020]`…): una escala
+     con nombre para que el tema claro pueda darles otro valor. `surface` (#191919) es el lienzo y
+     las tarjetas; `surface-2`, el fondo de una columna del tablero; `surface-3`, lo que flota
+     (menús, popovers); `surface-sunken`, lo hundido (campos, pozos). */
+  --color-surface-2: #202020;
+  --color-surface-3: #252525;
+  --color-surface-sunken: #131312;
+
+  /* `white` y `black` de Tailwind son **la tinta y el papel** del tema, no los colores literales:
+     `text-white`, `bg-white/5` o `border-white/10` —más de mil usos escritos para un fondo oscuro—
+     son «el color del texto» y «un velo del color del texto». En claro la tinta es casi negra y
+     el papel, blanco, y todo eso se invierte solo. Lo que tiene que ser blanco de verdad
+     (un texto sobre un botón de color) usa `text-on-color`. */
+  --color-white: var(--ink);
+  --color-black: var(--paper);
+  --color-on-color: #ffffff;
 
   /* ── MARCA / COLOR PRIMARIO ─────────────────────────────── */
   --color-primary: #6c63ff; /* Botones, links activos, estados */
@@ -171,12 +195,21 @@
    texto sobre blanco, y el mismo tono pastel que se lee bien sobre
    `#0d0f14` pierde casi todo el contraste sobre una superficie clara.
    ============================================================ */
+/* El tema claro (2026-10-12). Misma estructura que el oscuro: neutro, sin tinte, con el morado
+   de marca. Lo que no está aquí lo hereda del oscuro. */
 :root[data-theme="light"] {
+  color-scheme: light;
+  --ink: #202124;
+  --paper: #ffffff;
+
   /* ── FONDOS ─────────────────────────────────────────────── */
-  --color-background: #f3f4f9;
+  --color-background: #f8f9fa;
   --color-surface: #ffffff;
-  --color-surface-elevated: #eceef5;
-  --color-overlay: #0d0f14;
+  --color-surface-elevated: #f8f9fa;
+  --color-surface-2: #f1f3f4;
+  --color-surface-3: #ffffff;
+  --color-surface-sunken: #e8eaed;
+  --color-overlay: #000000;
   --color-canvas-shadow: #ffffff;
 
   /* ── MARCA / COLOR PRIMARIO ─────────────────────────────── */
@@ -186,8 +219,6 @@
   --color-primary-foreground: #ffffff;
 
   /* ── LA CARA DE PRAX ────────────────────────────────────── */
-  /* Claros en tema claro: el resto de la pantalla es luminoso, así que la cara
-     morada ya destaca sola y unos rasgos oscuros la endurecen. */
   --color-prax-face: #ffffff;
 
   /* ── ACENTO SECUNDARIO ──────────────────────────────────── */
@@ -197,15 +228,15 @@
   --color-accent-foreground: #ffffff;
 
   /* ── TEXTO ───────────────────────────────────────────────── */
-  --color-text-primary: #171922;
-  --color-text-secondary: #565c72;
-  --color-text-disabled: #a4a9ba;
+  --color-text-primary: #202124;
+  --color-text-secondary: #5f6368;
+  --color-text-disabled: #9aa0a6;
   --color-text-inverse: #ffffff;
 
   /* ── BORDES ─────────────────────────────────────────────── */
-  --color-border: #dde1ea;
-  --color-border-subtle: #eceef3;
-  --color-border-strong: #c3c9d9;
+  --color-border: #dadce0;
+  --color-border-subtle: #e8eaed;
+  --color-border-strong: #bdc1c6;
 
   /* ── ESTADOS / FEEDBACK ──────────────────────────────────── */
   --color-success: #15803d;
@@ -240,18 +271,10 @@
    `:root[data-theme="light"]` fija los tokens en el `<html>`, y este selector
    los vuelve a fijar en el contenedor, que es donde de verdad se leen.
    ============================================================ */
+/* `[data-tone="dark"]` ya no fuerza nada: los valores neutros de aquí abajo son los de base, y con
+   el tema claro un subárbol que se quedara oscuro rompería la pantalla. El atributo sigue en el
+   código por si vuelve a hacer falta. */
 [data-tone="dark"] {
-  --color-background: #0c0c0b;
-  --color-surface: #191919;
-  --color-surface-elevated: #1c1c1b;
-  --color-overlay: #000000;
-  --color-canvas-shadow: #000000;
-  --color-text-primary: #ffffff;
-  --color-text-secondary: rgba(255, 255, 255, 0.55);
-  --color-text-disabled: rgba(255, 255, 255, 0.38);
-  --color-border: rgba(255, 255, 255, 0.12);
-  --color-border-subtle: rgba(255, 255, 255, 0.07);
-  --color-border-strong: rgba(255, 255, 255, 0.22);
 }
 
 /* ── BASE STYLES ──────────────────────────────────────────── */

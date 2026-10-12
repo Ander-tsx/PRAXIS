@@ -19,7 +19,7 @@ export const dynamic = 'force-static';
 
 export default function SinConexion() {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-[#191919] px-8 pb-safe pt-safe text-center">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-surface px-8 pb-safe pt-safe text-center">
       <svg
         className="h-12 w-12 text-text-secondary"
         fill="none"

@@ -343,6 +343,12 @@ model Board {
   /// borra ningún sprint ni ninguna tarea (D1, invariante 3), así que fijarlo
   /// para siempre no daría ninguna seguridad real.
   scrumEnabled Boolean      @default(false)
+
+  /// El nombre de la columna final de un tablero con Scrum, la de solo lectura donde se ven las
+  /// tareas terminadas en sprints pasados. `null` = el nombre por defecto, «Closed». No es una
+  /// columna de verdad (no está en `columns`): las tareas no se mueven a ella, se **muestran** ahí
+  /// por tener `completedAt` y un sprint cerrado. Solo se guarda cómo se llama.
+  closedColumnName String?
   sprints      Sprint[]
 
   @@schema("projects")

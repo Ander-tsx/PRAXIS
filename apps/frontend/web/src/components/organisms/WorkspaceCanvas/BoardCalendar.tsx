@@ -419,7 +419,7 @@ export function BoardCalendar({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
       {/* ── Calendario ── */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#202020]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-surface-2">
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-white/10 px-3 py-2.5">
           <div className="flex items-center gap-2">
             <h4
@@ -651,7 +651,7 @@ export function BoardCalendar({
             e.preventDefault();
             soltarEn(e.dataTransfer.getData('text/plain'), null);
           }}
-          className={`flex shrink-0 flex-col overflow-hidden rounded-xl bg-[#202020] border-white/10 transition-all duration-300 ease-in-out ${
+          className={`flex shrink-0 flex-col overflow-hidden rounded-xl bg-surface-2 border-white/10 transition-all duration-300 ease-in-out ${
             /* Cerrado, en móvil fuera del todo: con la página en columna, el
                `w-0` lo dejaba con el alto de su lista y aplastaba la agenda. */
             mostrarSinFecha
@@ -770,7 +770,7 @@ function AgendaSemana({
             )}
             {(esHoy || delDia.length > 0 || creandoEn === k) && (
               <section aria-label={diaLargo.format(d)} className="border-b border-white/[0.06]">
-                <header className="sticky top-0 z-10 flex min-h-11 items-center gap-2 bg-[#202020]/95 px-4 backdrop-blur">
+                <header className="sticky top-0 z-10 flex min-h-11 items-center gap-2 bg-surface-2/95 px-4 backdrop-blur">
                   <span
                     className={`inline-block font-sans text-[13px] font-semibold first-letter:uppercase ${
                       esHoy ? 'text-primary' : 'text-white/80'
@@ -960,7 +960,7 @@ function CrearEnDia({
         disabled={pending}
         placeholder={pending ? 'Creando…' : 'Nueva tarea'}
         aria-label="Título de la tarea nueva"
-        className="h-7 w-full min-w-0 rounded-md border border-white/10 bg-[#191919] px-2 font-sans text-xs text-white outline-none placeholder:text-white/40 focus:border-primary"
+        className="h-7 w-full min-w-0 rounded-md border border-white/10 bg-surface px-2 font-sans text-xs text-white outline-none placeholder:text-white/40 focus:border-primary"
       />
       {state.error && (
         <p role="alert" className="font-sans text-[10px]" style={{ color: colors.error }}>

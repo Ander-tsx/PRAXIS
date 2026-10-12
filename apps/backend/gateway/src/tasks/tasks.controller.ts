@@ -160,15 +160,49 @@ export class TasksController {
     required: false,
     description: '`true`: solo las que no tienen sprint (el backlog del tablero)',
   })
+  @ApiQuery({
+    name: 'closed',
+    required: false,
+    description:
+      '`true`: lo terminado en sprints ya cerrados, lo último primero (la columna «Closed» de Scrum)',
+  })
   @ApiResponse({ status: 200, description: 'Lista de tareas recuperada' })
-  findAll(
+  async findAll(
     @Param('boardId') boardId: string,
     @Query('columnId') columnId?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('sprintId') sprintId?: string,
     @Query('backlog') backlog?: string,
+    @Query('closed') closed?: string,
   ) {
+    if (closed === 'true') {
+      if (sprintId || backlog === 'true') {
+        throw new BadRequestException('`closed` no se combina con `sprintId` ni con `backlog`');
+      }
+      /* Solo el gateway sabe cuáles sprints están cerrados (viven en projects-service). */
+      const sprints = await firstValueFrom(
+        this.projectsClient.send<{ id: string; status: string }[]>(
+          { cmd: 'sprint_find_by_board' },
+          { boardId },
+        ),
+      );
+      const closedSprintIds = sprints.filter((s) => s.status === 'CLOSED').map((s) => s.id);
+      if (closedSprintIds.length === 0) return { items: [], total: 0 };
+      return firstValueFrom(
+        this.tasksClient.send(
+          { cmd: 'task_find_all' },
+          {
+            boardId,
+            closedSprintIds,
+            query: {
+              page: page ? Number(page) : undefined,
+              limit: limit ? Number(limit) : undefined,
+            },
+          } satisfies FindTasksDto,
+        ),
+      );
+    }
     if (sprintId && backlog === 'true') {
       throw new BadRequestException(
         '`sprintId` y `backlog` no se combinan: uno pide un sprint, el otro ninguno',

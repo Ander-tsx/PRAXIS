@@ -250,7 +250,7 @@ export function presentacionDe(tipo: string): Presentacion {
  *
  * ## Por qué se sobrescribe el de serie
  *
- * `sileo` trae `{ light: '#1a1a1a', dark: '#f2f2f2' }`: negro casi puro sobre la
+ * `sileo` trae `{ light: 'var(--color-surface-sunken)', dark: '#f2f2f2' }`: negro casi puro sobre la
  * aplicación clara y blanco casi puro sobre la oscura. Contrasta, sí, pero **no
  * pertenece a la paleta**: en pantalla se lee como un elemento de otra
  * aplicación pegado encima, y el blanco puro sobre el tema oscuro deslumbra.
@@ -276,15 +276,15 @@ export const RELLENO_POR_TEMA: Record<'dark' | 'light', string> = {
   /**
    * ⚠️ **Neutro, no azul pizarra.** Estaba en `#2c354a`, que venía de la paleta
    * anterior —la de los tokens `--color-surface`, azulados— y se quedó cuando la
-   * interfaz pasó al monocromo: el panel es `#191919` y la barra `#202020`, los
+   * interfaz pasó al monocromo: el panel es `var(--color-surface)` y la barra `var(--color-surface-2)`, los
    * dos grises puros. Una píldora azulada encima se leía como de otra
    * aplicación.
    *
-   * `#2b2b2b` es un peldaño por encima de la barra lateral: se despega del fondo
+   * `var(--color-surface-3)` es un peldaño por encima de la barra lateral: se despega del fondo
    * sin competir con él, que es lo que tiene que hacer algo que aparece encima
    * de lo que estás leyendo y se va solo.
    */
-  dark: '#2b2b2b',
+  dark: 'var(--color-surface-3)',
   /* El claro se conserva por si vuelve el tema: hoy `getTheme()` devuelve
      siempre `'dark'` y esta entrada no la lee nadie. */
   light: '#f2f2f2',

@@ -34,8 +34,8 @@ export function DocumentoCompartido({
   const irAEntrar = useCallback(() => window.location.assign(login), [login]);
 
   return (
-    <div data-tone="dark" className="min-h-screen bg-[#191919] text-text-primary">
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-[#191919]/95 px-5 py-3 backdrop-blur">
+    <div data-tone="dark" className="min-h-screen bg-surface text-text-primary">
+      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-surface/95 px-5 py-3 backdrop-blur">
         <Link href="/" className="font-sans text-base font-bold tracking-tight text-primary">
           Praxis
         </Link>

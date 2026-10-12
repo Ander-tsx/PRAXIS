@@ -55,7 +55,7 @@ export function RolesPanel({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#191919] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
+      <div className="overflow-x-auto rounded-xl border border-white/10 bg-surface [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
         <table className="w-full text-left font-sans text-sm text-white">
           <thead className="border-b border-white/10 bg-white/5">
             <tr>
@@ -154,7 +154,7 @@ function Formulario({
   }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#191919] p-6 shadow-sm">
+    <div className="rounded-xl border border-white/10 bg-surface p-6 shadow-sm">
       <div className="flex items-center gap-4 mb-8">
         <button
           type="button"
@@ -205,7 +205,7 @@ function Formulario({
                   <span className="min-w-0 flex-1 font-sans text-sm text-white/90">
                     {TEXTO_DE_PERMISO[clave]}
                     {!puedoDarlo && (
-                      <span className="ml-2 text-xs text-amber-400">
+                      <span className="ml-2 text-xs text-warning">
                         — no lo tienes, no puedes darlo
                       </span>
                     )}
@@ -243,7 +243,7 @@ function Formulario({
         </div>
 
         {state.error && (
-          <p role="alert" className="font-sans text-sm text-red-400">
+          <p role="alert" className="font-sans text-sm text-error">
             {state.error}
           </p>
         )}
@@ -306,14 +306,14 @@ function RoleColumnHeader({
             <button
               type="submit"
               disabled={pending}
-              className="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+              className="text-xs text-error hover:text-error transition-colors disabled:opacity-50"
             >
               {pending ? '...' : 'Borrar'}
             </button>
           </form>
         </div>
       )}
-      {state.error && <span className="text-[10px] text-red-400 mt-1">{state.error}</span>}
+      {state.error && <span className="text-[10px] text-error mt-1">{state.error}</span>}
     </div>
   );
 }

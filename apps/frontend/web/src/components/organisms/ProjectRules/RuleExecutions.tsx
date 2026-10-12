@@ -92,7 +92,7 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
           <span className="shrink-0 font-light text-text-disabled">/</span>
           {/* ⚠️ **«Las de barrido se lanzan desde aquí» no explicaba nada.**
               «Barrido» es como se llama por dentro; quien lee esto solo quiere
-              saber qué pasa si pulsa el botón de al lado. */}
+              saber qué pasa si presiona el botón de al lado. */}
           <p className="truncate font-sans text-sm text-text-secondary">
             Qué hizo cada regla, sobre qué tarea y cuándo.
           </p>

@@ -1880,7 +1880,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 aria-label="Ir al último mensaje"
                 className="absolute bottom-3 right-4 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-border transition-transform hover:scale-105"
                 style={{
-                  background: '#131312',
+                  background: 'var(--color-surface-sunken)',
                   boxShadow: `0 8px 20px ${alpha(colors.overlay, 45)}`,
                 }}
               >
@@ -1902,7 +1902,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
              */}
             {busquedaAbierta &&
               (errorBusqueda || (resultados !== null && resultados.length === 0)) && (
-                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 bg-[#191919]/90 backdrop-blur-sm">
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 bg-surface/90 backdrop-blur-sm">
                   <p className="font-sans text-sm text-text-secondary">
                     {errorBusqueda ? errorBusqueda : `Nada que coincida con «${terminoBuscado}».`}
                   </p>
@@ -1926,9 +1926,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
            * — o vuelven a desalinearse.
            */}
           {canWrite ? (
-            <div className="relative shrink-0 p-3 pt-4 bg-[#131312] rounded-b-2xl">
+            <div className="relative shrink-0 p-3 pt-4 bg-surface-sunken rounded-b-2xl">
               {/* Degradado suave flotante por encima del composer para fusionarse con el chat */}
-              <div className="absolute left-0 right-0 top-0 h-16 -translate-y-full bg-gradient-to-t from-[#131312] to-transparent pointer-events-none z-10" />
+              <div className="absolute left-0 right-0 top-0 h-16 -translate-y-full bg-gradient-to-t from-surface-sunken to-transparent pointer-events-none z-10" />
               <Composer
                 /**
                  * ⚠️ **La `key` es lo que rellena el campo al editar.**

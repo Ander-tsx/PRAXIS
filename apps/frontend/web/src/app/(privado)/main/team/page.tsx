@@ -152,7 +152,7 @@ function Seccion({
 
 function Vacio({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-xl border border-white/10 bg-[#191919] p-5 font-sans text-sm text-white/80">
+    <p className="rounded-xl border border-white/10 bg-surface p-5 font-sans text-sm text-white/80">
       {children}
     </p>
   );

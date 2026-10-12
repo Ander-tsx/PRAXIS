@@ -71,9 +71,7 @@ export function TableroMenu({
               tareasAbiertas={tareasAbiertas}
               haySprintEnCurso={haySprintEnCurso}
             />
-            {historial && historial.length > 0 && (
-              <HistorialDeSprints sprints={historial} board={board} />
-            )}
+            {historial && historial.length > 0 && <HistorialDeSprints sprints={historial} />}
           </>
         ) : undefined
       }

@@ -139,7 +139,7 @@ export function DirectConversation({
       canWrite={canWrite}
       /* Sois dos: el «visto por todos» se cumple en cuanto lo lee esa persona. */
       participantes={1}
-      motivoSinEscribir="Para escribirle a esta persona debéis compartir al menos un proyecto."
+      motivoSinEscribir="Para escribirle a esta persona deben compartir al menos un proyecto."
       /**
        * ⚠️ **En privado no se menciona a nadie.** Sois dos: escribir `@Juan`
        * cuando le estás escribiendo a Juan no aporta nada, y el desplegable
@@ -147,7 +147,7 @@ export function DirectConversation({
        * devuelve la lista de personas vacía, así que no depende solo de esto.
        */
       permiteMenciones={false}
-      vacio={`Todavía no habéis hablado. Escríbele a ${peerNombre}.`}
+      vacio={`Todavía no han hablado. Escríbele a ${peerNombre}.`}
       encabezado={
         <Encabezado
           perfil={directorio.perfiles.get(peerId)}
@@ -282,7 +282,7 @@ function Encabezado({
             <p className="font-sans text-xs text-text-secondary">
               {isAdmin
                 ? 'No compartís ningún proyecto; puedes chatear porque administras la plataforma.'
-                : 'Estáis en la misma organización. Todavía no compartís ningún proyecto.'}
+                : 'Están en la misma organización. Todavía no comparten ningún proyecto.'}
             </p>
           ) : (
             <div className="flex flex-wrap items-center gap-1.5">

@@ -165,8 +165,8 @@ export function WorkspacePicker({
         title={compacto ? `Espacio de trabajo: ${active?.name ?? 'ninguno'}` : undefined}
         className={
           compacto
-            ? 'flex max-w-[14rem] cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-left font-sans text-sm font-semibold text-white transition-colors hover:bg-[#1c1c1b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
-            : 'flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#191919] px-4 py-3 text-left transition-colors hover:border-white/20'
+            ? 'flex max-w-[14rem] cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-left font-sans text-sm font-semibold text-white transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+            : 'flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-surface px-4 py-3 text-left transition-colors hover:border-white/20'
         }
       >
         {compacto ? (
@@ -196,7 +196,7 @@ export function WorkspacePicker({
 
       {open && (
         <div
-          className={`absolute top-full z-30 mt-2 overflow-hidden rounded-2xl border border-white/10 bg-[#1c1c1b] ${
+          className={`absolute top-full z-30 mt-2 overflow-hidden rounded-2xl border border-white/10 bg-surface-elevated ${
             compacto ? 'left-0 w-72 shadow-lg' : 'left-0 right-0 shadow-lg'
           }`}
         >
@@ -313,7 +313,7 @@ export function WorkspacePicker({
                   onSubmit={(event) => {
                     if (clientError || !name.trim()) event.preventDefault();
                   }}
-                  className="flex flex-col gap-2 border-t border-white/10 p-2 bg-[#191919]"
+                  className="flex flex-col gap-2 border-t border-white/10 p-2 bg-surface"
                 >
                   <input type="hidden" name="projectId" value={projectId} />
                   <input type="hidden" name="kind" value={tipo} />
@@ -360,7 +360,7 @@ export function WorkspacePicker({
                          blanco sobre fondo y borde transparentes, y el placeholder
                          pasaba por una etiqueta más del menú. Fondo hundido, borde
                          visible, placeholder apagado y foco en el acento. */
-                      className="h-8 min-w-0 flex-1 rounded-lg border border-white/10 bg-[#141414] px-2.5 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary hover:border-white/20 focus:border-primary focus:ring-1 focus:ring-primary/40"
+                      className="h-8 min-w-0 flex-1 rounded-lg border border-white/10 bg-surface-sunken px-2.5 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-secondary hover:border-white/20 focus:border-primary focus:ring-1 focus:ring-primary/40"
                     />
                     <Button
                       type="submit"

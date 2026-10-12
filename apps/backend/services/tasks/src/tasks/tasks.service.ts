@@ -664,6 +664,7 @@ export class TasksService {
       (dto.columnId ? `:col:${dto.columnId}` : '') +
       (dto.sprintId ? `:sprint:${dto.sprintId}` : '') +
       (dto.onlyBacklog ? ':backlog' : '') +
+      (dto.closedSprintIds ? `:closed:${[...dto.closedSprintIds].sort().join(',')}` : '') +
       `:p${page}:l${limit}`;
     const cached = await this.redis.get(cacheKey);
     if (cached) return cached;
@@ -678,13 +679,22 @@ export class TasksService {
       where.sprintId = null;
       where.completedAt = null;
     }
+    /* La columna «Closed»: lo terminado en sprints ya cerrados. Una tarea que no se terminó
+       pasó al siguiente sprint o al backlog al cerrar, así que no entra aquí. */
+    const soloCerradas = dto.closedSprintIds !== undefined;
+    if (soloCerradas) {
+      where.sprintId = { in: dto.closedSprintIds };
+      where.completedAt = { not: null };
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.task.findMany({
         where,
         skip,
         take: limit,
-        orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        orderBy: soloCerradas
+          ? [{ completedAt: 'desc' }, { createdAt: 'desc' }]
+          : [{ order: 'asc' }, { createdAt: 'asc' }],
         include: TASK_INCLUDE,
       }),
       this.prisma.task.count({ where }),

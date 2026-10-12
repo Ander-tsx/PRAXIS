@@ -134,7 +134,7 @@ export function RailTooltip({
   return createPortal(
     <div
       role="tooltip"
-      className="pointer-events-none fixed z-[200] -translate-y-1/2 whitespace-nowrap rounded-md border border-white/10 bg-[#2a2a2a] px-2 py-1 font-sans text-xs font-medium text-white shadow-lg"
+      className="pointer-events-none fixed z-[200] -translate-y-1/2 whitespace-nowrap rounded-md border border-white/10 bg-surface-3 px-2 py-1 font-sans text-xs font-medium text-white shadow-lg"
       style={{ left: tip.x, top: tip.y }}
     >
       {tip.texto}
@@ -229,7 +229,7 @@ export function BuscadorDeBarra({
   );
   if (!movil) return caja;
   return (
-    <div className="sticky top-0 z-10 -mx-4 -mt-4 flex flex-col gap-2 bg-[#191919]/95 px-4 pb-2 pt-3 backdrop-blur-md">
+    <div className="sticky top-0 z-10 -mx-4 -mt-4 flex flex-col gap-2 bg-surface/95 px-4 pb-2 pt-3 backdrop-blur-md">
       {caja}
       {children}
     </div>
@@ -539,7 +539,7 @@ export function MenuFlotante({
             ref={menuRef}
             role="menu"
             style={{ top: posicion.top, left: posicion.left }}
-            className={`fixed z-[120] w-52 origin-top-right rounded-xl border border-white/10 bg-[#191919] p-1 shadow-2xl transition-[opacity,transform] duration-150 motion-reduce:transition-none ${
+            className={`fixed z-[120] w-52 origin-top-right rounded-xl border border-white/10 bg-surface p-1 shadow-2xl transition-[opacity,transform] duration-150 motion-reduce:transition-none ${
               dentro ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
             }`}
           >
@@ -866,7 +866,7 @@ export function claseDePopover(
   anclaje: 'abajo' | 'arriba' = 'abajo',
 ): string {
   const arriba = anclaje === 'arriba';
-  return `absolute z-50 rounded-2xl border border-border bg-[#252525] shadow-xl transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+  return `absolute z-50 rounded-2xl border border-border bg-surface-3 shadow-xl transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
     plegada
       ? arriba
         ? 'top-0 left-full ml-2 w-80 origin-top-left'

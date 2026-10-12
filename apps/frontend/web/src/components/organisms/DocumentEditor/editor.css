@@ -69,7 +69,7 @@
 }
 
 .documento-praxis pre {
-  background: #141414;
+  background: var(--color-surface-sunken);
   border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 0.9em 1.1em;
@@ -339,7 +339,7 @@
 }
 .collaboration-carets__label {
   border-radius: 4px 4px 4px 0;
-  color: #0c0c0b;
+  color: var(--color-background);
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 600;

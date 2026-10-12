@@ -159,7 +159,7 @@ export function OrgSwitcher({
    */
   const menu = (enFlotante: boolean) => (
     <div
-      className={`flex flex-col gap-0.5 p-1.5 ${enFlotante ? '' : 'rounded-xl border border-white/10 bg-[#202020] shadow-inner'}`}
+      className={`flex flex-col gap-0.5 p-1.5 ${enFlotante ? '' : 'rounded-xl border border-white/10 bg-surface-2 shadow-inner'}`}
     >
       <div className="flex flex-col mb-1 pb-1 border-b border-white/5">
         {/* Contratar y cambiar el plan es **solo del dueño** — el gateway
@@ -638,13 +638,13 @@ function InviteMemberModal({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="alguien@ejemplo.com"
-            className="w-full bg-[#191919] border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-all"
+            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-all"
             required
           />
         </div>
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-white">Seleccionar rol</label>
-          <div className="flex flex-col gap-2 border border-white/10 rounded-xl overflow-hidden bg-[#191919]">
+          <div className="flex flex-col gap-2 border border-white/10 rounded-xl overflow-hidden bg-surface">
             {roles.length === 0 ? (
               <div className="px-4 py-4 text-sm text-white text-center">Cargando roles...</div>
             ) : (
@@ -680,12 +680,12 @@ function InviteMemberModal({
           </div>
         </div>
         {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+          <div className="p-3 bg-error/10 border border-error/20 rounded-lg text-sm text-error">
             {error}
           </div>
         )}
         {success && (
-          <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-sm text-green-400">
+          <div className="p-3 bg-success/10 border border-success/20 rounded-lg text-sm text-success">
             Invitación enviada con éxito.
           </div>
         )}
@@ -776,7 +776,7 @@ function NewSpaceModal({ onClose, zonePath }: { onClose: () => void; zonePath: s
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ej. Acme Corp"
-            className="w-full bg-[#191919] border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-all"
+            className="w-full bg-surface border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-all"
             required
           />
         </div>
@@ -813,7 +813,7 @@ function NewSpaceModal({ onClose, zonePath }: { onClose: () => void; zonePath: s
           </div>
         </div>
         {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+          <div className="p-3 bg-error/10 border border-error/20 rounded-lg text-sm text-error">
             {error}
           </div>
         )}
@@ -879,7 +879,7 @@ function ModalWrapper({
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg bg-[#191919] rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">
+      <div className="relative z-10 w-full max-w-lg bg-surface rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <div className="flex flex-col">
             <h2 className="text-xl font-bold text-white font-sans">{title}</h2>

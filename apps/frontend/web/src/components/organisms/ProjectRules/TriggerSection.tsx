@@ -50,7 +50,7 @@ export function TriggerSection({
 
       <Grupo
         titulo="Pasa solo"
-        explicacion="La regla actúa en cuanto ocurre, sin que nadie pulse nada."
+        explicacion="La regla actúa en cuanto ocurre, sin que nadie presione nada."
         icono={<Zap className="size-3.5" />}
         triggers={reactivos}
         elegido={triggerType}

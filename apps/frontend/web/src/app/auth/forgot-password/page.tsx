@@ -1,7 +1,7 @@
 'use client';
 
-import { AuthForm, Button, Input } from '@praxis/commons';
 import { AuthPanel } from '@/components/organisms/AuthPanel';
+import { AuthForm, Button, Input } from '@praxis/commons';
 import Link from 'next/link';
 import { type FormEvent, useState } from 'react';
 
@@ -79,7 +79,10 @@ function Contenido() {
         </Button>
       }
       footer={
-        <Link href="/auth/login" className="text-text-primary underline underline-offset-2 hover:opacity-70">
+        <Link
+          href="/auth/login"
+          className="text-text-primary underline underline-offset-2 hover:opacity-70"
+        >
           Volver a entrar
         </Link>
       }
@@ -105,7 +108,10 @@ function Aviso({ titulo, texto }: { titulo: string; texto: string }) {
     <div className="w-full max-w-md">
       <h1 className="mb-2 font-display text-3xl text-text-primary">{titulo}</h1>
       <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">{texto}</p>
-      <Link href="/auth/login" className="font-sans text-sm text-text-primary underline underline-offset-2 hover:opacity-70">
+      <Link
+        href="/auth/login"
+        className="font-sans text-sm text-text-primary underline underline-offset-2 hover:opacity-70"
+      >
         Volver a entrar
       </Link>
     </div>

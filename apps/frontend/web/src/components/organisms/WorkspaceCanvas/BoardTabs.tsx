@@ -55,7 +55,7 @@ export function BoardTabs({ boards, activeId, onCambiar, tareasPorTablero }: Boa
               'font-sans text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
               activo
                 ? 'font-semibold text-white'
-                : 'text-white hover:bg-[#1c1c1b] hover:text-white',
+                : 'text-white hover:bg-surface-elevated hover:text-white',
             ].join(' ')}
             style={activo ? { background: alpha(colors.primary, 12) } : undefined}
           >

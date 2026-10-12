@@ -161,7 +161,7 @@ export default async function BillingPage({
   const topeDeAsientos = spec?.quotas.asientos ?? null;
 
   const tuPlanSlot = esGratis ? null : (
-    <div className="flex flex-col gap-6 rounded-2xl border border-white/10 bg-[#191919] p-6">
+    <div className="flex flex-col gap-6 rounded-2xl border border-white/10 bg-surface p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <span className="font-sans text-xs font-semibold uppercase tracking-wider text-primary">
@@ -340,7 +340,7 @@ export default async function BillingPage({
         </div>
 
         {historial && historial.length > 0 ? (
-          <ol className="overflow-hidden rounded-xl border border-white/10 bg-[#191919]">
+          <ol className="overflow-hidden rounded-xl border border-white/10 bg-surface">
             {historial.map((evento) => (
               <li
                 key={evento.id}

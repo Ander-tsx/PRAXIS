@@ -415,7 +415,7 @@ export function AssistantChat({
         const fuera = previos.find((adjunto) => adjunto.localId === localId);
         /* El borrador sube ocupando sitio en el servidor: quitarlo del chip sin
            avisar dejaría el archivo colgando para siempre. No se espera a la
-           respuesta —el chip tiene que desaparecer al pulsar— y si falla, el
+           respuesta —el chip tiene que desaparecer al presionar— y si falla, el
            borrador queda huérfano, que es basura y no un error. */
         if (fuera?.id) {
           void fetch(`${gatewayPath}/me/assistant/attachments/${fuera.id}`, { method: 'DELETE' });
@@ -1027,7 +1027,7 @@ export function AssistantChat({
       style={
         esFlotante
           ? /* El minichat comparte el tono de la barra lateral. */
-            { background: '#202020' }
+            { background: 'var(--color-surface-2)' }
           : undefined
       }
       /* La paleta casi negra de la aplicación (theme.css, `data-tone`), no la
@@ -1921,7 +1921,7 @@ export function AssistantChat({
                 /* Al enfocar el campo, el borde se pone morado igual que el
                      resto de inputs del sistema (`focus:border-primary` + halo). */
                 className="flex flex-col gap-1.5 rounded-2xl border border-white/10 p-2.5 transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20"
-                style={{ background: '#191919' }}
+                style={{ background: 'var(--color-surface)' }}
               >
                 <textarea
                   ref={campoRef}
@@ -2251,7 +2251,7 @@ function TextoEnVivo({ texto }: { texto: string }) {
     <div className="whitespace-pre-wrap">
       {texto.slice(0, mostrado)}
       <span
-        className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-pulse bg-text-primary"
+        className="ml-0.5 inline-block h-4 w-2 translate-y-0.5 animate-presione bg-text-primary"
         aria-hidden="true"
       />
     </div>
@@ -2538,7 +2538,7 @@ function NombreConRecientes({
       {abierto && (
         <div
           role="menu"
-          className="absolute left-0 top-full z-20 mt-1.5 w-64 overflow-hidden rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl"
+          className="absolute left-0 top-full z-20 mt-1.5 w-64 overflow-hidden rounded-xl border border-white/10 bg-surface-3 p-1 shadow-2xl"
         >
           {recientes.length === 0 ? (
             <p className="px-3 py-3 font-sans text-xs text-text-secondary">

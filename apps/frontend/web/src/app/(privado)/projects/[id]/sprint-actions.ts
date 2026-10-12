@@ -83,6 +83,36 @@ export async function toggleScrumAction(
   return { error: null, done: enabled ? 'on' : 'off' };
 }
 
+/**
+ * Renombra la columna final de solo lectura de un tablero con Scrum («Closed» por defecto).
+ * Es una propiedad del tablero, así que pide `canEditBoard` como renombrarlo. Un nombre vacío la
+ * devuelve a su nombre por defecto.
+ */
+export async function renameClosedColumnAction(
+  _prev: SprintState,
+  formData: FormData,
+): Promise<SprintState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const boardId = String(formData.get('boardId') ?? '');
+  const name = String(formData.get('name') ?? '').trim();
+  if (name.length > 40) return { error: 'El nombre admite 40 caracteres como máximo.', done: null };
+
+  try {
+    const board = await api.patch<Board>(`/boards/${boardId}`, { closedColumnName: name });
+    if ((board?.closedColumnName ?? '') !== name) {
+      return { error: 'El servidor no guardó el cambio.', done: null };
+    }
+  } catch (error) {
+    return { error: describe(error, 'No se pudo renombrar la columna.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'renamed' };
+}
+
 /** `YYYY-MM-DD` local → ISO, al principio o al final del día (ver `startSprintAction`). */
 function fechasDelFormulario(
   formData: FormData,

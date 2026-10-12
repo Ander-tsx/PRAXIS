@@ -154,8 +154,19 @@ export function FilaDeArbol({
 
   return (
     <div className="flex flex-col">
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: el equivalente de teclado es el enlace de dentro, que ya es focalizable */}
       <div
-        className={`group ${SIDEBAR_FILA} ${compacta ? 'min-h-8' : ''} gap-1.5 ${
+        /* **Toda la caja es clic**, no solo el nombre: el icono y los márgenes de la fila no hacían
+           nada y apuntar al monograma de un proyecto era fallar. Se salta lo que tiene gesto
+           propio —el chevron de plegar, el menú de acciones, el enlace, un campo—. */
+        onClick={(evento) => {
+          const objetivo = evento.target as HTMLElement;
+          if (objetivo.closest('a, button, input, textarea, [role="menu"], [role="menuitem"]')) {
+            return;
+          }
+          router.push(href);
+        }}
+        className={`group ${SIDEBAR_FILA} cursor-pointer ${compacta ? 'min-h-8' : ''} gap-1.5 ${
           activo ? SIDEBAR_FILA_ACTIVA : SIDEBAR_FILA_REPOSO
         }`}
       >

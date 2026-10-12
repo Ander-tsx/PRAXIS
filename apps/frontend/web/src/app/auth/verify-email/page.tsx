@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@praxis/commons';
 import { AuthPanel } from '@/components/organisms/AuthPanel';
+import { Button } from '@praxis/commons';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';

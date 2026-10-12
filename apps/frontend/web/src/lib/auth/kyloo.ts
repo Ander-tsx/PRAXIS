@@ -173,7 +173,7 @@ export const ERRORES_KYLOO: Record<string, string> = {
   no_disponible:
     'Kyloo no responde ahora mismo. Entra con tu correo y contraseña de Praxis o con Google.',
   cancelado: 'Cancelaste la entrada con Kyloo.',
-  intento_invalido: 'El intento de entrada caducó. Vuelve a pulsar «Continuar con Kyloo».',
+  intento_invalido: 'El intento de entrada caducó. Vuelve a presionar «Continuar con Kyloo».',
   no_verificado: 'Kyloo no pudo verificar tu cuenta. Inténtalo de nuevo.',
   sin_confirmar:
     'Ya existe una cuenta de Praxis con este correo sin confirmar. Confírmala con el enlace que se te envió al registrarla y vuelve a intentarlo.',

@@ -104,20 +104,27 @@ responde 401 y se lee como una avería, no como una sesión que falta.
 
 **Estilos:** Tailwind v4 con `@theme` en CSS (no hay `tailwind.config`).
 
-🚫 **El modo claro está retirado** (`2aae679`). `getTheme()` devuelve `'dark'`
-fijo e **ignora la cookie `praxis_theme`**, incluso una `=light` que quedara de
-antes. La infraestructura sigue en su sitio, dormida —la cookie,
-`:root[data-theme="light"]` en `theme.css`, el átomo
-`commons/molecules/ThemeToggle` y su uso en el landing—, así que volver a
-habilitarlo es restaurar la lectura de la cookie en `commons/theme/theme.ts`.
+🎨 **Hay dos temas, oscuro (el de siempre, por defecto) y claro** (2026-10-12, rama
+`feature/closed-column`). La cookie `praxis_theme` guarda `dark`, `light` o `system`
+(seguir al sistema); `getTheme()` la lee en el servidor y estampa `data-theme` en el
+`<html>`, y con `system` un script de la cabecera lo corrige antes del primer pintado. El
+selector son tres iconos (`SelectorDeTema`, en `commons/molecules`) junto a «Cerrar sesión»
+en el perfil y en la pantalla «Tú» del móvil, y se aplica al instante. La landing pública
+tiene su paleta fija (`.landing`) y **no** cambia con el tema.
 
-⚠️ Mientras siga así, **una pantalla nueva no tiene que probarse en claro**, pero
-tampoco se le arranca el soporte: `theme.css` conserva las dos paletas y quitar
-una es trabajo que habría que rehacer. Lo que sí importa es **no escribir colores
-a pelo**: usa los tokens (`text-text-primary`, `text-text-secondary`,
-`bg-surface`…). Un `text-white` literal es exactamente lo que aplanó la jerarquía
-tipográfica de media aplicación cuando se pasó a la paleta monocroma — ver la
-auditoría, hallazgo E4.
+Cómo está montado, y lo que hay que respetar al escribir una pantalla:
+
+- **`white` y `black` de Tailwind son la tinta y el papel del tema** (`--color-white: var(--ink)`
+  en `theme.css`): `text-white`, `bg-white/5` o `border-white/10` son «el color del texto» y «un
+  velo de ese color», y se invierten solos en claro. Si algo tiene que ser blanco **de verdad**
+  (texto sobre un botón de color) usa `text-on-color`.
+- **Las superficies son tokens**, no hexadecimales: `bg-surface` (lienzo y tarjetas),
+  `bg-surface-2` (columna del tablero), `bg-surface-3` (menús y popovers),
+  `bg-surface-sunken` (campos y pozos), `bg-surface-elevated`, `bg-background`. Un
+  `bg-[#202020]` nuevo se queda oscuro en claro.
+- **Un `rgba(255,255,255,…)` o un `#fff` literal en un `style` tampoco se invierte**: usa
+  `color-mix(in srgb, var(--color-white) N%, transparent)` o los tokens de `colors.ts`.
+- `[data-tone="dark"]` ya no fuerza nada.
 
 Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.css` de zona lo importa y solo añade lo suyo: `@source "../**/*.tsx"` y sus `@font-face` (que llevan el basePath).
 

@@ -78,7 +78,7 @@ export function BarraInferior({
       aria-label="Secciones"
       aria-hidden={!visible || undefined}
       inert={!visible}
-      className={`fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.08] bg-[#191919]/95 pb-safe backdrop-blur-md transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden ${
+      className={`fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.08] bg-surface/95 pb-safe backdrop-blur-md transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden ${
         visible ? 'translate-y-0' : 'translate-y-full'
       }`}
     >
@@ -212,7 +212,7 @@ function Pestana({
             <span
               key={insignia}
               aria-label={`${insignia} sin leer`}
-              className="insignia-entra absolute -right-2 -top-1 min-w-4 rounded-full bg-primary px-1 text-center font-sans text-[9px] font-semibold leading-4 text-primary-foreground ring-2 ring-[#191919]"
+              className="insignia-entra absolute -right-2 -top-1 min-w-4 rounded-full bg-primary px-1 text-center font-sans text-[9px] font-semibold leading-4 text-primary-foreground ring-2 ring-surface"
             >
               {insignia > 99 ? '99+' : insignia}
             </span>

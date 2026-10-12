@@ -1,8 +1,7 @@
 'use client';
 
-import { type Board, Dialog, type Sprint } from '@praxis/commons';
+import { Dialog, type Sprint } from '@praxis/commons';
 import { useState } from 'react';
-import { TareasDeSprint } from './TareasDeSprint';
 import { rangoDeFechas, sprintsCerrados } from './scrum';
 
 /**
@@ -10,9 +9,8 @@ import { rangoDeFechas, sprintsCerrados } from './scrum';
  * auditoría S8 de `docs/PLAN-SCRUM-KANBAN.md`). Apagar Scrum no borra el
  * historial, y tiene que poder leerse sin volver a encenderlo.
  */
-export function HistorialDeSprints({ sprints, board }: { sprints: Sprint[]; board: Board }) {
+export function HistorialDeSprints({ sprints }: { sprints: Sprint[] }) {
   const [abierto, setAbierto] = useState(false);
-  const [verTareas, setVerTareas] = useState<Sprint | null>(null);
   const cerrados = sprintsCerrados(sprints);
 
   return (
@@ -50,19 +48,11 @@ export function HistorialDeSprints({ sprints, board }: { sprints: Sprint[]; boar
                     .filter(Boolean)
                     .join(' · ')}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setVerTareas(s)}
-                  className="w-fit cursor-pointer font-sans text-xs text-text-primary underline underline-offset-2 transition-colors hover:text-text-secondary"
-                >
-                  Ver tareas
-                </button>
               </li>
             );
           })}
         </ul>
       </Dialog>
-      <TareasDeSprint sprint={verTareas} board={board} onCerrar={() => setVerTareas(null)} />
     </>
   );
 }

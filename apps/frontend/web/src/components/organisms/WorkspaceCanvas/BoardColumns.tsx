@@ -14,10 +14,12 @@ import {
   type ColumnColor,
   DONE_COLUMN_COLOR,
   type Label,
+  type Paginated,
   type Task,
   type UserProfile,
   alpha,
   colors,
+  createApiClient,
   useAccion,
 } from '@praxis/commons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -33,8 +35,9 @@ import { useReposicionAnimada } from '../TaskBoard/useReposicionAnimada';
 import { AddColumnCard } from './AddColumnCard';
 import { BacklogPanel } from './BacklogPanel';
 import { ColumnMenu } from './ColumnMenu';
+import { ColumnaCerrada } from './ColumnaCerrada';
 import { MinimizarIcono } from './TableroExpandible';
-import { BACKLOG } from './scrum';
+import { BACKLOG, LOTE_DE_CERRADAS } from './scrum';
 import { BOARD_SURFACE } from './superficie-tablero';
 
 /**
@@ -52,7 +55,31 @@ export interface PlanificacionDelTablero {
   nombreNuevo: string;
   /** Pasar tareas entre backlog y sprint es editarlas: `canEditTask`. */
   canPlan: boolean;
+  /** La columna final de solo lectura: lo terminado en sprints cerrados (una página y el total). */
+  cerradas: { items: Task[]; total: number };
+  /** El nombre de cada sprint por id, para la etiqueta de cada tarjeta cerrada. */
+  nombreDeSprint: Map<string, string>;
+  /** Cómo se llama esa columna («Closed» si nadie la renombró). */
+  nombreColumnaCerrada: string;
+  /** Renombrarla es editar el tablero: `canEditBoard`. */
+  puedeRenombrarCerrada: boolean;
 }
+
+const apiDelNavegador = createApiClient({ gatewayPath: '/api/gateway' });
+
+/**
+ * Los degradados de los bordes del tablero. Del color de la superficie (opaco, en el borde de la
+ * página) a transparente (en el límite del tablero), con paradas intermedias: un lineal a secas se
+ * nota como una banda; esta curva es más suave al principio, que es donde el ojo la busca.
+ */
+const SUPERFICIE = 'var(--color-surface)';
+function degradado(direccion: string): string {
+  const velo = (porcentaje: number) =>
+    `color-mix(in srgb, ${SUPERFICIE} ${porcentaje}%, transparent)`;
+  return `linear-gradient(${direccion}, ${velo(100)} 0%, ${velo(90)} 22%, ${velo(60)} 48%, ${velo(25)} 75%, ${velo(0)} 100%)`;
+}
+const DEGRADADO_IZQUIERDA = degradado('to right');
+const DEGRADADO_DERECHA = degradado('to left');
 
 export interface BoardColumnsProps {
   board: Board;
@@ -170,12 +197,44 @@ export function BoardColumns({
   planificacion,
 }: BoardColumnsProps) {
   const backlog = planificacion?.backlog;
+
+  /* La columna «Closed»: la primera página viene de la página (`planificacion.cerradas`) y el
+     resto se va pidiendo al presionar «Cargar más». Se juntan sin repetir. */
+  const [masCerradas, setMasCerradas] = useState<Task[]>([]);
+  const [cargandoCerradas, setCargandoCerradas] = useState(false);
+  const [errorCerradas, setErrorCerradas] = useState(false);
+  const cerradas = useMemo(() => {
+    const primera = planificacion?.cerradas.items ?? [];
+    const vistas = new Set(primera.map((t) => t.id));
+    return [...primera, ...masCerradas.filter((t) => !vistas.has(t.id))];
+  }, [planificacion?.cerradas.items, masCerradas]);
+  const idsCerradas = useMemo(() => new Set(cerradas.map((t) => t.id)), [cerradas]);
+
+  async function cargarMasCerradas() {
+    setCargandoCerradas(true);
+    setErrorCerradas(false);
+    try {
+      const pagina = Math.floor(cerradas.length / LOTE_DE_CERRADAS) + 1;
+      const res = await apiDelNavegador.get<Paginated<Task>>(
+        `/boards/${board.id}/tasks?closed=true&page=${pagina}&limit=${LOTE_DE_CERRADAS}`,
+      );
+      setMasCerradas((previas) => [...previas, ...res.items]);
+    } catch {
+      setErrorCerradas(true);
+    } finally {
+      setCargandoCerradas(false);
+    }
+  }
+
   /**
    * Las tareas tal como son (para el panel de tarea) y tal como las ve el
    * motor: las del backlog con `columnId = BACKLOG`, para que repartirlas,
    * moverlas en optimista y medir el hueco sea el mismo código para todas.
    */
-  const originales = useMemo(() => (backlog ? [...tasks, ...backlog] : tasks), [tasks, backlog]);
+  const originales = useMemo(
+    () => [...tasks, ...(backlog ?? []), ...cerradas],
+    [tasks, backlog, cerradas],
+  );
   const todas = useMemo(
     () => (backlog ? [...tasks, ...backlog.map((t) => ({ ...t, columnId: BACKLOG }))] : tasks),
     [tasks, backlog],
@@ -617,7 +676,7 @@ export function BoardColumns({
         /* Móvil: una columna por pantalla, con imán al deslizar y un borde de
            la siguiente asomando —para que se vea que hay más— (M3 de
            `docs/PLAN-MOVIL.md`). Desde `md`, los 288 px de siempre. */
-        className="group flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-[#202020] max-md:w-[calc(100vw-3rem)] max-md:snap-center"
+        className="group flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-surface-2 max-md:w-[calc(100vw-3rem)] max-md:snap-center"
         style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
       >
         {/**
@@ -801,31 +860,82 @@ export function BoardColumns({
           cuantas: (tasksByColumn.get(column.id) ?? []).length,
         }))}
       />
-      <div
-        ref={(el) => {
-          registrarPista(el);
-          pistaMovil.current = el;
-        }}
-        onScroll={reposicion.invalidar}
-        className="scrollbar-slim -mx-1 flex min-h-0 flex-1 items-stretch gap-4 overflow-x-auto px-1 pb-1 max-md:snap-x max-md:snap-mandatory max-md:gap-3"
-      >
-        {columnasVisibles.flatMap((column, index) =>
-          index === huecoDeColumna
-            ? [
-                <HuecoDeColumna key="hueco-columna" ancho={arrastrandoColumna?.ancho ?? 288} />,
-                pintarColumna(column, index),
-              ]
-            : [pintarColumna(column, index)],
-        )}
-        {huecoDeColumna >= columnasVisibles.length && (
-          <HuecoDeColumna key="hueco-columna" ancho={arrastrandoColumna?.ancho ?? 288} />
-        )}
+      {/**
+       * El tablero **sangra hasta el borde de la página** y se desvanece en el camino.
+       *
+       * Antes la pista de columnas recortaba en seco en el límite del tablero (el margen de la
+       * página más el relleno de su superficie), y una columna o una tarea a medio salir se veía
+       * cortada con un cuchillo a 44 px del borde. Ahora la pista se extiende por los costados
+       * hasta el borde de la página (`-mx`) y el relleno interior (`px`) deja
+       * **el contenido en reposo exactamente donde estaba**: lo que cabe se ve entero y sin
+       * degradado encima. Solo lo que sale del margen entra en la franja, y ahí se funde con el
+       * fondo hasta desaparecer justo en el borde de la página.
+       *
+       * Los degradados son capas encima, con `pointer-events: none` (no estorban al arrastrar).
+       * **Solo en los costados**: la página de un tablero no tiene scroll vertical, y un degradado
+       * abajo no sacaba nada suave: tapaba el pie de las columnas, justo donde está «Añadir tarea».
+       * Las barras de desplazamiento están ocultas (`scrollbar-none`) para no romper el efecto.
+       * `--sangrado-x` es el margen real de la página + el relleno de la superficie del tablero
+       * (16 px): 2 / 2,5 / 3 rem según el ancho (`p-4`, `md:p-6`, `lg:px-8` del contenedor de
+       * página). Si ese relleno cambia, cambia aquí.
+       */}
+      <div className="relative -mx-[var(--sangrado-x)] flex min-h-0 flex-1 flex-col [--sangrado-x:2rem] md:[--sangrado-x:2.5rem] lg:[--sangrado-x:3rem]">
+        <div
+          ref={(el) => {
+            registrarPista(el);
+            pistaMovil.current = el;
+          }}
+          onScroll={reposicion.invalidar}
+          className="scrollbar-none flex min-h-0 flex-1 items-stretch gap-4 overflow-x-auto px-[var(--sangrado-x)] pb-1 max-md:snap-x max-md:snap-mandatory max-md:gap-3"
+        >
+          {columnasVisibles.flatMap((column, index) =>
+            index === huecoDeColumna
+              ? [
+                  <HuecoDeColumna key="hueco-columna" ancho={arrastrandoColumna?.ancho ?? 288} />,
+                  pintarColumna(column, index),
+                ]
+              : [pintarColumna(column, index)],
+          )}
+          {huecoDeColumna >= columnasVisibles.length && (
+            <HuecoDeColumna key="hueco-columna" ancho={arrastrandoColumna?.ancho ?? 288} />
+          )}
 
-        {canCreateColumn && (
-          <div className="self-start">
-            <AddColumnCard boardId={board.id} projectId={projectId} nextOrder={columns.length} />
-          </div>
-        )}
+          {/* La última: no es una columna de las del tablero, no se arrastra a ella ni se reordena. */}
+          {planificacion && (
+            <ColumnaCerrada
+              boardId={board.id}
+              projectId={projectId}
+              nombre={planificacion.nombreColumnaCerrada}
+              tareas={cerradas}
+              total={Math.max(planificacion.cerradas.total, cerradas.length)}
+              nombreDeSprint={planificacion.nombreDeSprint}
+              usersById={usersById}
+              currentUserId={currentUserId}
+              puedeRenombrar={planificacion.puedeRenombrarCerrada}
+              onOpenTask={setOpenTask}
+              openTaskId={openTask?.id ?? null}
+              onCargarMas={cargarMasCerradas}
+              cargandoMas={cargandoCerradas}
+              errorAlCargar={errorCerradas}
+            />
+          )}
+
+          {canCreateColumn && (
+            <div className="self-start">
+              <AddColumnCard boardId={board.id} projectId={projectId} nextOrder={columns.length} />
+            </div>
+          )}
+        </div>
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[var(--sangrado-x)]"
+          style={{ background: DEGRADADO_IZQUIERDA }}
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-[var(--sangrado-x)]"
+          style={{ background: DEGRADADO_DERECHA }}
+        />
       </div>
 
       {/**
@@ -967,7 +1077,7 @@ export function BoardColumns({
               tira. Es lo que devuelve el contraste a las tarjetas y lo que hace
               que se reconozca como la columna de siempre. */}
           <div
-            className="flex min-h-0 flex-1 flex-col rounded-2xl bg-[#191919] p-2"
+            className="flex min-h-0 flex-1 flex-col rounded-2xl bg-surface p-2"
             style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
           >
             <ColumnTasks
@@ -1018,6 +1128,7 @@ export function BoardColumns({
 
       {renderedTask && (
         <TaskDialog
+          /* Una tarea de la columna «Closed» se abre, pero no se toca: todos los permisos, apagados. */
           open={!!openTask}
           onClose={handleCloseTask}
           projectId={projectId}
@@ -1029,14 +1140,14 @@ export function BoardColumns({
           labels={labels}
           usersById={usersById}
           currentUserId={currentUserId}
-          canToggleChecklist={canMoveTask}
-          canComment={canComment}
-          canManageLabels={canManageLabels}
-          canEdit={canEditTask}
-          canDelete={canDeleteTask}
+          canToggleChecklist={canMoveTask && !idsCerradas.has(renderedTask.id)}
+          canComment={canComment && !idsCerradas.has(renderedTask.id)}
+          canManageLabels={canManageLabels && !idsCerradas.has(renderedTask.id)}
+          canEdit={canEditTask && !idsCerradas.has(renderedTask.id)}
+          canDelete={canDeleteTask && !idsCerradas.has(renderedTask.id)}
           onSaved={handleTaskSaved}
           planificacion={
-            planificacion?.canPlan && columns[0]
+            planificacion?.canPlan && columns[0] && !idsCerradas.has(renderedTask.id)
               ? (() => {
                   const enBacklog = (tasksByColumn.get(BACKLOG) ?? []).some(
                     (t) => t.id === renderedTask.id,
@@ -1124,7 +1235,7 @@ function ColumnaFantasma({
 }) {
   return (
     <div
-      className="flex flex-col gap-3 rounded-2xl bg-[#191919] px-4 py-4"
+      className="flex flex-col gap-3 rounded-2xl bg-surface px-4 py-4"
       style={{ boxShadow: `0 24px 48px -12px ${alpha(colors.overlay, 70)}` }}
     >
       <span className="flex min-w-0 items-center gap-2">

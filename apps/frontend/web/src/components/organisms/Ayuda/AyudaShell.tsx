@@ -1,6 +1,8 @@
 import { ARTICULOS, CATEGORIAS } from '@/content/ayuda/articulos';
 import type { Bloque } from '@/content/ayuda/tipos';
+import { DOCUMENTOS_LEGALES } from '@/content/legal';
 import type { ReactNode } from 'react';
+import { EnlaceDeRiel, GrupoDeRiel } from '../Documentos/riel';
 import { type EntradaDeIndice, IndiceDeAyuda } from './IndiceDeAyuda';
 
 /** El texto de un bloque, sin marcas, para que el buscador mire dentro de los artículos. */
@@ -38,17 +40,27 @@ const ENTRADAS: EntradaDeIndice[] = ARTICULOS.map((a) => ({
  */
 export function AyudaShell({ activo, children }: { activo?: string; children: ReactNode }) {
   const indice = (
-    <IndiceDeAyuda
-      entradas={ENTRADAS}
-      categorias={CATEGORIAS.map((c) => c.nombre)}
-      activo={activo}
-    />
+    <div className="flex flex-col gap-6">
+      <IndiceDeAyuda
+        entradas={ENTRADAS}
+        categorias={CATEGORIAS.map((c) => c.nombre)}
+        activo={activo}
+      />
+      {/* Los tres textos de lectura se encuentran entre sí: desde la ayuda se llega a lo legal. */}
+      <GrupoDeRiel titulo="Documentos legales">
+        {DOCUMENTOS_LEGALES.map((d) => (
+          <EnlaceDeRiel key={d.slug} href={`/main/legal/${d.slug}`}>
+            {d.titulo}
+          </EnlaceDeRiel>
+        ))}
+      </GrupoDeRiel>
+    </div>
   );
 
   return (
     <div className="grid gap-8 lg:grid-cols-[16rem_minmax(0,1fr)]">
-      <details className="rounded-xl border border-border bg-white/[0.03] p-3 lg:hidden">
-        <summary className="cursor-pointer font-sans text-[13px] font-semibold text-white">
+      <details className="rounded-xl border border-border bg-surface-2 p-3 lg:hidden">
+        <summary className="cursor-pointer font-sans text-[13px] font-semibold text-text-primary">
           Índice de la ayuda
         </summary>
         <div className="mt-3">{indice}</div>

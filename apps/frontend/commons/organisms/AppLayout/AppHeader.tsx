@@ -118,7 +118,7 @@ export function AppHeader({
        */}
       <main
         aria-label={title}
-        className={`relative flex-1 bg-[#191919] motion-safe:scroll-smooth ${
+        className={`relative flex-1 bg-surface motion-safe:scroll-smooth ${
           /* `overflow-hidden` y no `auto`: con `lleno`, el que desplaza es un
              hijo, y dejar aquí un scroll de reserva produce dos barras
              anidadas —una que no se mueve nunca— en cuanto el hijo mide justo. */

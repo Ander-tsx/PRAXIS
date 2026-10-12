@@ -92,6 +92,12 @@ export interface TaskCardProps {
    * porque en ese momento no se abre nada.
    */
   fantasma?: boolean;
+  /**
+   * Una etiqueta de color sólido y bien contrastada arriba de la tarjeta: en la columna «Closed»
+   * de Scrum, a qué sprint pertenece la tarea terminada. Las etiquetas de la tarea son tenues y
+   * de muchos colores; esta tiene que leerse de un vistazo y no confundirse con ellas.
+   */
+  etiquetaDeSprint?: string;
 }
 
 /**
@@ -151,6 +157,7 @@ export function TaskCard({
   onArrastrar,
   registrarNodo,
   fantasma = false,
+  etiquetaDeSprint,
 }: TaskCardProps) {
   const { done, total } = checklistProgress(task);
   const due = dueState(task.dueDate);
@@ -243,7 +250,7 @@ export function TaskCard({
       }}
       onClick={fantasma ? undefined : alPulsar}
       className={[
-        'relative flex flex-col gap-2 rounded-xl bg-[#191919] p-3 text-left',
+        'relative flex flex-col gap-2 rounded-xl bg-surface p-3 text-left',
         'transition-[box-shadow,outline-color] duration-150 ease-out',
         fantasma ? 'pointer-events-none w-full' : '',
         /**
@@ -330,6 +337,11 @@ export function TaskCard({
        * Sin fondo, sin borde y sin cursor propio: tiene que seguir leyéndose
        * como el título de la tarjeta, no como un control dentro de ella.
        */}
+      {etiquetaDeSprint && (
+        <span className="w-fit rounded-md bg-white px-2 py-0.5 font-sans text-[11px] font-bold uppercase tracking-wide text-black">
+          {etiquetaDeSprint}
+        </span>
+      )}
       <h6 className="min-w-0 font-sans text-sm leading-snug text-white">
         <button
           type="button"
@@ -484,7 +496,7 @@ export function TaskCard({
             })}
           {task.assignees.length > 7 && (
             <span
-              className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-[#1c1c1b] font-sans text-[11px] font-medium text-white ring-2 ring-[#131312]"
+              className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated font-sans text-[11px] font-medium text-white ring-2 ring-surface-sunken"
               title={`${task.assignees.length - 7} más`}
             >
               +{task.assignees.length - 7}
@@ -554,7 +566,7 @@ function mineFirst<T extends { userId: string }>(assignees: T[], currentUserId: 
  *
  * Se distingue de `Chip` a propósito — ver la nota de la fila de píldoras. El
  * borde va al 35 % del tono y el fondo al 8 %: lo justo para que la píldora
- * exista sobre el `#191919` de la tarjeta sin competir con las de estado.
+ * exista sobre el `var(--color-surface)` de la tarjeta sin competir con las de estado.
  *
  * `title` lleva el texto largo («3 notas») porque el contenido visible es solo
  * la cifra; sin él, un lector de pantalla anunciaría «3» a secas.

@@ -20,7 +20,7 @@ export function AnimatedSearchButton({
 
   return (
     <div
-      className={`flex h-8 shrink-0 items-center overflow-hidden rounded-lg border border-border bg-[#191919] transition-all duration-300 ${abierta ? 'w-48' : 'w-8 hover:bg-white/5'}`}
+      className={`flex h-8 shrink-0 items-center overflow-hidden rounded-lg border border-border bg-surface transition-all duration-300 ${abierta ? 'w-48' : 'w-8 hover:bg-white/5'}`}
     >
       <button
         type="button"

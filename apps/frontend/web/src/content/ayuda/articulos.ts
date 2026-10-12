@@ -3,7 +3,10 @@ import type { Articulo, Categoria } from './tipos';
 /** El orden de aquí es el del índice. */
 export const CATEGORIAS: Categoria[] = [
   { nombre: 'Primeros pasos', descripcion: 'Qué es Praxis y cómo se organiza todo.' },
-  { nombre: 'Trabajo en proyectos', descripcion: 'Tableros, tareas, sprints, documentos y equipo.' },
+  {
+    nombre: 'Trabajo en proyectos',
+    descripcion: 'Tableros, tareas, sprints, documentos y equipo.',
+  },
   { nombre: 'Comunicación', descripcion: 'Chats y avisos.' },
   { nombre: 'PRAX, el asistente', descripcion: 'Cómo te ayuda y qué no hace por su cuenta.' },
   { nombre: 'Automatización', descripcion: 'Reglas que trabajan por ti.' },
@@ -29,7 +32,11 @@ export const ARTICULOS: Articulo[] = [
         tipo: 'tabla',
         cabecera: ['Nivel', 'Qué es', 'Ejemplo'],
         filas: [
-          ['Organización', 'El equipo que paga el plan y reparte los asientos.', 'Estudio Nordeste'],
+          [
+            'Organización',
+            'El equipo que paga el plan y reparte los asientos.',
+            'Estudio Nordeste',
+          ],
           ['Proyecto', 'Un trabajo con su propio equipo, roles y permisos.', 'Rediseño del panel'],
           ['Espacio', 'Una carpeta dentro del proyecto, de tableros o de documentos.', 'Producto'],
           ['Tablero / documento', 'Donde se trabaja de verdad.', 'Sprint 12, Guía de marca'],
@@ -91,7 +98,7 @@ export const ARTICULOS: Articulo[] = [
       {
         tipo: 'consejo',
         texto:
-          'El botón de arriba a la derecha de la barra la pliega para dejar solo los iconos y ganar espacio. En el móvil, la barra es el menú de la hamburguesa.',
+          'El botón de arriba a la derecha de la barra la pliega para dejar solo los iconos y ganar espacio. En el celular, la barra es el menú de la hamburguesa.',
       },
     ],
   },
@@ -106,10 +113,10 @@ export const ARTICULOS: Articulo[] = [
       {
         tipo: 'pasos',
         items: [
-          'En la pestaña **Inicio**, pulsa el **+** junto a «Proyectos» (o el botón «Nuevo proyecto» de la pantalla de Proyectos).',
+          'En la pestaña **Inicio**, presiona el **+** junto a «Proyectos» (o el botón «Nuevo proyecto» de la pantalla de Proyectos).',
           'Escribe el **nombre** y, si quieres, una descripción.',
           'Opcional: sube una **imagen** o elige un **icono y un color**. Si pones imagen, esa es la que se ve.',
-          'Pulsa **Crear proyecto**. Aparece en el árbol de la barra lateral.',
+          'Presiona **Crear proyecto**. Aparece en el árbol de la barra lateral.',
         ],
       },
       {
@@ -339,7 +346,7 @@ export const ARTICULOS: Articulo[] = [
         items: [
           'Los avisos llegan **en vivo**: aparece una tarjeta y suena un aviso sin que recargues la página.',
           'La bandeja tiene dos vistas: **Sin leer** y **Todos**.',
-          'Al pulsar un aviso se marca como leído y te lleva a lo que lo provocó.',
+          'Al presionar un aviso se marca como leído y te lleva a lo que lo provocó.',
           'Los avisos pueden venir de personas (te asignaron una tarea, te mencionaron) o de **reglas de automatización**.',
         ],
       },
@@ -453,7 +460,10 @@ export const ARTICULOS: Articulo[] = [
         texto:
           'Una **organización** contiene los proyectos y es lo que paga el plan. Tienes siempre una **personal** y puedes crear equipos con «Nuevo espacio de trabajo» en el selector de arriba de la barra lateral (con nombre e imagen).',
       },
-      { tipo: 'lista', items: ['Puedes ser dueño de **hasta tres** organizaciones, la personal incluida.'] },
+      {
+        tipo: 'lista',
+        items: ['Puedes ser dueño de **hasta tres** organizaciones, la personal incluida.'],
+      },
       { tipo: 'h2', texto: 'Asientos' },
       {
         tipo: 'p',
@@ -530,7 +540,7 @@ export const ARTICULOS: Articulo[] = [
       {
         tipo: 'p',
         texto:
-          'Pulsa **tu nombre y correo** al pie de la barra lateral para abrir tu perfil. Se muestra en el hueco de debajo de las pestañas.',
+          'Presiona **tu nombre y correo** al pie de la barra lateral para abrir tu perfil. Se muestra en el hueco de debajo de las pestañas.',
       },
       { tipo: 'h2', texto: 'Editar tu perfil' },
       {

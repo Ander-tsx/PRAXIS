@@ -179,7 +179,7 @@ export function HojaInferior({
         aria-modal="true"
         aria-labelledby={tituloId}
         tabIndex={-1}
-        className={`absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-[1.25rem] border-t border-white/10 bg-[#202020] shadow-2xl outline-none ${
+        className={`absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-[1.25rem] border-t border-white/10 bg-surface-2 shadow-2xl outline-none ${
           arrastrando
             ? ''
             : 'transition-transform duration-[260ms] ease-[cubic-bezier(0.22,1,0.36,1)]'

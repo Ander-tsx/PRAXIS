@@ -685,11 +685,11 @@ function ArmazonInterno({
        * `dvh` es la unidad dinámica: mide lo que se ve ahora, y se recalcula
        * cuando la barra del navegador aparece o desaparece.
        */}
-      <div className="flex h-dvh overflow-hidden bg-[#191919] font-sans text-text-primary">
+      <div className="flex h-dvh overflow-hidden bg-surface font-sans text-text-primary">
         {/* ── Barra lateral (escritorio) ───────────────────────── */}
         <aside
           ref={barraRef}
-          className={`relative hidden shrink-0 flex-col border-r border-border bg-[#202020] md:flex ${
+          className={`relative hidden shrink-0 flex-col border-r border-border bg-surface-2 md:flex ${
             redimensionando ? '' : 'transition-[width] duration-200 motion-reduce:transition-none'
           } ${plegada ? 'w-[4.5rem]' : ''}`}
           style={plegada ? undefined : { width: ancho }}
@@ -833,7 +833,7 @@ function ArmazonInterno({
                     className="block rounded-full"
                   >
                     {/* Sin `presence`: el punto lo pinta `estadoSlot`, que
-                        además se puede pulsar. Ver el aviso de esa prop. */}
+                        además se puede presionar. Ver el aviso de esa prop. */}
                     <Avatar
                       label={user.name.trim() || user.email}
                       mine
@@ -1105,7 +1105,7 @@ function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () =>
       className={
         plegada
           ? `${RAIL_CELDA} ${RAIL_REPOSO} cursor-pointer`
-          : 'flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-border bg-[#202020] text-text-secondary shadow-sm transition-colors hover:bg-[#2a2a2a] hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-[#202020]'
+          : 'flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface-2 text-text-secondary shadow-sm transition-colors hover:bg-surface-3 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-2'
       }
     >
       <svg
@@ -1343,7 +1343,7 @@ function BandejaBoton({
           />
         </svg>
         {sinLeer > 0 && (
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-[#202020]" />
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-surface-2" />
         )}
       </button>
 
@@ -1379,7 +1379,7 @@ function InsigniaDePestana({ cuantos }: { cuantos: number }) {
   if (cuantos <= 0) return null;
   return (
     <span
-      className="absolute -right-2 -top-2 min-w-[16px] rounded-full bg-primary px-1 py-px text-center font-sans text-[9px] font-semibold leading-tight text-primary-foreground ring-2 ring-[#202020]"
+      className="absolute -right-2 -top-2 min-w-[16px] rounded-full bg-primary px-1 py-px text-center font-sans text-[9px] font-semibold leading-tight text-primary-foreground ring-2 ring-surface-2"
       aria-label={`${cuantos} sin leer`}
     >
       {cuantos > 99 ? '99+' : cuantos}
@@ -1512,7 +1512,7 @@ function SidebarTabs({
        */
       className={
         plegada
-          ? 'relative flex shrink-0 flex-col items-center gap-0.5 self-center rounded-xl border border-white/10 bg-[#191919] p-0.5'
+          ? 'relative flex shrink-0 flex-col items-center gap-0.5 self-center rounded-xl border border-white/10 bg-surface p-0.5'
           : '-mt-2 mb-4 flex shrink-0 items-center gap-1 overflow-x-auto whitespace-nowrap pt-2 scrollbar-none'
       }
     >
@@ -1595,7 +1595,7 @@ function SidebarTabs({
                  hace falta saber —hay algo— con el `title` para el resto. */
               pestana.insignia > 0 && (
                 <span
-                  className="absolute h-2 w-2 rounded-full bg-primary ring-2 right-1 top-1 ring-[#191919]"
+                  className="absolute h-2 w-2 rounded-full bg-primary ring-2 right-1 top-1 ring-surface"
                   aria-label={`${pestana.insignia} sin leer`}
                 />
               )
@@ -1928,7 +1928,7 @@ function SidebarProjectsTree({
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className={`animate-pulse rounded-lg bg-white/5 ${plegada ? 'h-10 w-10' : 'h-9'}`}
+            className={`animate-presione rounded-lg bg-white/5 ${plegada ? 'h-10 w-10' : 'h-9'}`}
           />
         ))}
       </SidebarSection>
@@ -2332,7 +2332,7 @@ function FilaDePersona({
       {plegada && conversacion.unread > 0 && (
         <span
           aria-label={`${conversacion.unread} sin leer`}
-          className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-[#202020]"
+          className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-surface-2"
         />
       )}
       {!plegada && (
@@ -2411,7 +2411,7 @@ function FilaDeProyecto({
       {plegada && chat.unread > 0 && (
         <span
           aria-label={`${chat.unread} sin leer`}
-          className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-[#202020]"
+          className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-surface-2"
         />
       )}
       {!plegada && (
@@ -2596,8 +2596,8 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
   if (cargando) {
     return (
       <div className="flex flex-col gap-2 px-1">
-        <div className="h-11 animate-pulse rounded-lg bg-white/5" />
-        <div className="h-11 animate-pulse rounded-lg bg-white/5" />
+        <div className="h-11 animate-presione rounded-lg bg-white/5" />
+        <div className="h-11 animate-presione rounded-lg bg-white/5" />
       </div>
     );
   }
@@ -2846,8 +2846,8 @@ export function SidebarInboxList({
      golpe de una altura a la otra. */
   const loader = (
     <div className={`flex flex-col justify-center gap-2.5 px-4 ${ALTO_VACIO}`} aria-hidden="true">
-      <div className="h-3 w-3/4 animate-pulse rounded bg-white/5" />
-      <div className="h-3 w-1/2 animate-pulse rounded bg-white/5" />
+      <div className="h-3 w-3/4 animate-presione rounded bg-white/5" />
+      <div className="h-3 w-1/2 animate-presione rounded bg-white/5" />
     </div>
   );
 
@@ -2857,7 +2857,7 @@ export function SidebarInboxList({
         <div
           className={
             movil
-              ? 'sticky top-0 z-10 -mx-4 -mt-4 mb-2 bg-[#191919]/95 px-4 pb-2 pt-3 backdrop-blur-md'
+              ? 'sticky top-0 z-10 -mx-4 -mt-4 mb-2 bg-surface/95 px-4 pb-2 pt-3 backdrop-blur-md'
               : 'contents'
           }
         >

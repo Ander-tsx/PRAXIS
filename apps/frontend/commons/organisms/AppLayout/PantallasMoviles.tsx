@@ -8,6 +8,7 @@ import { personLabel } from '../../api/domain';
 import { avatarHref } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
 import { ProjectMonogram } from '../../atoms/ProjectMonogram';
+import { SelectorDeTema } from '../../molecules/SelectorDeTema';
 import { olvidarDatosSinConexion } from '../../pwa/sinConexion';
 import { usePresence } from '../../realtime/presence';
 import { SidebarInboxList, cuandoCorto, resumenDe, useDatosDeTu } from './AppShell';
@@ -125,10 +126,10 @@ export function ListaDeChatsMovil() {
         <div className="flex flex-col gap-1 pt-2" aria-hidden="true">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="flex items-center gap-3 py-2.5">
-              <div className="h-11 w-11 shrink-0 animate-pulse rounded-full bg-white/5" />
+              <div className="h-11 w-11 shrink-0 animate-presione rounded-full bg-white/5" />
               <div className="flex flex-1 flex-col gap-2">
-                <div className="h-3 w-1/3 animate-pulse rounded bg-white/5" />
-                <div className="h-3 w-2/3 animate-pulse rounded bg-white/5" />
+                <div className="h-3 w-1/3 animate-presione rounded bg-white/5" />
+                <div className="h-3 w-2/3 animate-presione rounded bg-white/5" />
               </div>
             </div>
           ))}
@@ -384,15 +385,18 @@ export function PantallaTu() {
         </section>
       ))}
 
-      <button
-        type="button"
-        onClick={() => void cerrarSesion()}
-        disabled={saliendo}
-        className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white/[0.04] px-4 font-sans text-[15px] font-medium text-error transition-colors active:bg-white/10 disabled:opacity-60"
-      >
-        <LogOut className="h-5 w-5" aria-hidden="true" />
-        {saliendo ? 'Saliendo…' : 'Cerrar sesión'}
-      </button>
+      <div className="flex items-stretch gap-2">
+        <button
+          type="button"
+          onClick={() => void cerrarSesion()}
+          disabled={saliendo}
+          className="flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-white/[0.04] px-4 font-sans text-[15px] font-medium text-error transition-colors active:bg-white/10 disabled:opacity-60"
+        >
+          <LogOut className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span className="truncate">{saliendo ? 'Saliendo…' : 'Cerrar sesión'}</span>
+        </button>
+        <SelectorDeTema className="min-h-12 rounded-2xl px-1" />
+      </div>
     </div>
   );
 }

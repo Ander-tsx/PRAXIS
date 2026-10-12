@@ -337,7 +337,7 @@ function EditorVivo({
         placeholder: ({ node }) =>
           node.type.name === 'heading'
             ? `Título ${node.attrs.level}`
-            : 'Escribe, o pulsa «/» para insertar un bloque',
+            : 'Escribe, o presiona «/» para insertar un bloque',
         showOnlyCurrent: true,
         includeChildren: false,
       }),
@@ -613,7 +613,7 @@ function Presentes({ gente }: { gente: { name: string; color: string; id: number
       {visibles.map((g) => (
         <span
           key={g.id}
-          className="-ml-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#191919] font-sans text-[10px] font-semibold text-[#0c0c0b] first:ml-0"
+          className="-ml-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface font-sans text-[10px] font-semibold text-background first:ml-0"
           style={{ background: g.color }}
         >
           {g.name.slice(0, 1).toUpperCase()}
@@ -634,7 +634,7 @@ function LineasFantasma() {
       {[92, 78, 85, 40].map((ancho) => (
         <span
           key={ancho}
-          className="h-3.5 animate-pulse rounded bg-white/[0.06]"
+          className="h-3.5 animate-presione rounded bg-white/[0.06]"
           style={{ width: `${ancho}%` }}
         />
       ))}

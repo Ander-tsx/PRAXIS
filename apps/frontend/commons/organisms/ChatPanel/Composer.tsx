@@ -472,7 +472,7 @@ export function Composer({
             <span
               key={adjunto.id}
               className="flex items-center gap-1.5 rounded-lg border border-border py-1 pl-2.5 pr-1 font-sans text-xs text-text-secondary"
-              style={{ background: '#131312' }}
+              style={{ background: 'var(--color-surface-sunken)' }}
             >
               <span className="max-w-40 truncate" title={adjunto.filename}>
                 {adjunto.filename}
@@ -516,7 +516,7 @@ export function Composer({
             aria-label="Sugerencias"
             className="absolute bottom-full left-0 z-50 mb-2 w-full max-w-md overflow-hidden rounded-sm border border-border"
             style={{
-              background: '#131312',
+              background: 'var(--color-surface-sunken)',
               boxShadow: `0 16px 40px ${alpha(colors.overlay, 55)}`,
             }}
           >
@@ -579,7 +579,7 @@ export function Composer({
 
         <div
           className="flex items-end gap-2 rounded-2xl border border-border-strong p-2 shadow-sm transition-colors focus-within:border-primary"
-          style={{ background: '#131312' }}
+          style={{ background: 'var(--color-surface-sunken)' }}
         >
           <div className="relative min-w-0 flex-1">
             {/* La capa de debajo: el mismo texto, con las etiquetas pintadas. */}
@@ -679,7 +679,7 @@ export function Composer({
                  una fila que se alinea por abajo (`items-end`). */
               className={`flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg ${
                 compactButtons
-                  ? 'w-9 border border-border bg-[#191919] shadow-sm hover:bg-white/5'
+                  ? 'w-9 border border-border bg-surface shadow-sm hover:bg-white/5'
                   : 'px-3 hover:bg-white/5 hover:text-text-primary'
               } font-sans text-xs text-text-secondary transition-colors`}
             >
@@ -760,17 +760,17 @@ export function Composer({
           className={`hidden sm:flex items-center gap-3 truncate font-sans text-[11px] text-text-secondary mt-1 ${hideShortcuts ? 'invisible select-none' : ''}`}
         >
           <span className="flex items-center gap-1.5">
-            <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
+            <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
               ↵
             </kbd>{' '}
             enviar
           </span>
           <span className="flex items-center gap-1.5">
             <span className="flex items-center gap-0.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
                 ⇧
               </kbd>
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
                 ↵
               </kbd>
             </span>{' '}
@@ -778,7 +778,7 @@ export function Composer({
           </span>
           {permiteMenciones && (
             <span className="flex items-center gap-1.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1.5 font-sans text-[10px] font-medium shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1.5 font-sans text-[10px] font-medium shadow-sm">
                 @
               </kbd>{' '}
               mencionar
@@ -786,7 +786,7 @@ export function Composer({
           )}
           {permiteReferencias && (
             <span className="flex items-center gap-1.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] font-medium shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] font-medium shadow-sm">
                 /
               </kbd>{' '}
               enlazar tarea
@@ -794,10 +794,10 @@ export function Composer({
           )}
           <span className="flex items-center gap-1.5">
             <span className="flex items-center gap-0.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
                 Ctrl
               </kbd>
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
                 V
               </kbd>
             </span>{' '}

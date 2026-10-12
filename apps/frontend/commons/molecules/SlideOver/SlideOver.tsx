@@ -25,7 +25,7 @@ export interface SlideOverProps {
    * Paleta del panel.
    *
    * `default` es la de siempre —`surface` azulado, `text-primary`—. `dark` es la
-   * del refrandeo: negro casi puro (`#0c0c0b`), bordes y textos en blanco
+   * del refrandeo: negro casi puro (`var(--color-background)`), bordes y textos en blanco
    * translúcido. Se añadió para el diálogo de tarea, que abre sobre el tablero
    * ya refrandeado y desentonaba en azul. Los demás consumidores no pasan `tone`
    * y siguen exactamente igual.
@@ -255,7 +255,7 @@ export function SlideOver({
            (ver `theme.css`): los átomos de dentro —Select, SelectorDeFecha,
            Input…— salen en la paleta near-black sin tocarlos uno a uno. El
            panel además fija su propio fondo/borde a pelo porque quiere el
-           `#0c0c0b` del rebrand, un peldaño por debajo del `surface` de dentro. */
+           `var(--color-background)` del rebrand, un peldaño por debajo del `surface` de dentro. */
         data-tone={dark ? 'dark' : undefined}
         /* Por posición en la pila: el que se abrió después pinta encima, y es
            lo que hace que tape por completo al de debajo mientras entra —sin
@@ -277,7 +277,7 @@ export function SlideOver({
              es lo de siempre (I1). */
           'fixed inset-y-0 right-0 m-0 h-full w-full max-h-screen overflow-y-auto p-5 text-left max-sm:pb-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] max-sm:pt-[calc(env(safe-area-inset-top,0px)+1rem)] max-sm:transition-transform max-sm:duration-300 max-sm:ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none sm:transition-transform sm:duration-300 sm:left-auto sm:border-l cursor-default',
           dark
-            ? 'bg-[#202020] text-white sm:border-white/[0.08]'
+            ? 'bg-surface-2 text-white sm:border-white/[0.08]'
             : 'bg-surface text-text-primary sm:border-border',
           sizeClasses[size],
           visible ? 'translate-x-0 translate-y-0' : 'max-sm:translate-y-full sm:translate-x-full',

@@ -108,7 +108,7 @@ export function BarraSuperior() {
   const raiz = pantalla.atras === null;
 
   return (
-    <header className="shrink-0 border-b border-white/[0.06] bg-[#191919]/95 pt-safe backdrop-blur-md md:hidden">
+    <header className="shrink-0 border-b border-white/[0.06] bg-surface/95 pt-safe backdrop-blur-md md:hidden">
       <div className={`flex h-12 items-center gap-1 ${raiz ? 'px-4' : 'pl-1 pr-4'}`}>
         {pantalla.atras && (
           <Link

@@ -13,7 +13,18 @@ export interface ScrumDelTablero {
   sprints: Sprint[];
   backlog: Task[];
   metricas: SprintMetrics;
+  /**
+   * Lo terminado en sprints ya cerrados, lo último primero: la columna «Closed». Es una página
+   * (`LOTE_DE_CERRADAS`), con el `total` para saber si hay más.
+   */
+  cerradas: { items: Task[]; total: number };
 }
+
+/** Cuántas tareas de la columna «Closed» se piden de una vez. */
+export const LOTE_DE_CERRADAS = 50;
+
+/** Cómo se llama la columna final de solo lectura si nadie la ha renombrado. */
+export const NOMBRE_COLUMNA_CERRADA = 'Closed';
 
 /**
  * Id de la «columna» del backlog dentro del motor de arrastre del tablero. El

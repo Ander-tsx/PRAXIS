@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { EnlaceDeRiel, GrupoDeRiel } from '../Documentos/riel';
 
 export interface EntradaDeIndice {
   slug: string;
@@ -13,11 +13,7 @@ export interface EntradaDeIndice {
 }
 
 /** Sin acentos y en minúsculas: «Facturación» se encuentra escribiendo «facturacion». */
-const normalizar = (t: string) =>
-  t
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
+const normalizar = (t: string) => t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 /**
  * El índice de la ayuda: buscador y artículos por categoría.
@@ -39,9 +35,7 @@ export function IndiceDeAyuda({
   const visibles = useMemo(() => {
     const q = normalizar(consulta.trim());
     if (!q) return entradas;
-    return entradas.filter((e) =>
-      normalizar(`${e.titulo} ${e.resumen} ${e.texto}`).includes(q),
-    );
+    return entradas.filter((e) => normalizar(`${e.titulo} ${e.resumen} ${e.texto}`).includes(q));
   }, [consulta, entradas]);
 
   return (
@@ -67,7 +61,7 @@ export function IndiceDeAyuda({
           value={consulta}
           onChange={(e) => setConsulta(e.target.value)}
           placeholder="Buscar en la ayuda…"
-          className="w-full rounded-lg border border-border bg-white/5 py-2 pl-9 pr-3 font-sans text-[13px] text-white placeholder-text-secondary focus:border-white/30 focus:outline-none"
+          className="w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 font-sans text-[13px] text-text-primary placeholder-text-secondary focus:border-border-strong focus:outline-none"
         />
       </label>
 
@@ -80,25 +74,13 @@ export function IndiceDeAyuda({
           const delGrupo = visibles.filter((e) => e.categoria === categoria);
           if (delGrupo.length === 0) return null;
           return (
-            <div key={categoria} className="flex flex-col gap-1">
-              <h2 className="px-3 pb-1 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
-                {categoria}
-              </h2>
+            <GrupoDeRiel key={categoria} titulo={categoria}>
               {delGrupo.map((e) => (
-                <Link
-                  key={e.slug}
-                  href={`/ayuda/${e.slug}`}
-                  aria-current={e.slug === activo ? 'page' : undefined}
-                  className={`rounded-lg px-3 py-1.5 font-sans text-[13px] transition-colors ${
-                    e.slug === activo
-                      ? 'bg-white/10 font-semibold text-white'
-                      : 'text-text-secondary hover:bg-white/5 hover:text-white'
-                  }`}
-                >
+                <EnlaceDeRiel key={e.slug} href={`/ayuda/${e.slug}`} activo={e.slug === activo}>
                   {e.titulo}
-                </Link>
+                </EnlaceDeRiel>
               ))}
-            </div>
+            </GrupoDeRiel>
           );
         })
       )}

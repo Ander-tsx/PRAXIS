@@ -65,13 +65,13 @@ export function PlanCatalog({
       {/* En móvil la tabla se desplaza de lado y la primera columna —qué se
           compara— se queda fija (M6 de docs/PLAN-MOVIL.md): sin eso, a la
           tercera columna ya no se sabía de qué fila hablaba cada número. */}
-      <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#191919]">
+      <div className="overflow-x-auto rounded-xl border border-white/10 bg-surface">
         <table className="w-full min-w-[760px] text-left font-sans text-sm">
           <thead>
             <tr className="border-b border-white/10">
               <th
                 scope="col"
-                className="w-[26%] px-5 py-5 align-bottom max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-[#191919]"
+                className="w-[26%] px-5 py-5 align-bottom max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-surface"
               >
                 <span className="font-sans text-xs font-medium uppercase tracking-wider text-white/40">
                   Planes
@@ -146,7 +146,7 @@ export function PlanCatalog({
               <tr key={fila.label}>
                 <th
                   scope="row"
-                  className="px-5 py-3.5 font-sans font-medium text-white/60 max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-[#191919]"
+                  className="px-5 py-3.5 font-sans font-medium text-white/60 max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-surface"
                 >
                   {fila.label}
                 </th>
@@ -169,7 +169,7 @@ export function PlanCatalog({
 
           <tfoot>
             <tr className="border-t border-white/10">
-              <td className="px-5 py-5 max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-[#191919]" />
+              <td className="px-5 py-5 max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-surface" />
               {planes.map((plan) => {
                 const esActual = plan.tier === actual;
                 const seVende = disponibles.includes(plan.tier);
@@ -300,7 +300,7 @@ function TopesRebasados({ excedidas }: { excedidas: QuotaExcedida[] }) {
   if (excedidas.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-2 rounded-r-lg border-l-2 border-amber-500 bg-amber-500/[0.06] py-4 pl-4 pr-4">
+    <section className="flex flex-col gap-2 rounded-r-lg border-l-2 border-warning bg-warning/[0.06] py-4 pl-4 pr-4">
       <h3 className="font-sans text-sm font-semibold text-white">
         Tu plan se queda corto para lo que ya tienes
       </h3>
@@ -311,7 +311,7 @@ function TopesRebasados({ excedidas }: { excedidas: QuotaExcedida[] }) {
       <ul className="mt-1 flex flex-col gap-1.5">
         {excedidas.map((excedida) => (
           <li key={excedida.kind} className="flex gap-2 font-sans text-sm text-white/70">
-            <span aria-hidden="true" className="text-amber-500">
+            <span aria-hidden="true" className="text-warning">
               •
             </span>
             <span>{REBASADO[excedida.kind](excedida)}</span>

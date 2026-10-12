@@ -328,7 +328,7 @@ export function BoardTable({
 
   if (tasks.length === 0) {
     return (
-      <div className="flex h-fit max-h-full w-full items-center justify-center rounded-xl border border-white/10 bg-[#202020] p-10 text-center">
+      <div className="flex h-fit max-h-full w-full items-center justify-center rounded-xl border border-white/10 bg-surface-2 p-10 text-center">
         <p className="font-sans text-sm text-white">Este tablero todavía no tiene tareas.</p>
       </div>
     );
@@ -370,7 +370,7 @@ export function BoardTable({
           <select
             value={orden.col}
             onChange={(e) => setOrden({ col: e.target.value as Col, asc: true })}
-            className="min-h-9 rounded-lg border border-white/10 bg-[#191919] px-2 font-sans text-sm text-text-primary"
+            className="min-h-9 rounded-lg border border-white/10 bg-surface px-2 font-sans text-sm text-text-primary"
           >
             <option value="columna">Columna</option>
             <option value="titulo">Tarea</option>
@@ -419,7 +419,7 @@ export function BoardTable({
   }
 
   return (
-    <div className="h-fit max-h-full overflow-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20 w-fit max-w-full rounded-xl border border-white/10 bg-[#202020]">
+    <div className="h-fit max-h-full overflow-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20 w-fit max-w-full rounded-xl border border-white/10 bg-surface-2">
       {/**
        * ⚠️ **`table-layout: fixed` y anchos en `<colgroup>`.** Con el reparto
        * automático, un título de doscientos caracteres estiraba su columna
@@ -442,7 +442,7 @@ export function BoardTable({
           ))}
           {puedeGestionarCampos && <col style={{ width: ANCHO_AÑADIR }} />}
         </colgroup>
-        <thead className="sticky top-0 z-10 bg-[#202020]">
+        <thead className="sticky top-0 z-10 bg-surface-2">
           <tr className="border-b border-white/10 font-sans text-[11px] font-semibold uppercase tracking-wider text-white">
             {COLUMNAS.map((c) => (
               <Th
@@ -567,7 +567,7 @@ function FilaTarea({
     // biome-ignore lint/a11y/useKeyWithClickEvents: el equivalente de teclado es el <button> del título, cuyo click burbujea hasta aquí; el click en la fila es solo comodidad de ratón
     <tr
       onClick={onOpen}
-      className={`cursor-pointer border-b border-white/[0.06] transition-colors last:border-0 hover:bg-[#282828] ${atenuada ? 'opacity-60' : ''}`}
+      className={`cursor-pointer border-b border-white/[0.06] transition-colors last:border-0 hover:bg-surface-3 ${atenuada ? 'opacity-60' : ''}`}
     >
       <td className={CELDA}>
         <button
@@ -608,7 +608,7 @@ function FilaTarea({
               );
             })}
             {t.assignees.length > 4 && (
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 font-sans text-[9px] text-white ring-2 ring-[#202020]">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 font-sans text-[9px] text-white ring-2 ring-surface-2">
                 +{t.assignees.length - 4}
               </span>
             )}
@@ -933,7 +933,7 @@ function TarjetaDeTarea({
     <button
       type="button"
       onClick={onOpen}
-      className={`flex w-full flex-col gap-2 rounded-xl border border-white/[0.06] bg-[#202020] p-3 text-left active:bg-[#282828] ${
+      className={`flex w-full flex-col gap-2 rounded-xl border border-white/[0.06] bg-surface-2 p-3 text-left active:bg-surface-3 ${
         atenuada ? 'opacity-60' : ''
       }`}
     >
