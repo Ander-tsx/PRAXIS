@@ -472,3 +472,39 @@ export async function borrarPlantillaAction(
     };
   }
 }
+
+/**
+ * Elimina la organización. **No se deshace.**
+ *
+ * La confirmación escrita se comprueba **aquí**, contra el nombre que tiene en el servidor, y
+ * no solo en el botón deshabilitado del diálogo: un botón apagado es una pista, no una garantía.
+ * Quién puede (dueño, no personal) y qué lo impide (proyectos, suscripción viva) lo dice el
+ * gateway con su propio texto, que se enseña tal cual.
+ */
+export async function eliminarOrganizacionAction(
+  _prev: OrganizacionState,
+  formData: FormData,
+): Promise<OrganizacionState> {
+  if (!(await sesionViva())) return { error: SESION_CADUCADA, done: null };
+
+  const organizationId = String(formData.get('organizationId') ?? '');
+  const confirmacion = String(formData.get('confirmacion') ?? '').trim();
+  const api = createServerApiClient();
+
+  try {
+    const organizacion = await api.get<OrganizationView>(`/organizations/${organizationId}`);
+    if (!organizacion.name || confirmacion !== organizacion.name.trim()) {
+      return { error: 'El nombre no coincide: no se eliminó nada.', done: null };
+    }
+    await api.delete(`/organizations/${organizationId}`);
+  } catch (error) {
+    return {
+      error: error instanceof ApiError ? error.message : 'No se pudo eliminar la organización.',
+      done: null,
+    };
+  }
+
+  /* Cambia la lista de organizaciones de la barra lateral y de todo el armazón. */
+  revalidatePath('/', 'layout');
+  return { error: null, done: 'eliminada' };
+}

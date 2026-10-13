@@ -49,10 +49,14 @@ export const SECTION_BODY_CLASS =
  * como excesivo. Aquí suben un peldaño **por encima** del panel, como corresponde
  * a una capa elevada. Se redefinen para el subárbol, igual que hace
  * `data-tone`, en vez de tocar el tema de toda la aplicación.
+ *
+ * 🔴 **Los valores salen de `--task-panel-surface*` (theme.css), no de un hex.** Con los grises
+ * oscuros a pelo, en tema claro todos los desplegables, el calendario y las listas del panel
+ * salían **negros con texto oscuro**, ilegibles.
  */
 export const TASK_PANEL_TOKENS = {
-  '--color-surface': '#262626',
-  '--color-surface-elevated': '#2c2c2b',
+  '--color-surface': 'var(--task-panel-surface)',
+  '--color-surface-elevated': 'var(--task-panel-surface-elevated)',
 } as CSSProperties;
 
 /**

@@ -4,3 +4,4 @@ export { OrganizationForm } from './OrganizationForm';
 export { OrgIdentityForm } from './OrgIdentityForm';
 export { RolesPanel } from './RolesPanel';
 export { SeatsPanel } from './SeatsPanel';
+export * from './EliminarOrganizacion';

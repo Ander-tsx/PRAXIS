@@ -369,7 +369,7 @@ function ProyectosLista({
                 {equiposPorProyecto[project.id]?.slice(0, 3).map((user) => (
                   <div
                     key={user.id}
-                    className="relative rounded-full ring-2 ring-[#080807] bg-surface"
+                    className="relative rounded-full ring-2 ring-background bg-surface"
                   >
                     <Avatar
                       label={
@@ -384,7 +384,7 @@ function ProyectosLista({
                   </div>
                 ))}
                 {(equiposPorProyecto[project.id]?.length ?? 0) > 3 && (
-                  <div className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[10px] font-medium text-white ring-2 ring-[#080807]">
+                  <div className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-[10px] font-medium text-white ring-2 ring-background">
                     +{equiposPorProyecto[project.id]!.length - 3}
                   </div>
                 )}

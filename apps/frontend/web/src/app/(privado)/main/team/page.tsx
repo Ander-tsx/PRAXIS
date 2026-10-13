@@ -1,4 +1,9 @@
-import { MembersPanel, OrgIdentityForm, RolesPanel } from '@/components/organisms/Organizations';
+import {
+  EliminarOrganizacion,
+  MembersPanel,
+  OrgIdentityForm,
+  RolesPanel,
+} from '@/components/organisms/Organizations';
 import { AppHeader } from '@praxis/commons';
 import { createServerApiClient, loadPrivateChrome } from '@praxis/commons/auth';
 import type {
@@ -108,6 +113,15 @@ export default async function TeamPage({
                     puedeEditar={permisos.canManageOrganization}
                   />
                 </div>
+                {/* Solo su dueño. Puede ser incluso la personal, mientras le quede otra propia. */}
+                {org.soyDueno && (
+                  <div className="mt-10">
+                    <EliminarOrganizacion
+                      organizationId={organizationId}
+                      nombre={org.name ?? 'Mi espacio'}
+                    />
+                  </div>
+                )}
               </Seccion>
             }
             roles={

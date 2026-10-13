@@ -195,6 +195,17 @@
    texto sobre blanco, y el mismo tono pastel que se lee bien sobre
    `#0d0f14` pierde casi todo el contraste sobre una superficie clara.
    ============================================================ */
+/* Las superficies del panel de tarea (`TASK_PANEL_TOKENS`): un peldaño por encima del panel. No
+   van dentro de `@theme` porque no son utilidades, solo variables intermedias. */
+:root {
+  --task-panel-surface: #262626;
+  --task-panel-surface-elevated: #2c2c2b;
+}
+:root[data-theme="light"] {
+  --task-panel-surface: #ffffff;
+  --task-panel-surface-elevated: #ffffff;
+}
+
 /* El tema claro (2026-10-12). Misma estructura que el oscuro: neutro, sin tinte, con el morado
    de marca. Lo que no está aquí lo hereda del oscuro. */
 :root[data-theme="light"] {

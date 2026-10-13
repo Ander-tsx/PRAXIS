@@ -253,13 +253,17 @@ export class QuotaService {
     }
 
     const suyas = await firstValueFrom(
-      this.billingClient.send<{ id: string; kind: string }[]>(
+      this.billingClient.send<{ id: string; kind: string; soyDueno?: boolean }[]>(
         { cmd: 'billing_orgs_of' },
         { userId },
       ),
-    ).catch(() => [] as { id: string; kind: string }[]);
+    ).catch(() => [] as { id: string; kind: string; soyDueno?: boolean }[]);
 
-    return suyas.find((organizacion) => organizacion.kind === 'PERSONAL')?.id ?? null;
+    /* La personal; y si la eliminó, la primera que sea suya (ver `personalDe`). */
+    return (
+      (suyas.find((organizacion) => organizacion.kind === 'PERSONAL') ??
+        suyas.find((organizacion) => organizacion.soyDueno))?.id ?? null
+    );
   }
 
   /**
