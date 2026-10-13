@@ -33,10 +33,10 @@ export function CheckToggle({
       {/* El cuadro: se enciende con `peer-checked`, que mira al input de al lado. */}
       <span
         aria-hidden="true"
-        className="mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] border-white/30 transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:[&>svg]:opacity-100"
+        className="mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border-[1.5px] border-border-strong bg-surface-sunken transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:[&>svg]:opacity-100"
       >
         <svg
-          className="h-3 w-3 text-white opacity-0 transition-opacity"
+          className="h-3 w-3 text-on-color opacity-0 transition-opacity"
           aria-hidden="true"
           viewBox="0 0 24 24"
           fill="none"

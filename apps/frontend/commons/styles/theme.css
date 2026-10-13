@@ -338,9 +338,13 @@ button:disabled,
 }
 
 /* Selección de texto */
+/* ⚠️ Fondo opaco y texto del tema: con `primary-muted` (10-12 % de alfa) el
+   resaltado casi no se ve sobre blanco, y el texto en `primary` sobre ese velo
+   se pierde — al arrastrar sobre un elemento parece que el texto desaparece.
+   Windows pinta la selección tal cual; macOS la suaviza y por eso allí no se notaba. */
 ::selection {
-  background: var(--color-primary-muted);
-  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 35%, var(--color-background));
+  color: var(--color-text-primary);
 }
 
 /* ============================================================
