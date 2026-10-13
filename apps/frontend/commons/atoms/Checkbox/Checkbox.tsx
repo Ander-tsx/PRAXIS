@@ -42,7 +42,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           {...props}
         />
 
-        <span className="mt-[2px] flex h-4 w-4 shrink-0 items-center justify-center rounded border border-text-disabled transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:[&>svg]:opacity-100 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-disabled:opacity-50">
+        <span className="mt-[2px] flex h-4 w-4 shrink-0 items-center justify-center rounded border-[1.5px] border-border-strong bg-surface-sunken transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:[&>svg]:opacity-100 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-disabled:opacity-50">
           <svg
             className="h-3 w-3 text-text-inverse opacity-0 transition-opacity"
             viewBox="0 0 24 24"

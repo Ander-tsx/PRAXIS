@@ -246,7 +246,7 @@ function ChecklistRow({
           aria-label={completed ? `Desmarcar «${text}»` : `Marcar «${text}»`}
           className="mt-px flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-not-allowed"
           style={{
-            borderColor: completed ? colors.success : 'rgba(255,255,255,0.2)',
+            borderColor: completed ? colors.success : 'var(--color-border-strong)',
             background: completed ? alpha(colors.success, 25) : 'transparent',
             cursor: canToggle && !toggling ? 'pointer' : undefined,
           }}
