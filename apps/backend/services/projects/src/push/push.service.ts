@@ -13,10 +13,22 @@ export interface CargaPush {
   url: string;
   /** Mismo `tag` = la notificación nueva sustituye a la anterior (un chat = una). */
   tag?: string;
+  /** El service worker apila las últimas líneas de un mismo `tag` (chats). */
+  acumular?: boolean;
 }
 
-/** Misma clave que escribe `PresenceService` del gateway al abrirse un SSE. */
-const CLAVE_CONECTADO = 'presencia:conectado:';
+/**
+ * «Tiene Praxis a la vista ahora mismo». La escribe el propio cliente
+ * (`POST /me/push/visible`) mientras la pestaña está visible y caduca sola.
+ *
+ * ⚠️ **No se usa la presencia del SSE.** Con la app en segundo plano el socket
+ * sigue abierto en el servidor —el latido de 25 s lo escribe el servidor, no el
+ * navegador— y la persona figuraba «conectada» durante minutos, sin recibir
+ * ningún push. Que la ventana esté **visible** sí lo sabe solo el cliente.
+ */
+const CLAVE_VISIBLE = 'push:visible:';
+/** Los clientes refrescan cada 30 s; 50 s deja margen a un latido perdido. */
+const VIGENCIA_VISIBLE_S = 50;
 
 /** Cuánto aguarda el servicio de push un mensaje que no puede entregar. */
 const TTL_S = 60 * 60 * 12;
@@ -158,18 +170,28 @@ export class PushService {
     }
   }
 
+  /** El cliente dice si Praxis está a la vista. Nunca lanza. */
+  async marcarVisible(dto: { userId: string; visible: boolean }) {
+    const clave = `${CLAVE_VISIBLE}${dto.userId}`;
+    await (dto.visible
+      ? this.redis.set(clave, 1, VIGENCIA_VISIBLE_S)
+      : this.redis.del(clave)
+    ).catch(() => undefined);
+    return { ok: true };
+  }
+
   /**
-   * Un mensaje de chat, solo a quien **no tiene la aplicación abierta**.
+   * Un mensaje de chat, solo a quien **no tiene Praxis a la vista**.
    *
-   * Si hay un SSE abierto (clave de presencia en Redis), la persona ya lo ve en
-   * pantalla: mandarle además un push es ruido y gasto. Sin Redis, se asume
-   * desconectada, que es el valor seguro (mejor un aviso de más que ninguno).
+   * Si la ventana está visible, la persona ya lo ve en pantalla: mandarle además
+   * un push es ruido y gasto. Sin Redis, se asume que no la ve, que es el valor
+   * seguro (mejor un aviso de más que ninguno).
    */
   async avisarMensaje(destinatarios: string[], carga: CargaPush): Promise<void> {
     if (!this.habilitado || destinatarios.length === 0) return;
     const desconectados: string[] = [];
     for (const id of destinatarios) {
-      const conectado = await this.redis.get(`${CLAVE_CONECTADO}${id}`).catch(() => null);
+      const conectado = await this.redis.get(`${CLAVE_VISIBLE}${id}`).catch(() => null);
       if (!conectado) desconectados.push(id);
     }
     await this.enviar(desconectados, carga);

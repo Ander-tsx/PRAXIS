@@ -62,7 +62,7 @@ describe('PushService', () => {
     expect(prisma.pushSubscription.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('los mensajes no se mandan a quien tiene la aplicación abierta', async () => {
+  it('los mensajes no se mandan a quien tiene Praxis a la vista', async () => {
     const { servicio, prisma } = montar(true, ['u1']);
     await servicio.avisarMensaje(['u1'], { title: 't', body: 'b', url: '/' });
     expect(prisma.pushSubscription.findMany).not.toHaveBeenCalled();

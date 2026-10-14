@@ -44,6 +44,7 @@ import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { MentionablesService } from './mentionables.service';
+import { NombreDeAutorService } from './nombre-de-autor.service';
 import { OrigenDeMensajeService } from './origen-de-mensaje.service';
 
 /**
@@ -79,6 +80,7 @@ export class DirectChatController {
     private readonly rolesService: GlobalRolesService,
     private readonly cuotas: QuotaService,
     private readonly origenes: OrigenDeMensajeService,
+    private readonly autores: NombreDeAutorService,
   ) {}
 
   /**
@@ -223,7 +225,14 @@ export class DirectChatController {
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'chat_direct_send' },
-        { ...mensaje, peerId, requesterId: req.user!.userId, isAdmin: yaAutorizado, ...origen },
+        {
+          ...mensaje,
+          peerId,
+          requesterId: req.user!.userId,
+          authorName: await this.autores.de(req.user!.userId),
+          isAdmin: yaAutorizado,
+          ...origen,
+        },
       ),
     );
   }

@@ -294,23 +294,58 @@ async function guardarPantalla(persona, clave, respuesta) {
    genérica. Por eso no hay rama que se salte `showNotification`, ni siquiera si
    el JSON llega roto. El `tag` hace que un chat con varios mensajes seguidos
    sea una sola notificación que se actualiza. */
+/* Cuántas líneas se apilan en la notificación de un chat. */
+const LINEAS_APILADAS = 4;
+
 self.addEventListener('push', (evento) => {
-  let datos = {};
-  try {
-    datos = evento.data ? evento.data.json() : {};
-  } catch {
-    /* Un cuerpo que no es JSON se ignora: se enseña la notificación genérica. */
-  }
-  const titulo = typeof datos.title === 'string' && datos.title ? datos.title : 'Praxis';
   evento.waitUntil(
-    self.registration.showNotification(titulo, {
-      body: typeof datos.body === 'string' ? datos.body : '',
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
-      tag: typeof datos.tag === 'string' ? datos.tag : undefined,
-      renotify: Boolean(datos.tag),
-      data: { url: typeof datos.url === 'string' && datos.url.startsWith('/') ? datos.url : '/' },
-    }),
+    (async () => {
+      let datos = {};
+      try {
+        datos = evento.data ? evento.data.json() : {};
+      } catch {
+        /* Un cuerpo que no es JSON se ignora: se enseña la notificación genérica. */
+      }
+      const titulo = typeof datos.title === 'string' && datos.title ? datos.title : 'Praxis';
+      const tag = typeof datos.tag === 'string' ? datos.tag : undefined;
+      let cuerpo = typeof datos.body === 'string' ? datos.body : '';
+      let lineas = cuerpo ? [cuerpo] : [];
+
+      /* Un chat con varios mensajes seguidos es **una** notificación con los
+         últimos: se leen las líneas de la que ya hay con ese `tag` y se le suma
+         la nueva. Si el navegador no deja leerlas, se enseña solo la nueva. */
+      if (datos.acumular && tag) {
+        try {
+          const previas = await self.registration.getNotifications({ tag });
+          const antes = previas[0]?.data?.lineas;
+          if (Array.isArray(antes)) lineas = [...antes, ...lineas].slice(-LINEAS_APILADAS);
+          cuerpo = lineas.join('\n');
+        } catch {
+          /* Sin acceso a las anteriores. */
+        }
+      }
+
+      await self.registration.showNotification(titulo, {
+        body: cuerpo,
+        /* El icono de la app. `badge` es el pequeño de la barra de estado de
+           Android: tiene que ser **monocromo sobre transparente**, o sale un
+           cuadrado blanco. iOS pone el icono de la app por su cuenta. */
+        icon: '/icons/icon-192.png',
+        badge: '/icons/badge-96.png',
+        tag,
+        renotify: Boolean(tag),
+        /* Sonido: la web no puede elegir el suyo, suena el de notificaciones del
+           sistema (`silent: false` lo pide expresamente). La vibración solo la
+           respeta Android. */
+        silent: false,
+        vibrate: [120, 60, 120],
+        timestamp: Date.now(),
+        data: {
+          url: typeof datos.url === 'string' && datos.url.startsWith('/') ? datos.url : '/',
+          lineas,
+        },
+      });
+    })(),
   );
 });
 

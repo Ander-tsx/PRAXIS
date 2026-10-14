@@ -19,7 +19,7 @@ import { ConfigService } from '@nestjs/config';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsOptional, IsString, IsUrl, MaxLength, ValidateNested } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsUrl, MaxLength, ValidateNested } from 'class-validator';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { type ModoVencimiento, modoPorDefecto, textoDelAviso, tramoDe } from './vencimientos';
@@ -48,6 +48,11 @@ export class BajaPushDto {
   @IsString()
   @MaxLength(1000)
   endpoint: string;
+}
+
+export class VisiblePushDto {
+  @IsBoolean()
+  visible: boolean;
 }
 
 export class EstadoPushQueryDto {
@@ -106,6 +111,19 @@ export class MyPushController {
           auth: dto.keys.auth,
           userAgent: userAgent ?? null,
         },
+      ),
+    );
+  }
+
+  /** El cliente avisa de si Praxis está a la vista; mientras lo está, no se le manda push de chat. */
+  @Post('visible')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Praxis está (o deja de estar) a la vista' })
+  visible(@Request() req: Express.Request, @Body() dto: VisiblePushDto) {
+    return firstValueFrom(
+      this.projectsClient.send(
+        { cmd: 'push_visible' },
+        { userId: req.user!.userId, visible: dto.visible },
       ),
     );
   }

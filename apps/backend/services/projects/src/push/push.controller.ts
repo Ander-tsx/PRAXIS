@@ -30,6 +30,11 @@ export class PushController {
     return this.push.suscribir(dto);
   }
 
+  @MessagePattern({ cmd: 'push_visible' })
+  visible(@Payload() dto: { userId: string; visible: boolean }) {
+    return this.push.marcarVisible(dto);
+  }
+
   @MessagePattern({ cmd: 'push_unsubscribe' })
   unsubscribe(@Payload() dto: { userId: string; endpoint: string }) {
     return this.push.desuscribir(dto);

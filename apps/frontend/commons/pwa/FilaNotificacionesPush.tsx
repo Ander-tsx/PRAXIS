@@ -2,6 +2,7 @@
 
 import { Bell } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { colors } from '../tokens/colors';
 import { type EstadoPush, activarPush, desactivarPush, leerEstadoPush } from './push';
 
 /**
@@ -43,9 +44,11 @@ export function FilaNotificacionesPush() {
     setOcupado(true);
     try {
       if (activo) {
-        await desactivarPush();
+        /* Optimista: la palanca se mueve ya, sin esperar a la red. */
         setEstado({ tipo: 'apagado' });
+        await desactivarPush();
       } else {
+        setEstado({ tipo: 'activo' });
         setEstado(await activarPush());
       }
     } catch {
@@ -58,30 +61,36 @@ export function FilaNotificacionesPush() {
   return (
     <section aria-label="Notificaciones" className="flex flex-col gap-2">
       <h3 className="px-4 font-sans text-[13px] font-medium text-text-secondary">Notificaciones</h3>
-      <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] px-4 py-3">
+      {/* La fila entera es el interruptor (mismo patrón que `ScrumToggle`): un
+          objetivo táctil grande y sin un botón diminuto que se descuadre. */}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={activo}
+        aria-label="Notificaciones en este dispositivo"
+        disabled={bloqueado}
+        onClick={() => void alternar()}
+        className="flex min-h-14 w-full items-center gap-3 rounded-2xl bg-white/[0.04] px-4 py-3 text-left transition-colors active:bg-white/10 disabled:opacity-60"
+      >
         <Bell className="h-5 w-5 shrink-0 text-text-secondary" aria-hidden="true" />
-        <div className="min-w-0 flex-1">
-          <p className="font-sans text-[15px] text-text-primary">En este dispositivo</p>
-          <p className="font-sans text-[12px] text-text-secondary">{detalle}</p>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={activo}
-          aria-label="Notificaciones en este dispositivo"
-          disabled={ocupado || bloqueado}
-          onClick={() => void alternar()}
-          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
-            activo ? 'bg-primary' : 'bg-white/20'
-          }`}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="font-sans text-[15px] text-text-primary">En este dispositivo</span>
+          <span className="font-sans text-[12px] text-text-secondary">{detalle}</span>
+        </span>
+        <span
+          aria-hidden="true"
+          className="relative block h-6 w-11 shrink-0 rounded-full transition-colors"
+          style={{
+            background: activo ? colors.primary : colors.border,
+            opacity: ocupado ? 0.6 : 1,
+          }}
         >
           <span
-            className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-              activo ? 'translate-x-5' : 'translate-x-0'
-            }`}
+            className="absolute top-0.5 block h-5 w-5 rounded-full shadow transition-[left]"
+            style={{ left: activo ? '1.375rem' : '0.125rem', background: '#ffffff' }}
           />
-        </button>
-      </div>
+        </span>
+      </button>
     </section>
   );
 }

@@ -29,6 +29,7 @@ import {
 } from './shared-documents.controller';
 import { SprintsController } from './sprints.controller';
 import { AssistantModule } from '../assistant/assistant.module';
+import { NombreDeAutorService } from './nombre-de-autor.service';
 import { OrigenDeMensajeService } from './origen-de-mensaje.service';
 import { TaskPurgeService } from './task-purge.service';
 import { WorkspacesController, WorkspacesResourceController } from './workspaces.controller';
@@ -53,6 +54,8 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
          foránea. Ver `TaskPurgeService`. */
       clienteDeServicio('ASSISTANT'),
       clienteDeServicio('AUTOMATION'),
+      /* Solo para ponerle nombre a quien escribe en el chat (push). */
+      clienteDeServicio('CREDENTIALS'),
     ]),
   ],
   controllers: [
@@ -83,6 +86,7 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
     MentionablesService,
     DocumentAccessService,
     OrigenDeMensajeService,
+    NombreDeAutorService,
     OptionalJwtGuard,
   ],
   /**

@@ -180,6 +180,8 @@ export class ChatService {
      */
     origin?: ChatMessageOrigin;
     originMeta?: Record<string, unknown> | null;
+    /** Nombre de quien escribe, que pone el gateway (solo para el push). */
+    authorName?: string | null;
   }) {
     /* Una respuesta tiene que apuntar a un mensaje **de este mismo canal**. Sin
        esta comprobación, un id conocido de otra conversación se citaría dentro
@@ -270,7 +272,7 @@ export class ChatService {
        ellos** —los adjuntos se reclaman después del `create`—, y no reaparecían
        hasta recargar. Es la clase de fallo que solo se ve con adjuntos y por eso
        es fácil que sobreviva a las pruebas manuales. */
-    void this.anunciarMensaje(dto.channelId, completo, message.createdAt);
+    void this.anunciarMensaje(dto.channelId, completo, message.createdAt, dto.authorName ?? null);
 
     return completo;
   }
@@ -1239,6 +1241,7 @@ export class ChatService {
     channelId: string,
     mensaje: { id: string; authorId: string; body?: string | null; deletedAt?: Date | null },
     at: Date,
+    authorName: string | null,
   ) {
     /* Quién recibe un push: todos menos el autor y quien lo tiene silenciado. Se
        recoge aquí, dentro del reparto, porque es donde ya están resueltos los
@@ -1270,16 +1273,20 @@ export class ChatService {
 
     const canal = guardado.canal;
     if (paraPush.length === 0 || !canal) return;
-    const texto = (mensaje.body ?? '').replace(/\s+/g, ' ').trim();
+    const texto = (mensaje.body ?? '').replace(/\s+/g, ' ').trim() || 'Te envió un archivo';
     const privado = canal.channelKind === 'DIRECT';
-    /* Cada destinatario de un privado tiene un `peerId` distinto, así que la
-       dirección se calcula por persona; en un proyecto es la misma para todos. */
+    /* En un privado el título es quien escribe y el cuerpo, solo el texto; en
+       un grupo el título es el proyecto y cada línea lleva su autor. El service
+       worker apila las últimas líneas de un mismo `tag` en una sola notificación. */
     this.push
       .avisarMensaje(paraPush, {
-        title: privado ? 'Mensaje privado' : (canal.projectName ?? 'Chat del proyecto'),
-        body: texto ? texto.slice(0, 120) : 'Te enviaron un archivo',
-        url: privado ? '/chat?lista=1' : `/chat/proyecto/${canal.projectId}`,
+        title: privado
+          ? (authorName ?? 'Mensaje privado')
+          : (canal.projectName ?? 'Chat del proyecto'),
+        body: privado ? texto.slice(0, 120) : `${authorName ?? 'Alguien'}: ${texto.slice(0, 120)}`,
+        url: privado ? `/chat/${mensaje.authorId}` : `/chat/proyecto/${canal.projectId}`,
         tag: `chat:${channelId}`,
+        acumular: true,
       })
       .catch(() => undefined);
   }

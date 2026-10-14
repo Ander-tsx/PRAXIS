@@ -55,7 +55,9 @@ import { DirectorioDeChatsProvider, useDirectorioDeChats } from './DirectorioDeC
 import { DockColumn, DockProvider } from './DockPanel';
 import { FilaDeArbol } from './FilaDeArbol';
 import { FranjaSinConexion } from './FranjaSinConexion';
+import { AvisoActivarNotificaciones } from '../../pwa/AvisoActivarNotificaciones';
 import { HapticoGlobal } from '../../pwa/HapticoGlobal';
+import { PresenciaDePush } from '../../pwa/PresenciaDePush';
 import { GestosMoviles } from './GestosMoviles';
 import { NavList } from './NavList';
 import { OrgSwitcher } from './OrgSwitcher';
@@ -978,6 +980,8 @@ function ArmazonInterno({
          */}
         <GestosMoviles />
         <HapticoGlobal />
+        <PresenciaDePush />
+        <AvisoActivarNotificaciones />
         <FranjaSinConexion />
         <BarraInferior
           activa={pestanaInferior}
