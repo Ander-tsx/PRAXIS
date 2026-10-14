@@ -685,7 +685,7 @@ function ArmazonInterno({
        * `dvh` es la unidad dinámica: mide lo que se ve ahora, y se recalcula
        * cuando la barra del navegador aparece o desaparece.
        */}
-      <div className="flex h-dvh overflow-hidden bg-surface font-sans text-text-primary">
+      <div className="flex h-dvh overflow-hidden max-md:fixed max-md:inset-0 max-md:h-auto bg-surface font-sans text-text-primary">
         {/* ── Barra lateral (escritorio) ───────────────────────── */}
         <aside
           ref={barraRef}

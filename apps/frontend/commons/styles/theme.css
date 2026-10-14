@@ -299,6 +299,28 @@ html {
   scroll-behavior: smooth;
 }
 
+/* ⚠️ iOS, PWA instalada («Añadir a inicio»).
+   1) Al abrir, el WebView mide la ventana sin la zona del indicador de inicio
+      hasta el primer scroll, y por esa franja asoma el fondo del propio
+      WebView (negro). Pintar el `<html>` con el fondo del tema la disimula; el
+      armazón de la aplicación además se fija a toda la pantalla (AppShell).
+   2) Safari hace zoom al enfocar un campo con menos de 16 px y lo deja puesto
+      hasta que se pellizca. Sin capa (`@layer`) y con `!important` para ganarle
+      a las utilidades `text-sm`/`text-xs`. Solo en táctil: en escritorio no
+      cambia nada. */
+html {
+  background-color: var(--color-background);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
+  textarea,
+  select,
+  [contenteditable="true"] {
+    font-size: 16px !important;
+  }
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-text-primary);
