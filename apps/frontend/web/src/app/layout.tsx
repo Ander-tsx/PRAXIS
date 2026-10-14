@@ -131,6 +131,11 @@ export const metadata: Metadata = {
       media: `(device-width: ${cw}px) and (device-height: ${ch}px) and (-webkit-device-pixel-ratio: ${dpr}) and (orientation: portrait)`,
     })),
   },
+  /* ⚠️ Next 16 convierte `appleWebApp.capable` en `mobile-web-app-capable`, que
+     iOS no lee para esto. Sin `apple-mobile-web-app-capable` la PWA instalada
+     arranca en un modo a medias: la ventana acaba sobre la zona del indicador de
+     inicio, con `env(safe-area-inset-bottom)` en 0 y una franja negra abajo. */
+  other: { 'apple-mobile-web-app-capable': 'yes' },
   twitter: {
     card: 'summary_large_image',
     title: 'Praxis — Gestión de proyectos inteligente',
