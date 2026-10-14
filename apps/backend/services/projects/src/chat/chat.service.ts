@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import type { ChatMessageOrigin, Prisma } from '../generated/prisma-client';
 import { PrismaService } from '../prisma/prisma.service';
+import type { ChannelContext } from '../realtime/events';
+import { PushService } from '../push/push.service';
 import { EventDispatcher } from '../realtime/event-dispatcher.service';
 import { RedisService } from '../redis/redis.service';
 import { ChannelsService } from './channels.service';
@@ -148,6 +150,7 @@ export class ChatService {
     private readonly channels: ChannelsService,
     private readonly attachments: ChatAttachmentsService,
     private readonly eventos: EventDispatcher,
+    private readonly push: PushService,
   ) {}
 
   /**
@@ -1232,23 +1235,55 @@ export class ChatService {
    * es reproducirlo en una tarjeta que aparece sobre cualquier pantalla, y eso
    * lo decide `LiveNotices`.
    */
-  private anunciarMensaje(channelId: string, mensaje: { id: string; authorId: string }, at: Date) {
-    return this.eventos.repartir(channelId, (contexto) => ({
-      tipo: 'chat.mensaje',
-      channelId,
-      actorId: mensaje.authorId,
-      at: at.toISOString(),
-      mensaje,
-      silenciado: contexto.silenciado,
-      channelKind: contexto.channelKind,
-      projectId: contexto.projectId,
-      projectName: contexto.projectName,
-      projectSlug: contexto.projectSlug,
-      peerId: contexto.peerId,
-      organizationId: contexto.organizationId,
-      organizationName: contexto.organizationName,
-    }));
+  private async anunciarMensaje(
+    channelId: string,
+    mensaje: { id: string; authorId: string; body?: string | null; deletedAt?: Date | null },
+    at: Date,
+  ) {
+    /* Quién recibe un push: todos menos el autor y quien lo tiene silenciado. Se
+       recoge aquí, dentro del reparto, porque es donde ya están resueltos los
+       silencios y el contexto del canal. */
+    const paraPush: string[] = [];
+    const guardado: { canal: ChannelContext | null } = { canal: null };
+
+    await this.eventos.repartir(channelId, (contexto) => {
+      if (!contexto.silenciado && contexto.destinatario !== mensaje.authorId) {
+        paraPush.push(contexto.destinatario);
+      }
+      guardado.canal = contexto;
+      return {
+        tipo: 'chat.mensaje',
+        channelId,
+        actorId: mensaje.authorId,
+        at: at.toISOString(),
+        mensaje,
+        silenciado: contexto.silenciado,
+        channelKind: contexto.channelKind,
+        projectId: contexto.projectId,
+        projectName: contexto.projectName,
+        projectSlug: contexto.projectSlug,
+        peerId: contexto.peerId,
+        organizationId: contexto.organizationId,
+        organizationName: contexto.organizationName,
+      };
+    });
+
+    const canal = guardado.canal;
+    if (paraPush.length === 0 || !canal) return;
+    const texto = (mensaje.body ?? '').replace(/\s+/g, ' ').trim();
+    const privado = canal.channelKind === 'DIRECT';
+    /* Cada destinatario de un privado tiene un `peerId` distinto, así que la
+       dirección se calcula por persona; en un proyecto es la misma para todos. */
+    this.push
+      .avisarMensaje(paraPush, {
+        title: privado ? 'Mensaje privado' : (canal.projectName ?? 'Chat del proyecto'),
+        body: texto ? texto.slice(0, 120) : 'Te enviaron un archivo',
+        url: privado ? '/chat?lista=1' : `/chat/proyecto/${canal.projectId}`,
+        tag: `chat:${channelId}`,
+      })
+      .catch(() => undefined);
   }
+
   /**
    * Oculta un canal para un usuario, actualizando hiddenAt en ChatChannelState.
    * Si llegan nuevos mensajes después de hiddenAt, el chat reaparecerá.

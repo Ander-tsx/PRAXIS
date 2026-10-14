@@ -15,6 +15,7 @@ import { AutomationModule } from './automation/automation.module';
 import { BillingModule } from './billing/billing.module';
 import { McpModule } from './mcp/mcp.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PushModule } from './push/push.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { PresenceModule } from './presence/presence.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -73,6 +74,7 @@ import { UserModule } from './users/user.module';
     ProjectsModule,
     TasksModule,
     NotificationsModule,
+    PushModule,
     AssistantModule,
     AutomationModule,
     AdminModule,
