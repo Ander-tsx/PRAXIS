@@ -428,6 +428,26 @@ function ArmazonInterno({
   useEffect(() => {
     instalarDetectorDeNavegacion();
   }, []);
+  /* iOS, PWA instalada: al abrir, el WebView mide la ventana sin la zona del
+     indicador de inicio y deja una franja negra abajo **hasta el primer scroll**
+     (la barra inferior es `fixed` y se queda pegada al borde corto). Un scroll de
+     1 px lo recoloca; como aquí no hay nada que desplazar en el documento, se
+     alarga un instante para poder darlo. Solo si de verdad mide de menos. */
+  useEffect(() => {
+    const standalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    if (!standalone || window.innerHeight >= window.screen.height - 8) return;
+    const raiz = document.documentElement;
+    raiz.style.minHeight = 'calc(100% + 2px)';
+    window.scrollTo(0, 1);
+    const id = window.setTimeout(() => {
+      window.scrollTo(0, 0);
+      raiz.style.minHeight = '';
+    }, 60);
+    return () => {
+      window.clearTimeout(id);
+      raiz.style.minHeight = '';
+    };
+  }, []);
   /* Sin conexión: el SW guarda las pantallas por persona y no sabe quién es
      (la cookie es httpOnly); se lo dice esto. Ver `commons/pwa`. */
   useEffect(() => {
