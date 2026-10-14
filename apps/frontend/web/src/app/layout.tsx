@@ -1,5 +1,5 @@
 import { RegistroDelServiceWorker } from '@/components/organisms/ServiceWorker/RegistroDelServiceWorker';
-import { getTheme } from '@praxis/commons/theme';
+import { getTheme, getThemePreference } from '@praxis/commons/theme';
 import type { Metadata, Viewport } from 'next';
 import { Archivo, Fraunces, Inter, Lora } from 'next/font/google';
 import localFont from 'next/font/local';
@@ -145,23 +145,39 @@ export const metadata: Metadata = {
 };
 
 /**
- * Exporte aparte y no un campo de `metadata`: desde Next 14, `themeColor`
+ * Exporte aparte y no un campo de `metadata` (y ahora `generateViewport`, porque
+ * el color depende del tema de la cookie): desde Next 14, `themeColor`
  * dejó de leerse ahí y solo cuenta si viene de `viewport`/`generateViewport`
  * (`generate-viewport.md`). Sin esto, `manifest.ts` sigue declarando su
  * `theme_color` para la app instalada, pero la pestaña normal del navegador
  * no coloreaba la barra — dos sitios que tenían que decir el mismo negro y
  * solo uno lo decía.
  */
-export const viewport: Viewport = {
-  themeColor: '#080807',
-  /* Móvil (docs/PLAN-MOVIL.md, M0). `cover`: la app se dibuja también bajo el
-     notch, y las utilidades `pt-safe`/`pb-safe` devuelven ese hueco donde haga
-     falta. `resizes-content`: al abrir el teclado se encoge la ventana en vez de
-     taparla, que es lo que deja un compositor pegado encima del teclado. Las dos
-     son inertes en escritorio. */
-  viewportFit: 'cover',
-  interactiveWidget: 'resizes-content',
-};
+export async function generateViewport(): Promise<Viewport> {
+  const theme = await getThemePreference();
+  /* El mismo `--color-surface` que pinta el armazón (theme.css): #191919 en
+     oscuro, #ffffff en claro. Con `system` el servidor no sabe cuál toca, y se
+     lo dejamos al navegador con las dos variantes por `media`. */
+  const themeColor =
+    theme === 'light'
+      ? '#ffffff'
+      : theme === 'system'
+        ? [
+            { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+            { media: '(prefers-color-scheme: dark)', color: '#191919' },
+          ]
+        : '#191919';
+  return {
+    themeColor,
+    /* Móvil (docs/PLAN-MOVIL.md, M0). `cover`: la app se dibuja también bajo el
+       notch, y las utilidades `pt-safe`/`pb-safe` devuelven ese hueco donde haga
+       falta. `resizes-content`: al abrir el teclado se encoge la ventana en vez de
+       taparla, que es lo que deja un compositor pegado encima del teclado. Las dos
+       son inertes en escritorio. */
+    viewportFit: 'cover',
+    interactiveWidget: 'resizes-content',
+  };
+}
 
 /**
  * El layout raíz de **toda** la aplicación: la landing pública, las pantallas

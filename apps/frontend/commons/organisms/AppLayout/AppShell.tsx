@@ -55,6 +55,7 @@ import { DirectorioDeChatsProvider, useDirectorioDeChats } from './DirectorioDeC
 import { DockColumn, DockProvider } from './DockPanel';
 import { FilaDeArbol } from './FilaDeArbol';
 import { FranjaSinConexion } from './FranjaSinConexion';
+import { HapticoGlobal } from '../../pwa/HapticoGlobal';
 import { GestosMoviles } from './GestosMoviles';
 import { NavList } from './NavList';
 import { OrgSwitcher } from './OrgSwitcher';
@@ -976,6 +977,7 @@ function ArmazonInterno({
          * Todo es `md:hidden`: en escritorio no se pinta nada de esto (I1).
          */}
         <GestosMoviles />
+        <HapticoGlobal />
         <FranjaSinConexion />
         <BarraInferior
           activa={pestanaInferior}

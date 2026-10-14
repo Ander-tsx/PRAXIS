@@ -170,9 +170,7 @@ function Pestana({
       }
       return;
     }
-    /* Un toque corto donde haya motor de vibración (Android). iOS no lo expone
-       a la web y la llamada no existe: no pasa nada. */
-    navigator.vibrate?.(8);
+    /* La vibración la da `HapticoGlobal` al pulsar cualquier control. */
   }
 
   const clase = `group relative z-10 flex h-full w-full flex-col items-center justify-center gap-1 font-sans text-[10px] transition-colors active:opacity-70 [-webkit-tap-highlight-color:transparent] ${

@@ -106,6 +106,9 @@ const DATOS_ESTRUCTURADOS = {
  * claro/oscuro de la cuenta. Ese selector sigue viviendo en Configuración,
  * dentro de la aplicación.
  */
+/* La landing tiene paleta fija (`.landing`), no la del tema de la cuenta. */
+export const viewport = { themeColor: '#080807' };
+
 export default function LandingPage() {
   return (
     <>
