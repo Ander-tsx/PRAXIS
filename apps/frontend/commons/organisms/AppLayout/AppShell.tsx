@@ -428,24 +428,40 @@ function ArmazonInterno({
   useEffect(() => {
     instalarDetectorDeNavegacion();
   }, []);
-  /* iOS, PWA instalada: al abrir, el WebView mide la ventana sin la zona del
-     indicador de inicio y deja una franja negra abajo **hasta el primer scroll**
-     (la barra inferior es `fixed` y se queda pegada al borde corto). Un scroll de
-     1 px lo recoloca; como aquí no hay nada que desplazar en el documento, se
-     alarga un instante para poder darlo. Solo si de verdad mide de menos. */
+  /* iOS, PWA instalada: el WebView arranca con la ventana **más corta que la
+     pantalla** —medido en un iPhone: `innerHeight` 793 frente a `screen.height`
+     852, justo la zona segura de arriba— y deja una franja negra abajo con la
+     barra inferior «elevada». Un scroll lo corrige, pero aquí no hay documento
+     que desplazar. Se mide la diferencia y se publica en `--desfase-inferior`
+     (negativa: empuja hacia abajo lo que va pegado al borde). Si el WebView se
+     corrige solo, `resize` la devuelve a 0. Con un campo enfocado no se mide: el
+     teclado también encoge la ventana y no es este fallo. */
   useEffect(() => {
     const standalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
-    if (!standalone || window.innerHeight >= window.screen.height - 8) return;
+    if (!standalone) return;
     const raiz = document.documentElement;
-    raiz.style.minHeight = 'calc(100% + 2px)';
-    window.scrollTo(0, 1);
-    const id = window.setTimeout(() => {
-      window.scrollTo(0, 0);
-      raiz.style.minHeight = '';
-    }, 60);
+    const medir = () => {
+      const activo = document.activeElement;
+      const escribiendo =
+        activo instanceof HTMLElement &&
+        (activo.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(activo.tagName));
+      if (escribiendo) return;
+      const vertical = window.matchMedia('(orientation: portrait)').matches;
+      const falta = window.screen.height - window.innerHeight;
+      raiz.style.setProperty(
+        '--desfase-inferior',
+        vertical && falta > 8 && falta <= 80 ? `${-falta}px` : '0px',
+      );
+    };
+    medir();
+    const id = window.setTimeout(medir, 400);
+    window.addEventListener('resize', medir);
+    window.addEventListener('orientationchange', medir);
     return () => {
       window.clearTimeout(id);
-      raiz.style.minHeight = '';
+      window.removeEventListener('resize', medir);
+      window.removeEventListener('orientationchange', medir);
+      raiz.style.removeProperty('--desfase-inferior');
     };
   }, []);
   /* Sin conexión: el SW guarda las pantallas por persona y no sabe quién es
@@ -705,7 +721,7 @@ function ArmazonInterno({
        * `dvh` es la unidad dinámica: mide lo que se ve ahora, y se recalcula
        * cuando la barra del navegador aparece o desaparece.
        */}
-      <div className="flex h-dvh overflow-hidden max-md:fixed max-md:inset-0 max-md:h-auto bg-surface font-sans text-text-primary">
+      <div className="flex h-dvh overflow-hidden max-md:fixed max-md:inset-x-0 max-md:top-0 max-md:bottom-[var(--desfase-inferior,0px)] max-md:h-auto bg-surface font-sans text-text-primary">
         {/* ── Barra lateral (escritorio) ───────────────────────── */}
         <aside
           ref={barraRef}
