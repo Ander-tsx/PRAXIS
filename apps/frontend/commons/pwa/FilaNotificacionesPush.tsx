@@ -3,7 +3,7 @@
 import { Bell } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { colors } from '../tokens/colors';
-import { type EstadoPush, activarPush, desactivarPush, leerEstadoPush } from './push';
+import { type EstadoPush, activarPush, desactivarPush, leerEstadoPush, probarPush } from './push';
 
 /**
  * La fila de «Notificaciones» de la pantalla Tú: un interruptor para este
@@ -12,6 +12,7 @@ import { type EstadoPush, activarPush, desactivarPush, leerEstadoPush } from './
 export function FilaNotificacionesPush() {
   const [estado, setEstado] = useState<EstadoPush | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [prueba, setPrueba] = useState<string | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -38,6 +39,20 @@ export function FilaNotificacionesPush() {
       : estado.tipo === 'bloqueado'
         ? 'Bloqueadas en los ajustes del dispositivo.'
         : 'Mensajes nuevos y tareas que vencen hoy o mañana.';
+
+  async function probar() {
+    setPrueba('Enviando…');
+    try {
+      const n = await probarPush();
+      setPrueba(
+        n > 0
+          ? `Enviada a ${n} dispositivo${n === 1 ? '' : 's'}. Debería sonar en unos segundos.`
+          : 'No hay ningún dispositivo registrado. Apaga y vuelve a activar el interruptor.',
+      );
+    } catch {
+      setPrueba('No se pudo enviar la prueba.');
+    }
+  }
 
   async function alternar() {
     if (ocupado || bloqueado) return;
@@ -91,6 +106,18 @@ export function FilaNotificacionesPush() {
           />
         </span>
       </button>
+      {activo && (
+        <div className="flex flex-col gap-1 px-4">
+          <button
+            type="button"
+            onClick={() => void probar()}
+            className="self-start font-sans text-[13px] font-medium text-primary"
+          >
+            Enviar notificación de prueba
+          </button>
+          {prueba && <p className="font-sans text-[12px] text-text-secondary">{prueba}</p>}
+        </div>
+      )}
     </section>
   );
 }

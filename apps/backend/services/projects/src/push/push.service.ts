@@ -31,7 +31,7 @@ const CLAVE_VISIBLE = 'push:visible:';
 const VIGENCIA_VISIBLE_S = 50;
 
 /** Cuánto aguarda el servicio de push un mensaje que no puede entregar. */
-const TTL_S = 60 * 60 * 12;
+const TTL_S = 60 * 60 * 4;
 
 /**
  * Notificaciones push (Web Push) — `docs/PLAN-PUSH.md`.
@@ -147,7 +147,14 @@ export class PushService {
             await webpush.sendNotification(
               { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
               cuerpo,
-              { TTL: TTL_S, urgency: 'normal' },
+              {
+                TTL: TTL_S,
+                /* 🔴 `high`, no `normal`: en Android, FCM retiene los mensajes de
+                   prioridad normal hasta que el teléfono sale del modo ahorro
+                   (Doze) —que es cuando se abre la app—, y la notificación llega
+                   horas tarde y de golpe. `high` despierta el dispositivo. */
+                urgency: 'high',
+              },
             );
             enviados++;
           } catch (error) {
@@ -163,6 +170,7 @@ export class PushService {
       if (muertas.length > 0) {
         await this.prisma.pushSubscription.deleteMany({ where: { id: { in: muertas } } });
       }
+      this.log.log(`Push «${carga.title}»: ${enviados}/${subs.length} dispositivos`);
       return { enviados };
     } catch (error) {
       this.log.warn(`No se pudo enviar el push: ${(error as Error).message}`);

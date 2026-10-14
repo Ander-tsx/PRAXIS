@@ -128,6 +128,30 @@ export class MyPushController {
     );
   }
 
+  /**
+   * Una notificación de prueba a **todos tus dispositivos**, sin mirar si Praxis
+   * está a la vista. Sirve para saber si el envío funciona de punta a punta.
+   */
+  @Post('test')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Manda una notificación de prueba a tus dispositivos' })
+  test(@Request() req: Express.Request) {
+    return firstValueFrom(
+      this.projectsClient.send<{ enviados: number }>(
+        { cmd: 'push_send' },
+        {
+          userIds: [req.user!.userId],
+          carga: {
+            title: 'Praxis',
+            body: 'Así llegarán tus notificaciones.',
+            url: '/main/me',
+            tag: 'prueba',
+          },
+        },
+      ),
+    );
+  }
+
   @Delete('subscribe')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Da de baja este dispositivo' })

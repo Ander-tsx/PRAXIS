@@ -115,3 +115,11 @@ export async function desactivarPush(): Promise<void> {
     /* Sin push no pasa nada: la sesión se cierra igual. */
   }
 }
+
+/** Manda una notificación de prueba a los dispositivos de la persona. Devuelve cuántos. */
+export async function probarPush(): Promise<number> {
+  const r = await createApiClient({ gatewayPath: GATEWAY }).post<{ enviados: number }>(
+    '/me/push/test',
+  );
+  return r.enviados;
+}
