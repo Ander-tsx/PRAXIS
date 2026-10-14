@@ -119,6 +119,9 @@ export const envValidationSchema = Joi.object({
   /** La dirección pública del MCP, que es el `aud` de los tokens OAuth. */
   MCP_RESOURCE_URL: Joi.string().uri().optional().allow(''),
   /** Secreto compartido con Accounts para firmar sus llamadas internas (HMAC). 32+ caracteres. */
+  /** Secreto del cron de vencimientos push (docs/PLAN-PUSH.md). Sin él, la ruta responde 404. */
+  PUSH_CRON_SECRET: Joi.string().min(32).optional().allow(''),
+
   KYLOO_INTERNAL_SECRET: Joi.string().min(32).optional().allow(''),
   STRIPE_PRICE_TEAM: Joi.string().optional().allow(''),
   STRIPE_PRICE_BUSINESS: Joi.string().optional().allow(''),

@@ -312,6 +312,18 @@ html {
   background-color: var(--color-background);
 }
 
+/* En móvil el armazón pinta `surface`, no `background` (#191919 frente a #0c0c0b
+   en oscuro, #fff frente a #f8f9fa en claro). Cualquier borde que el armazón no
+   cubra —la zona segura bajo la barra de estado, el indicador de inicio, el
+   rebote del scroll— enseñaba el `html` en un tono distinto. Mismo token en los
+   tres sitios y desaparece. Solo bajo `md`: el escritorio no cambia (I1). */
+@media (max-width: 767px) {
+  html,
+  body {
+    background-color: var(--color-surface);
+  }
+}
+
 @media (hover: none) and (pointer: coarse) {
   input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]),
   textarea,

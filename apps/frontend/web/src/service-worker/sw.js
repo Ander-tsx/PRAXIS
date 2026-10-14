@@ -287,6 +287,49 @@ async function guardarPantalla(persona, clave, respuesta) {
   }
 }
 
-/* Push (D14): fuera de este plan, y a propósito sin `addEventListener('push')`.
-   Chrome exige enseñar una notificación por cada push; un oyente vacío haría que
-   enseñara la suya genérica. Sin suscripciones no llega ninguno. */
+/* Push (docs/PLAN-PUSH.md). El servidor manda un JSON `{ title, body, url, tag }`.
+
+   Todo push **tiene que** acabar en una notificación visible: Safari revoca la
+   suscripción a quien recibe pushes sin enseñar nada, y Chrome enseña una
+   genérica. Por eso no hay rama que se salte `showNotification`, ni siquiera si
+   el JSON llega roto. El `tag` hace que un chat con varios mensajes seguidos
+   sea una sola notificación que se actualiza. */
+self.addEventListener('push', (evento) => {
+  let datos = {};
+  try {
+    datos = evento.data ? evento.data.json() : {};
+  } catch {
+    /* Un cuerpo que no es JSON se ignora: se enseña la notificación genérica. */
+  }
+  const titulo = typeof datos.title === 'string' && datos.title ? datos.title : 'Praxis';
+  evento.waitUntil(
+    self.registration.showNotification(titulo, {
+      body: typeof datos.body === 'string' ? datos.body : '',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: typeof datos.tag === 'string' ? datos.tag : undefined,
+      renotify: Boolean(datos.tag),
+      data: { url: typeof datos.url === 'string' && datos.url.startsWith('/') ? datos.url : '/' },
+    }),
+  );
+});
+
+/* Pulsar la notificación: si la app ya está abierta se lleva a esa ventana al
+   sitio; si no, se abre. La URL es siempre relativa (se comprueba arriba): un
+   push no puede mandar a nadie fuera de Praxis. */
+self.addEventListener('notificationclick', (evento) => {
+  evento.notification.close();
+  const destino = new URL(evento.notification.data?.url ?? '/', self.location.origin).href;
+  evento.waitUntil(
+    (async () => {
+      const ventanas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const ventana of ventanas) {
+        if (new URL(ventana.url).origin !== self.location.origin) continue;
+        await ventana.focus();
+        if ('navigate' in ventana) await ventana.navigate(destino).catch(() => undefined);
+        return;
+      }
+      await self.clients.openWindow(destino);
+    })(),
+  );
+});

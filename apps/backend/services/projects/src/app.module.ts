@@ -14,6 +14,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProjectRolesModule } from './project-roles/project-roles.module';
 import { ProjectsModule } from './projects/projects.module';
+import { PushModule } from './push/push.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { RedisModule } from './redis/redis.module';
 import { SprintsModule } from './sprints/sprints.module';
@@ -43,6 +44,10 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
         STORAGE_DRIVER: Joi.string().valid('postgres', 'gcs').default('postgres'),
         GCS_PROJECT_ID: Joi.string().allow(''),
         GCS_BUCKET: Joi.string().allow(''),
+        /* Notificaciones push (docs/PLAN-PUSH.md). Sin las dos claves se apagan. */
+        PUSH_VAPID_PUBLIC_KEY: Joi.string().allow(''),
+        PUSH_VAPID_PRIVATE_KEY: Joi.string().allow(''),
+        PUSH_VAPID_SUBJECT: Joi.string().allow(''),
       }),
     }),
     PrismaModule,
@@ -60,6 +65,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     NotificationsModule,
     ProjectRolesModule,
     ChatModule,
+    PushModule,
   ],
 })
 export class AppModule {}

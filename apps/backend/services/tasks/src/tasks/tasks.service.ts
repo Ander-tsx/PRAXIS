@@ -872,6 +872,39 @@ export class TasksService {
   }
 
   /**
+   * Las tareas **abiertas** con fecha límite en `[from, to)`, con sus encargados.
+   *
+   * Es lo que consulta el recordatorio de vencimientos (`docs/PLAN-PUSH.md`):
+   * una vez por tanda, no por persona. Sin proyecto ni usuario como filtro a
+   * propósito, porque el cron mira toda la plataforma.
+   *
+   * - `completedAt: null`: una tarea en una columna de cierre no se recuerda.
+   * - Solo las que tienen encargado: sin nadie a quien avisar no hay push.
+   * - Sin caché: se pide dos veces al día.
+   */
+  async findDueBetween(dto: { from: string; to: string }) {
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        completedAt: null,
+        dueDate: { gte: new Date(dto.from), lt: new Date(dto.to) },
+        assignees: { some: {} },
+      },
+      select: {
+        id: true,
+        title: true,
+        projectId: true,
+        assignees: { select: { userId: true } },
+      },
+    });
+    return tasks.map((t) => ({
+      taskId: t.id,
+      title: t.title,
+      projectId: t.projectId,
+      userIds: t.assignees.map((a) => a.userId),
+    }));
+  }
+
+  /**
    * Tareas asignadas a una persona, dentro de los proyectos donde sigue estando.
    *
    * No se cachea: cambia con cada movimiento de cualquier tarea de cualquiera de

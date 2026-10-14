@@ -972,3 +972,28 @@ model ReportLayout {
   @@schema("projects")
   @@map("report_layouts")
 }
+
+/// Un dispositivo que aceptó recibir notificaciones push (`docs/PLAN-PUSH.md`).
+///
+/// La identidad es el `endpoint`: lo da el servicio de push del navegador (Apple,
+/// Google, Mozilla) y es único por instalación. Si dos personas usan el mismo
+/// teléfono, la suscripción **pasa** a quien la registró la última vez —un
+/// dispositivo no puede recibir los avisos de quien ya cerró sesión—.
+///
+/// Las claves `p256dh` y `auth` son públicas del navegador, no secretos del
+/// servidor: sirven para cifrar el mensaje para ese dispositivo y nada más.
+/// Se borra la fila cuando el servicio de push responde 404 o 410 (la
+/// suscripción murió) o cuando la persona lo apaga.
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@schema("projects")
+  @@map("push_subscriptions")
+}
