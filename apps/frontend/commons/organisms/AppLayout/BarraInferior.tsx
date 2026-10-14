@@ -78,7 +78,7 @@ export function BarraInferior({
       aria-label="Secciones"
       aria-hidden={!visible || undefined}
       inert={!visible}
-      className={`fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.08] bg-surface/95 pb-safe backdrop-blur-md transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden ${
+      className={`fixed inset-x-0 bottom-[var(--desfase-inferior,0px)] z-30 border-t border-white/[0.08] bg-surface/95 pb-safe backdrop-blur-md transition-transform duration-200 ease-out motion-reduce:transition-none md:hidden ${
         visible ? 'translate-y-0' : 'translate-y-full'
       }`}
     >

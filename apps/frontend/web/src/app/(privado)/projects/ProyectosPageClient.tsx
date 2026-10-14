@@ -89,16 +89,7 @@ export function ProyectosPageClient({
     return (
       /* El título «Inicio» lo pone la barra de arriba del armazón
          (`BarraSuperior`, M8 de `docs/PLAN-MOVIL.md`). */
-      <>
-        {/* TEMPORAL — diagnóstico de la PWA de iPhone; se borra con `/pwa-debug`. */}
-        <a
-          href="/pwa-debug"
-          className="mx-4 mt-3 block rounded-xl border border-primary px-4 py-3 text-center font-sans text-sm text-primary"
-        >
-          Test PWA (temporal)
-        </a>
-        <ArbolDeProyectos />
-      </>
+      <ArbolDeProyectos />
     );
   }
 
