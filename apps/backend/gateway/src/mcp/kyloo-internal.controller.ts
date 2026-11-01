@@ -7,63 +7,23 @@ import {
   Inject,
   NotFoundException,
   Post,
-  UnauthorizedException,
-  UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiExcludeController } from '@nestjs/swagger';
-import { SkipThrottle } from '@nestjs/throttler';
 import { MCP_CONNECTION_MAX_ORGS, type McpConnectionView } from '@praxis/contracts';
-import {
-  ArrayMaxSize,
-  ArrayMinSize,
-  IsArray,
-  IsEmail,
-  IsString,
-  IsUUID,
-  MaxLength,
-} from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsString, IsUUID, MaxLength } from 'class-validator';
 import { firstValueFrom } from 'rxjs';
-import { KylooInternalGuard } from './kyloo-internal.guard';
+import { type ConnectClaims, KylooOAuthService } from './kyloo-oauth.service';
 import { McpAccessError, McpAccessService } from './mcp-access.service';
 
-class IdentidadKylooDto {
+/** El token del paso de conexión o del evento: es lo único que se pide, y lo único que se cree. */
+class TokenDto {
   @IsString()
-  @MaxLength(200)
-  sub: string;
-
-  @IsEmail()
-  email: string;
-
-  /** El cliente que se está conectando, para recordar lo que ya tenía. */
-  @IsString()
-  @MaxLength(200)
-  clientId: string;
+  @MaxLength(4000)
+  token: string;
 }
 
-class LegacyLoginDto {
-  @IsEmail()
-  email: string;
-
-  @IsString()
-  @MaxLength(200)
-  password: string;
-}
-
-class RevocarDto {
-  @IsString()
-  @MaxLength(200)
-  sub: string;
-
-  @IsEmail()
-  email: string;
-}
-
-class GuardarConexionDto extends IdentidadKylooDto {
-  @IsString()
-  @MaxLength(80)
-  clientName: string;
-
+class SaveConnectionDto extends TokenDto {
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(MCP_CONNECTION_MAX_ORGS)
@@ -74,71 +34,67 @@ class GuardarConexionDto extends IdentidadKylooDto {
   activeOrgId: string;
 }
 
-interface OrgDeBilling {
+interface OrgOfBilling {
   id: string;
   name: string | null;
   kind: string;
 }
 
+/** Eventos tras los cuales hay que cerrar todo lo que esa persona tenía abierto. */
+const REVOKING_EVENTS = new Set(['user.credentials_changed', 'user.suspended', 'user.deleted']);
+
 /**
- * Lo que Kyloo Accounts necesita de Praxis para conectar un cliente de IA
- * (docs/PLAN-OAUTH-KYLOO.md): decirle a la persona qué organizaciones puede
- * ofrecer y guardar la elección.
+ * Lo que Kyloo Accounts necesita de Praxis (docs/PLAN-OAUTH-KYLOO.md): el paso de conexión de un
+ * cliente de IA —qué organizaciones puede ver— y los eventos de identidad.
  *
- * ⚠️ **No están detrás de `JwtGuard`** (Accounts no tiene sesión de Praxis) sino
- * de `KylooInternalGuard`, que firma con un secreto compartido. Y la identidad
- * que llega —`sub` y `email`— sale de Accounts **ya verificada**: este
- * controlador la traduce a una cuenta de Praxis, no la vuelve a comprobar.
+ * ⚠️ **No están detrás de `JwtGuard`** (Accounts no tiene sesión de Praxis) y tampoco de un secreto
+ * compartido: lo que se cree es **un token que Kyloo firmó**, verificado con sus claves públicas.
+ * La identidad sale de él y nunca del cuerpo: el navegador dice qué organizaciones quiere, no
+ * quién es. Un token dura 5 minutos, va dirigido solo a Praxis y dice para qué sirve (`token_use`).
  */
 @ApiExcludeController()
-@SkipThrottle()
-@UseGuards(KylooInternalGuard)
 @Controller('internal/kyloo')
 export class KylooInternalController {
   constructor(
     @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
     @Inject('BILLING_SERVICE') private readonly billingClient: ClientProxy,
     private readonly access: McpAccessService,
+    private readonly kyloo: KylooOAuthService,
   ) {}
 
-  private async persona(dto: IdentidadKylooDto): Promise<string> {
-    const encontrada = await firstValueFrom(
+  private async userIdOf(claims: ConnectClaims): Promise<string> {
+    const found = await firstValueFrom(
       this.credentialsClient.send<{ userId: string } | null>(
         { cmd: 'mcp_conn_identify' },
-        { sub: dto.sub, email: dto.email },
+        { sub: claims.sub, email: claims.email },
       ),
     ).catch(() => null);
-    if (!encontrada) {
+    if (!found) {
       throw new NotFoundException({
         code: 'NO_PRAXIS_ACCOUNT',
         message:
           'No hay una cuenta de Praxis para este correo. Entra primero en Praxis con tu cuenta de Kyloo.',
       });
     }
-    return encontrada.userId;
+    return found.userId;
   }
 
   /** Cuáles se pueden ofrecer: aquellas en las que el MCP se puede usar, con el porqué de las demás. */
-  private async disponibles(userId: string) {
+  private async availableOrgs(userId: string) {
     const orgs = await firstValueFrom(
-      this.billingClient.send<OrgDeBilling[]>({ cmd: 'billing_orgs_of' }, { userId }),
-    ).catch(() => [] as OrgDeBilling[]);
+      this.billingClient.send<OrgOfBilling[]>({ cmd: 'billing_orgs_of' }, { userId }),
+    ).catch(() => [] as OrgOfBilling[]);
 
     return Promise.all(
-      (Array.isArray(orgs) ? orgs : []).map(async (o) => {
+      (Array.isArray(orgs) ? orgs : []).map(async (org) => {
+        const base = { id: org.id, name: org.name, personal: org.kind === 'PERSONAL' };
         try {
-          await this.access.exigirOrganizacionUsable(userId, o.id);
-          return { id: o.id, name: o.name, personal: o.kind === 'PERSONAL', disponible: true };
+          await this.access.exigirOrganizacionUsable(userId, org.id);
+          return { ...base, available: true };
         } catch (error) {
-          const motivo =
+          const reason =
             error instanceof McpAccessError ? error.message : 'No se puede usar ahora mismo.';
-          return {
-            id: o.id,
-            name: o.name,
-            personal: o.kind === 'PERSONAL',
-            disponible: false,
-            motivo,
-          };
+          return { ...base, available: false, reason };
         }
       }),
     );
@@ -146,28 +102,32 @@ export class KylooInternalController {
 
   @Post('organizations')
   @HttpCode(HttpStatus.OK)
-  async organizaciones(@Body() dto: IdentidadKylooDto) {
-    const userId = await this.persona(dto);
-    const [organizaciones, existentes] = await Promise.all([
-      this.disponibles(userId),
+  async organizations(@Body() dto: TokenDto) {
+    const claims = await this.kyloo.verifyConnectToken(dto.token);
+    const userId = await this.userIdOf(claims);
+    const [organizations, existing] = await Promise.all([
+      this.availableOrgs(userId),
       firstValueFrom(
         this.credentialsClient.send<McpConnectionView[]>({ cmd: 'mcp_conn_list' }, { userId }),
       ).catch(() => [] as McpConnectionView[]),
     ]);
-    const actual = existentes.find((c) => c.clientId === dto.clientId && !c.revokedAt);
+    const current = existing.find((c) => c.clientId === claims.clientId && !c.revokedAt);
     return {
-      organizaciones,
+      clientName: claims.clientName,
+      organizations,
       /* Reconectar el mismo cliente parte de lo que ya tenía, no de cero. */
-      actual: actual
-        ? { allowedOrgIds: actual.allowedOrgIds, activeOrgId: actual.activeOrgId }
+      current: current
+        ? { allowedOrgIds: current.allowedOrgIds, activeOrgId: current.activeOrgId }
         : null,
     };
   }
 
+  /** Guarda la elección, se la comunica a Kyloo y devuelve a dónde seguir. */
   @Post('connections')
   @HttpCode(HttpStatus.OK)
-  async guardar(@Body() dto: GuardarConexionDto) {
-    const userId = await this.persona(dto);
+  async save(@Body() dto: SaveConnectionDto) {
+    const claims = await this.kyloo.verifyConnectToken(dto.token);
+    const userId = await this.userIdOf(claims);
     const orgIds = [...new Set(dto.orgIds)];
     if (!orgIds.includes(dto.activeOrgId)) {
       throw new BadRequestException('La organización activa tiene que estar entre las elegidas.');
@@ -175,64 +135,51 @@ export class KylooInternalController {
 
     /* Todas las elegidas tienen que ser suyas Y usables: la lista que vio la
        persona la armó el navegador, y el navegador no es de fiar. */
-    const buenas = new Set(
-      (await this.disponibles(userId)).filter((o) => o.disponible).map((o) => o.id),
+    const usable = new Set(
+      (await this.availableOrgs(userId)).filter((org) => org.available).map((org) => org.id),
     );
-    if (!orgIds.every((id) => buenas.has(id))) {
+    if (!orgIds.every((id) => usable.has(id))) {
       throw new BadRequestException(
         'Alguna de las organizaciones elegidas no existe o no permite conectar agentes.',
       );
     }
 
-    const conexion = await firstValueFrom(
+    const connection = await firstValueFrom(
       this.credentialsClient.send<McpConnectionView>(
         { cmd: 'mcp_conn_save' },
         {
           userId,
-          kylooSub: dto.sub,
-          clientId: dto.clientId,
-          clientName: dto.clientName,
+          kylooSub: claims.sub,
+          clientId: claims.clientId,
+          /* El nombre sale del token, que lo tomó de la base de Kyloo: lo que se guarda aquí y se
+             enseña luego en Integraciones no puede ser lo que el navegador quiera. */
+          clientName: claims.clientName.slice(0, 80),
           allowedOrgIds: orgIds,
           activeOrgId: dto.activeOrgId,
         },
       ),
     );
-    return { connectionId: conexion.id };
+    await this.kyloo.completeConnection(claims.connectId, connection.id);
+    return { returnUrl: claims.returnUrl };
   }
 
   /**
-   * PLAN-AUTH-KYLOO D4 — migración perezosa de contraseñas. Kyloo pregunta, cuando alguien entra
-   * con un correo que no conoce, si esa contraseña vale para una cuenta heredada de Praxis. Si
-   * vale devuelve la identidad (Kyloo crea la cuenta con su propio hash); si no, un 401 que no
-   * dice por qué.
+   * Un evento de identidad. Kyloo reintenta hasta que respondemos 200, así que el mismo evento
+   * puede llegar más de una vez: cerrar sesiones es idempotente. Los eventos que no conocemos
+   * se reconocen igual, para que no se reintenten sin fin.
    */
-  @Post('legacy-login')
+  @Post('events')
   @HttpCode(HttpStatus.OK)
-  async entradaHeredada(@Body() dto: LegacyLoginDto) {
-    const identidad = await firstValueFrom(
-      this.credentialsClient.send<{ email: string; name: string } | null>(
-        { cmd: 'auth_legacy_verify' },
-        { email: dto.email, password: dto.password },
-      ),
-    ).catch(() => null);
-    if (!identidad) {
-      throw new UnauthorizedException({
-        code: 'INVALID_CREDENTIALS',
-        message: 'Credenciales inválidas',
-      });
+  async event(@Body() dto: TokenDto) {
+    const event = await this.kyloo.verifyEventToken(dto.token);
+    if (REVOKING_EVENTS.has(event.event)) {
+      await firstValueFrom(
+        this.credentialsClient.send<{ revocadas: boolean }>(
+          { cmd: 'auth_revoke_all_of' },
+          { sub: event.sub, email: event.email },
+        ),
+      );
     }
-    return identidad;
-  }
-
-  /** PLAN-AUTH-KYLOO D6 — Kyloo cambió una credencial: se cierra todo lo que esa persona tenía abierto. */
-  @Post('revoke')
-  @HttpCode(HttpStatus.OK)
-  async revocar(@Body() dto: RevocarDto) {
-    return firstValueFrom(
-      this.credentialsClient.send<{ revocadas: boolean }>(
-        { cmd: 'auth_revoke_all_of' },
-        { sub: dto.sub, email: dto.email },
-      ),
-    );
+    return { ok: true };
   }
 }

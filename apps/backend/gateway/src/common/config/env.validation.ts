@@ -96,7 +96,7 @@ export const envValidationSchema = Joi.object({
   /**
    * Kyloo Accounts como servidor de autorización del MCP (docs/PLAN-OAUTH-KYLOO.md).
    * Sin `KYLOO_ISSUER` el MCP solo admite tokens personales, y las rutas internas
-   * que llama Accounts responden 503. Las tres juntas o ninguna.
+   * que llama Accounts responden 503.
    */
   KYLOO_ISSUER: Joi.string()
     .uri()
@@ -118,11 +118,15 @@ export const envValidationSchema = Joi.object({
   AUTH_FALLBACK_LOCAL: Joi.string().valid('true', 'false').default('true'),
   /** La dirección pública del MCP, que es el `aud` de los tokens OAuth. */
   MCP_RESOURCE_URL: Joi.string().uri().optional().allow(''),
-  /** Secreto compartido con Accounts para firmar sus llamadas internas (HMAC). 32+ caracteres. */
   /** Secreto del cron de vencimientos push (docs/PLAN-PUSH.md). Sin él, la ruta responde 404. */
   PUSH_CRON_SECRET: Joi.string().min(32).optional().allow(''),
 
-  KYLOO_INTERNAL_SECRET: Joi.string().min(32).optional().allow(''),
+  /**
+   * Las credenciales de Praxis como cliente OAuth de Kyloo. Con ellas se verifican los tokens que
+   * Kyloo nos dirige (`aud` es el `client_id`) y se cierra el paso de conexión del MCP.
+   */
+  KYLOO_CLIENT_ID: Joi.string().optional().allow(''),
+  KYLOO_CLIENT_SECRET: Joi.string().optional().allow(''),
   STRIPE_PRICE_TEAM: Joi.string().optional().allow(''),
   STRIPE_PRICE_BUSINESS: Joi.string().optional().allow(''),
   /**

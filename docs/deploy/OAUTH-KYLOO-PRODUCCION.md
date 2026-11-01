@@ -1,5 +1,8 @@
 # OAuth con Kyloo Accounts: puesta en producción
 
+> 🕰️ **Historia de la primera puesta.** El secreto compartido, `/organizacion` y `legacy-login` de
+> aquí se sustituyeron: ver [KYLOO-PRODUCTO-GENERICO](KYLOO-PRODUCTO-GENERICO.md).
+
 Pasos exactos para desplegar [PLAN-OAUTH-KYLOO](../PLAN-OAUTH-KYLOO.md). El orden importa:
 `kyloo-auth-api` **no arranca** si le falta una variable de producción (es lo previsto), y ese
 servicio también lo usa Oskel. Por eso las variables y la migración van **antes** de subir el código.

@@ -1,55 +1,57 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 /**
- * Paso al gateway de las llamadas de servidor a servidor de Kyloo Accounts
+ * Paso al gateway de las llamadas de Kyloo Accounts y de la pantalla de conexión
  * (docs/PLAN-OAUTH-KYLOO.md).
  *
- * Accounts necesita preguntar a Praxis qué organizaciones tiene una persona y
- * guardar la que elige al conectar un cliente de IA. El gateway no tiene
- * dominio público, así que entra por aquí, igual que `api/mcp`.
+ * El gateway no tiene dominio público, así que entra por aquí, igual que `api/mcp`.
  *
- * ## Lo que no puede cambiar por el camino
+ * ## Quién es quién
  *
- * - 🔴 **El cuerpo pasa crudo** (`arrayBuffer`) y las cabeceras de firma
- *   (`x-kyloo-timestamp`, `x-kyloo-signature`) tal cual: la firma HMAC cubre los
- *   bytes exactos. Reserializar el JSON la rompería sin un solo aviso útil.
- * - **Solo `organizations`, `connections`, `legacy-login` y `revoke`**, por `POST`. Nada más
- *   del gateway se alcanza por esta puerta. Las dos últimas son de PLAN-AUTH-KYLOO
- *   (migración perezosa de contraseñas y revocación de sesiones): olvidarlas aquí no da
- *   ningún error en local, que apunta directo al gateway, y en producción las dos dan 404.
+ * La autenticación no está aquí ni es un secreto compartido: cada cuerpo lleva **un token que
+ * Kyloo firmó**, y el gateway lo verifica con las claves públicas de Kyloo. Este proxy solo
+ * reenvía, sin leer nada.
  *
- * La autenticación es la firma, que comprueba el gateway (`KylooInternalGuard`);
- * aquí no se mira nada.
+ * - `organizations` y `connections`: los llama la pantalla `/auth/kyloo/connect`, que el
+ *   navegador abre con el token del paso de conexión.
+ * - `events`: los llama Kyloo, de servidor a servidor, con un evento de identidad.
+ *
+ * ⚠️ Solo estas tres rutas, por `POST`. Nada más del gateway se alcanza por esta puerta, y olvidar
+ * una aquí no da ningún error en local, que apunta directo al gateway: en producción da 404.
  */
 export const dynamic = 'force-dynamic';
 
-const RUTAS = new Set(['organizations', 'connections', 'legacy-login', 'revoke']);
+const ROUTES = new Set(['organizations', 'connections', 'events']);
+/** Un token firmado y un puñado de identificadores: nada de esto pasa de unos pocos KB. */
+const MAX_BODY_BYTES = 16 * 1024;
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
   const { path } = await params;
-  const destino = path.join('/');
-  if (path.length !== 1 || !RUTAS.has(destino)) return new NextResponse(null, { status: 404 });
+  const destination = path.join('/');
+  if (path.length !== 1 || !ROUTES.has(destination)) return new NextResponse(null, { status: 404 });
 
-  const cabeceras = new Headers({ 'content-type': 'application/json' });
-  for (const nombre of ['x-kyloo-timestamp', 'x-kyloo-signature']) {
-    const valor = request.headers.get(nombre);
-    if (valor) cabeceras.set(nombre, valor);
-  }
+  const body = await request.arrayBuffer();
+  if (body.byteLength > MAX_BODY_BYTES) return new NextResponse(null, { status: 413 });
 
-  let respuesta: Response;
+  let response: Response;
   try {
-    respuesta = await fetch(
-      `${process.env.GATEWAY_URL ?? 'http://localhost:3000'}/api/internal/kyloo/${destino}`,
-      { method: 'POST', headers: cabeceras, body: await request.arrayBuffer(), cache: 'no-store' },
+    response = await fetch(
+      `${process.env.GATEWAY_URL ?? 'http://localhost:3000'}/api/internal/kyloo/${destination}`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+        cache: 'no-store',
+      },
     );
   } catch {
     return NextResponse.json({ message: 'Praxis no está disponible.' }, { status: 502 });
   }
-  return new NextResponse(respuesta.body, {
-    status: respuesta.status,
-    headers: { 'content-type': respuesta.headers.get('content-type') ?? 'application/json' },
+  return new NextResponse(response.body, {
+    status: response.status,
+    headers: { 'content-type': response.headers.get('content-type') ?? 'application/json' },
   });
 }

@@ -22,8 +22,6 @@ import {
 } from '@praxis/contracts';
 
 const SALT_ROUNDS = 10;
-/** Un hash de bcrypt válido de una cadena que nadie escribe: para gastar el mismo tiempo cuando la cuenta no existe. */
-const HASH_SIN_CUENTA = '$2b$10$OL4eJFuMgLrIwxiHO4IwbO6gjGJuCMEZVyc7t3Sc1eawaQuz1qyQi';
 const TOKEN_CACHE_TTL = 300; // 5 min
 const SESSION_TTL = 60 * 60 * 24 * 7; // 7 días
 
@@ -766,43 +764,8 @@ export class AuthService {
   }
 
   /**
-   * D4 — ¿esta contraseña vale para una cuenta heredada de Praxis?
-   *
-   * Lo pregunta Kyloo Accounts (llamada firmada) cuando alguien entra con un correo que Kyloo aún
-   * no conoce. Si vale, Kyloo crea su cuenta con **su propio hash**; nada de lo de aquí sale. Solo
-   * responde `null` o la identidad, sin decir por qué falló: cuenta inexistente, contraseña mala,
-   * correo sin confirmar, cuenta suspendida y cuenta sin contraseña (solo Google) son lo mismo
-   * hacia fuera.
-   */
-  async verificarCredencialHeredada(
-    email: string,
-    password: string,
-  ): Promise<{ email: string; name: string } | null> {
-    const credential = await this.prisma.credential.findFirst({
-      where: { email: { equals: email, mode: 'insensitive' } },
-      include: { user: true },
-    });
-    /* El mismo coste de bcrypt exista o no la cuenta: si no, el tiempo de respuesta delata qué
-       correos tienen cuenta. */
-    const hash = credential?.passwordHash ?? HASH_SIN_CUENTA;
-    const coincide = await bcrypt.compare(password, hash).catch(() => false);
-    if (
-      !credential?.passwordHash ||
-      !coincide ||
-      !credential.user ||
-      credential.user.status !== 'ACTIVE' ||
-      credential.emailVerifiedAt === null
-    ) {
-      return null;
-    }
-    return {
-      email: credential.email,
-      name: `${credential.user.firstName} ${credential.user.lastName}`.trim(),
-    };
-  }
-
-  /**
-   * D6 — Kyloo cambió o restableció una contraseña (o borró la cuenta): fuera todas las sesiones,
+   * D6 — Kyloo avisa de que cambió o restableció una contraseña, suspendió o borró la cuenta
+   * (evento `user.credentials_changed`, `user.suspended` o `user.deleted`): fuera todas las sesiones,
    * tokens personales y conexiones OAuth de esa persona. Sin esto, el refresh token de 7 días de
    * quien robó una sesión seguiría vivo después de que la víctima cambiara la contraseña.
    */

@@ -4,7 +4,6 @@ import { clienteDeServicio } from '@praxis/local-transport';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
 import { KylooInternalController } from './kyloo-internal.controller';
-import { KylooInternalGuard } from './kyloo-internal.guard';
 import { KylooOAuthService } from './kyloo-oauth.service';
 import { McpAccessService } from './mcp-access.service';
 import { McpConnectionsController } from './mcp-connections.controller';
@@ -36,6 +35,6 @@ import { PersonalTokensController } from './personal-tokens.controller';
     McpConnectionsController,
     KylooInternalController,
   ],
-  providers: [McpAccessService, McpService, KylooOAuthService, KylooInternalGuard],
+  providers: [McpAccessService, McpService, KylooOAuthService],
 })
 export class McpModule {}

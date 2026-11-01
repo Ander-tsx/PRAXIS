@@ -164,54 +164,6 @@ describe('AuthService.loginWithKyloo con AUTH_MODE=kyloo', () => {
   });
 });
 
-describe('AuthService.verificarCredencialHeredada', () => {
-  // biome-ignore lint/suspicious/noExplicitAny: bcrypt real, dobles de lo demás
-  const bcrypt = require('bcrypt');
-
-  async function cuenta(sobre: Record<string, unknown> = {}) {
-    return {
-      email: 'ana@ejemplo.com',
-      passwordHash: await bcrypt.hash('la-contrasena-buena', 4),
-      emailVerifiedAt: new Date(),
-      user: { firstName: 'Ana', lastName: 'Pérez', status: 'ACTIVE' },
-      ...sobre,
-    };
-  }
-
-  it('devuelve la identidad si la contraseña vale', async () => {
-    const { servicio, credential } = montar();
-    credential.findFirst.mockResolvedValue(await cuenta());
-    await expect(
-      servicio.verificarCredencialHeredada('ana@ejemplo.com', 'la-contrasena-buena'),
-    ).resolves.toEqual({ email: 'ana@ejemplo.com', name: 'Ana Pérez' });
-  });
-
-  it.each([
-    ['contraseña equivocada', {}, 'otra-cosa'],
-    ['correo sin confirmar', { emailVerifiedAt: null }, 'la-contrasena-buena'],
-    [
-      'cuenta suspendida',
-      { user: { firstName: 'A', lastName: 'B', status: 'SUSPENDED' } },
-      'la-contrasena-buena',
-    ],
-    ['cuenta sin contraseña (solo Google)', { passwordHash: null }, 'la-contrasena-buena'],
-  ])('responde null: %s', async (_motivo, sobre, clave) => {
-    const { servicio, credential } = montar();
-    credential.findFirst.mockResolvedValue(await cuenta(sobre));
-    await expect(
-      servicio.verificarCredencialHeredada('ana@ejemplo.com', clave),
-    ).resolves.toBeNull();
-  });
-
-  it('responde null si la cuenta no existe', async () => {
-    const { servicio, credential } = montar();
-    credential.findFirst.mockResolvedValue(null);
-    await expect(
-      servicio.verificarCredencialHeredada('nadie@ejemplo.com', 'x'),
-    ).resolves.toBeNull();
-  });
-});
-
 describe('AuthService.revocarTodoDe', () => {
   it('cierra las sesiones y revoca tokens y conexiones de esa persona', async () => {
     const { servicio, credential, redis, personalTokens } = montar();
