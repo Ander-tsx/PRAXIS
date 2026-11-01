@@ -21,8 +21,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
-    "jose": "^5.9.6",
-    "@praxis/local-transport": "workspace:*",
+    "@kyloo/auth": "^0.1.3",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
@@ -33,6 +32,7 @@
     "@nestjs/swagger": "^11.0.0",
     "@nestjs/throttler": "^6.5.0",
     "@praxis/contracts": "workspace:*",
+    "@praxis/local-transport": "workspace:*",
     "@praxis/observability": "workspace:*",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
