@@ -27,6 +27,7 @@ function montar(opciones: { identificada?: boolean; bloqueadas?: string[] } = {}
       if (pattern.cmd === 'mcp_conn_list') return of([]);
       if (pattern.cmd === 'mcp_conn_save') return of({ id: 'conn-77' });
       if (pattern.cmd === 'auth_revoke_all_of') return of({ revocadas: true });
+      if (pattern.cmd === 'auth_kyloo_account_deleted') return of({ anonimizada: true });
       if (pattern.cmd === 'auth_kyloo_email_changed') return of({ actualizado: true });
       return throwError(() => new Error(`comando inesperado ${pattern.cmd}`));
     }),
@@ -148,6 +149,13 @@ describe('KylooInternalController', () => {
         });
       },
     );
+
+    it('user.deleted cierra todo Y anonimiza lo que Praxis sabe de la persona', async () => {
+      const { controller, enviados } = montar();
+      await controller.event({ token: 'evento:user.deleted' });
+      expect(enviados.map((e) => e.cmd)).toEqual(['auth_revoke_all_of', 'auth_kyloo_account_deleted']);
+      expect(enviados[1]?.payload).toEqual({ sub: 'sub-ana' });
+    });
 
     it('user.updated sigue el cambio de correo y NO cierra sesiones', async () => {
       const { controller, enviados } = montar();

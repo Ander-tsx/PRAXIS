@@ -6,6 +6,7 @@ import { RpcException } from '@nestjs/microservices';
 import * as bcrypt from 'bcrypt';
 import { type LoginTicket, OAuth2Client, type TokenPayload } from 'google-auth-library';
 
+import { Prisma } from '../generated/prisma-client';
 import { PersonalTokensService } from '../personal-tokens/personal-tokens.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
@@ -780,6 +781,66 @@ export class AuthService {
       this.log.warn(`No se pudo seguir el cambio de correo de ${credential.id}: ${String(error)}`);
       return false;
     }
+  }
+
+  /**
+   * D8 — la persona eliminó su cuenta de Kyloo (evento `user.deleted`): se **anonimiza** lo que
+   * Praxis sabe de ella, en vez de borrar la fila.
+   *
+   * El `id` del usuario se conserva a propósito: tareas, comentarios y documentos de las
+   * organizaciones apuntan a él, y borrar en cascada destruiría trabajo de otras personas. Sin
+   * nombre, correo, foto, contraseña ni identificadores de Kyloo/Google, ese `id` ya no dice
+   * quién fue: el contenido queda atribuido a «Persona eliminada».
+   *
+   * ⚠️ Se busca **solo por `kylooSub`**, nunca por correo: un borrado por correo podría alcanzar
+   * a otra cuenta. Idempotente: tras la primera vez el `kylooSub` ya no existe y el evento
+   * repetido no encuentra nada. Se usa `INACTIVE` (no hay estado `DELETED`) y sin credenciales
+   * utilizables: no puede entrar nadie, ni con el mismo correo (esa persona tendría un `sub` nuevo).
+   */
+  async anonimizarCuentaDeKyloo(sub: string): Promise<{ anonimizada: boolean }> {
+    if (this.config.get<string>('AUTH_MODE') !== 'kyloo') return { anonimizada: false };
+    const credential = await this.prisma.credential.findUnique({
+      where: { kylooSub: sub },
+      include: { user: true },
+    });
+    if (!credential) return { anonimizada: false };
+
+    await this.prisma.$transaction(async (tx) => {
+      if (credential.user) {
+        const userId = credential.user.id;
+        await tx.personalAccessToken.deleteMany({ where: { userId } });
+        await tx.mcpConnection.deleteMany({ where: { userId } });
+        await tx.userAvatar.deleteMany({ where: { userId } });
+        await tx.userCover.deleteMany({ where: { userId } });
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            firstName: 'Persona',
+            lastName: 'eliminada',
+            avatarUrl: null,
+            googleAvatarUrl: null,
+            coverUrl: null,
+            biography: null,
+            location: null,
+            professionalInfo: Prisma.DbNull,
+            status: 'INACTIVE',
+          },
+        });
+      }
+      await tx.authToken.deleteMany({ where: { credentialId: credential.id } });
+      await tx.credential.update({
+        where: { id: credential.id },
+        data: {
+          email: `eliminada-${credential.id}@eliminada.invalid`,
+          passwordHash: null,
+          googleSub: null,
+          kylooSub: null,
+          emailVerifiedAt: null,
+        },
+      });
+    });
+    if (credential.user) await this.redis.del(claveDeSesiones(credential.user.id));
+    return { anonimizada: true };
   }
 
   /**

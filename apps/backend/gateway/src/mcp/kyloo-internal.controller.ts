@@ -180,6 +180,16 @@ export class KylooInternalController {
         ),
       );
     }
+    /* Después de cerrar todo lo abierto: se anonimiza lo que Praxis sabe de la persona (D8). Si
+       falla, el 500 hace que Kyloo reintente; repetirlo no cambia nada. */
+    if (event.event === 'user.deleted') {
+      await firstValueFrom(
+        this.credentialsClient.send<{ anonimizada: boolean }>(
+          { cmd: 'auth_kyloo_account_deleted' },
+          { sub: event.sub },
+        ),
+      );
+    }
     if (event.event === 'user.updated') {
       await firstValueFrom(
         this.credentialsClient.send<{ actualizado: boolean }>(

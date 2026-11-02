@@ -40,6 +40,11 @@ export class AuthController {
     return this.authService.seguirCambioDeCorreo(dto.sub, dto.email);
   }
 
+  @MessagePattern({ cmd: 'auth_kyloo_account_deleted' })
+  anonimizarCuentaDeKyloo(@Payload() dto: { sub: string }) {
+    return this.authService.anonimizarCuentaDeKyloo(dto.sub);
+  }
+
   @MessagePattern({ cmd: 'auth_google' })
   loginWithGoogle(@Payload() dto: GoogleLoginDto) {
     return this.authService.loginWithGoogle(dto);
