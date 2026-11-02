@@ -42,3 +42,26 @@ export async function gatewayAuthPost(path: string, body: unknown): Promise<Auth
 
   return data;
 }
+
+/**
+ * Despierta el backend con un `GET` (que `fetchAlGateway` sí reintenta) antes de una operación que
+ * no se puede repetir. Nunca falla: si no responde, el intento real dará su propio error.
+ *
+ * ⚠️ Railway duerme `praxis-api` tras unos minutos sin tráfico, y la primera petición recibe un 502.
+ * Un `POST` no se reintenta (ver `despertar.ts`), y el canje del código de Kyloo es un `POST` con
+ * un código de **un solo uso**: si ese primer intento caía en el 502, el código se perdía y la
+ * persona veía «Kyloo no responde» aunque hubiera puesto bien su código 2FA. Con la API ya despierta,
+ * el canje sale a la primera.
+ */
+export async function despertarGateway(): Promise<void> {
+  try {
+    const response = await fetchAlGateway(`${GATEWAY_URL}/api`, {
+      method: 'GET',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(12_000),
+    });
+    await response.body?.cancel();
+  } catch {
+    /* no hace falta nada: lo que venga después reportará su propio fallo */
+  }
+}

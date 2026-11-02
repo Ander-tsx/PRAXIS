@@ -1,4 +1,4 @@
-import { gatewayAuthPost } from '@/lib/auth/gateway';
+import { despertarGateway, gatewayAuthPost } from '@/lib/auth/gateway';
 import {
   ERRORES_KYLOO,
   KYLOO_FLOW_COOKIE,
@@ -44,6 +44,10 @@ export async function GET(request: NextRequest) {
   const intento = await abrirIntento(request.cookies.get(KYLOO_FLOW_COOKIE)?.value);
   const code = params.get('code');
   if (!intento || !code || params.get('state') !== intento.state) return fallo('intento_invalido');
+
+  /* El código de Kyloo es de un solo uso: con la API dormida el primer POST caía en el 502 de
+     Railway y se perdía. Se despierta antes, con un GET que sí se reintenta. */
+  await despertarGateway();
 
   let tokens: Awaited<ReturnType<typeof gatewayAuthPost>>;
   try {
