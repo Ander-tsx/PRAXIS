@@ -153,7 +153,10 @@ describe('KylooInternalController', () => {
     it('user.deleted cierra todo Y anonimiza lo que Praxis sabe de la persona', async () => {
       const { controller, enviados } = montar();
       await controller.event({ token: 'evento:user.deleted' });
-      expect(enviados.map((e) => e.cmd)).toEqual(['auth_revoke_all_of', 'auth_kyloo_account_deleted']);
+      expect(enviados.map((e) => e.cmd)).toEqual([
+        'auth_revoke_all_of',
+        'auth_kyloo_account_deleted',
+      ]);
       expect(enviados[1]?.payload).toEqual({ sub: 'sub-ana' });
     });
 

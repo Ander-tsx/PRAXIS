@@ -287,12 +287,7 @@ describe('AuthService.anonimizarCuentaDeKyloo', () => {
         emailVerifiedAt: null,
       },
     });
-    for (const borrado of [
-      tx.personalAccessToken,
-      tx.mcpConnection,
-      tx.userAvatar,
-      tx.userCover,
-    ]) {
+    for (const borrado of [tx.personalAccessToken, tx.mcpConnection, tx.userAvatar, tx.userCover]) {
       expect(borrado.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } });
     }
     expect(tx.authToken.deleteMany).toHaveBeenCalledWith({ where: { credentialId: 'c1' } });
