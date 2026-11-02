@@ -180,6 +180,14 @@ export class KylooInternalController {
         ),
       );
     }
+    if (event.event === 'user.updated') {
+      await firstValueFrom(
+        this.credentialsClient.send<{ actualizado: boolean }>(
+          { cmd: 'auth_kyloo_email_changed' },
+          { sub: event.sub, email: event.email },
+        ),
+      );
+    }
     return { ok: true };
   }
 }

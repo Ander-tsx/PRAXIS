@@ -690,17 +690,8 @@ export class AuthService {
       include: { user: true },
     });
     if (porKyloo?.user) {
-      /* D7: la identidad es el `sub`, el correo es un dato. Si cambió en Kyloo, aquí también —
-         pero solo si nadie más lo tiene, y nunca por una cuenta sin el correo verificado. */
-      if (delegado && porKyloo.email.toLowerCase() !== perfil.email) {
-        await this.prisma.credential
-          .update({ where: { id: porKyloo.id }, data: { email: perfil.email } })
-          .catch((error: unknown) =>
-            this.log.warn(
-              `No se pudo seguir el cambio de correo de ${porKyloo.id}: ${String(error)}`,
-            ),
-          );
-      }
+      /* D7: la identidad es el `sub`, el correo es un dato. Si cambió en Kyloo, aquí también. */
+      if (delegado) await this.seguirCorreoDeKyloo(porKyloo, perfil.email);
       return this.emitirSesion(porKyloo.user.id, porKyloo.user.status);
     }
 
@@ -761,6 +752,34 @@ export class AuthService {
       throw new RpcException({ statusCode: 500, message: 'No se pudo crear el perfil' });
     }
     return this.emitirSesion(creada.user.id, creada.user.status);
+  }
+
+  /**
+   * D7 — la persona cambió su correo en Kyloo (evento `user.updated`): aquí también, sin esperar a
+   * su próximo inicio de sesión, que es cuando la vinculación por correo (y las invitaciones a
+   * organizaciones) dejarían de encontrarla. Idempotente: el evento puede llegar repetido.
+   */
+  async seguirCambioDeCorreo(sub: string, email: string): Promise<{ actualizado: boolean }> {
+    if (this.config.get<string>('AUTH_MODE') !== 'kyloo') return { actualizado: false };
+    const credential = await this.prisma.credential.findUnique({ where: { kylooSub: sub } });
+    if (!credential) return { actualizado: false };
+    return { actualizado: await this.seguirCorreoDeKyloo(credential, email) };
+  }
+
+  /** Solo si el correo es otro y nadie más lo tiene: nunca se le quita la cuenta a quien la usa. */
+  private async seguirCorreoDeKyloo(
+    credential: { id: string; email: string },
+    email: string,
+  ): Promise<boolean> {
+    const nuevo = email.toLowerCase();
+    if (credential.email.toLowerCase() === nuevo) return false;
+    try {
+      await this.prisma.credential.update({ where: { id: credential.id }, data: { email: nuevo } });
+      return true;
+    } catch (error) {
+      this.log.warn(`No se pudo seguir el cambio de correo de ${credential.id}: ${String(error)}`);
+      return false;
+    }
   }
 
   /**
