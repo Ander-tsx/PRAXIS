@@ -1,85 +1,105 @@
+import { createTestIssuer } from '@kyloo/auth/testing';
 import { ConfigService } from '@nestjs/config';
-import { type KeyLike, SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from 'jose';
 import { KylooOidcService } from './kyloo-oidc.service';
 
 const ISSUER = 'https://accounts.kyloo.test/api/auth';
 const CLIENT_ID = 'praxis-client';
 const NONCE = 'nonce-de-este-intento';
+const entrada = {
+  code: 'c',
+  codeVerifier: 'v',
+  redirectUri: 'https://praxis.test/cb',
+  nonce: NONCE,
+};
 
-describe('KylooOidcService.verificar', () => {
-  let privada: KeyLike;
-  let ajena: KeyLike;
-  let jwks: ReturnType<typeof createLocalJWKSet>;
-  const servicio = new KylooOidcService(new ConfigService({}));
-  const esperado = { issuer: ISSUER, clientId: CLIENT_ID, nonce: NONCE };
-
-  beforeAll(async () => {
-    const par = await generateKeyPair('RS256');
-    privada = par.privateKey;
-    ajena = (await generateKeyPair('RS256')).privateKey;
-    const jwk = { ...(await exportJWK(par.publicKey)), kid: 'k1', alg: 'RS256', use: 'sig' };
-    jwks = createLocalJWKSet({ keys: [jwk] });
-  });
-
-  const firmar = (
-    claims: Record<string, unknown> = {},
-    opciones: { key?: KeyLike; iss?: string; aud?: string; exp?: string } = {},
-  ) =>
-    new SignJWT({ nonce: NONCE, ...claims })
-      .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
-      .setSubject('sub-ana')
-      .setIssuer(opciones.iss ?? ISSUER)
-      .setAudience(opciones.aud ?? CLIENT_ID)
-      .setIssuedAt()
-      .setExpirationTime(opciones.exp ?? '10m')
-      .sign(opciones.key ?? privada);
-
-  const verificar = (token: string) => servicio.verificar(token, { jwks_uri: '' }, esperado, jwks);
-
-  it('acepta una identidad bien firmada, para nosotros y de este intento', async () => {
-    await expect(verificar(await firmar())).resolves.toEqual({ sub: 'sub-ana' });
-  });
-
-  it.each([
-    ['otro emisor', () => firmar({}, { iss: 'https://evil.test/api/auth' })],
-    ['dirigido a otra aplicación (Oskel)', () => firmar({}, { aud: 'oskel-client' })],
-    ['otro nonce', () => firmar({ nonce: 'de-otro-intento' })],
-    ['sin nonce', () => firmar({ nonce: undefined })],
-    ['firmado con otra clave', () => firmar({}, { key: ajena })],
-    ['caducado', () => firmar({}, { exp: '-1m' })],
-  ])('rechaza un id_token %s', async (_caso, crear) => {
-    await expect(verificar(await crear())).rejects.toMatchObject({ error: expect.anything() });
-  });
+const config = new ConfigService({
+  KYLOO_ISSUER: ISSUER,
+  KYLOO_CLIENT_ID: CLIENT_ID,
+  KYLOO_CLIENT_SECRET: 'secreto',
 });
 
-describe('KylooOidcService.exigirPerfil (lo que dice userinfo)', () => {
-  const servicio = new KylooOidcService(new ConfigService({}));
-  const ok = { sub: 'sub-ana', email: 'ANA@Ejemplo.com', email_verified: true, name: 'Ana Pérez' };
+describe('KylooOidcService.perfilDesdeCodigo', () => {
+  let emisor: Awaited<ReturnType<typeof createTestIssuer>>;
+  let fetchSpy: jest.SpiedFunction<typeof fetch>;
 
-  it('acepta un perfil verificado y normaliza el correo', () => {
-    expect(servicio.exigirPerfil('sub-ana', ok)).toEqual({
-      sub: 'sub-ana',
+  beforeAll(async () => {
+    emisor = await createTestIssuer({ issuer: ISSUER, clientId: CLIENT_ID });
+  });
+
+  afterEach(() => fetchSpy?.mockRestore());
+
+  /** Kyloo falso: el descubrimiento y el canje del código devuelven este id_token. */
+  const kylooDevuelve = (idToken: string | undefined, tokenStatus = 200) => {
+    fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (url) => {
+      const direccion = String(url);
+      if (direccion.endsWith('/.well-known/openid-configuration')) {
+        return Response.json({ issuer: ISSUER, token_endpoint: `${ISSUER}/oauth2/token` });
+      }
+      return Response.json(idToken ? { id_token: idToken } : {}, { status: tokenStatus });
+    });
+  };
+
+  const servicio = () => new KylooOidcService(config, { keys: emisor.keys });
+
+  it('devuelve sub, correo y nombre del id_token, sin llamar a userinfo', async () => {
+    kylooDevuelve(await emisor.idToken(NONCE, { email: 'ANA@Ejemplo.com', name: 'Ana Pérez' }));
+    await expect(servicio().perfilDesdeCodigo(entrada)).resolves.toEqual({
+      sub: 'persona-1',
       email: 'ana@ejemplo.com',
       name: 'Ana Pérez',
     });
+    const llamadas = fetchSpy.mock.calls.map(([url]) => String(url));
+    expect(llamadas.some((url) => url.includes('userinfo'))).toBe(false);
   });
 
   it.each([
-    ['otro sujeto: userinfo de otra persona', { ...ok, sub: 'sub-otra' }],
-    ['correo sin verificar', { ...ok, email_verified: false }],
-    ['sin la marca de verificación', { ...ok, email_verified: undefined }],
-    ['sin correo', { ...ok, email: undefined }],
-    ['nada', null],
-  ])('rechaza %s', (_caso, info) => {
-    expect(() => servicio.exigirPerfil('sub-ana', info)).toThrow();
+    ['de otro intento (nonce distinto)', { nonce: 'de-otro-intento' }],
+    ['sin nonce', { nonce: undefined }],
+    ['con el correo sin verificar', { email_verified: false }],
+    ['sin correo', { email: undefined }],
+  ])('🔴 rechaza un id_token %s con 401', async (_caso, cambios) => {
+    kylooDevuelve(await emisor.idToken(NONCE, cambios));
+    await expect(servicio().perfilDesdeCodigo(entrada)).rejects.toMatchObject({
+      error: { statusCode: 401 },
+    });
+  });
+
+  it('🔴 rechaza el id_token que Kyloo emitió para otra aplicación (Oskel)', async () => {
+    const oskel = await createTestIssuer({ issuer: ISSUER, clientId: 'oskel-client' });
+    kylooDevuelve(await oskel.idToken(NONCE));
+    await expect(
+      new KylooOidcService(config, { keys: oskel.keys }).perfilDesdeCodigo(entrada),
+    ).rejects.toMatchObject({ error: { statusCode: 401 } });
+  });
+
+  it('🔴 rechaza un id_token firmado con otra clave', async () => {
+    const intruso = await createTestIssuer({ issuer: ISSUER, clientId: CLIENT_ID });
+    kylooDevuelve(await intruso.idToken(NONCE));
+    await expect(servicio().perfilDesdeCodigo(entrada)).rejects.toMatchObject({
+      error: { statusCode: 401 },
+    });
+  });
+
+  it('si Kyloo no devuelve id_token, 401', async () => {
+    kylooDevuelve(undefined);
+    await expect(servicio().perfilDesdeCodigo(entrada)).rejects.toMatchObject({
+      error: { statusCode: 401 },
+    });
+  });
+
+  it('un código que Kyloo rechaza es 401', async () => {
+    kylooDevuelve(undefined, 400);
+    await expect(servicio().perfilDesdeCodigo(entrada)).rejects.toMatchObject({
+      error: { statusCode: 401 },
+    });
   });
 });
 
 describe('KylooOidcService sin configurar', () => {
   it('responde 503 en vez de romper el arranque', async () => {
     const servicio = new KylooOidcService(new ConfigService({}));
-    await expect(
-      servicio.perfilDesdeCodigo({ code: 'c', codeVerifier: 'v', redirectUri: 'r', nonce: 'n' }),
-    ).rejects.toMatchObject({ error: { statusCode: 503 } });
+    await expect(servicio.perfilDesdeCodigo(entrada)).rejects.toMatchObject({
+      error: { statusCode: 503 },
+    });
   });
 });
