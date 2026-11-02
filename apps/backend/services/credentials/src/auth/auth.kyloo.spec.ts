@@ -10,13 +10,26 @@ function montar(modo: 'local' | 'kyloo' = 'local') {
     update: jest.fn(),
     create: jest.fn(),
   };
+  const tx = {
+    personalAccessToken: { deleteMany: jest.fn() },
+    mcpConnection: { deleteMany: jest.fn() },
+    userAvatar: { deleteMany: jest.fn() },
+    userCover: { deleteMany: jest.fn() },
+    user: { update: jest.fn() },
+    authToken: { deleteMany: jest.fn() },
+    credential: { update: jest.fn() },
+  };
+  const prisma = {
+    credential,
+    $transaction: jest.fn(async (fn: (t: typeof tx) => Promise<void>) => fn(tx)),
+  };
   const redis = { del: jest.fn().mockResolvedValue(1) };
   const personalTokens = { revocarTodos: jest.fn().mockResolvedValue(undefined) };
   const config = { get: jest.fn((clave: string) => (clave === 'AUTH_MODE' ? modo : undefined)) };
   const kyloo = { perfilDesdeCodigo: jest.fn().mockResolvedValue(perfil) };
   // biome-ignore lint/suspicious/noExplicitAny: dobles de prueba
   const servicio = new AuthService(
-    { credential } as any,
+    prisma as any,
     redis as any,
     {} as any,
     config as any,
@@ -26,7 +39,7 @@ function montar(modo: 'local' | 'kyloo' = 'local') {
   );
   // biome-ignore lint/suspicious/noExplicitAny: método privado
   const emitir = jest.spyOn(servicio as any, 'emitirSesion').mockResolvedValue({ userId: 'u1' });
-  return { servicio, credential, emitir, redis, personalTokens };
+  return { servicio, credential, emitir, redis, personalTokens, tx };
 }
 
 const usuario = { id: 'u1', status: 'ACTIVE' };
@@ -237,5 +250,76 @@ describe('AuthService.seguirCambioDeCorreo', () => {
     await expect(servicio.seguirCambioDeCorreo('nadie', 'x@ejemplo.com')).resolves.toEqual({
       actualizado: false,
     });
+  });
+});
+
+describe('AuthService.anonimizarCuentaDeKyloo', () => {
+  const cuenta = { id: 'c1', user: { id: 'u1' } };
+
+  it('anonimiza el perfil y las credenciales, conserva el id y cierra el acceso', async () => {
+    const { servicio, credential, tx, redis } = montar('kyloo');
+    credential.findUnique.mockResolvedValue(cuenta);
+    await expect(servicio.anonimizarCuentaDeKyloo('kyloo-sub-1')).resolves.toEqual({
+      anonimizada: true,
+    });
+
+    expect(credential.findUnique).toHaveBeenCalledWith({
+      where: { kylooSub: 'kyloo-sub-1' },
+      include: { user: true },
+    });
+    expect(tx.user.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: expect.objectContaining({
+        firstName: 'Persona',
+        lastName: 'eliminada',
+        avatarUrl: null,
+        biography: null,
+        status: 'INACTIVE',
+      }),
+    });
+    expect(tx.credential.update).toHaveBeenCalledWith({
+      where: { id: 'c1' },
+      data: {
+        email: 'eliminada-c1@eliminada.invalid',
+        passwordHash: null,
+        googleSub: null,
+        kylooSub: null,
+        emailVerifiedAt: null,
+      },
+    });
+    for (const borrado of [
+      tx.personalAccessToken,
+      tx.mcpConnection,
+      tx.userAvatar,
+      tx.userCover,
+    ]) {
+      expect(borrado.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u1' } });
+    }
+    expect(tx.authToken.deleteMany).toHaveBeenCalledWith({ where: { credentialId: 'c1' } });
+    expect(redis.del).toHaveBeenCalledWith('auth:sessions:u1');
+  });
+
+  it('🔴 solo busca por kylooSub: nunca por correo, que podría alcanzar a otra cuenta', async () => {
+    const { servicio, credential } = montar('kyloo');
+    credential.findUnique.mockResolvedValue(null);
+    await servicio.anonimizarCuentaDeKyloo('kyloo-sub-1');
+    expect(credential.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('es idempotente: repetido, ya no encuentra la cuenta y no escribe nada', async () => {
+    const { servicio, credential, tx } = montar('kyloo');
+    credential.findUnique.mockResolvedValue(null);
+    await expect(servicio.anonimizarCuentaDeKyloo('kyloo-sub-1')).resolves.toEqual({
+      anonimizada: false,
+    });
+    expect(tx.credential.update).not.toHaveBeenCalled();
+  });
+
+  it('en modo local no toca nada', async () => {
+    const { servicio, credential } = montar('local');
+    await expect(servicio.anonimizarCuentaDeKyloo('kyloo-sub-1')).resolves.toEqual({
+      anonimizada: false,
+    });
+    expect(credential.findUnique).not.toHaveBeenCalled();
   });
 });
