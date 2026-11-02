@@ -1,3 +1,4 @@
+import { despertarGateway } from '@/lib/auth/gateway';
 import {
   KYLOO_FLOW_COOKIE,
   KYLOO_RELOGIN_COOKIE,
@@ -52,6 +53,10 @@ export async function GET(request: NextRequest) {
   if (!(await kylooResponde(config.issuer))) {
     return NextResponse.redirect(new URL('/auth/login?kyloo_error=no_disponible', origen), 303);
   }
+
+  /* La persona va a tardar unos segundos en Kyloo (Google, código 2FA): tiempo de sobra para que
+     la API, si estaba dormida, esté lista cuando vuelva. No se espera aquí. */
+  void despertarGateway();
 
   const next = rutaSegura(request.nextUrl.searchParams.get('next'));
   const intento = nuevoIntento(next);
