@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { type Kyloo, KylooError, type KylooOptions, createKyloo } from '@kyloo/auth';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
-import { type JWTPayload, createLocalJWKSet, createRemoteJWKSet, jwtVerify } from 'jose';
 
 /** Lo que Praxis lee de la identidad de Kyloo. El resto del id_token no se usa. */
 export interface PerfilKyloo {
@@ -13,8 +13,6 @@ export interface PerfilKyloo {
 interface Descubrimiento {
   issuer: string;
   token_endpoint: string;
-  userinfo_endpoint: string;
-  jwks_uri: string;
 }
 
 /**
@@ -36,21 +34,33 @@ interface Descubrimiento {
  * - **`email_verified === true`**: la vinculación decide por el correo, y un
  *   correo sin confirmar no identifica a nadie.
  *
- * ## El correo no viene en el id_token
+ * ## La verificación es del SDK
  *
- * Kyloo Accounts (Better Auth) emite un id_token con `sub`, `aud`, `nonce`… pero
- * **sin `email`, `name` ni `email_verified`**: esos claims solo salen por
- * `userinfo`. Se llama con el access token recién canjeado y se exige que su
- * `sub` sea el del id_token, para que un `userinfo` de otra persona no se
- * mezcle con una identidad ya verificada.
+ * `@kyloo/auth` (`verifyIdToken`) comprueba firma, emisor, destinatario (`aud`), caducidad y
+ * `nonce`, y exige el correo verificado. El `id_token` ya trae `sub`, `email` y `name`: no hace
+ * falta llamar a `userinfo`, que era un viaje de red más en cada entrada.
  */
+/** Solo las pruebas sustituyen las claves de Kyloo con las suyas. */
+export const KYLOO_CLIENT_OPTIONS = 'KYLOO_OIDC_CLIENT_OPTIONS';
+
 @Injectable()
 export class KylooOidcService {
   private readonly log = new Logger(KylooOidcService.name);
   private descubrimiento?: Promise<Descubrimiento>;
-  private jwks?: ReturnType<typeof createRemoteJWKSet>;
+  private client?: Kyloo;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    /** Solo las pruebas sustituyen las claves de Kyloo. */
+    @Optional()
+    @Inject(KYLOO_CLIENT_OPTIONS)
+    private readonly overrides?: Partial<KylooOptions>,
+  ) {}
+
+  private kyloo(issuer: string, clientId: string): Kyloo {
+    this.client ??= createKyloo({ issuer, clientId, ...this.overrides });
+    return this.client;
+  }
 
   private requerir() {
     const issuer = this.config.get<string>('KYLOO_ISSUER');
@@ -101,7 +111,7 @@ export class KylooOidcService {
       throw new RpcException({ statusCode: 502, message: 'Kyloo Accounts no responde' });
     }
 
-    let cuerpo: { id_token?: string; access_token?: string };
+    let cuerpo: { id_token?: string };
     try {
       const res = await fetch(doc.token_endpoint, {
         method: 'POST',
@@ -120,100 +130,31 @@ export class KylooOidcService {
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) throw new Error(`token ${res.status}`);
-      cuerpo = (await res.json()) as { id_token?: string; access_token?: string };
+      cuerpo = (await res.json()) as { id_token?: string };
     } catch (e) {
       /* Código caducado, ya usado, verificador distinto o redirect distinta:
          todo significa lo mismo hacia fuera. */
       this.log.warn(`Canje de código rechazado por Kyloo Accounts: ${String(e)}`);
       throw new RpcException({ statusCode: 401, message: 'Kyloo no aceptó el intento de entrada' });
     }
-    if (!cuerpo.id_token || !cuerpo.access_token) {
+    if (!cuerpo.id_token) {
       throw new RpcException({ statusCode: 401, message: 'Kyloo no devolvió identidad' });
     }
 
-    const { sub } = await this.verificar(cuerpo.id_token, doc, {
-      issuer,
-      clientId,
-      nonce: entrada.nonce,
-    });
-    return this.perfilDeUserinfo(sub, doc.userinfo_endpoint, cuerpo.access_token);
-  }
-
-  private async perfilDeUserinfo(
-    sub: string,
-    endpoint: string,
-    accessToken: string,
-  ): Promise<PerfilKyloo> {
-    let info: unknown;
     try {
-      const res = await fetch(endpoint, {
-        headers: { authorization: `Bearer ${accessToken}` },
-        signal: AbortSignal.timeout(8000),
+      const identidad = await this.kyloo(issuer, clientId).verifyIdToken({
+        idToken: cuerpo.id_token,
+        nonce: entrada.nonce,
       });
-      if (!res.ok) throw new Error(`userinfo ${res.status}`);
-      info = await res.json();
+      return { sub: identidad.sub, email: identidad.email, name: identidad.name ?? '' };
     } catch (e) {
-      this.log.warn(`userinfo de Kyloo Accounts falló: ${String(e)}`);
-      throw new RpcException({ statusCode: 502, message: 'Kyloo Accounts no responde' });
-    }
-    return this.exigirPerfil(sub, info);
-  }
-
-  /** Las reglas sobre lo que dice `userinfo`; aparte para poder probarlas sin red. */
-  exigirPerfil(sub: string, info: unknown): PerfilKyloo {
-    const datos = (info ?? {}) as {
-      sub?: unknown;
-      email?: unknown;
-      email_verified?: unknown;
-      name?: unknown;
-    };
-    if (datos.sub !== sub) {
-      throw new RpcException({ statusCode: 401, message: 'La identidad de Kyloo no es coherente' });
-    }
-    if (typeof datos.email !== 'string' || datos.email_verified !== true) {
-      throw new RpcException({
-        statusCode: 401,
-        message: 'Kyloo no confirma este correo como verificado',
-      });
-    }
-    return {
-      sub,
-      email: datos.email.toLowerCase(),
-      name: typeof datos.name === 'string' ? datos.name : '',
-    };
-  }
-
-  async verificar(
-    idToken: string,
-    doc: Pick<Descubrimiento, 'jwks_uri'>,
-    esperado: { issuer: string; clientId: string; nonce: string },
-    /** Solo las pruebas pasan un conjunto de claves propio. */
-    jwks?: ReturnType<typeof createLocalJWKSet>,
-  ): Promise<{ sub: string }> {
-    let claves = jwks;
-    if (!claves) {
-      this.jwks ??= createRemoteJWKSet(new URL(doc.jwks_uri));
-      claves = this.jwks;
-    }
-    let payload: JWTPayload;
-    try {
-      ({ payload } = await jwtVerify(idToken, claves, {
-        issuer: esperado.issuer,
-        audience: esperado.clientId,
-      }));
-    } catch {
+      if (e instanceof KylooError && e.code === 'unavailable') {
+        throw new RpcException({ statusCode: 502, message: 'Kyloo Accounts no responde' });
+      }
+      /* Firma, emisor, destinatario, caducidad, nonce y correo sin verificar significan lo mismo
+         hacia fuera: esta identidad no vale. */
+      this.log.warn(`id_token de Kyloo rechazado: ${String(e)}`);
       throw new RpcException({ statusCode: 401, message: 'La identidad de Kyloo no es válida' });
     }
-
-    if (payload.nonce !== esperado.nonce) {
-      throw new RpcException({
-        statusCode: 401,
-        message: 'La identidad de Kyloo no es de este intento',
-      });
-    }
-    if (typeof payload.sub !== 'string' || !payload.sub) {
-      throw new RpcException({ statusCode: 401, message: 'La identidad de Kyloo no trae sujeto' });
-    }
-    return { sub: payload.sub };
   }
 }
