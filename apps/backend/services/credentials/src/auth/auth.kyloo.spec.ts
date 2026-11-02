@@ -185,3 +185,57 @@ describe('AuthService.revocarTodoDe', () => {
     expect(redis.del).not.toHaveBeenCalled();
   });
 });
+
+describe('AuthService.seguirCambioDeCorreo', () => {
+  it('actualiza el correo de la cuenta vinculada', async () => {
+    const { servicio, credential } = montar('kyloo');
+    credential.findUnique.mockResolvedValue({ id: 'c1', email: 'viejo@ejemplo.com' });
+    await expect(
+      servicio.seguirCambioDeCorreo('kyloo-sub-1', 'Nuevo@Ejemplo.com'),
+    ).resolves.toEqual({
+      actualizado: true,
+    });
+    expect(credential.update).toHaveBeenCalledWith({
+      where: { id: 'c1' },
+      data: { email: 'nuevo@ejemplo.com' },
+    });
+  });
+
+  it('es idempotente: el mismo evento dos veces no vuelve a escribir', async () => {
+    const { servicio, credential } = montar('kyloo');
+    credential.findUnique.mockResolvedValue({ id: 'c1', email: 'nuevo@ejemplo.com' });
+    await expect(
+      servicio.seguirCambioDeCorreo('kyloo-sub-1', 'nuevo@ejemplo.com'),
+    ).resolves.toEqual({
+      actualizado: false,
+    });
+    expect(credential.update).not.toHaveBeenCalled();
+  });
+
+  it('si el correo ya es de otra cuenta, no falla ni lo quita (se avisa en el log)', async () => {
+    const { servicio, credential } = montar('kyloo');
+    credential.findUnique.mockResolvedValue({ id: 'c1', email: 'viejo@ejemplo.com' });
+    credential.update.mockRejectedValue(new Error('Unique constraint failed'));
+    await expect(servicio.seguirCambioDeCorreo('kyloo-sub-1', 'otro@ejemplo.com')).resolves.toEqual(
+      {
+        actualizado: false,
+      },
+    );
+  });
+
+  it('en modo local no toca nada', async () => {
+    const { servicio, credential } = montar('local');
+    await expect(servicio.seguirCambioDeCorreo('kyloo-sub-1', 'x@ejemplo.com')).resolves.toEqual({
+      actualizado: false,
+    });
+    expect(credential.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('una persona que Praxis no conoce se ignora', async () => {
+    const { servicio, credential } = montar('kyloo');
+    credential.findUnique.mockResolvedValue(null);
+    await expect(servicio.seguirCambioDeCorreo('nadie', 'x@ejemplo.com')).resolves.toEqual({
+      actualizado: false,
+    });
+  });
+});

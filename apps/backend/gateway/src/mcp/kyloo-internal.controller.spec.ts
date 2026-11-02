@@ -27,6 +27,7 @@ function montar(opciones: { identificada?: boolean; bloqueadas?: string[] } = {}
       if (pattern.cmd === 'mcp_conn_list') return of([]);
       if (pattern.cmd === 'mcp_conn_save') return of({ id: 'conn-77' });
       if (pattern.cmd === 'auth_revoke_all_of') return of({ revocadas: true });
+      if (pattern.cmd === 'auth_kyloo_email_changed') return of({ actualizado: true });
       return throwError(() => new Error(`comando inesperado ${pattern.cmd}`));
     }),
   } as unknown as ClientProxy;
@@ -148,9 +149,18 @@ describe('KylooInternalController', () => {
       },
     );
 
-    it('un evento que no conoce se reconoce sin hacer nada, para que no se reintente', async () => {
+    it('user.updated sigue el cambio de correo y NO cierra sesiones', async () => {
       const { controller, enviados } = montar();
       await expect(controller.event({ token: 'evento:user.updated' })).resolves.toEqual({
+        ok: true,
+      });
+      expect(enviados.map((e) => e.cmd)).toEqual(['auth_kyloo_email_changed']);
+      expect(enviados[0]?.payload).toEqual({ sub: 'sub-ana', email: 'ana@kyloo.test' });
+    });
+
+    it('un evento que no conoce se reconoce sin hacer nada, para que no se reintente', async () => {
+      const { controller, enviados } = montar();
+      await expect(controller.event({ token: 'evento:user.algo_nuevo' })).resolves.toEqual({
         ok: true,
       });
       expect(enviados).toHaveLength(0);

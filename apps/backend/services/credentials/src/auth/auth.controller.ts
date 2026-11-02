@@ -35,6 +35,11 @@ export class AuthController {
     return this.authService.revocarTodoDe(dto.sub, dto.email);
   }
 
+  @MessagePattern({ cmd: 'auth_kyloo_email_changed' })
+  seguirCambioDeCorreo(@Payload() dto: { sub: string; email: string }) {
+    return this.authService.seguirCambioDeCorreo(dto.sub, dto.email);
+  }
+
   @MessagePattern({ cmd: 'auth_google' })
   loginWithGoogle(@Payload() dto: GoogleLoginDto) {
     return this.authService.loginWithGoogle(dto);
