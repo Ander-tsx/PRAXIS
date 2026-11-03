@@ -1977,25 +1977,96 @@ export class OrganizationsService {
   }
 
   /**
-   * La persona eliminó su cuenta de Kyloo: se limpia lo que billing sabe de ella **como dato
-   * personal**, sin tocar dinero ni propiedad.
+   * La persona eliminó su cuenta de Kyloo: se limpia lo que billing sabe de ella y se resuelve qué
+   * pasa con lo que era suyo.
    *
    * - Las invitaciones **pendientes** a su correo se borran: son solo su correo y ocupaban asiento.
-   * - En las membresías **activas** (`userId`) el correo pasa a un marcador. La membresía no cambia:
-   *   quién ocupa un asiento, quién es dueño de una organización y qué pasa con una que se queda sin
-   *   dueño son decisiones de negocio que no se toman aquí. La cuenta ya no puede entrar.
+   * - Las organizaciones de **equipo** de las que era dueña pasan a la persona **activa más antigua
+   *   con el mismo papel** (el de administración): sigue habiendo alguien con control. Un miembro
+   *   con menos papel NUNCA hereda: recibiría de golpe el control de la facturación.
+   * - Sin heredero, la organización **se conserva intacta**: no se borra nada que otras personas o
+   *   un plan de pago puedan necesitar, y se avisa en el log (`ORGANIZACION_HUERFANA`) para que
+   *   alguien del equipo decida. La personal también se conserva: es solo de ella y no estorba.
+   * - Donde ya no es dueña, su membresía se borra (libera el asiento). Donde sigue siéndolo
+   *   (huérfanas y personal), solo se anonimiza el correo para no tocar quién es dueño.
    *
-   * Idempotente: repetido, no encuentra nada que cambiar.
+   * ⚠️ **No toca dinero.** Cancelar una suscripción de Stripe vive en el gateway y es una decisión
+   * con consecuencias (se cobra a una persona que ya no está): por eso el log nombra las huérfanas
+   * con plan de pago, para cancelarlas a mano. Ver `docs/deploy/KYLOO-ELIMINACION-DE-CUENTA.md`.
+   *
+   * Idempotente: repetido, ya no es dueña de nada que transferir ni tiene filas que borrar.
    */
   async anonimizarPersona(userId: string, email: string) {
     const invitaciones = await this.prisma.organizationMember.deleteMany({
-      where: { status: 'INVITED', email: { equals: email, mode: 'insensitive' } },
+      where: { status: MembershipStatus.INVITED, email: { equals: email, mode: 'insensitive' } },
     });
-    const membresias = await this.prisma.organizationMember.updateMany({
+
+    const transferidas: string[] = [];
+    const huerfanas: Array<{ organizationId: string; plan: string }> = [];
+    const suyas = await this.prisma.organization.findMany({
+      where: { ownerUserId: userId },
+      select: { id: true, kind: true, subscription: { select: { tier: true, status: true } } },
+    });
+    for (const organizacion of suyas) {
+      if (organizacion.kind === OrganizationKind.PERSONAL) continue;
+      const suya = await this.prisma.organizationMember.findFirst({
+        where: { organizationId: organizacion.id, userId },
+        select: { roleId: true },
+      });
+      const heredero = suya
+        ? await this.prisma.organizationMember.findFirst({
+            where: {
+              organizationId: organizacion.id,
+              status: MembershipStatus.ACTIVE,
+              roleId: suya.roleId,
+              userId: { not: userId },
+              NOT: { userId: null },
+            },
+            orderBy: { joinedAt: 'asc' },
+            select: { userId: true },
+          })
+        : null;
+      if (heredero?.userId) {
+        await this.prisma.organization.update({
+          where: { id: organizacion.id },
+          data: { ownerUserId: heredero.userId },
+        });
+        await this.olvidar(organizacion.id, heredero.userId);
+        await this.olvidar(organizacion.id, userId);
+        transferidas.push(organizacion.id);
+        this.log.log(
+          `Organización ${organizacion.id}: dueño pasa de la cuenta eliminada a otra persona.`,
+        );
+      } else {
+        const plan = organizacion.subscription
+          ? `${organizacion.subscription.tier}/${organizacion.subscription.status}`
+          : 'sin suscripción';
+        huerfanas.push({ organizationId: organizacion.id, plan });
+        this.log.warn(
+          `ORGANIZACION_HUERFANA ${organizacion.id}: su dueña eliminó la cuenta y nadie puede heredarla. Plan: ${plan}. Si es de pago, cancelarlo a mano en Stripe.`,
+        );
+      }
+    }
+
+    /* Donde ya no es dueña, fuera: libera el asiento. Donde lo sigue siendo, solo el correo. */
+    const siguenSiendoSuyas = suyas
+      .map((organizacion) => organizacion.id)
+      .filter((id) => !transferidas.includes(id));
+    const liberadas = await this.prisma.organizationMember.deleteMany({
+      where: { userId, organizationId: { notIn: siguenSiendoSuyas } },
+    });
+    const anonimizadas = await this.prisma.organizationMember.updateMany({
       where: { userId },
       data: { email: `eliminada-${userId}@eliminada.invalid` },
     });
-    return { invitacionesBorradas: invitaciones.count, membresiasAnonimizadas: membresias.count };
+
+    return {
+      invitacionesBorradas: invitaciones.count,
+      membresiasLiberadas: liberadas.count,
+      membresiasAnonimizadas: anonimizadas.count,
+      transferidas,
+      huerfanas,
+    };
   }
 }
 
