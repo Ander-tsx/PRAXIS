@@ -24,6 +24,12 @@ export class OrganizationsController {
    * El plan que vale para alguien. **Es el comando más llamado del servicio**:
    * lo pide el gateway antes de cada escritura con cuota.
    */
+  /** `user.deleted` de Kyloo: ver `anonimizarPersona`. */
+  @MessagePattern({ cmd: 'billing_anonymize_user' })
+  anonimizarPersona(@Payload() dto: { userId: string; email: string }) {
+    return this.organizaciones.anonimizarPersona(dto.userId, dto.email);
+  }
+
   @MessagePattern({ cmd: 'billing_plan_of' })
   planDe(@Payload() dto: { userId: string; organizationId?: string | null }) {
     return this.organizaciones.planEfectivoDe(dto.userId, dto.organizationId);

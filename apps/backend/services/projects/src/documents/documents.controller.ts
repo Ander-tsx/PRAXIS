@@ -13,6 +13,12 @@ import { DocumentsService } from './documents.service';
 export class DocumentsController {
   constructor(private readonly documents: DocumentsService) {}
 
+  /** `user.deleted` de Kyloo: ver `borrarInvitacionesDe`. */
+  @MessagePattern({ cmd: 'document_invites_purge_email' })
+  borrarInvitacionesDe(@Payload() dto: { email: string }) {
+    return this.documents.borrarInvitacionesDe(dto.email);
+  }
+
   @MessagePattern({ cmd: 'document_find_by_workspace' })
   findByWorkspace(@Payload() dto: { workspaceId: string }) {
     return this.documents.findByWorkspace(dto.workspaceId);
@@ -56,9 +62,7 @@ export class DocumentsController {
   }
 
   @MessagePattern({ cmd: 'document_collab_store' })
-  collabStore(
-    @Payload() dto: { id: string; yState: string; content: string; userIds: string[] },
-  ) {
+  collabStore(@Payload() dto: { id: string; yState: string; content: string; userIds: string[] }) {
     return this.documents.collabStore(dto);
   }
 

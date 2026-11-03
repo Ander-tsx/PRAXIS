@@ -27,18 +27,28 @@ function montar(opciones: { identificada?: boolean; bloqueadas?: string[] } = {}
       if (pattern.cmd === 'mcp_conn_list') return of([]);
       if (pattern.cmd === 'mcp_conn_save') return of({ id: 'conn-77' });
       if (pattern.cmd === 'auth_revoke_all_of') return of({ revocadas: true });
-      if (pattern.cmd === 'auth_kyloo_account_deleted') return of({ anonimizada: true });
+      if (pattern.cmd === 'auth_kyloo_account_deleted') {
+        return of({ anonimizada: true, userId: 'u-1' });
+      }
       if (pattern.cmd === 'auth_kyloo_email_changed') return of({ actualizado: true });
       return throwError(() => new Error(`comando inesperado ${pattern.cmd}`));
     }),
   } as unknown as ClientProxy;
   const billing = {
-    send: jest.fn(() =>
-      of([
+    send: jest.fn((pattern: { cmd: string }, payload: unknown) => {
+      enviados.push({ cmd: pattern.cmd, payload });
+      if (pattern.cmd === 'billing_anonymize_user') return of({ invitacionesBorradas: 1 });
+      return of([
         { id: ORG_A, name: 'Personal', kind: 'PERSONAL' },
         { id: ORG_B, name: 'Equipo', kind: 'TEAM' },
-      ]),
-    ),
+      ]);
+    }),
+  } as unknown as ClientProxy;
+  const projects = {
+    send: jest.fn((pattern: { cmd: string }, payload: unknown) => {
+      enviados.push({ cmd: pattern.cmd, payload });
+      return of({ borradas: 1 });
+    }),
   } as unknown as ClientProxy;
   const access = {
     exigirOrganizacionUsable: jest.fn(async (_user: string, org: string) => {
@@ -56,7 +66,7 @@ function montar(opciones: { identificada?: boolean; bloqueadas?: string[] } = {}
     }),
     completeConnection: jest.fn(async () => undefined),
   } as unknown as KylooOAuthService;
-  const controller = new KylooInternalController(credentials, billing, access, kyloo);
+  const controller = new KylooInternalController(credentials, billing, projects, access, kyloo);
   return { controller, enviados, kyloo };
 }
 
@@ -156,8 +166,12 @@ describe('KylooInternalController', () => {
       expect(enviados.map((e) => e.cmd)).toEqual([
         'auth_revoke_all_of',
         'auth_kyloo_account_deleted',
+        'document_invites_purge_email',
+        'billing_anonymize_user',
       ]);
       expect(enviados[1]?.payload).toEqual({ sub: 'sub-ana' });
+      expect(enviados[2]?.payload).toEqual({ email: 'ana@kyloo.test' });
+      expect(enviados[3]?.payload).toEqual({ userId: 'u-1', email: 'ana@kyloo.test' });
     });
 
     it('user.updated sigue el cambio de correo y NO cierra sesiones', async () => {
