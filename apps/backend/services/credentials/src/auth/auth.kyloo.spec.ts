@@ -261,6 +261,7 @@ describe('AuthService.anonimizarCuentaDeKyloo', () => {
     credential.findUnique.mockResolvedValue(cuenta);
     await expect(servicio.anonimizarCuentaDeKyloo('kyloo-sub-1')).resolves.toEqual({
       anonimizada: true,
+      userId: 'u1',
     });
 
     expect(credential.findUnique).toHaveBeenCalledWith({

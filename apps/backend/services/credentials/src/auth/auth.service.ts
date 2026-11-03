@@ -797,7 +797,7 @@ export class AuthService {
    * repetido no encuentra nada. Se usa `INACTIVE` (no hay estado `DELETED`) y sin credenciales
    * utilizables: no puede entrar nadie, ni con el mismo correo (esa persona tendría un `sub` nuevo).
    */
-  async anonimizarCuentaDeKyloo(sub: string): Promise<{ anonimizada: boolean }> {
+  async anonimizarCuentaDeKyloo(sub: string): Promise<{ anonimizada: boolean; userId?: string }> {
     if (this.config.get<string>('AUTH_MODE') !== 'kyloo') return { anonimizada: false };
     const credential = await this.prisma.credential.findUnique({
       where: { kylooSub: sub },
@@ -840,7 +840,7 @@ export class AuthService {
       });
     });
     if (credential.user) await this.redis.del(claveDeSesiones(credential.user.id));
-    return { anonimizada: true };
+    return { anonimizada: true, userId: credential.user?.id };
   }
 
   /**

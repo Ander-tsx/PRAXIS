@@ -58,6 +58,7 @@ export class KylooInternalController {
   constructor(
     @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
     @Inject('BILLING_SERVICE') private readonly billingClient: ClientProxy,
+    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     private readonly access: McpAccessService,
     private readonly kyloo: KylooOAuthService,
   ) {}
@@ -183,12 +184,25 @@ export class KylooInternalController {
     /* Después de cerrar todo lo abierto: se anonimiza lo que Praxis sabe de la persona (D8). Si
        falla, el 500 hace que Kyloo reintente; repetirlo no cambia nada. */
     if (event.event === 'user.deleted') {
-      await firstValueFrom(
-        this.credentialsClient.send<{ anonimizada: boolean }>(
+      const resultado = await firstValueFrom(
+        this.credentialsClient.send<{ anonimizada: boolean; userId?: string }>(
           { cmd: 'auth_kyloo_account_deleted' },
           { sub: event.sub },
         ),
       );
+      /* Lo demás que Praxis guarda de la persona, aparte de su cuenta: su correo en invitaciones.
+         Es idempotente en cada servicio, así que si uno falla el 500 hace que Kyloo reintente. */
+      await firstValueFrom(
+        this.projectsClient.send({ cmd: 'document_invites_purge_email' }, { email: event.email }),
+      );
+      if (resultado.userId) {
+        await firstValueFrom(
+          this.billingClient.send(
+            { cmd: 'billing_anonymize_user' },
+            { userId: resultado.userId, email: event.email },
+          ),
+        );
+      }
     }
     if (event.event === 'user.updated') {
       await firstValueFrom(

@@ -116,9 +116,7 @@ export class DocumentsService {
         createdAt: true,
         updatedAt: true,
         workspace: { select: { projectId: true, name: true } },
-        invites: email
-          ? { where: { email: email.toLowerCase() }, select: { role: true } }
-          : false,
+        invites: email ? { where: { email: email.toLowerCase() }, select: { role: true } } : false,
       },
     });
     if (!documento) {
@@ -229,7 +227,11 @@ export class DocumentsService {
     return documento;
   }
 
-  async updateShare(dto: { id: string; linkAccess?: DocumentLinkAccess; regenerateLink?: boolean }) {
+  async updateShare(dto: {
+    id: string;
+    linkAccess?: DocumentLinkAccess;
+    regenerateLink?: boolean;
+  }) {
     const actual = await this.prisma.document.findUnique({
       where: { id: dto.id },
       select: { linkToken: true },
@@ -375,5 +377,17 @@ export class DocumentsService {
       select: { projectId: true },
     });
     if (workspace) await this.redis.del(`project:${workspace.projectId}`);
+  }
+
+  /**
+   * La persona eliminó su cuenta: las invitaciones a documentos hechas a su correo se borran. Son
+   * solo su correo y un permiso que ya no puede usar. Los documentos, y lo que ella escribió en
+   * ellos, no se tocan. Idempotente.
+   */
+  async borrarInvitacionesDe(email: string) {
+    const borradas = await this.prisma.documentInvite.deleteMany({
+      where: { email: email.toLowerCase() },
+    });
+    return { borradas: borradas.count };
   }
 }

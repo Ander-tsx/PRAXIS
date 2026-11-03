@@ -1975,6 +1975,28 @@ export class OrganizationsService {
         this.log.error(`No se pudo registrar «${type}» de ${organizationId}: ${error.message}`);
       });
   }
+
+  /**
+   * La persona eliminó su cuenta de Kyloo: se limpia lo que billing sabe de ella **como dato
+   * personal**, sin tocar dinero ni propiedad.
+   *
+   * - Las invitaciones **pendientes** a su correo se borran: son solo su correo y ocupaban asiento.
+   * - En las membresías **activas** (`userId`) el correo pasa a un marcador. La membresía no cambia:
+   *   quién ocupa un asiento, quién es dueño de una organización y qué pasa con una que se queda sin
+   *   dueño son decisiones de negocio que no se toman aquí. La cuenta ya no puede entrar.
+   *
+   * Idempotente: repetido, no encuentra nada que cambiar.
+   */
+  async anonimizarPersona(userId: string, email: string) {
+    const invitaciones = await this.prisma.organizationMember.deleteMany({
+      where: { status: 'INVITED', email: { equals: email, mode: 'insensitive' } },
+    });
+    const membresias = await this.prisma.organizationMember.updateMany({
+      where: { userId },
+      data: { email: `eliminada-${userId}@eliminada.invalid` },
+    });
+    return { invitacionesBorradas: invitaciones.count, membresiasAnonimizadas: membresias.count };
+  }
 }
 
 /**
