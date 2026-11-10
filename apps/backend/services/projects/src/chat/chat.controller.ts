@@ -73,7 +73,6 @@ export class ChatController {
       /* Solo por TCP (D13): automation-service y el gateway cuando habla PRAX. */
       origin?: ChatMessageOrigin;
       originMeta?: Record<string, unknown> | null;
-      authorName?: string | null;
     },
   ) {
     const canal = await this.channels.deProyecto(dto.projectId);
@@ -189,7 +188,6 @@ export class ChatController {
       enHilo?: boolean;
       origin?: ChatMessageOrigin;
       originMeta?: Record<string, unknown> | null;
-      authorName?: string | null;
     },
   ) {
     const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);

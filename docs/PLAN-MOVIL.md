@@ -131,7 +131,7 @@ la pregunta. Escribir sin red significa una cola, reintentos y conflictos al
 reconectar: es otra etapa. Sin red, los botones de escritura se apagan con el
 motivo, y una franja dice «Sin conexión · enseñando lo último que se cargó».
 
-**D14 — Notificaciones push (cerrada por [PLAN-PUSH](PLAN-PUSH.md)).** Necesitan backend (claves
+**D14 — Notificaciones push, fuera de este plan.** Necesitan backend (claves
 VAPID y guardar suscripciones) y, en iOS, solo funcionan instalada y desde la
 16.4. Por defecto, sin respuesta del dueño. Se deja preparado el SW para
 recibirlas (un `push` vacío no hace nada) y nada más.

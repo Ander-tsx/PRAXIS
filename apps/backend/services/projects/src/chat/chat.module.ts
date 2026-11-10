@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PushModule } from '../push/push.module';
 import { BlobStorageModule } from '../storage/blob-storage.module';
 import { ChannelsService } from './channels.service';
 import { ChatAttachmentsService } from './chat-attachments.service';
@@ -18,7 +17,7 @@ import { ChatService } from './chat.service';
  * activo.
  */
 @Module({
-  imports: [BlobStorageModule, PushModule],
+  imports: [BlobStorageModule],
   controllers: [ChatController],
   providers: [ChatService, ChannelsService, ChatAttachmentsService],
 })

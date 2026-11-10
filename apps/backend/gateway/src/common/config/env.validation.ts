@@ -118,9 +118,6 @@ export const envValidationSchema = Joi.object({
   AUTH_FALLBACK_LOCAL: Joi.string().valid('true', 'false').default('true'),
   /** La dirección pública del MCP, que es el `aud` de los tokens OAuth. */
   MCP_RESOURCE_URL: Joi.string().uri().optional().allow(''),
-  /** Secreto del cron de vencimientos push (docs/PLAN-PUSH.md). Sin él, la ruta responde 404. */
-  PUSH_CRON_SECRET: Joi.string().min(32).optional().allow(''),
-
   /**
    * Las credenciales de Praxis como cliente OAuth de Kyloo. Con ellas se verifican los tokens que
    * Kyloo nos dirige (`aud` es el `client_id`) y se cierra el paso de conexión del MCP.
