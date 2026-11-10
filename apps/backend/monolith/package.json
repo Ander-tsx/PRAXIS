@@ -6,7 +6,7 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start:prod": "node --max-old-space-size=512 dist/main.js"
+    "start:prod": "node --max-old-space-size=320 dist/main.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

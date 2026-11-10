@@ -82,12 +82,6 @@ export class TasksController {
     return this.tasksService.findMyTasks(dto);
   }
 
-  /** Tareas abiertas que vencen en un tramo de fechas: el recordatorio push. */
-  @MessagePattern({ cmd: 'task_find_due_between' })
-  findDueBetween(@Payload() dto: { from: string; to: string }) {
-    return this.tasksService.findDueBetween(dto);
-  }
-
   /** Tareas de todo un proyecto, sin paginar: automatizaciones y purgas. */
   @MessagePattern({ cmd: 'task_find_by_project' })
   findByProject(@Payload() dto: FindTasksByProjectDto) {

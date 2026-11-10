@@ -1,5 +1,7 @@
 # PLAN-PUSH — Notificaciones push (mensajes y tareas por vencer)
 
+> ✂️ **Retirado el 2026-11-09:** el recordatorio de vencimientos (el cron de Railway y `PushCronController`). Las partes de este plan que lo describen quedan solo como registro; el push de mensajes sigue vigente.
+
 **Etapa entregada en rama** `feature/push-notificaciones` (2026-10-14), sin desplegar. Cierra la
 **D14 de [PLAN-MOVIL](PLAN-MOVIL.md)** («push, fuera de este plan»). ⚠️ **Toca el backend**, por
 encargo del dueño y solo aditivo. Despliegue en [deploy/PUSH-PRODUCCION.md](deploy/PUSH-PRODUCCION.md).
