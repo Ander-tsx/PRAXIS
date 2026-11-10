@@ -1586,7 +1586,14 @@ export class TasksService {
 
     const updated = await this.prisma.checklist.update({
       where: { id: dto.id },
-      data: { completed: !item.completed },
+      data: item.completed
+        ? { completed: false, completedById: null, completedAt: null, completedVia: null }
+        : {
+            completed: true,
+            completedById: dto.requesterId,
+            completedAt: new Date(),
+            completedVia: dto.via ?? null,
+          },
     });
 
     // También la lista del tablero: la tarjeta enseña el avance del checklist,

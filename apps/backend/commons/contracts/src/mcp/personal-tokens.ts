@@ -131,3 +131,11 @@ export class SetOrganizationIntegrationsBodyDto {
   @IsBoolean()
   mcpAllowed: boolean;
 }
+
+/** Cuerpo de `PATCH /organizations/:organizationId/agent-attribution`. */
+export class SetAgentAttributionBodyDto {
+  /** Si se marca lo que hacen los agentes de IA por MCP (coautoría). */
+  @ApiProperty()
+  @IsBoolean()
+  agentAttribution: boolean;
+}

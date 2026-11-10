@@ -130,6 +130,18 @@ describe('PersonalTokensService', () => {
     await expect(crear()).rejects.toMatchObject({ error: { statusCode: 409 } });
   });
 
+  it('el JWT del canje lleva la marca de coautoría firmada: via, agente y su tipo', async () => {
+    const { token, personalToken } = await crear(['read', 'write']);
+    const canje = await servicio.canjear(token);
+
+    expect(jwt.verify(canje.accessToken)).toMatchObject({
+      via: 'mcp',
+      agentId: personalToken.id,
+      agentName: personalToken.name,
+      agentKind: expect.stringMatching(/^(claude|chatgpt|ai)$/),
+    });
+  });
+
   it('el canje emite un JWT de acceso, no de refresco, con el dueño como sub', async () => {
     const { token } = await crear(['read', 'write']);
     const canje = await servicio.canjear(token);

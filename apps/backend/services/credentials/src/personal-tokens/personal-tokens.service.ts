@@ -11,6 +11,7 @@ import {
   PAT_SCOPES,
   type PatScope,
   type PersonalTokenView,
+  agentKindFromName,
 } from '@praxis/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -221,7 +222,15 @@ export class PersonalTokensService {
     }
 
     const accessToken = await this.jwt.signAsync(
-      { sub: fila.userId, typ: TOKEN_ACCESO },
+      {
+        sub: fila.userId,
+        typ: TOKEN_ACCESO,
+        /* La marca de coautoría: la firma el servidor y no sale del gateway. */
+        via: 'mcp',
+        agentId: fila.id,
+        agentName: fila.name,
+        agentKind: agentKindFromName(fila.name),
+      },
       { expiresIn: VIDA_DEL_ACCESO },
     );
 

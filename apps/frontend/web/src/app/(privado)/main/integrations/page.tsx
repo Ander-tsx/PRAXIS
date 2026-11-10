@@ -1,4 +1,5 @@
 import {
+  AtribucionDeAgentes,
   ConexionesDeIa,
   IntegrationRow,
   McpIntegration,
@@ -93,6 +94,13 @@ export default async function IntegrationsPage() {
     <AppHeader title="Integraciones">
       <div className="flex w-full flex-col pb-16">
         {cabecera}
+
+        {conIntegraciones && canManageOrganization && (
+          <AtribucionDeAgentes
+            organizationId={organizationId}
+            agentAttribution={organizacion.agentAttribution === true}
+          />
+        )}
 
         <IntegrationRow
           title="Conectar un agente de IA (MCP)"

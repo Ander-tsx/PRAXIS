@@ -509,6 +509,10 @@ export class McpService {
       method,
       headers: {
         authorization: `Bearer ${session.accessToken}`,
+        /* La coautoría está encendida en esta organización: sin esta cabecera el
+           `JwtGuard` ignora la marca del JWT y no se anota nada. La pone el propio
+           gateway en su llamada interna; el agente no habla con esta petición. */
+        ...(session.atribucion ? { 'x-praxis-agent-attribution': 'on' } : {}),
         ...(body ? { 'content-type': 'application/json' } : {}),
       },
       ...(body ? { body: JSON.stringify(body) } : {}),

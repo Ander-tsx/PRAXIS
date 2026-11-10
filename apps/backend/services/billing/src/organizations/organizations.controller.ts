@@ -102,6 +102,18 @@ export class OrganizationsController {
     return this.organizaciones.permitirMcp(dto.organizationId, dto.userId, dto.mcpAllowed);
   }
 
+  /** El interruptor de la coautoría de los agentes. Exige `canManageOrganization`. */
+  @MessagePattern({ cmd: 'billing_org_set_agent_attribution' })
+  permitirAtribucion(
+    @Payload() dto: { organizationId: string; userId: string; agentAttribution: boolean },
+  ) {
+    return this.organizaciones.permitirAtribucion(
+      dto.organizationId,
+      dto.userId,
+      dto.agentAttribution,
+    );
+  }
+
   /** Si esa persona sigue dentro y si la organización permite el MCP. Una consulta. */
   @MessagePattern({ cmd: 'billing_org_mcp_access' })
   accesoMcp(@Payload() dto: { organizationId: string; userId: string }) {

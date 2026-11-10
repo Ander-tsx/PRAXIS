@@ -49,6 +49,8 @@ const TASK_CONTROLLERS = new Set([
   'TaskFieldValuesController',
   /* Los enlaces de una tarea: `/tasks/:taskId/links`. */
   'TaskLinksController',
+  /* Quién editó la tarea por MCP: `GET /tasks/:taskId/agent-editors`. */
+  'AgentEditorsController',
 ]);
 
 /**

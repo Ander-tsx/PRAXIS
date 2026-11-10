@@ -65,7 +65,13 @@ export class CommentsController {
     return firstValueFrom(
       this.tasksClient.send(
         { cmd: 'comment_create' },
-        { ...body, taskId, projectId: req.projectId, requesterId: req.user!.userId },
+        {
+          ...body,
+          taskId,
+          projectId: req.projectId,
+          requesterId: req.user!.userId,
+          via: req.user!.agent?.agentKind,
+        },
       ),
     );
   }

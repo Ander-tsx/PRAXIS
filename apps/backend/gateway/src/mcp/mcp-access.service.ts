@@ -33,6 +33,11 @@ export interface McpSession {
    * pueda cambiar de organización; solo las herramientas de organización pasan.
    */
   bloqueo?: McpAccessError;
+  /**
+   * La organización activa tiene encendida la coautoría: las escrituras de esta
+   * sesión se marcan. Apagada por defecto (`Organization.agentAttribution`).
+   */
+  atribucion?: boolean;
 }
 
 /* `McpAccessError` vive en `mcp-errors.ts` y se reexporta: kyloo-oauth.service lo usa y esta
@@ -101,8 +106,11 @@ export class McpAccessService {
       );
     }
 
-    await this.exigirOrganizacionUsable(sesion.userId, sesion.organizationId);
-    return sesion;
+    const { atribucion } = await this.exigirOrganizacionUsable(
+      sesion.userId,
+      sesion.organizationId,
+    );
+    return { ...sesion, atribucion };
   }
 
   /**
@@ -155,7 +163,9 @@ export class McpAccessService {
     /* A diferencia de un token personal, aquí un fallo de la organización activa
        no cierra la puerta: el agente tiene que poder pedir las suyas y cambiar. */
     try {
-      await this.exigirOrganizacionUsable(conexion.userId, conexion.activeOrgId);
+      sesion.atribucion = (
+        await this.exigirOrganizacionUsable(conexion.userId, conexion.activeOrgId)
+      ).atribucion;
     } catch (error) {
       if (!(error instanceof McpAccessError)) throw error;
       sesion.bloqueo = error;
@@ -168,7 +178,10 @@ export class McpAccessService {
    * dentro, que su plan traiga integraciones y que su interruptor esté
    * encendido. Se usa en cada petición y al cambiar de organización.
    */
-  async exigirOrganizacionUsable(userId: string, organizationId: string): Promise<void> {
+  async exigirOrganizacionUsable(
+    userId: string,
+    organizationId: string,
+  ): Promise<{ atribucion: boolean }> {
     /* El plan primero: si no trae integraciones, ese es el motivo que hay que
        dar, aunque el interruptor también esté apagado. Lanza un 402 con
        `puedeAmpliar` (QuotaService). */
@@ -183,10 +196,11 @@ export class McpAccessService {
     }
 
     const acceso = await firstValueFrom(
-      this.billingClient.send<{ miembro: boolean; mcpAllowed: boolean }>(
-        { cmd: 'billing_org_mcp_access' },
-        { organizationId, userId },
-      ),
+      this.billingClient.send<{
+        miembro: boolean;
+        mcpAllowed: boolean;
+        agentAttribution?: boolean;
+      }>({ cmd: 'billing_org_mcp_access' }, { organizationId, userId }),
     ).catch(() => null);
 
     if (!acceso?.miembro) {
@@ -203,6 +217,7 @@ export class McpAccessService {
         'Esta organización no permite conectar agentes por MCP. Lo decide quien la administra, en Integraciones.',
       );
     }
+    return { atribucion: acceso.agentAttribution === true };
   }
 
   /**

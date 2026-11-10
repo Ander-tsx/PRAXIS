@@ -93,6 +93,7 @@ export class ChecklistsController {
           id,
           projectId: req.projectId,
           requesterId: req.user!.userId,
+          via: req.user!.agent?.agentKind,
         },
       ),
     );

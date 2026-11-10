@@ -1,4 +1,4 @@
-import { forwardRef, type InputHTMLAttributes } from 'react';
+import { type InputHTMLAttributes, forwardRef } from 'react';
 
 export interface FloatingLabelInputProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;

@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { RpcException } from '@nestjs/microservices';
-import type { ExchangedMcpConnection, McpConnectionView } from '@praxis/contracts';
+import {
+  type ExchangedMcpConnection,
+  type McpConnectionView,
+  agentKindFromName,
+} from '@praxis/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** Valor del claim `typ` que exige `JwtGuard` en el gateway. */
@@ -197,7 +201,15 @@ export class McpConnectionsService {
     }
 
     const accessToken = await this.jwt.signAsync(
-      { sub: fila.userId, typ: TOKEN_ACCESO },
+      {
+        sub: fila.userId,
+        typ: TOKEN_ACCESO,
+        /* La marca de coautoría: la firma el servidor y no sale del gateway. */
+        via: 'mcp',
+        agentId: fila.id,
+        agentName: fila.clientName,
+        agentKind: agentKindFromName(fila.clientName),
+      },
       { expiresIn: VIDA_DEL_ACCESO },
     );
     return {

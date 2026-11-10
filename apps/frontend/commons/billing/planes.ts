@@ -256,6 +256,8 @@ export interface OrganizationView {
   imageUrl?: string | null;
   /** Si sus miembros pueden conectar su agente por MCP (M14 de PLAN-MCP). */
   mcpAllowed?: boolean;
+  /** Si se marca lo que hacen los agentes de IA por MCP (coautoría). Apagado por defecto. */
+  agentAttribution?: boolean;
   createdAt: string;
 }
 

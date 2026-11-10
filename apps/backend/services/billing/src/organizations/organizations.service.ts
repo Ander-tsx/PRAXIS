@@ -437,6 +437,7 @@ export class OrganizationsService {
       color: string | null;
       imageUrl?: string | null;
       mcpAllowed?: boolean;
+      agentAttribution?: boolean;
       createdAt: Date;
       subscription: { tier: string; status: string; seats: number } | null;
       _count?: { members: number };
@@ -475,6 +476,7 @@ export class OrganizationsService {
       color: organizacion.color,
       imageUrl: organizacion.imageUrl ?? null,
       mcpAllowed: organizacion.mcpAllowed ?? true,
+      agentAttribution: organizacion.agentAttribution ?? false,
       createdAt: organizacion.createdAt.toISOString(),
     };
   }
@@ -724,15 +726,45 @@ export class OrganizationsService {
   }
 
   /**
+   * Enciende o apaga la coautoría de los agentes de IA (se marca lo que hacen por MCP).
+   * Misma puerta que el interruptor del MCP: `canManageOrganization`.
+   */
+  async permitirAtribucion(organizationId: string, userId: string, agentAttribution: boolean) {
+    const permiso = await this.exigirPermiso(
+      organizationId,
+      userId,
+      OrganizationPermission.CAN_MANAGE_ORGANIZATION,
+    );
+    if (esFallo(permiso)) return permiso;
+
+    const organizacion = await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { agentAttribution },
+      include: { subscription: true, _count: { select: { members: true } } },
+    });
+    await this.olvidar(organizationId, userId);
+    await this.registrar(organizationId, 'atribucion_de_agentes', { agentAttribution, userId });
+    return this.vista(
+      organizacion,
+      { role: { name: permiso.roleName ?? '', permissions: permiso.permisos } },
+      userId,
+    );
+  }
+
+  /**
    * Lo que necesita saber el MCP en cada llamada: si esa persona sigue dentro
    * y si la organización lo permite. Una sola consulta.
    */
   async accesoMcp(organizationId: string, userId: string) {
     const membresia = await this.prisma.organizationMember.findFirst({
       where: { organizationId, userId, status: MembershipStatus.ACTIVE },
-      select: { organization: { select: { mcpAllowed: true } } },
+      select: { organization: { select: { mcpAllowed: true, agentAttribution: true } } },
     });
-    return { miembro: membresia !== null, mcpAllowed: membresia?.organization.mcpAllowed ?? false };
+    return {
+      miembro: membresia !== null,
+      mcpAllowed: membresia?.organization.mcpAllowed ?? false,
+      agentAttribution: membresia?.organization.agentAttribution ?? false,
+    };
   }
 
   async renombrar(

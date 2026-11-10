@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '../../atoms/Button';
 import { useRef, useState } from 'react';
+import { Button } from '../../atoms/Button';
 
 /** Mismo tope que el gateway (`IMAGEN_MAX_BYTES`): el mensaje llega antes. */
 const MAX_BYTES = 2 * 1024 * 1024;

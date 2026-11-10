@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { McpActionsService } from './mcp-actions.service';
 import { McpConnectionsService } from './mcp-connections.service';
 import { PersonalTokensController } from './personal-tokens.controller';
 import { PersonalTokensService } from './personal-tokens.service';
@@ -18,7 +19,7 @@ import { PersonalTokensService } from './personal-tokens.service';
     }),
   ],
   controllers: [PersonalTokensController],
-  providers: [PersonalTokensService, McpConnectionsService],
+  providers: [PersonalTokensService, McpConnectionsService, McpActionsService],
   exports: [PersonalTokensService, McpConnectionsService],
 })
 export class PersonalTokensModule {}

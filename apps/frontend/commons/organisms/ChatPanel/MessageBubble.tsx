@@ -629,7 +629,9 @@ export function MessageBubble({
    * burbuja se lea como una superficie y no como un tinte. Sigue siendo el
    * morado de la marca: cambia el tono, no la identidad.
    */
-  const fondo = mine ? `color-mix(in srgb, ${colors.primary} 20%, var(--color-surface-3))` : 'var(--color-surface-sunken)';
+  const fondo = mine
+    ? `color-mix(in srgb, ${colors.primary} 20%, var(--color-surface-3))`
+    : 'var(--color-surface-sunken)';
 
   /**
    * Si la flecha del desplegable tiene algo que desplegar.

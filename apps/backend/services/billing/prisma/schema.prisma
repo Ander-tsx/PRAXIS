@@ -123,6 +123,12 @@ model Organization {
   /// y eso ya lo comprueba el plan.
   mcpAllowed Boolean @default(true)
 
+  /// Si lo que hacen los agentes de IA por MCP **se marca** (coautoría): insignia
+  /// «Editado por Claude y Ana» en la tarea, caras en cada paso del checklist y en
+  /// cada nota. `false` por defecto: es decisión de quien administra la organización.
+  /// Apagarlo deja de anotar lo nuevo; lo ya marcado queda como historial.
+  agentAttribution Boolean @default(false)
+
   members       OrganizationMember[]
   roles         OrganizationRole[]
   roleTemplates ProjectRoleTemplate[]

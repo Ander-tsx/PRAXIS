@@ -36,6 +36,9 @@ import {
   describirAviso,
   destinoDeAviso,
 } from '../../notifications/avisos';
+import { AvisoActivarNotificaciones } from '../../pwa/AvisoActivarNotificaciones';
+import { HapticoGlobal } from '../../pwa/HapticoGlobal';
+import { PresenciaDePush } from '../../pwa/PresenciaDePush';
 import { presentarPersona } from '../../pwa/sinConexion';
 import { LivePresences, LiveSource, useLiveEvent, useReconnection } from '../../realtime';
 import { usePresence } from '../../realtime/presence';
@@ -55,9 +58,6 @@ import { DirectorioDeChatsProvider, useDirectorioDeChats } from './DirectorioDeC
 import { DockColumn, DockProvider } from './DockPanel';
 import { FilaDeArbol } from './FilaDeArbol';
 import { FranjaSinConexion } from './FranjaSinConexion';
-import { AvisoActivarNotificaciones } from '../../pwa/AvisoActivarNotificaciones';
-import { HapticoGlobal } from '../../pwa/HapticoGlobal';
-import { PresenciaDePush } from '../../pwa/PresenciaDePush';
 import { GestosMoviles } from './GestosMoviles';
 import { NavList } from './NavList';
 import { OrgSwitcher } from './OrgSwitcher';

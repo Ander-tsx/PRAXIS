@@ -20,7 +20,7 @@ export interface GlobalRoleBadgesProps {
  * Una cuenta sin roles no pinta nada, que es el caso normal: `POST /auth/register`
  * no asigna ninguno.
  */
-import { colors, alpha } from '../../tokens';
+import { alpha, colors } from '../../tokens';
 
 export function GlobalRoleBadges({ roles }: GlobalRoleBadgesProps) {
   return (
