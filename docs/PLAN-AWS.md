@@ -12,6 +12,9 @@
 - **La factura de ~30 USD no es de Praxis.** Es del *workspace* entero (6 proyectos). Ciclo 31-oct → 30-nov:
   uso 8,65 USD al día 9, estimado **19,09 USD**; KYLOO SPACE lleva **3,95 USD** (≈ 12-13 USD proyectados),
   HOME 2,99, macrofit 0,82, kyloo-agent 0,57. Memoria: 8,29 de los 8,65.
+- **Por qué casi todo es RAM:** Railway cobra la memoria **reservada por minuto** (0,000231 USD/GB-min) y la CPU
+  solo por lo que usa (0,000463 USD/vCPU-min). Una app Node casi dormida —`praxis-api`: 193 vCPU-min al mes, ≈ 0,4 %
+  de un núcleo— paga RAM y casi nada de CPU. 19.483 GB-min = ≈ 0,45 GB de media. Es el comportamiento esperado.
 - **No hay leak.** `praxis-api` sube de ~180 MB a ~600 MB en una semana y **se estabiliza** (tope de heap de
   512 MB). El ajuste es bajar ese tope (~320 MB), no buscar una fuga.
 - **Mudarse a una EC2 no ahorra dinero** frente a lo que cuesta Praxis en Railway una vez retirado Kyloo Auth
@@ -42,6 +45,11 @@ Base de datos por tamaño: esquema `projects` 85 MB, el resto < 4 MB cada uno. *
 `chat_attachment_blobs` 68 MB (49 adjuntos), `document_asset_blobs` 10 MB, `project_images` 4 MB, `user_covers` 1 MB.
 Es decir: con `STORAGE_DRIVER=postgres` (el valor de producción) **los adjuntos viven dentro de Postgres**.
 
+**Sueño (`sleepApplication`):** activo en `praxis-api`, `praxis-web` y `praxis-redis`; no en `praxis-db` (una base no
+duerme). El backend está preparado para dormir (`PLAN-MONOLITO` M-K: tras 5 min sin mensajes los sondeos se callan).
+Indicio de que funciona: el 2026-11-09 hubo ~17 h seguidas sin una sola línea de log de `praxis-api`. Mis mediciones
+de memoria las hice despertándolo yo mismo (SSH, despliegues), así que **no son la media de un día normal**.
+
 Hay además un volumen huérfano en el proyecto (`postgres-volume-DPi6`) que no cuelga de ningún servicio.
 
 ## 3. Redis no se puede quitar sin reescribir
@@ -56,7 +64,7 @@ publicador `domain-outbox.publisher.ts` y el consumidor de `automation`). Son 36
 `praxis-push-cron` solo dispara el recordatorio de **vencimientos** (`PushCronController`,
 `POST /api/internal/push/vencimientos`). Decisión del dueño: **ya no se quiere ni el cron ni esos avisos.**
 
-Para quitarlo del todo (cuando se haga la migración, no antes):
+Para quitarlo del todo (hecho en el PR #48; falta borrar el servicio y la variable en Railway tras fusionarlo):
 1. Borrar el servicio `praxis-push-cron` y la variable `PUSH_CRON_SECRET`.
 2. Eliminar `PushCronController` y su ruta en `web` (`/api/internal/push/vencimientos`), y `PUSH_CRON_SECRET`
    de `env.validation.ts`. Sin la variable la ruta ya responde 404, así que es inofensivo hasta entonces.
