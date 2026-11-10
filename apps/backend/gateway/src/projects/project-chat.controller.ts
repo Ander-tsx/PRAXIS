@@ -47,7 +47,6 @@ import { RequireProjectPermission } from '../common/decorators/require-project-p
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { MentionablesService } from './mentionables.service';
 import { PraxEnElChatService } from '../assistant/prax-en-el-chat.service';
-import { NombreDeAutorService } from './nombre-de-autor.service';
 import { OrigenDeMensajeService } from './origen-de-mensaje.service';
 
 /**
@@ -86,7 +85,6 @@ export class ProjectChatController {
     private readonly mentionables: MentionablesService,
     private readonly origenes: OrigenDeMensajeService,
     private readonly prax: PraxEnElChatService,
-    private readonly autores: NombreDeAutorService,
   ) {}
 
   /**
@@ -141,13 +139,7 @@ export class ProjectChatController {
     const guardado = await firstValueFrom(
       this.projectsClient.send<{ id: string }>(
         { cmd: 'chat_project_send' },
-        {
-          ...mensaje,
-          projectId: req.projectId,
-          requesterId: req.user!.userId,
-          authorName: await this.autores.de(req.user!.userId),
-          ...origen,
-        },
+        { ...mensaje, projectId: req.projectId, requesterId: req.user!.userId, ...origen },
       ),
     );
     /* @PRAX (D15): responde detrás, sin esperar y sin poder tumbar el envío.

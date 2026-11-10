@@ -984,6 +984,11 @@ model ReportLayout {
 /// servidor: sirven para cifrar el mensaje para ese dispositivo y nada más.
 /// Se borra la fila cuando el servicio de push responde 404 o 410 (la
 /// suscripción murió) o cuando la persona lo apaga.
+/// ⚠️ **HUÉRFANA desde 2026-11-10**: las notificaciones push se retiraron (rama
+/// `chore/sin-caches`) y ningún código lee ni escribe esta tabla. Se conserva el modelo y
+/// su migración a propósito: borrar la tabla es irreversible y esa decisión es aparte.
+/// Para quitarla: una migración con `DROP TABLE "projects"."push_subscriptions"` y fuera
+/// este modelo.
 model PushSubscription {
   id        String   @id @default(uuid())
   userId    String

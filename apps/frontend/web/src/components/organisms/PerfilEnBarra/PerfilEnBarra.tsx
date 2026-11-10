@@ -5,7 +5,7 @@ import {
   uploadAvatarAction,
   useGoogleAvatarAction,
 } from '@/app/(privado)/main/profile/actions';
-import { Avatar, SelectorDeTema, olvidarDatosSinConexion, useEsMovil } from '@praxis/commons';
+import { Avatar, SelectorDeTema, useEsMovil } from '@praxis/commons';
 import { Camera, ImageUp, Loader2, LogOut, Mail, Pencil } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -143,9 +143,6 @@ export function PerfilEnBarra({
 
   async function cerrarSesion() {
     setSaliendo(true);
-    /* Las pantallas guardadas para leer sin conexión son de esta persona:
-       se van con ella (D5 de docs/PLAN-MOVIL.md). */
-    await olvidarDatosSinConexion().catch(() => undefined);
     try {
       await fetch('/auth/api/logout', { method: 'POST' });
     } catch {

@@ -2,8 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import type { ChatMessageOrigin, Prisma } from '../generated/prisma-client';
 import { PrismaService } from '../prisma/prisma.service';
-import type { ChannelContext } from '../realtime/events';
-import { PushService } from '../push/push.service';
 import { EventDispatcher } from '../realtime/event-dispatcher.service';
 import { RedisService } from '../redis/redis.service';
 import { ChannelsService } from './channels.service';
@@ -150,7 +148,6 @@ export class ChatService {
     private readonly channels: ChannelsService,
     private readonly attachments: ChatAttachmentsService,
     private readonly eventos: EventDispatcher,
-    private readonly push: PushService,
   ) {}
 
   /**
@@ -180,8 +177,6 @@ export class ChatService {
      */
     origin?: ChatMessageOrigin;
     originMeta?: Record<string, unknown> | null;
-    /** Nombre de quien escribe, que pone el gateway (solo para el push). */
-    authorName?: string | null;
   }) {
     /* Una respuesta tiene que apuntar a un mensaje **de este mismo canal**. Sin
        esta comprobación, un id conocido de otra conversación se citaría dentro
@@ -272,7 +267,7 @@ export class ChatService {
        ellos** —los adjuntos se reclaman después del `create`—, y no reaparecían
        hasta recargar. Es la clase de fallo que solo se ve con adjuntos y por eso
        es fácil que sobreviva a las pruebas manuales. */
-    void this.anunciarMensaje(dto.channelId, completo, message.createdAt, dto.authorName ?? null);
+    void this.anunciarMensaje(dto.channelId, completo, message.createdAt);
 
     return completo;
   }
@@ -1237,60 +1232,23 @@ export class ChatService {
    * es reproducirlo en una tarjeta que aparece sobre cualquier pantalla, y eso
    * lo decide `LiveNotices`.
    */
-  private async anunciarMensaje(
-    channelId: string,
-    mensaje: { id: string; authorId: string; body?: string | null; deletedAt?: Date | null },
-    at: Date,
-    authorName: string | null,
-  ) {
-    /* Quién recibe un push: todos menos el autor y quien lo tiene silenciado. Se
-       recoge aquí, dentro del reparto, porque es donde ya están resueltos los
-       silencios y el contexto del canal. */
-    const paraPush: string[] = [];
-    const guardado: { canal: ChannelContext | null } = { canal: null };
-
-    await this.eventos.repartir(channelId, (contexto) => {
-      if (!contexto.silenciado && contexto.destinatario !== mensaje.authorId) {
-        paraPush.push(contexto.destinatario);
-      }
-      guardado.canal = contexto;
-      return {
-        tipo: 'chat.mensaje',
-        channelId,
-        actorId: mensaje.authorId,
-        at: at.toISOString(),
-        mensaje,
-        silenciado: contexto.silenciado,
-        channelKind: contexto.channelKind,
-        projectId: contexto.projectId,
-        projectName: contexto.projectName,
-        projectSlug: contexto.projectSlug,
-        peerId: contexto.peerId,
-        organizationId: contexto.organizationId,
-        organizationName: contexto.organizationName,
-      };
-    });
-
-    const canal = guardado.canal;
-    if (paraPush.length === 0 || !canal) return;
-    const texto = (mensaje.body ?? '').replace(/\s+/g, ' ').trim() || 'Te envió un archivo';
-    const privado = canal.channelKind === 'DIRECT';
-    /* En un privado el título es quien escribe y el cuerpo, solo el texto; en
-       un grupo el título es el proyecto y cada línea lleva su autor. El service
-       worker apila las últimas líneas de un mismo `tag` en una sola notificación. */
-    this.push
-      .avisarMensaje(paraPush, {
-        title: privado
-          ? (authorName ?? 'Mensaje privado')
-          : (canal.projectName ?? 'Chat del proyecto'),
-        body: privado ? texto.slice(0, 120) : `${authorName ?? 'Alguien'}: ${texto.slice(0, 120)}`,
-        url: privado ? `/chat/${mensaje.authorId}` : `/chat/proyecto/${canal.projectId}`,
-        tag: `chat:${channelId}`,
-        acumular: true,
-      })
-      .catch(() => undefined);
+  private anunciarMensaje(channelId: string, mensaje: { id: string; authorId: string }, at: Date) {
+    return this.eventos.repartir(channelId, (contexto) => ({
+      tipo: 'chat.mensaje',
+      channelId,
+      actorId: mensaje.authorId,
+      at: at.toISOString(),
+      mensaje,
+      silenciado: contexto.silenciado,
+      channelKind: contexto.channelKind,
+      projectId: contexto.projectId,
+      projectName: contexto.projectName,
+      projectSlug: contexto.projectSlug,
+      peerId: contexto.peerId,
+      organizationId: contexto.organizationId,
+      organizationName: contexto.organizationName,
+    }));
   }
-
   /**
    * Oculta un canal para un usuario, actualizando hiddenAt en ChatChannelState.
    * Si llegan nuevos mensajes después de hiddenAt, el chat reaparecerá.

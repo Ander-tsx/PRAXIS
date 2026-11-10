@@ -3,7 +3,8 @@ import { crearCuentaYEntrar } from '../../fixtures/ui';
 
 /**
  * La PWA (M1 de `docs/PLAN-MOVIL.md`): que se instala bien, que el service
- * worker toma el mando y que sin red hace lo que dice D4 —y nada más—.
+ * worker toma el mando y que su único trabajo es la pantalla «Sin conexión».
+ * Desde 2026-11-10 no guarda nada más: ni estáticos, ni pantallas, ni datos.
  */
 
 /**
@@ -88,8 +89,7 @@ test('sin red, el gateway no se sirve de ninguna caché (I2, I3)', async ({ page
   const conRed = await page.evaluate(async () => (await fetch('/api/gateway/users/me')).status);
   expect(conRed).toBe(200);
 
-  /* …y sin red falla: nadie la guardó. Cuando llegue M7, solo la lista
-     blanca de lectura tendrá copia, y por usuario. */
+  /* …y sin red falla: nadie la guardó. */
   await context.setOffline(true);
   const sinRed = await page.evaluate(async () => {
     try {
@@ -105,16 +105,15 @@ test('sin red, el gateway no se sirve de ninguna caché (I2, I3)', async ({ page
   const guardadas = await page.evaluate(async () => {
     const urls: string[] = [];
     for (const nombre of await caches.keys()) {
-      /* Las copias por persona de M7 se comprueban en `08-sin-conexion`. */
-      if (nombre.startsWith('praxis-datos-') || nombre === 'praxis-sesion') continue;
+      /* Ya no hay cachés por persona ni de estáticos: solo la de «Sin conexión». */
+      if (!nombre.startsWith('praxis-sin-conexion-')) urls.push(`caché inesperada: ${nombre}`);
       const cache = await caches.open(nombre);
       for (const peticion of await cache.keys()) urls.push(new URL(peticion.url).pathname);
     }
     return urls;
   });
   expect(guardadas.filter((u) => u.startsWith('/api/'))).toEqual([]);
-  /* Fuera de las cachés por persona, ni HTML de la aplicación: solo la
-     pantalla «Sin conexión». */
+  /* Ni HTML de la aplicación ni datos: solo la pantalla «Sin conexión» y sus hojas. */
   const publico =
     /^\/(_next\/static\/|icons\/|fonts\/|media\/|manifest\.webmanifest$|(apple-)?icon[^/]*\.png$|sin-conexion$)/;
   expect(guardadas.filter((u) => !publico.test(u))).toEqual([]);
@@ -130,7 +129,7 @@ test('la app registra siempre /sw.js, sin versión en la URL (D6)', async ({ pag
   expect(new URL(script).search).toBe('');
 });
 
-test('una versión nueva se aplica sola, sin aviso (D6)', async ({ page }) => {
+test('una versión nueva toma el mando sin recargar la página ni avisar', async ({ page }) => {
   await page.goto('/auth/login');
   await conServiceWorker(page);
 
@@ -143,17 +142,45 @@ test('una versión nueva se aplica sola, sin aviso (D6)', async ({ page }) => {
   await page.evaluate(() => {
     (window as unknown as { __sigue: boolean }).__sigue = true;
   });
-  await Promise.all([
-    page.waitForEvent('load'),
-    page.evaluate(() => navigator.serviceWorker.register('/sw.js?simulacro=1', { scope: '/' })),
-  ]);
-
-  /* Recargó sin que nadie pulsara nada, y no hay ningún aviso que pulsar. */
-  expect(await page.evaluate(() => (window as unknown as { __sigue?: boolean }).__sigue)).toBe(
-    undefined,
-  );
-  await expect(page.getByText('Hay una versión nueva')).toHaveCount(0);
+  await page.evaluate(() => navigator.serviceWorker.register('/sw.js?simulacro=1', { scope: '/' }));
   await page.waitForFunction(() =>
     navigator.serviceWorker.controller?.scriptURL.includes('simulacro=1'),
   );
+
+  /* Ya no se recarga: no hay nada guardado que pueda quedar viejo. Ni hay aviso que pulsar. */
+  expect(await page.evaluate(() => (window as unknown as { __sigue?: boolean }).__sigue)).toBe(
+    true,
+  );
+  await expect(page.getByText('Hay una versión nueva')).toHaveCount(0);
+});
+
+test('al activarse borra las cachés que dejó la versión anterior', async ({ page }) => {
+  await page.goto('/auth/login');
+  await conServiceWorker(page);
+
+  /* Las que creaban M1 y M7: estáticos, recursos, pantallas por persona y su huella. */
+  await page.evaluate(async () => {
+    for (const nombre of [
+      'praxis-estaticos-vieja',
+      'praxis-recursos-vieja',
+      'praxis-paginas-vieja',
+      'praxis-datos-abc123',
+      'praxis-sesion',
+    ]) {
+      await (await caches.open(nombre)).put('/x', new Response('viejo'));
+    }
+    await navigator.serviceWorker.register('/sw.js?simulacro=2', { scope: '/' });
+  });
+  await page.waitForFunction(() =>
+    navigator.serviceWorker.controller?.scriptURL.includes('simulacro=2'),
+  );
+
+  /* El borrado va justo después de tomar el mando: se espera a que termine. */
+  await expect
+    .poll(async () =>
+      (await page.evaluate(() => caches.keys())).filter(
+        (n) => !n.startsWith('praxis-sin-conexion-'),
+      ),
+    )
+    .toEqual([]);
 });
