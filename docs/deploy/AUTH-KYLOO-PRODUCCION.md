@@ -1,5 +1,7 @@
 # Kyloo como único login: puesta en producción
 
+> 🕰️ **Histórico.** Kyloo Accounts dejó Railway el 2026-11-08: hoy corre en una EC2 de AWS desde el repositorio `Kyloo-OAuth` (mismo emisor, `accounts.kyloo.com.mx`; Praxis no cambió). Los comandos de `railway` sobre `kyloo-auth-*` ya no aplican.
+
 Pasos de [PLAN-AUTH-KYLOO](../PLAN-AUTH-KYLOO.md). **Ninguna migración nueva** en ninguno de los dos
 repositorios, y `AUTH_MODE` es una variable: lo que se despliega primero no cambia nada visible, y
 activarlo o volver atrás es poner o quitar esa variable.
