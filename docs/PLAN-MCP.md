@@ -506,8 +506,8 @@ enlaces de una tarea. **55 herramientas.**
 ## Coautoría de agentes (2026-11-10, rama `feature/agente-coautor`)
 
 Lo que un agente (Claude, ChatGPT…) hace por MCP a nombre de alguien **se marca**,
-como el `Co-Authored-By` de GitHub. **Apagado por defecto**: lo enciende quien
-tiene `canManageOrganization` en `Integraciones` (`Organization.agentAttribution`,
+como el `Co-Authored-By` de GitHub. **Apagado por defecto**: lo enciende **solo
+quien es dueño** (`ownerUserId`; ni siquiera `canManageOrganization` basta) en `Integraciones` (`Organization.agentAttribution`,
 `PATCH /organizations/:id/agent-attribution`). Apagarlo deja de anotar lo nuevo;
 lo ya marcado queda como historial.
 

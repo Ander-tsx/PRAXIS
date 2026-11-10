@@ -10,7 +10,7 @@ import type { FormEvent } from 'react';
  * Claude, ChatGPT o cualquier agente haga por MCP a nombre de alguien se marca en la tarea
  * («Editado por Claude y Ana»), en cada paso del checklist y en cada nota.
  *
- * Apagado por defecto y solo para quien administra la organización. Apagarlo deja de
+ * Apagado por defecto y solo para quien es dueño de la organización. Apagarlo deja de
  * anotar lo nuevo; lo ya marcado queda como historial.
  */
 export function AtribucionDeAgentes({
@@ -39,7 +39,7 @@ export function AtribucionDeAgentes({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <span className="font-sans text-xs uppercase tracking-wider text-text-secondary">
-            Ajuste de la organización · solo lo ve quien la administra
+            Ajuste de la organización · solo lo ve quien es dueño
           </span>
           <span className="flex items-center gap-2 font-sans text-sm font-medium text-text-primary">
             <span className="flex -space-x-1.5">

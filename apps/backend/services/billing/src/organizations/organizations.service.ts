@@ -727,7 +727,7 @@ export class OrganizationsService {
 
   /**
    * Enciende o apaga la coautoría de los agentes de IA (se marca lo que hacen por MCP).
-   * Misma puerta que el interruptor del MCP: `canManageOrganization`.
+   * **Solo el dueño** de la organización (ver abajo), no cualquiera que pueda gestionarla.
    */
   async permitirAtribucion(organizationId: string, userId: string, agentAttribution: boolean) {
     const permiso = await this.exigirPermiso(
@@ -736,6 +736,19 @@ export class OrganizationsService {
       OrganizationPermission.CAN_MANAGE_ORGANIZATION,
     );
     if (esFallo(permiso)) return permiso;
+
+    /* Solo la persona dueña: un papel con `canManageOrganization` no basta. Es una decisión
+       sobre qué se marca de todo el equipo, y ser dueño no es un papel (se mira `ownerUserId`). */
+    const dueno = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { ownerUserId: true },
+    });
+    if (dueno?.ownerUserId !== userId) {
+      return {
+        error: 'Solo quien es dueño de la organización puede cambiar esto.',
+        codigo: 'SIN_PERMISO',
+      } as Fallo;
+    }
 
     const organizacion = await this.prisma.organization.update({
       where: { id: organizationId },

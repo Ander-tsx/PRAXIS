@@ -95,7 +95,7 @@ export default async function IntegrationsPage() {
       <div className="flex w-full flex-col pb-16">
         {cabecera}
 
-        {conIntegraciones && canManageOrganization && (
+        {conIntegraciones && organizacion.soyDueno && (
           <AtribucionDeAgentes
             organizationId={organizationId}
             agentAttribution={organizacion.agentAttribution === true}
