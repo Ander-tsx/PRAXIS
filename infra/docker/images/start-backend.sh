@@ -34,4 +34,4 @@ fi
 # 512 MB de techo de heap para todo; la huella en reposo ronda los 200 MB.
 echo "==> [start-backend] Arrancando el monolito…"
 cd /app/apps/backend/monolith
-exec node --max-old-space-size=512 dist/main.js
+exec node --max-old-space-size=320 dist/main.js
