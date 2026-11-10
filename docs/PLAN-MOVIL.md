@@ -11,6 +11,18 @@
 > Aparca, por decisión del dueño, lo que quedaba abierto: P3/P4 de
 > `PLAN-PRO-INTEGRACIONES` y M7 de `PLAN-MCP`.
 
+> 🔻 **Simplificado el 2026-11-10 (rama `chore/sin-caches`, decisión del dueño).** Las cachés
+> daban más problemas que valor —Praxis cambia a menudo y cada capa podía enseñar código o
+> pantallas viejas sin ningún error—. **Se retiró:** la lectura sin conexión de M7 (caché por
+> persona, `presentarPersona`, `olvidarDatosSinConexion`, `FranjaSinConexion`), la caché de
+> estáticos y recursos de M1, el aviso/recarga por versión nueva y las **notificaciones push**
+> (PLAN-PUSH, retirado; la tabla `push_subscriptions` queda huérfana a propósito). **Queda**
+> solo lo que hace instalable la app y la pantalla «Sin conexión»: el SW la sirve cuando
+> una navegación falla y **no guarda nada para servirlo con red**. Al activarse borra las cachés
+> que dejó la versión anterior y cancela suscripciones push. Lo de abajo (D4, D5, D14, M7, I2)
+> describe lo que **hubo**; se conserva por el registro.
+
+
 ---
 
 ## El encargo, literal

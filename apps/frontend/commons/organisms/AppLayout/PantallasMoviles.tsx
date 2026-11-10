@@ -9,7 +9,6 @@ import { avatarHref } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
 import { ProjectMonogram } from '../../atoms/ProjectMonogram';
 import { SelectorDeTema } from '../../molecules/SelectorDeTema';
-import { olvidarDatosSinConexion } from '../../pwa/sinConexion';
 import { usePresence } from '../../realtime/presence';
 import { SidebarInboxList, cuandoCorto, resumenDe, useDatosDeTu } from './AppShell';
 import { useDirectorioDeChats } from './DirectorioDeChats';
@@ -314,9 +313,6 @@ export function PantallaTu() {
 
   async function cerrarSesion() {
     setSaliendo(true);
-    /* Las pantallas guardadas para leer sin conexión son de esta persona:
-       se van con ella (D5 de docs/PLAN-MOVIL.md). */
-    await olvidarDatosSinConexion().catch(() => undefined);
     try {
       await fetch('/auth/api/logout', { method: 'POST' });
     } catch {

@@ -1,43 +1,36 @@
 /**
- * El service worker de Praxis (M1 de `docs/PLAN-MOVIL.md`).
+ * El service worker de Praxis: **solo** la pantalla «Sin conexión».
  *
- * Escrito a mano y no con Serwist ni Workbox (D3): Serwist exige webpack y aquí
- * se compila con Turbopack, y lo que hace falta son cuatro estrategias que se
- * leen enteras en este archivo.
+ * ## Qué hace (y qué ya no hace)
  *
- * ## Qué se guarda y qué no (D4)
+ * Existe únicamente para que quien abre la app instalada sin red vea «Sin
+ * conexión» en vez de la pantalla de error del navegador. Nada más:
  *
- * | Petición                                | Estrategia                                 |
- * |-----------------------------------------|--------------------------------------------|
- * | `/_next/static/*`                        | Caché primero: llevan hash en el nombre    |
- * | Fuentes, iconos, `/media/*`, manifiesto  | Caché y revalidación en segundo plano      |
- * | Navegaciones (HTML)                      | Red; sin red, la pantalla «Sin conexión»   |
- * | Todo lo demás                            | **No se toca**: va directo a la red        |
+ * | Petición                        | Qué se hace                                   |
+ * |---------------------------------|-----------------------------------------------|
+ * | Navegaciones (HTML)             | Red. Si falla, la pantalla «Sin conexión»     |
+ * | CSS y fuentes de `/_next/static`| Red. Si falla, las de la pantalla «Sin conexión» |
+ * | Todo lo demás                   | **No se toca**: va directo a la red           |
  *
- * 🔴 **El HTML privado solo se guarda por persona** (M7, ver «Lectura sin
- * conexión» más abajo), y nunca respuestas del gateway: llevan los datos de la
- * sesión, y en un móvil compartido quien entrase después los vería (I2).
+ * 🔴 **No guarda nada para servirlo estando la red disponible**: ni estáticos, ni
+ * recursos, ni pantallas privadas, ni datos. Praxis cambia a menudo, y cada capa de
+ * caché era una forma de enseñar código o pantallas viejas sin ningún error. La
+ * versión anterior (M1 y M7 de `docs/PLAN-MOVIL.md`) guardaba todo eso por persona y
+ * se retiró el 2026-11-10. Tampoco hay notificaciones push.
  *
- * 🔴 **Ni escrituras, ni sesión, ni flujos en vivo, ni Stripe** (I3): todo lo
- * que no sea un GET del mismo origen, `/api/*`, `/auth/api/*`, los
- * `text/event-stream` y las peticiones RSC pasan sin que este archivo los toque.
+ * ## Limpieza de lo que dejó la versión anterior
  *
- * ## Versiones (D6)
+ * Al activarse se borran **todas** las cachés que no sean la de esta versión
+ * (`praxis-estaticos-*`, `praxis-recursos-*`, `praxis-paginas-*`, `praxis-datos-*`,
+ * `praxis-sesion`) y se cancela cualquier suscripción push que quedara. Se activa
+ * en el momento (`skipWaiting`) y toma el mando (`clients.claim`): no hay nada que
+ * proteger de un cambio de versión a mitad de uso, porque ya no sirve nada guardado.
  *
- * Este archivo **no se sirve tal cual**: lo sirve `src/app/sw.js/route.ts` en
- * `/sw.js`, generado en el build con `const VERSION = '<versión>'` delante.
- * Cada despliegue cambia los bytes del script, y así es como el navegador se
- * entera de que hay uno nuevo —desde cualquier pestaña, también una vieja—.
- * El nuevo **espera** sin activarse hasta que la página le dice `activar`
- * —cuando la persona pulsa «Actualizar»—, para no recargar a nadie a mitad
- * de un documento.
+ * Este archivo no se sirve tal cual: `src/app/sw.js/route.ts` lo sirve en `/sw.js`
+ * con `const VERSION = '<versión>'` delante, para que cada despliegue cambie sus
+ * bytes y el navegador se entere de que hay uno nuevo.
  *
- * ⚠️ Estuvo versionado por la URL (`/sw.js?v=…`) y tenía un agujero: una
- * pestaña abierta desde antes del despliegue registraba **su** versión, la
- * vieja, como si fuera nueva, y «Actualizar» hacía bajar de versión. Con la
- * URL fija, el servidor siempre sirve la última y bajar no es posible.
- *
- * ## Si hubiera que retirarlo (I4)
+ * ## Si hubiera que retirarlo del todo
  *
  * Desplegar este archivo con el cuerpo cambiado por:
  *
@@ -47,96 +40,37 @@
  *     await self.registration.unregister();
  *     for (const c of await self.clients.matchAll()) c.navigate(c.url);
  *   });
- *
- * Se desregistra solo en la siguiente visita de cada navegador.
  */
 
 /* global VERSION */
 /* `VERSION` la declara la línea que antepone `src/app/sw.js/route.ts`. */
-const ESTATICOS = `praxis-estaticos-${VERSION}`;
-const RECURSOS = `praxis-recursos-${VERSION}`;
-const PAGINAS = `praxis-paginas-${VERSION}`;
-/** Las cachés de datos por usuario de M7 empiezan así; se borran al salir. */
-const PREFIJO_DATOS = 'praxis-datos-';
-
+const CACHE = `praxis-sin-conexion-${VERSION}`;
 const SIN_CONEXION = '/sin-conexion';
 
-/**
- * ## Lectura sin conexión (M7, D5)
- *
- * Las pantallas privadas ya visitadas se guardan **por persona**, en
- * `praxis-datos-<huella>`, donde la huella es un SHA-256 del correo que manda
- * la propia app al montarse (este SW no puede leer la cookie de sesión: es
- * httpOnly). Sin red, se sirve la última copia de **esa** persona y de nadie
- * más:
- *
- * - si entra otra cuenta, se borran las copias de cualquier otra (I2);
- * - al cerrar sesión, la app pide `olvidar-datos` y se borran todas;
- * - sin persona conocida, no se sirve ninguna copia.
- *
- * Solo navegaciones (HTML). Las peticiones RSC del router no se guardan: su
- * respuesta depende de cabeceras del árbol de rutas y una copia por URL podría
- * pintar un árbol que no encaja. Sin red, el router cae a una navegación dura,
- * y esa sí sale de aquí.
- */
-const SESION = 'praxis-sesion';
-const CLAVE_DE_PERSONA = '/__praxis/persona';
-/** Lo privado que vale la pena leer sin red. `/admin` no: no está en móvil. */
-const PREFIJOS_LEGIBLES = ['/projects', '/chat', '/assistant', '/main', '/ayuda'];
-/** Cuántas pantallas se guardan por persona; las más viejas salen primero. */
-const MAXIMO_DE_PANTALLAS = 60;
-
-async function personaActual() {
-  const respuesta = await (await caches.open(SESION)).match(CLAVE_DE_PERSONA);
-  return respuesta ? respuesta.text() : null;
-}
-
-async function fijarPersona(huella) {
-  if (!/^[a-f0-9]{16,128}$/.test(huella)) return;
-  const sesion = await caches.open(SESION);
-  await sesion.put(CLAVE_DE_PERSONA, new Response(huella));
-  for (const nombre of await caches.keys()) {
-    if (nombre.startsWith(PREFIJO_DATOS) && nombre !== PREFIJO_DATOS + huella) {
-      await caches.delete(nombre);
-    }
-  }
-}
-
-async function olvidarDatos() {
-  for (const nombre of await caches.keys()) {
-    if (nombre.startsWith(PREFIJO_DATOS)) await caches.delete(nombre);
-  }
-  await caches.delete(SESION);
-}
-
-function esLegible(url) {
-  return PREFIJOS_LEGIBLES.some((p) => url.pathname === p || url.pathname.startsWith(`${p}/`));
-}
-
 self.addEventListener('install', (evento) => {
-  evento.waitUntil(precargar());
+  evento.waitUntil(precargar().then(() => self.skipWaiting()));
 });
 
 /**
- * La pantalla «Sin conexión» y su hoja de estilos, para poder enseñarla sin
- * red. La hoja se saca del propio HTML: lleva hash en el nombre y cambia con
- * cada build.
+ * La pantalla «Sin conexión», sus hojas de estilo y sus fuentes. Las hojas se sacan del
+ * propio HTML: llevan hash en el nombre y cambian con cada build.
+ *
+ * ⚠️ **La página se guarda sin `<script>`.** Se sirve en la URL que se pidió
+ * (`/projects/…`), no en `/sin-conexion`; con los scripts de Next dentro, el router
+ * hidrataría un árbol de otra ruta y, sin red, intentaría pedirlo. HTML y CSS puros no
+ * hidratan nada, y su «Reintentar» es un enlace que recarga la URL de verdad.
  */
 async function precargar() {
-  const paginas = await caches.open(PAGINAS);
   const respuesta = await fetch(SIN_CONEXION, { cache: 'no-store' });
   if (!respuesta.ok) return;
   const html = await respuesta.text();
 
-  /* ⚠️ **Se guarda sin `<script>`.** La pantalla se sirve en la URL que se
-     pidió (`/projects/…`), no en `/sin-conexion`; con los scripts de Next
-     dentro, el router hidrataría un árbol de otra ruta y, sin red, intentaría
-     pedirlo. HTML y CSS puros no hidratan nada, y su «Reintentar» es un enlace
-     que recarga la URL de verdad. */
   const sinScripts = html
     .replace(/<script\b[\s\S]*?<\/script>/gi, '')
     .replace(/<link\b[^>]*rel="(?:preload|modulepreload)"[^>]*as="script"[^>]*>/gi, '');
-  await paginas.put(
+
+  const cache = await caches.open(CACHE);
+  await cache.put(
     SIN_CONEXION,
     new Response(sinScripts, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }),
   );
@@ -145,148 +79,52 @@ async function precargar() {
   const fuentes = [...html.matchAll(/href="(\/_next\/static\/media\/[^"]+\.woff2)"/g)].map(
     (m) => m[1],
   );
-  const estaticos = await caches.open(ESTATICOS);
   await Promise.all(
-    [...new Set([...hojas, ...fuentes])].map((url) => estaticos.add(url).catch(() => undefined)),
+    [...new Set([...hojas, ...fuentes])].map((url) => cache.add(url).catch(() => undefined)),
   );
 }
 
 self.addEventListener('activate', (evento) => {
   evento.waitUntil(
     (async () => {
-      /* Fuera las cachés de versiones anteriores. Las de datos no son de una
-         versión: son de una persona, y las borra cerrar sesión. */
-      const vigentes = new Set([ESTATICOS, RECURSOS, PAGINAS, SESION]);
       for (const nombre of await caches.keys()) {
-        if (nombre.startsWith(PREFIJO_DATOS)) continue;
-        if (!vigentes.has(nombre)) await caches.delete(nombre);
+        if (nombre !== CACHE) await caches.delete(nombre);
+      }
+      /* Las suscripciones push de la versión anterior ya no tienen a nadie al otro lado. */
+      try {
+        const suscripcion = await self.registration.pushManager?.getSubscription();
+        await suscripcion?.unsubscribe();
+      } catch {
+        /* Sin permiso o sin soporte: no hay nada que cancelar. */
       }
       await self.clients.claim();
     })(),
   );
 });
 
-self.addEventListener('message', (evento) => {
-  const tipo = evento.data?.tipo;
-  if (tipo === 'activar') {
-    self.skipWaiting();
-  } else if (tipo === 'olvidar-datos') {
-    evento.waitUntil(olvidarDatos());
-  } else if (tipo === 'persona' && typeof evento.data.huella === 'string') {
-    evento.waitUntil(fijarPersona(evento.data.huella));
-  }
-});
-
-/** Lo que este SW no debe tocar nunca (I3). */
-function esIntocable(peticion, url) {
-  if (peticion.method !== 'GET') return true;
-  if (url.origin !== self.location.origin) return true;
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/api/')) return true;
-  if ((peticion.headers.get('accept') || '').includes('text/event-stream')) return true;
-  /* Las peticiones RSC del router llevan datos de la sesión, igual que el HTML. */
-  if (peticion.headers.get('rsc') || url.searchParams.has('_rsc')) return true;
-  if (url.pathname === '/sw.js') return true;
-  return false;
-}
-
-function esRecursoPublico(url) {
-  return (
-    url.pathname.startsWith('/icons/') ||
-    url.pathname.startsWith('/fonts/') ||
-    url.pathname.startsWith('/media/') ||
-    url.pathname === '/manifest.webmanifest' ||
-    /^\/(icon|apple-icon)[^/]*\.png$/.test(url.pathname)
-  );
-}
-
 self.addEventListener('fetch', (evento) => {
   const peticion = evento.request;
   const url = new URL(peticion.url);
-  if (esIntocable(peticion, url)) return;
+  if (peticion.method !== 'GET' || url.origin !== self.location.origin) return;
 
-  if (url.pathname.startsWith('/_next/static/')) {
-    evento.respondWith(cachePrimero(peticion));
-  } else if (esRecursoPublico(url)) {
-    evento.respondWith(revalidarEnSegundoPlano(peticion, evento));
-  } else if (peticion.mode === 'navigate') {
-    evento.respondWith(redPrimero(peticion, evento));
+  if (peticion.mode === 'navigate') {
+    /* Las navegaciones van a la red; solo si falla, «Sin conexión», en la URL que se pidió
+       para que recargar la vuelva a intentar. */
+    evento.respondWith(
+      fetch(peticion).catch(async () => {
+        const guardada = await caches.match(SIN_CONEXION);
+        return (
+          guardada ||
+          new Response('Sin conexión', { status: 503, headers: { 'Content-Type': 'text/plain' } })
+        );
+      }),
+    );
+  } else if (url.pathname.startsWith('/_next/static/')) {
+    /* Red primero: la caché solo responde cuando la red falla, es decir, para pintar la
+       pantalla «Sin conexión». Con red, siempre lo de ahora. */
+    evento.respondWith(
+      fetch(peticion).catch(() => caches.match(peticion).then((r) => r || Response.error())),
+    );
   }
   /* El resto no se toca: sin `respondWith`, el navegador lo pide como siempre. */
 });
-
-async function cachePrimero(peticion) {
-  const cache = await caches.open(ESTATICOS);
-  const guardada = await cache.match(peticion);
-  if (guardada) return guardada;
-  const respuesta = await fetch(peticion);
-  if (respuesta.ok) cache.put(peticion, respuesta.clone());
-  return respuesta;
-}
-
-async function revalidarEnSegundoPlano(peticion, evento) {
-  const cache = await caches.open(RECURSOS);
-  const guardada = await cache.match(peticion);
-  const deRed = fetch(peticion)
-    .then((respuesta) => {
-      if (respuesta.ok) cache.put(peticion, respuesta.clone());
-      return respuesta;
-    })
-    .catch(() => guardada);
-  if (guardada) {
-    evento.waitUntil(deRed);
-    return guardada;
-  }
-  return deRed;
-}
-
-/**
- * Las navegaciones van a la red. Las privadas que salen bien se guardan para la
- * persona de ahora (M7); sin red se sirve su copia, y si no hay, «Sin
- * conexión», en la URL que se pidió para que recargar la vuelva a intentar.
- */
-async function redPrimero(peticion, evento) {
-  const url = new URL(peticion.url);
-  const legible = esLegible(url);
-  try {
-    const respuesta = await fetch(peticion);
-    if (
-      legible &&
-      respuesta.ok &&
-      !respuesta.redirected &&
-      (respuesta.headers.get('content-type') || '').includes('text/html')
-    ) {
-      const persona = await personaActual();
-      if (persona) {
-        evento.waitUntil(guardarPantalla(persona, url.href, respuesta.clone()));
-      }
-    }
-    return respuesta;
-  } catch {
-    if (legible) {
-      const persona = await personaActual();
-      if (persona) {
-        const guardada = await (await caches.open(PREFIJO_DATOS + persona)).match(url.href);
-        if (guardada) return guardada;
-      }
-    }
-    const sinConexion = await caches.match(SIN_CONEXION);
-    return (
-      sinConexion ||
-      new Response('Sin conexión', { status: 503, headers: { 'Content-Type': 'text/plain' } })
-    );
-  }
-}
-
-async function guardarPantalla(persona, clave, respuesta) {
-  const cache = await caches.open(PREFIJO_DATOS + persona);
-  await cache.put(clave, respuesta);
-  const claves = await cache.keys();
-  /* `keys()` sale en orden de inserción: las primeras son las más viejas. */
-  for (const vieja of claves.slice(0, Math.max(0, claves.length - MAXIMO_DE_PANTALLAS))) {
-    await cache.delete(vieja);
-  }
-}
-
-/* Push (D14): fuera de este plan, y a propósito sin `addEventListener('push')`.
-   Chrome exige enseñar una notificación por cada push; un oyente vacío haría que
-   enseñara la suya genérica. Sin suscripciones no llega ninguno. */
