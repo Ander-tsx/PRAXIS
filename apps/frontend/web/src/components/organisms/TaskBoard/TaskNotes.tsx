@@ -7,9 +7,11 @@ import {
 } from '@/app/(privado)/projects/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/projects/action-state';
 import {
+  AuthorFaces,
   type TaskComment,
   type UserProfile,
   alpha,
+  avatarHref,
   colors,
   personLabel,
   useAccion,
@@ -119,6 +121,7 @@ export function TaskNotes({
                 author={usersById.get(comment.authorId)}
                 projectId={projectId}
                 taskId={taskId}
+                mine={comment.authorId === currentUserId}
                 canEdit={comment.authorId === currentUserId}
                 canDelete={comment.authorId === currentUserId || canModerate}
               />
@@ -170,6 +173,7 @@ function NoteRow({
   author,
   projectId,
   taskId,
+  mine,
   canEdit,
   canDelete,
 }: {
@@ -177,6 +181,7 @@ function NoteRow({
   author: UserProfile | undefined;
   projectId: string;
   taskId: string;
+  mine: boolean;
   canEdit: boolean;
   canDelete: boolean;
 }) {
@@ -194,7 +199,17 @@ function NoteRow({
 
   return (
     <li className="flex flex-col gap-1.5 rounded-xl p-3" style={SECTION_PANEL}>
-      <div className="flex flex-wrap items-baseline gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {/* La foto de quien escribió, a la izquierda del nombre. Si lo escribió un agente por
+            el MCP a su nombre, la del agente va pegada: se ve qué nota es de la persona y
+            cuál la redactó su IA. */}
+        <AuthorFaces
+          label={name}
+          src={avatarHref(author?.avatarUrl, '/api/gateway')}
+          mine={mine}
+          via={comment.viaAgent}
+          verb="Escrita por"
+        />
         <span className="font-sans text-xs font-semibold text-white">{name}</span>
         <span className="font-sans text-[11px] text-white">
           {formatWhen(comment.createdAt)}

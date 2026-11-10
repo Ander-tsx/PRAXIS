@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ClientsModule } from '@nestjs/microservices';
 import { clienteDeServicio } from '@praxis/local-transport';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
+import { AgentActionsInterceptor } from './agent-actions.interceptor';
+import { AgentEditorsController } from './agent-editors.controller';
 import { KylooInternalController } from './kyloo-internal.controller';
 import { KylooOAuthService } from './kyloo-oauth.service';
 import { McpAccessService } from './mcp-access.service';
@@ -34,7 +37,14 @@ import { PersonalTokensController } from './personal-tokens.controller';
     PersonalTokensController,
     McpConnectionsController,
     KylooInternalController,
+    AgentEditorsController,
   ],
-  providers: [McpAccessService, McpService, KylooOAuthService],
+  providers: [
+    McpAccessService,
+    McpService,
+    KylooOAuthService,
+    /* La coautoría: anota toda escritura hecha por un agente (ver el interceptor). */
+    { provide: APP_INTERCEPTOR, useClass: AgentActionsInterceptor },
+  ],
 })
 export class McpModule {}

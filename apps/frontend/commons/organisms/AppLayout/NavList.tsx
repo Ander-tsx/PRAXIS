@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { colors } from '../../tokens';
-import type { AppNavItem } from './navigation';
 import {
   RAIL_ACTIVA,
   RAIL_CELDA,
@@ -14,6 +13,7 @@ import {
   SIDEBAR_INICIO,
   SidebarSection,
 } from './SidebarPrimitives';
+import type { AppNavItem } from './navigation';
 
 /**
  * ⚠️ **Aviso de React en desarrollo, sin resolver: «Each child in a list should

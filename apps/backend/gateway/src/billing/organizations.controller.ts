@@ -46,6 +46,7 @@ import {
   PlanTier,
   ProjectRoleTemplateBodyDto,
   RenameOrganizationBodyDto,
+  SetAgentAttributionBodyDto,
   SetOrganizationIntegrationsBodyDto,
   TransferOrganizationBodyDto,
 } from '@praxis/contracts';
@@ -277,6 +278,29 @@ export class OrganizationsController {
         this.billingClient.send<OrganizationView>(
           { cmd: 'billing_org_set_mcp' },
           { organizationId, userId: req.user!.userId, mcpAllowed: body.mcpAllowed },
+        ),
+      ),
+    );
+  }
+
+  /**
+   * Enciende o apaga la coautoría de los agentes de IA: con ella, lo que se hace por
+   * MCP se marca en la tarea, en el checklist y en las notas. Misma puerta que
+   * `integrations` (`canManageOrganization`). Apagada por defecto.
+   */
+  @Patch('agent-attribution')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Activa o no la coautoría de los agentes de IA' })
+  async atribucionDeAgentes(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Body() body: SetAgentAttributionBodyDto,
+  ) {
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send<OrganizationView>(
+          { cmd: 'billing_org_set_agent_attribution' },
+          { organizationId, userId: req.user!.userId, agentAttribution: body.agentAttribution },
         ),
       ),
     );

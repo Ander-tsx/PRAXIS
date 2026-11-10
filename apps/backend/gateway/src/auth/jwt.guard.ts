@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { asAgentKind } from '@praxis/contracts';
 import { Request } from 'express';
 
 /**
@@ -53,6 +54,20 @@ export class JwtGuard implements CanActivate {
 
       request.user = {
         userId: payload.sub,
+        /* La marca de coautoría del MCP. Solo existe si la firmó credentials (una sesión
+           normal no la trae) **y** la organización la tiene encendida: eso lo dice la
+           cabecera que pone el MCP en su llamada interna. Una persona que mandara la
+           cabecera a mano no consigue nada: sin la marca firmada no hay a quién anotar. */
+        ...(payload.via === 'mcp' && request.headers['x-praxis-agent-attribution'] === 'on'
+          ? {
+              agent: {
+                via: 'mcp' as const,
+                agentId: String(payload.agentId ?? ''),
+                agentName: String(payload.agentName ?? 'Agente de IA'),
+                agentKind: asAgentKind(payload.agentKind),
+              },
+            }
+          : {}),
       };
       return true;
     } catch {

@@ -699,6 +699,21 @@ export interface TaskAssignee {
  * `editedAt` es `null` mientras no se haya tocado el texto: solo se marca
  * cuando cambia de verdad, no cada vez que la fila se actualiza.
  */
+/**
+ * Qué agente de IA hizo algo por el MCP a nombre de una persona. Espejo de
+ * `AgentKind` en `@praxis/contracts`; el nombre del agente es descriptivo y
+ * lo que decide la insignia es este tipo.
+ */
+export type AgentKind = 'claude' | 'chatgpt' | 'ai';
+
+/** Un agente que editó una tarea, con la persona a cuyo nombre actuó. */
+export interface TaskAgentEditor {
+  userId: string;
+  agentKind: AgentKind;
+  agentName: string;
+  lastAt: string;
+}
+
 export interface TaskComment {
   id: string;
   taskId: string;
@@ -706,6 +721,8 @@ export interface TaskComment {
   body: string;
   createdAt: string;
   editedAt: string | null;
+  /** Si la nota la escribió un agente por el MCP a nombre de `authorId`. */
+  viaAgent?: AgentKind | null;
 }
 
 /** Tope por archivo, espejo de `ATTACHMENT_MAX_BYTES` en el backend. */
@@ -800,6 +817,10 @@ export interface ChecklistItem {
   text: string;
   completed: boolean;
   order: number;
+  /** Quién lo marcó. `null` si está sin marcar o se marcó antes de que se registrara. */
+  completedById?: string | null;
+  /** Si lo marcó un agente por el MCP a nombre de `completedById`. */
+  completedVia?: AgentKind | null;
 }
 
 /**

@@ -437,6 +437,7 @@ export class OrganizationsService {
       color: string | null;
       imageUrl?: string | null;
       mcpAllowed?: boolean;
+      agentAttribution?: boolean;
       createdAt: Date;
       subscription: { tier: string; status: string; seats: number } | null;
       _count?: { members: number };
@@ -475,6 +476,7 @@ export class OrganizationsService {
       color: organizacion.color,
       imageUrl: organizacion.imageUrl ?? null,
       mcpAllowed: organizacion.mcpAllowed ?? true,
+      agentAttribution: organizacion.agentAttribution ?? false,
       createdAt: organizacion.createdAt.toISOString(),
     };
   }
@@ -724,15 +726,58 @@ export class OrganizationsService {
   }
 
   /**
+   * Enciende o apaga la coautoría de los agentes de IA (se marca lo que hacen por MCP).
+   * **Solo el dueño** de la organización (ver abajo), no cualquiera que pueda gestionarla.
+   */
+  async permitirAtribucion(organizationId: string, userId: string, agentAttribution: boolean) {
+    const permiso = await this.exigirPermiso(
+      organizationId,
+      userId,
+      OrganizationPermission.CAN_MANAGE_ORGANIZATION,
+    );
+    if (esFallo(permiso)) return permiso;
+
+    /* Solo la persona dueña: un papel con `canManageOrganization` no basta. Es una decisión
+       sobre qué se marca de todo el equipo, y ser dueño no es un papel (se mira `ownerUserId`). */
+    const dueno = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { ownerUserId: true },
+    });
+    if (dueno?.ownerUserId !== userId) {
+      return {
+        error: 'Solo quien es dueño de la organización puede cambiar esto.',
+        codigo: 'SIN_PERMISO',
+      } as Fallo;
+    }
+
+    const organizacion = await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { agentAttribution },
+      include: { subscription: true, _count: { select: { members: true } } },
+    });
+    await this.olvidar(organizationId, userId);
+    await this.registrar(organizationId, 'atribucion_de_agentes', { agentAttribution, userId });
+    return this.vista(
+      organizacion,
+      { role: { name: permiso.roleName ?? '', permissions: permiso.permisos } },
+      userId,
+    );
+  }
+
+  /**
    * Lo que necesita saber el MCP en cada llamada: si esa persona sigue dentro
    * y si la organización lo permite. Una sola consulta.
    */
   async accesoMcp(organizationId: string, userId: string) {
     const membresia = await this.prisma.organizationMember.findFirst({
       where: { organizationId, userId, status: MembershipStatus.ACTIVE },
-      select: { organization: { select: { mcpAllowed: true } } },
+      select: { organization: { select: { mcpAllowed: true, agentAttribution: true } } },
     });
-    return { miembro: membresia !== null, mcpAllowed: membresia?.organization.mcpAllowed ?? false };
+    return {
+      miembro: membresia !== null,
+      mcpAllowed: membresia?.organization.mcpAllowed ?? false,
+      agentAttribution: membresia?.organization.agentAttribution ?? false,
+    };
   }
 
   async renombrar(

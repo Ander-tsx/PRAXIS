@@ -10,6 +10,7 @@ import type {
   CheckStepsProposal,
   ChecklistProposal,
   CommentProposal,
+  DeleteBatchProposal,
   DeleteProposal,
   DocumentProposal,
   DocumentRevisionProposal,
@@ -23,10 +24,9 @@ import type {
   QuestionProposal,
   SprintProposal,
   StartSprintProposal,
+  TaskBatchProposal,
   TaskProposal,
   TemplateProposal,
-  TaskBatchProposal,
-  DeleteBatchProposal,
 } from '../../api/assistant';
 import { claveDeRevisionDePrax } from '../../api/assistant';
 import {
@@ -47,6 +47,7 @@ import {
   aceptarEdicionAction,
   aceptarEstadoAutomatizacionAction,
   aceptarInicioSprintAction,
+  aceptarLoteDeTareasAction,
   aceptarMarcarPasosAction,
   aceptarMensajeAction,
   aceptarMensajePrivadoAction,
@@ -55,7 +56,6 @@ import {
   aceptarPlantillaAction,
   aceptarSprintAction,
   aceptarTableroAction,
-  aceptarLoteDeTareasAction,
   aceptarTareaAction,
   resolverPropuestaAction,
 } from '../../assistant/actions';

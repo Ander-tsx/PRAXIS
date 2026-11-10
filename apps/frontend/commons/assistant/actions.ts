@@ -2,17 +2,18 @@
 
 import type {
   AssignmentProposal,
-  AutomationProposal,
-  AutomationStateProposal,
   AssistantChatResult,
   AssistantQuota,
+  AutomationProposal,
+  AutomationStateProposal,
   BoardProposal,
   CheckStepsProposal,
   ChecklistProposal,
   CommentProposal,
   ConversationSummary,
-  DocumentProposal,
+  DeleteBatchProposal,
   DeleteProposal,
+  DocumentProposal,
   EditProposal,
   FullConversation,
   MoveProposal,
@@ -21,7 +22,6 @@ import type {
   SprintProposal,
   StartSprintProposal,
   TaskBatchProposal,
-  DeleteBatchProposal,
   TaskProposal,
 } from '../api/assistant';
 import type {

@@ -1,5 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
+import { McpActionsService, type RegistrarAccion } from './mcp-actions.service';
 import { McpConnectionsService } from './mcp-connections.service';
 import { PersonalTokensService } from './personal-tokens.service';
 
@@ -15,7 +16,19 @@ export class PersonalTokensController {
   constructor(
     private readonly tokens: PersonalTokensService,
     private readonly conexiones: McpConnectionsService,
+    private readonly acciones: McpActionsService,
   ) {}
+
+  /** Anota una escritura hecha por un agente. La llama el gateway tras cada una que sale bien. */
+  @MessagePattern({ cmd: 'mcp_action_record' })
+  registrarAccion(@Payload() dto: RegistrarAccion) {
+    return this.acciones.registrar(dto);
+  }
+
+  @MessagePattern({ cmd: 'mcp_task_editors' })
+  editoresDeTarea(@Payload() dto: { taskId: string }) {
+    return this.acciones.editoresDeTarea(dto.taskId);
+  }
 
   @MessagePattern({ cmd: 'pat_create' })
   crear(

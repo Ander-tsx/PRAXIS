@@ -165,3 +165,33 @@ export async function revocarConexionAction(
     };
   }
 }
+
+/**
+ * Enciende o apaga la coautoría de los agentes de IA en la organización activa: con ella,
+ * lo que se hace por MCP se marca en la tarea, el checklist y las notas.
+ */
+export async function permitirAtribucionAction(
+  _prev: NotificationState,
+  formData: FormData,
+): Promise<NotificationState> {
+  if (!(await getSession())) return { error: SESION_CADUCADA, done: null };
+
+  const organizationId = String(formData.get('organizationId') ?? '');
+  const agentAttribution = formData.get('agentAttribution') === 'true';
+  try {
+    const organizacion = await createServerApiClient().patch<OrganizationView>(
+      `/organizations/${organizationId}/agent-attribution`,
+      { agentAttribution },
+    );
+    if (organizacion?.agentAttribution !== agentAttribution) {
+      return { error: 'El servidor no guardó el cambio.', done: null };
+    }
+    revalidatePath('/main/integrations');
+    return { error: null, done: String(agentAttribution) };
+  } catch (error) {
+    return {
+      error: error instanceof ApiError ? error.message : 'No se pudo cambiar el ajuste.',
+      done: null,
+    };
+  }
+}

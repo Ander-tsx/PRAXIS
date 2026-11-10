@@ -8,17 +8,22 @@ import {
 } from '@/app/(privado)/projects/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/projects/action-state';
 import {
+  type AgentKind,
+  AuthorFaces,
   Input,
   ProgressBar,
   type Task,
+  type UserProfile,
   alpha,
+  avatarHref,
   checklistProgress,
   colors,
+  personLabel,
   useAccion,
   useEsMovil,
 } from '@praxis/commons';
 import { Pencil, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   SECTION_BODY_CLASS,
   SECTION_CLASS,
@@ -39,6 +44,9 @@ export interface TaskChecklistProps {
    * un checklist de solo lectura sobre su propia tarea.
    */
   canToggle: boolean;
+  /** Para poner cara a quien marcó cada paso. */
+  usersById: Map<string, UserProfile>;
+  currentUserId: string;
 }
 
 /**
@@ -53,7 +61,14 @@ export interface TaskChecklistProps {
  * `pending` de cada uno es suyo: con una sola acción compartida, marcar un ítem
  * dejaba en estado de espera a toda la lista.
  */
-export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskChecklistProps) {
+export function TaskChecklist({
+  projectId,
+  task,
+  canEdit,
+  canToggle,
+  usersById,
+  currentUserId,
+}: TaskChecklistProps) {
   const { done, total } = checklistProgress(task);
   const [addState, addAction, adding] = useAccion(addChecklistItemAction, TASK_INITIAL_STATE);
   const addFormRef = useRef<HTMLFormElement>(null);
@@ -112,6 +127,15 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
                 completed={item.completed}
                 canEdit={canEdit}
                 canToggle={canToggle}
+                completedBy={
+                  item.completed && item.completedById
+                    ? {
+                        user: usersById.get(item.completedById),
+                        mine: item.completedById === currentUserId,
+                        via: item.completedVia ?? null,
+                      }
+                    : null
+                }
               />
             ))}
           </ul>
@@ -166,6 +190,7 @@ function ChecklistRow({
   completed,
   canEdit,
   canToggle,
+  completedBy,
 }: {
   projectId: string;
   taskId: string;
@@ -174,6 +199,8 @@ function ChecklistRow({
   completed: boolean;
   canEdit: boolean;
   canToggle: boolean;
+  /** Quién lo marcó; `null` si no se sabe (sin marcar, o marcado antes del registro). */
+  completedBy: { user: UserProfile | undefined; mine: boolean; via: AgentKind | null } | null;
 }) {
   const [toggleState, toggleAction, toggling] = useAccion(
     toggleChecklistItemAction,
@@ -192,6 +219,45 @@ function ChecklistRow({
   const [editando, setEditando] = useState(false);
   const [borrador, setBorrador] = useState(text);
   const error = toggleState.error ?? deleteState.error ?? updateState.error;
+
+  /**
+   * ¿El texto ocupa más de una línea? Decide dónde van las caras de quien lo marcó.
+   *
+   * Con una línea no hay hueco bajo los iconos de editar y eliminar, y ponerlas debajo
+   * estiraría la fila; se quedan a la izquierda de los iconos, en su misma línea. Con
+   * varias, el hueco existe y ahí caben, bajo los iconos y sin tocar el alto de la fila.
+   * Se mide y no se adivina por la longitud: el ancho del panel y el tamaño de letra
+   * cambian cuántos caracteres caben.
+   */
+  const textoRef = useRef<HTMLSpanElement>(null);
+  const [variasLineas, setVariasLineas] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: hay que volver a medir al cambiar el texto o salir de la edición
+  useLayoutEffect(() => {
+    const el = textoRef.current;
+    if (!el) return;
+    const medir = () => {
+      const estilo = getComputedStyle(el);
+      const linea = Number.parseFloat(estilo.lineHeight) || 18;
+      const relleno =
+        Number.parseFloat(estilo.paddingTop) + Number.parseFloat(estilo.paddingBottom);
+      setVariasLineas((el.getBoundingClientRect().height - relleno) / linea > 1.5);
+    };
+    medir();
+    const observador = new ResizeObserver(medir);
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, [text, editando]);
+
+  const caras = completedBy && (
+    <AuthorFaces
+      size="xs"
+      label={completedBy.user ? personLabel(completedBy.user) : 'Alguien del equipo'}
+      src={avatarHref(completedBy.user?.avatarUrl, '/api/gateway')}
+      mine={completedBy.mine}
+      via={completedBy.via}
+      verb="Marcado por"
+    />
+  );
 
   /* Al desmontarse el campo el navegador puede disparar un `blur` tardío con el cierre de antes:
      sin esto, Enter guardaba dos veces y Escape —que cancela— acababa guardando. */
@@ -299,6 +365,7 @@ function ChecklistRow({
         ) : (
           // biome-ignore lint/a11y/useKeyWithClickEvents: ampliar la zona de toque en móvil; con teclado se marca con el botón de al lado, que ya es accesible
           <span
+            ref={textoRef}
             onDoubleClick={canEdit ? empezarAEditar : undefined}
             /* En móvil el paso entero es la zona de toque —no solo el cuadradito de 18 px—, con
                el alto de un dedo. En escritorio el texto no marca: el doble clic lo edita. */
@@ -318,37 +385,56 @@ function ChecklistRow({
         )}
       </form>
 
-      {canEdit && !editando && (
-        <button
-          type="button"
-          onClick={empezarAEditar}
-          disabled={updating}
-          aria-label={`Editar «${text}»`}
-          title="Editar"
-          className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-white opacity-0 transition-opacity hover:bg-white/10 hover:text-primary focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed [@media(hover:none)]:opacity-60"
-        >
-          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
-      )}
+      {/* A la derecha, en una columna: los iconos arriba y, si el texto es de varias líneas,
+          las caras de quien lo marcó debajo, en el hueco que dejan. */}
+      {/* ⚠️ Ancho **fijo**: si las caras cambiaran el ancho del bloque según vayan al lado o
+          debajo, el texto tendría más o menos sitio, cambiaría de una a dos líneas, y eso
+          volvería a moverlas: un bucle que no termina. Reservar el ancho de los dos casos
+          lo corta de raíz. */}
+      <div
+        className="flex shrink-0 flex-col items-end gap-1"
+        style={{
+          minWidth:
+            (canEdit ? 52 : 0) +
+            (completedBy ? (completedBy.via ? 36 : 20) + (canEdit ? 4 : 0) : 0),
+        }}
+      >
+        <div className="flex items-center gap-0.5">
+          {canEdit && !editando && (
+            <button
+              type="button"
+              onClick={empezarAEditar}
+              disabled={updating}
+              aria-label={`Editar «${text}»`}
+              title="Editar"
+              className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded text-white opacity-0 transition-opacity hover:bg-white/10 hover:text-primary focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed [@media(hover:none)]:opacity-60"
+            >
+              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          )}
 
-      {canEdit && (
-        <form action={deleteAction} className="shrink-0">
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="taskId" value={taskId} />
-          <input type="hidden" name="itemId" value={itemId} />
-          <button
-            type="submit"
-            disabled={deleting}
-            aria-label={`Eliminar «${text}»`}
-            title="Eliminar"
-            /* Aparece al pasar por encima, pero con foco también: si no, con
-               teclado sería invisible e inalcanzable. */
-            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-white opacity-0 transition-opacity hover:bg-white/10 hover:text-error focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed [@media(hover:none)]:opacity-60"
-          >
-            <X className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-        </form>
-      )}
+          {canEdit && (
+            <form action={deleteAction} className="shrink-0">
+              <input type="hidden" name="projectId" value={projectId} />
+              <input type="hidden" name="taskId" value={taskId} />
+              <input type="hidden" name="itemId" value={itemId} />
+              <button
+                type="submit"
+                disabled={deleting}
+                aria-label={`Eliminar «${text}»`}
+                title="Eliminar"
+                /* Aparece al pasar por encima, pero con foco también: si no, con
+                 teclado sería invisible e inalcanzable. */
+                className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-white opacity-0 transition-opacity hover:bg-white/10 hover:text-error focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed [@media(hover:none)]:opacity-60"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </form>
+          )}
+          {!variasLineas && caras && <span className="ml-1">{caras}</span>}
+        </div>
+        {variasLineas && caras && <span>{caras}</span>}
+      </div>
 
       {error && (
         <span role="alert" className="font-sans text-[11px]" style={{ color: colors.error }}>

@@ -22,6 +22,7 @@ import {
 import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { DescripcionMarkdown } from './DescripcionMarkdown';
 import { GestorDeEtiquetas } from './GestorDeEtiquetas';
+import { TaskAgentLabel } from './TaskAgentLabel';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
 import { TaskDocuments } from './TaskDocuments';
@@ -312,6 +313,10 @@ export function TaskDialog({
          la tarea y cuándo nació, y con el botón de cerrar. */
       description={
         <span className="flex flex-wrap items-center gap-2">
+          {/* Hasta arriba: si un agente de IA (Claude, ChatGPT…) la ha editado por MCP. */}
+          <span className="flex w-full min-w-0">
+            <TaskAgentLabel taskId={task.id} version={task.updatedAt} usersById={usersById} />
+          </span>
           <span className="rounded-full bg-white/[0.08] px-2 py-0.5 font-sans text-[11px] text-white">
             {planificacion?.enBacklog ? 'Backlog' : columnName}
           </span>
@@ -529,6 +534,8 @@ export function TaskDialog({
           task={task}
           canEdit={canEdit}
           canToggle={canToggleChecklist}
+          usersById={usersById}
+          currentUserId={currentUserId}
         />
         {/* Los documentos del proyecto son la forma principal de dar contexto a
           una tarea (E9 de `docs/PLAN-DOCUMENTOS.md`). Debajo, los archivos:

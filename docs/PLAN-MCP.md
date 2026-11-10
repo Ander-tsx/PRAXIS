@@ -50,8 +50,10 @@ con el token del usuario *es* el usuario usando su propia herramienta, igual que
 un script con `curl`. No se le aplica el invariante de PRAX, ni se le inventa uno
 equivalente.
 
-🚫 Tampoco se marca en el producto que algo «vino del MCP»: ni
-`ChatMessage.origin`, ni insignias, ni un campo nuevo en las tareas. Una acción
+🚫 ~~Tampoco se marca en el producto que algo «vino del MCP».~~ **Revertido el
+2026-11-10 por decisión del dueño** (ver «Coautoría de agentes» al final): ahora
+se marca, pero **solo si la organización lo enciende** (apagado por defecto).
+Lo que sigue sin existir: `ChatMessage.origin` para el MCP. Una acción
 hecha por token MCP es una acción de esa persona, y se ve como tal. El único
 rastro que se guarda es el técnico de la seguridad —cuándo se usó cada token por
 última vez (M3)— y no se enseña en las pantallas de negocio.
@@ -497,3 +499,41 @@ enlaces de una tarea. **55 herramientas.**
 **2026-10-11**: `update_checklist_item` (write): cambia el texto de un punto del checklist
 (`PATCH /tasks/:taskId/checklists/:id`, `canEditTask`; marcar sigue siendo `toggle_checklist_item`).
 **56 herramientas.**
+
+
+---
+
+## Coautoría de agentes (2026-11-10, rama `feature/agente-coautor`)
+
+Lo que un agente (Claude, ChatGPT…) hace por MCP a nombre de alguien **se marca**,
+como el `Co-Authored-By` de GitHub. **Apagado por defecto**: lo enciende **solo
+quien es dueño** (`ownerUserId`; ni siquiera `canManageOrganization` basta) en `Integraciones` (`Organization.agentAttribution`,
+`PATCH /organizations/:id/agent-attribution`). Apagarlo deja de anotar lo nuevo;
+lo ya marcado queda como historial.
+
+**Cómo se garantiza que no se puede saltar por MCP**
+- `credentials` firma en el JWT del canje `via: 'mcp'`, `agentId`, `agentName` y
+  `agentKind` (`claude` | `chatgpt` | `ai`, por el nombre de la conexión). Ese JWT no
+  sale del gateway. Vale para tokens ya existentes: se firma en cada canje.
+- `JwtGuard` solo acepta la marca si **además** la llamada interna trae
+  `x-praxis-agent-attribution: on`, que pone `McpService.api` cuando la organización
+  lo tiene encendido. Quien mande esa cabecera a mano no consigue nada: sin la marca
+  firmada no hay a quién anotar.
+- `AgentActionsInterceptor` (global) anota **toda escritura que sale bien** en
+  `credentials.mcp_actions`, sin lista por herramienta: una herramienta nueva queda
+  cubierta sola. Se espera al registro antes de responder.
+- ⚠️ **No es a prueba de quien use la API REST con su propia sesión** (como el
+  trailer de git: se fuerza en el canal MCP, no en cualquier canal), ni de un
+  agente que maneje el navegador. El **nombre** del agente es descriptivo (en un
+  token personal lo escribe la persona); la marca dura es `via`.
+
+**Dónde se ve**
+- Tarea: etiqueta arriba del panel, «Editado por Claude y Sofía» (`TaskAgentLabel`,
+  `GET /tasks/:taskId/agent-editors`); dos nombres como mucho y «y N más»; pulsarla
+  abre la lista. Solo la tarea en sí, **no** checklist ni notas.
+- Checklist: `Checklist.completedById/completedAt/completedVia`; la cara de quien
+  marcó, y persona + agente si fue por MCP. Con una línea, al lado de los iconos; con
+  varias, debajo. 🔴 El bloque tiene **ancho fijo**: si cambiara con la posición, el
+  texto cambiaría de una a dos líneas y las caras se moverían en bucle.
+- Notas: `TaskComment.viaAgent`; la cara va a la izquierda del nombre. Editarla a
+  mano limpia `viaAgent`.

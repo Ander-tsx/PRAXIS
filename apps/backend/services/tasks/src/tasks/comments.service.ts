@@ -40,7 +40,12 @@ export class CommentsService {
     const task = await this.assertTaskInProject(dto.taskId, dto.projectId);
 
     const comment = await this.prisma.taskComment.create({
-      data: { taskId: dto.taskId, authorId: dto.requesterId, body: dto.body },
+      data: {
+        taskId: dto.taskId,
+        authorId: dto.requesterId,
+        body: dto.body,
+        viaAgent: dto.via ?? null,
+      },
     });
 
     await this.invalidate(dto.taskId, task.boardId);
@@ -66,7 +71,7 @@ export class CommentsService {
     const updated = await this.prisma.taskComment.update({
       where: { id: dto.id },
       // `editedAt` solo se marca aquí, que es cuando cambia de verdad el texto.
-      data: { body: dto.body, editedAt: new Date() },
+      data: { body: dto.body, editedAt: new Date(), viaAgent: null },
     });
 
     await this.invalidate(comment.taskId, comment.task.boardId);

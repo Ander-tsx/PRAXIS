@@ -1,6 +1,6 @@
 import { alpha, colors } from '../../tokens';
-import { type GlyphDef, glyphByKey } from './glyphs';
 import { IdentityImage } from './IdentityImage';
+import { type GlyphDef, glyphByKey } from './glyphs';
 
 export interface GlyphProps {
   /** La `key` guardada (`Project.iconKey` / `Organization.iconKey`). */

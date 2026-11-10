@@ -19,9 +19,11 @@ import { alpha, colors } from '../../tokens';
  * regla, y deja de poder divergir.
  */
 
-export type AvatarSize = 'sm' | 'base' | 'md' | 'lg' | 'xl';
+export type AvatarSize = 'xs' | 'sm' | 'base' | 'md' | 'lg' | 'xl';
 
 const SIZES: Record<AvatarSize, string> = {
+  /** El de una fila apretada: quién marcó cada paso de un checklist. */
+  xs: 'h-5 w-5 text-[8px]',
   /** El del tablero: cabe cuatro veces en una tarjeta sin ahogarla. */
   sm: 'h-6 w-6 text-[10px]',
   /** Tamaño intermedio para destacar más en las tarjetas. */
@@ -48,6 +50,7 @@ const SIZES: Record<AvatarSize, string> = {
  * cerrado y hay que meterse menos hacia dentro para caer sobre el borde.
  */
 const PRESENCE_DOT: Record<AvatarSize, string> = {
+  xs: 'bottom-[-1px] right-[-1px] h-1.5 w-1.5',
   sm: 'bottom-[-1px] right-[-1px] h-2 w-2',
   base: 'bottom-[-1px] right-[-1px] h-2.5 w-2.5',
   md: 'bottom-0 right-0 h-3 w-3',

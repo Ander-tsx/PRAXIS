@@ -211,6 +211,15 @@ model Checklist {
   completed Boolean @default(false)
   order     Int     @default(0)
 
+  /// Quién lo marcó y cuándo. Se limpian al desmarcar. Las filas anteriores a esta
+  /// columna quedan en `NULL`: no se puede reconstruir quién las marcó.
+  completedById String?
+  completedAt   DateTime?
+  /// `claude` | `chatgpt` | `ai` si lo marcó un agente por el MCP **a nombre de**
+  /// `completedById`; `NULL` si lo marcó la propia persona. La marca la firma el
+  /// servidor (JWT del canje del MCP), nunca el cuerpo de la petición.
+  completedVia  String?
+
   @@schema("tasks")
   @@map("checklists")
 }
@@ -275,6 +284,9 @@ model TaskComment {
   body      String
   createdAt DateTime  @default(now())
   editedAt  DateTime?
+  /// `claude` | `chatgpt` | `ai` si lo escribió un agente por el MCP a nombre de
+  /// `authorId`. Editarlo a mano lo limpia: ya no es solo del agente.
+  viaAgent  String?
 
   /// El listado siempre va por tarea y en orden cronológico.
   @@index([taskId, createdAt])

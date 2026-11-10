@@ -1,4 +1,4 @@
-import { forwardRef, type SelectHTMLAttributes } from 'react';
+import { type SelectHTMLAttributes, forwardRef } from 'react';
 
 export interface FloatingLabelSelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label: string;
