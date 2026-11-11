@@ -1,5 +1,7 @@
 # OAuth con Kyloo Accounts: puesta en producción
 
+> 🕰️ **Histórico.** Kyloo Accounts dejó Railway el 2026-11-08: hoy corre en una EC2 de AWS desde el repositorio `Kyloo-OAuth` (mismo emisor, `accounts.kyloo.com.mx`; Praxis no cambió). Los comandos de `railway` sobre `kyloo-auth-*` ya no aplican.
+
 > 🕰️ **Historia de la primera puesta.** El secreto compartido, `/organizacion` y `legacy-login` de
 > aquí se sustituyeron: ver [KYLOO-PRODUCTO-GENERICO](KYLOO-PRODUCTO-GENERICO.md).
 

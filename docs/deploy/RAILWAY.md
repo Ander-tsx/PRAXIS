@@ -5,7 +5,13 @@ que queda como legado. El coste baja de ~$130-160/mes a ~$5-20/mes.
 
 ## La forma
 
-Dos contenedores, un Postgres, un Redis. Nada más.
+Dos contenedores, un Postgres, un Redis. Más, desde el 2026-10-14, **`praxis-push-cron`**: un
+servicio de Railway programado (`0 6,18 * * *`) que llama a `POST /api/internal/push/vencimientos`
+([PUSH-PRODUCCION](PUSH-PRODUCCION.md)). Se retira (PR #48): ver [PLAN-AWS](../PLAN-AWS.md).
+
+> ⚠️ Medido el 2026-11-09: `api` ≈ 260 MB recién arrancado y ≈ 600 MB tras una semana (tope de heap
+> `--max-old-space-size=512`: V8 usa el margen que se le da; se estabiliza, no es un leak). `web` ≈ 165 MB,
+> Postgres ≈ 170 MB (base de 104 MB, de los que 82 MB son adjuntos), Redis ≈ 36 MB.
 
 | Servicio Railway | Qué corre dentro | Imagen | Puerto público |
 |---|---|---|---|

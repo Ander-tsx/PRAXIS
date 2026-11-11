@@ -35,6 +35,8 @@ bajar la base.
 **El objetivo: un solo proceso Node, ~200-300 MB, y `praxis-api` de ~$9 a
 ~$2-3 al mes.**
 
+> 📏 **Medido después (2026-11-09):** `praxis-api` arranca en ~260 MB, pero tras una semana de uso llega a ~600 MB y ahí se queda (el heap tiene tope `--max-old-space-size=512`). No es un leak sin fondo; es V8 usando el margen. Bajar el tope a ~320 MB es el ajuste que falta. Ver [PLAN-AWS](PLAN-AWS.md).
+
 Es la misma conclusión que la de [PLAN-FUSION-ZONAS](PLAN-FUSION-ZONAS.md) en el
 frontend: el reparto en procesos se paga entero y no da ningún beneficio,
 porque ya corrían todos en **un solo contenedor**.
