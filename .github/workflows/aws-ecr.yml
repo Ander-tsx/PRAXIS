@@ -1,0 +1,96 @@
+# Construye las imágenes del backend y del frontend y las sube a ECR (AWS).
+#
+# Es el equivalente de infra/ci/cloudbuild-main.yaml para la pila de
+# infra/aws/. Producción sigue en Railway y NO usa este workflow.
+#
+# Solo se lanza a mano (Actions → «Imágenes a ECR (AWS)» → Run workflow): no hay
+# disparador por push. Una pila AWS que no esté desplegada no tiene dónde
+# autenticarse, y un workflow que falla en cada merge a main es ruido que
+# acaba ignorándose. Cuando la pila sea la de producción, basta añadir
+# `push: branches: [main]` aquí.
+#
+# Autenticación por OIDC, sin claves: el rol lo crea `infra/aws/ci.tf` y solo
+# acepta tokens de este repositorio y de la rama de `rama_github_despliegue`.
+# Hay que definir tres VARIABLES del repositorio (no secretos: ninguna lo es):
+#
+#   AWS_ROLE_ARN   → el output `rol_github_ecr` de Terraform
+#   AWS_REGION     → la región de la pila, p. ej. us-east-1
+#   GOOGLE_CLIENT_ID → opcional; se incrusta en el bundle del frontend
+#
+# Este workflow solo SUBE las imágenes. Para que las máquinas las usen hay que
+# reemplazarlas (instance refresh): ver infra/aws/README.md. A propósito no lo
+# hace él, igual que el rol no tiene permisos sobre el autoescalado: un build
+# comprometido no debe poder cambiar la infraestructura.
+
+name: Imágenes a ECR (AWS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      prefijo:
+        description: "Prefijo de la pila (el `prefijo` de Terraform)"
+        default: praxis
+        required: true
+
+# `id-token: write` es lo que permite pedir el token OIDC; el resto, lo mínimo.
+permissions:
+  id-token: write
+  contents: read
+
+# Dos construcciones a la vez pisarían la etiqueta `latest` la una a la otra.
+concurrency:
+  group: aws-ecr
+  cancel-in-progress: false
+
+jobs:
+  imagenes:
+    runs-on: ubuntu-latest
+    # Compilar las apps de Next y de Nest tarda; el mismo margen que Cloud Build.
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Credenciales de AWS por OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Entrar en ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Los dos Dockerfiles necesitan BuildKit (`RUN --mount=type=cache`,
+      # `COPY --chmod`): buildx lo trae.
+      - uses: docker/setup-buildx-action@v3
+
+      # Las máquinas son x86-64. Un runner de GitHub también, pero se dice en
+      # claro: si algún día el runner es arm64, la imagen saldría inservible.
+      - name: Backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/images/backend.Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ inputs.prefijo }}/backend:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/${{ inputs.prefijo }}/backend:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+      - name: Frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/images/frontend.Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/${{ inputs.prefijo }}/frontend:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/${{ inputs.prefijo }}/frontend:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
