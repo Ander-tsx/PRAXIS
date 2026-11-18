@@ -47,7 +47,7 @@ provider "aws" {
      qué quedó vivo después de una prueba. */
   default_tags {
     tags = {
-      Proyecto    = var.prefijo
+      Proyecto   = var.prefijo
       Gestionado = "terraform"
     }
   }
