@@ -1,5 +1,11 @@
 # Despliegue
 
+> **Producción corre en Railway** ([`docs/deploy/RAILWAY.md`](deploy/RAILWAY.md)).
+> Lo que sigue describe la pila de **Google Cloud**, que quedó como alternativa.
+> Existe además una pila equivalente para **AWS** en
+> [`infra/aws/`](../infra/aws/README.md), también alternativa y **sin desplegar
+> todavía** (validada con `validate`, `tflint` y `trivy`, sin `plan` ni `apply`).
+
 Qué hay montado en Google Cloud, qué se despliega solo y qué sigue siendo a
 mano. Lo que **no** está aquí es cómo se construyó la infraestructura: eso vive
 en `infra/terraform/` y se aplica desde tu portátil.
