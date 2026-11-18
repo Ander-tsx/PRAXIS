@@ -1,0 +1,41 @@
+# Copia este archivo como `terraform.tfvars` y rellena lo tuyo.
+#
+# ⚠️ `terraform.tfvars` NO se versiona: lleva claves de terceros.
+
+region  = "us-east-1"
+prefijo = "praxis"
+
+# ───────────────────────────── red ─────────────────────────────
+rango_vpc            = "10.10.0.0/16"
+nat_por_zona         = false # true = un NAT por zona (+33 USD/mes), para producción
+cidrs_permitidos_alb = ["0.0.0.0/0"]
+
+# ──────────────────────── máquinas y escalado ────────────────────────
+tipo_instancia_backend  = "t3.medium"
+tipo_instancia_frontend = "t3.medium"
+minimo_instancias       = 1
+maximo_instancias       = 3
+objetivo_cpu            = 60
+
+# ───────────────────────────── datos ─────────────────────────────
+clase_rds             = "db.t4g.micro"
+rds_multi_az          = false
+borrado_protegido_rds = true # ponlo en false y aplica ANTES de un destroy de prueba
+clase_redis           = "cache.t4g.micro"
+
+# ───────────────────────────── dominio ─────────────────────────────
+# Vacío = solo HTTP, para demostrar la infraestructura. Con HTTP no se puede
+# iniciar sesión (cookie Secure). Para usar la aplicación de verdad hace falta
+# un dominio propio: ACM no emite certificados para una IP ni para sslip.io.
+dominio         = ""
+zona_route53_id = "" # si el DNS está en Route 53, ahorra los pasos manuales
+
+# ───────────────────────────── secretos ─────────────────────────────
+# Vacíos = la función correspondiente queda apagada, no el despliegue.
+gemini_api_key = ""
+mail_api_key   = ""
+# Para una prueba que se monta y se desmonta el mismo día:
+dias_recuperacion_secretos = 7 # 0 = borrado inmediato
+
+# ───────────────────────────── CI (opcional) ─────────────────────────────
+github_repo = "" # "organizacion/repo" para crear el rol OIDC de GitHub Actions
