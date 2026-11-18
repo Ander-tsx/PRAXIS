@@ -124,3 +124,9 @@ graphify-out
 skills-lock.json
 .claude/
 !.claude/.gitkeep
+
+# Terraform (infra/aws): los planes guardados llevan los valores de las variables
+# sensibles —claves de Stripe, de Gemini— y no son para versionar. Los
+# `.terraform/`, `*.tfstate*` y `*.tfvars` de arriba ya cubren esta carpeta.
+*.tfplan
+tfplan

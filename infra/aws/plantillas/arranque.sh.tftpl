@@ -1,0 +1,125 @@
+#!/bin/bash
+#
+# Arranque de una máquina de PRAXIS (el mismo script para backend y frontend).
+#
+# El sistema operativo es Amazon Linux 2023: trae el CLI de AWS y systemd, y
+# Docker se instala aquí. A diferencia de Container-Optimized OS (GCP), la raíz es
+# escribible y hay gestor de paquetes, así que no hacen falta los rodeos de
+# `HOME` ni de `iptables` que llevaban las plantillas de GCP.
+#
+# La secuencia es: instalar Docker, escribir la configuración no secreta, y
+# dejar a systemd un servicio que en cada arranque pide los secretos a Secrets
+# Manager con la identidad de la propia máquina, entra en ECR, baja la imagen y
+# la corre.
+#
+# ⚠️ Esto es un `templatefile`: cualquier `$` seguido de llaves lo interpreta
+# Terraform y no el shell. Por eso las variables del shell van sin llaves.
+set -euo pipefail
+
+dnf install -y docker
+systemctl enable --now docker
+
+mkdir -p /etc/praxis
+
+# ─────────────── configuración (nada secreto) ───────────────
+cat > /etc/praxis/config.env <<'CONFIG'
+REGION=${region}
+REGISTRO=${registro}
+IMAGEN=${imagen}
+NOMBRE=${nombre}
+LOG_GRUPO=${log_grupo}
+PREFIJO_SECRETOS=${prefijo}
+CONFIG
+
+# ─────────────── secretos → /run/praxis.env ───────────────
+cat > /etc/praxis/secretos.sh <<'SCRIPT'
+#!/bin/bash
+#
+# Deja /run/praxis.env listo para --env-file.
+#
+# /run es tmpfs: vive en memoria y desaparece al apagar. Los secretos no llegan
+# a tocar el disco. Se piden con el rol de la máquina; no hay credenciales
+# guardadas en ningún sitio.
+set -euo pipefail
+. /etc/praxis/config.env
+
+secreto() {
+  aws secretsmanager get-secret-value --region "$REGION" \
+    --secret-id "$PREFIJO_SECRETOS/$1" --query SecretString --output text
+}
+
+umask 077
+{
+%{ for clave, valor in entorno ~}
+  printf '%s\n' '${clave}=${valor}'
+%{ endfor ~}
+%{ for clave, secreto in secretos ~}
+  printf '%s\n' "${clave}=$(secreto ${secreto})"
+%{ endfor ~}
+} > /run/praxis.env
+SCRIPT
+chmod 0700 /etc/praxis/secretos.sh
+
+# ─────────────── arranque del contenedor ───────────────
+cat > /etc/praxis/arrancar.sh <<'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+. /etc/praxis/config.env
+
+/etc/praxis/secretos.sh
+
+# El token de ECR dura 12 horas; se pide en cada arranque del servicio, así que
+# nunca caduca a media vida de la máquina.
+aws ecr get-login-password --region "$REGION" \
+  | docker login --username AWS --password-stdin "$REGISTRO"
+
+docker rm -f "$NOMBRE" 2>/dev/null || true
+docker pull "$IMAGEN"
+
+# El nombre del flujo de logs es el id de la instancia: con el autoescalado hay
+# varias máquinas escribiendo en el mismo grupo, y con el id por defecto del
+# contenedor no se sabría de cuál es cada línea.
+TOKEN=$(curl -s -X PUT http://169.254.169.254/latest/api/token \
+  -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')
+ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/instance-id)
+
+# --network host: el contenedor escucha directamente en el puerto de la máquina.
+# En el backend los servicios internos hablan en memoria (monolito) y fuera de la
+# máquina solo existe el 3000.
+exec docker run --rm --name "$NOMBRE" \
+  --network host \
+  --env-file /run/praxis.env \
+  --log-driver=awslogs \
+  --log-opt awslogs-region="$REGION" \
+  --log-opt awslogs-group="$LOG_GRUPO" \
+  --log-opt awslogs-stream="$ID" \
+  "$IMAGEN"
+SCRIPT
+chmod 0700 /etc/praxis/arrancar.sh
+
+cat > /etc/systemd/system/praxis.service <<'UNIT'
+[Unit]
+Description=${descripcion}
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+# El primer arranque baja ~550 MB de imagen. Sin esto, systemd lo daría por
+# fallido antes de que termine.
+TimeoutStartSec=900
+# `docker login` escribe en $HOME/.docker, y una unidad de sistema no trae HOME.
+Environment=HOME=/root
+ExecStart=/etc/praxis/arrancar.sh
+ExecStop=/usr/bin/docker stop ${nombre}
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now praxis.service
