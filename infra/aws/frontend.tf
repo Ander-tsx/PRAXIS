@@ -54,8 +54,7 @@ resource "aws_launch_template" "frontend" {
 
       /* El nombre DNS del NLB interno. Ver la nota de backend.tf sobre por qué
          aquí no hay una IP fija. */
-      GATEWAY_URL            = "http://${aws_lb.gateway.dns_name}:3000"
-      NEXT_PUBLIC_PRECIO_PRO = var.precio_pro
+      GATEWAY_URL = "http://${aws_lb.gateway.dns_name}:3000"
     }
 
     /* Solo el que firma la cookie: el rol de esta máquina no puede leer más. */

@@ -92,6 +92,16 @@ resource "aws_launch_template" "backend" {
          localhost y ninguna confirmación de cuenta funcionaría. */
       PUBLIC_APP_URL = local.url_publica
 
+      /* ⚠️ La URL a la que se conecta el NAVEGADOR para editar documentos en
+         tiempo real; el gateway la entrega junto con el billete que firma. El
+         gateway no tiene dominio público: el WebSocket entra por el mismo
+         origen que la página y lo reenvía el servidor del frontend
+         (`apps/frontend/web/server.mjs`, `/api/collab` → gateway → collab). Con
+         HTTPS tiene que ser `wss://`, porque un navegador bloquea `ws://`
+         desde una página segura. Sin dominio (solo HTTP) es `ws://` contra el
+         ALB. Mismo criterio que en docs/deploy/RAILWAY.md. */
+      COLLAB_PUBLIC_URL = var.dominio != "" ? "wss://${var.dominio}/api/collab" : "ws://${aws_lb.publico.dns_name}/api/collab"
+
       /* El bucket de S3 existe (storage.tf) pero el backend no tiene driver
          para él: se queda en Postgres. Ver el comentario de storage.tf. */
       STORAGE_DRIVER = "postgres"

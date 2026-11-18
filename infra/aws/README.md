@@ -184,7 +184,7 @@ defecto, así que una demo no exige ninguna.
 | `dominio` | `""` | Vacío = solo HTTP (demo sin login) |
 | `zona_route53_id` | `""` | Si el DNS está en Route 53, Terraform crea los registros |
 | `gemini_api_key`, `mail_api_key`, `stripe_*` | `""` | Secretos. Vacío = esa función apagada, no el despliegue |
-| `google_client_id`, `mail_from`, `precio_pro` | — | Configuración no secreta de la aplicación |
+| `google_client_id`, `mail_from` | — | Configuración no secreta de la aplicación |
 | `dias_recuperacion_secretos` | `7` | `0` = borrado inmediato (pruebas que se montan y desmontan el mismo día) |
 | `retencion_logs_dias` | `14` | Retención de CloudWatch |
 | `github_repo` | `""` | `organizacion/repo`. Vacío = no se crea el rol OIDC |
@@ -249,11 +249,19 @@ terraform apply -target=aws_ecr_repository.imagenes
 REGISTRO=$(terraform -chdir=infra/aws output -raw registro)
 aws ecr get-login-password --region "$REGION" \
   | docker login --username AWS --password-stdin "$REGISTRO"
-for i in backend frontend; do
-  docker buildx build --platform linux/amd64 \
-    -f infra/docker/images/$i.Dockerfile \
-    -t "$REGISTRO/praxis/$i:latest" --push .
-done
+docker buildx build --platform linux/amd64 \
+  -f infra/docker/images/backend.Dockerfile \
+  -t "$REGISTRO/praxis/backend:latest" --push .
+# Los valores públicos de Next se incrustan al construir el frontend; vacíos
+# (o sin la línea) la función correspondiente queda apagada.
+docker buildx build --platform linux/amd64 \
+  -f infra/docker/images/frontend.Dockerfile \
+  --build-arg GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+  --build-arg NEXT_PUBLIC_PRECIO_PRO="$NEXT_PUBLIC_PRECIO_PRO" \
+  --build-arg NEXT_PUBLIC_PRECIO_TEAM="$NEXT_PUBLIC_PRECIO_TEAM" \
+  --build-arg NEXT_PUBLIC_PRECIO_BUSINESS="$NEXT_PUBLIC_PRECIO_BUSINESS" \
+  --build-arg NEXT_PUBLIC_KYLOO_LOGIN="$NEXT_PUBLIC_KYLOO_LOGIN" \
+  -t "$REGISTRO/praxis/frontend:latest" --push .
 
 # 3. Solo si hay dominio y su DNS NO está en Route 53 (si lo está, salta al 4):
 terraform apply -target=aws_acm_certificate.sitio
@@ -310,8 +318,9 @@ OIDC, sin claves**. Para usarlo:
 
 1. En `terraform.tfvars`: `github_repo = "organizacion/repo"` y `terraform apply`.
 2. En GitHub → Settings → Secrets and variables → Actions → **Variables**:
-   `AWS_ROLE_ARN` (`terraform output rol_github_ecr`), `AWS_REGION` y, si lo usas,
-   `GOOGLE_CLIENT_ID`.
+   `AWS_ROLE_ARN` (`terraform output rol_github_ecr`), `AWS_REGION` y, si los usas,
+   `GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_PRECIO_PRO`, `NEXT_PUBLIC_PRECIO_TEAM`,
+   `NEXT_PUBLIC_PRECIO_BUSINESS` y `NEXT_PUBLIC_KYLOO_LOGIN`.
 3. Actions → «Imágenes a ECR (AWS)» → Run workflow.
 
 Solo se lanza a mano y solo puede subir imágenes: el rol no toca el

@@ -11,11 +11,16 @@
 #
 # Autenticación por OIDC, sin claves: el rol lo crea `infra/aws/ci.tf` y solo
 # acepta tokens de este repositorio y de la rama de `rama_github_despliegue`.
-# Hay que definir tres VARIABLES del repositorio (no secretos: ninguna lo es):
+# Hay que definir VARIABLES del repositorio (no secretos: ninguna lo es):
 #
 #   AWS_ROLE_ARN   → el output `rol_github_ecr` de Terraform
 #   AWS_REGION     → la región de la pila, p. ej. us-east-1
-#   GOOGLE_CLIENT_ID → opcional; se incrusta en el bundle del frontend
+#
+# Y, opcionales, las que Next incrusta en el bundle del frontend al construirlo
+# (cambiar una exige volver a construir la imagen, no basta con Terraform):
+#
+#   GOOGLE_CLIENT_ID, NEXT_PUBLIC_PRECIO_PRO, NEXT_PUBLIC_PRECIO_TEAM,
+#   NEXT_PUBLIC_PRECIO_BUSINESS, NEXT_PUBLIC_KYLOO_LOGIN
 #
 # Este workflow solo SUBE las imágenes. Para que las máquinas las usen hay que
 # reemplazarlas (instance refresh): ver infra/aws/README.md. A propósito no lo
@@ -89,6 +94,10 @@ jobs:
           push: true
           build-args: |
             GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
+            NEXT_PUBLIC_PRECIO_PRO=${{ vars.NEXT_PUBLIC_PRECIO_PRO }}
+            NEXT_PUBLIC_PRECIO_TEAM=${{ vars.NEXT_PUBLIC_PRECIO_TEAM }}
+            NEXT_PUBLIC_PRECIO_BUSINESS=${{ vars.NEXT_PUBLIC_PRECIO_BUSINESS }}
+            NEXT_PUBLIC_KYLOO_LOGIN=${{ vars.NEXT_PUBLIC_KYLOO_LOGIN }}
           tags: |
             ${{ steps.ecr.outputs.registry }}/${{ inputs.prefijo }}/frontend:${{ github.sha }}
             ${{ steps.ecr.outputs.registry }}/${{ inputs.prefijo }}/frontend:latest

@@ -269,12 +269,6 @@ variable "stripe_price_business" {
   default     = ""
 }
 
-variable "precio_pro" {
-  description = "Lo que se enseña como precio del Pro en la página de planes, sin símbolo. Es cartelería: se cobra el `price_…` de Stripe."
-  type        = string
-  default     = ""
-}
-
 variable "dias_recuperacion_secretos" {
   description = <<-EOT
     Días que Secrets Manager conserva un secreto borrado antes de eliminarlo.
